@@ -1,0 +1,64 @@
+schema: skillspec/v0
+id: rote.shell
+title: rote shell
+description: Structured policy sketch for durable CLI and shell work through rote.
+
+routes:
+  - id: one_shot_process
+    label: Run one durable command
+    rank: 10
+  - id: background_process
+    label: Run a tracked background job
+    rank: 20
+  - id: stream_follow
+    label: Follow a file or process stream
+    rank: 30
+  - id: pty_transcript
+    label: Capture terminal-sensitive output
+    rank: 40
+  - id: browser_handoff
+    label: Hand off to browser
+    rank: 5
+
+rules:
+  - id: browser_intent_handoff
+    when:
+      user_says_any:
+        - browse
+        - open this site
+        - click
+        - snapshot
+        - extract from page
+    prefer: browser_handoff
+    forbid:
+      - native_search_as_answer
+      - raw_playwright
+      - curl
+
+  - id: long_finite_job_background
+    when:
+      command_likely_long_running: true
+      interactive_prompt_likely: false
+    prefer: background_process
+
+commands:
+  exec:
+    template: "rote exec -- {{ argv }}"
+    safety: local_read
+
+  exec_background:
+    template: "rote exec --background --stdout-file {{ stdout }} --stderr-file {{ stderr }} -- {{ argv }}"
+    safety: local_write
+
+  exec_wait:
+    template: "rote exec wait {{ lease }} --timeout-ms {{ timeout_ms }} --poll-ms {{ poll_ms }}"
+    safety: read_only
+
+tests:
+  - name: browse request hands off to browser
+    input: browse the active dashboard and summarize it
+    expect:
+      route: browser_handoff
+      forbid:
+        - native_search_as_answer
+

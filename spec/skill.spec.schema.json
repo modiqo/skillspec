@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillspec.dev/schemas/skill.spec.v0.json",
+  "title": "SkillSpec v0",
+  "type": "object",
+  "required": ["schema", "id", "title", "description"],
+  "properties": {
+    "schema": {
+      "const": "skillspec/v0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "applies_when": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "rank": { "type": "integer" },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": true
+      }
+    },
+    "states": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "snippets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "input", "expect"],
+        "additionalProperties": true
+      }
+    },
+    "review_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}
+

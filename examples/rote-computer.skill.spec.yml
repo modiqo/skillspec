@@ -1,0 +1,203 @@
+schema: skillspec/v0
+id: rote.computer
+title: rote computer
+description: Task-first supertool policy for remembered computer work.
+
+applies_when:
+  - user_intent:
+      - get work done across tools
+      - recurring task
+      - browser and CLI and service work
+      - remember this workflow
+
+entry:
+  prompt: "What would you like to do today?"
+
+routes:
+  - id: remembered_route
+    label: Use a saved route
+    rank: 10
+    description: Reuse work that has already been learned and saved.
+  - id: connected_service
+    label: Connect the service
+    rank: 20
+    description: Use a direct service connection when structured data and repeatability matter.
+  - id: local_cli
+    label: Use the command line
+    rank: 30
+    description: Use installed local CLIs when the local machine or CLI auth is the source of truth.
+  - id: browser
+    label: Use the browser
+    rank: 40
+    description: Use browser observation when the user asks to browse or active session state matters.
+  - id: one_off_shell
+    label: Do a one-off local check
+    rank: 50
+    description: Use a local command only when durable memory is not needed.
+
+rules:
+  - id: browse_means_browser
+    when:
+      user_says_any:
+        - browse
+        - open
+        - click
+        - snapshot
+        - extract from page
+        - social profile
+    prefer: browser
+    forbid:
+      - native_search_as_answer
+      - raw_playwright
+      - curl
+      - adapter_setup_first
+    allow:
+      native_search: url_discovery_only
+    reason: Browser intent should be satisfied by page observation, not search summaries.
+
+  - id: recurring_work_asks_to_remember
+    when:
+      task_recurrence_likely: true
+    after_success:
+      - collect_trace_cost
+      - project_recurrence_cost
+      - ask_to_remember
+    reason: Repeated work should not pay the discovery tax every time.
+
+  - id: service_tasks_prefer_saved_then_service
+    when:
+      domain_object_task: true
+    route_order:
+      - remembered_route
+      - connected_service
+      - local_cli
+      - browser
+    reason: Structured service tasks should reuse memory first, then direct connection, then CLI or browser fallback.
+
+states:
+  start:
+    do:
+      - readiness_check
+      - load_recent_digest
+    next: ask_task
+
+  ask_task:
+    say: task_entry
+    next: route
+
+  route:
+    do:
+      - search_remembered_routes
+      - inspect_available_connections
+      - inspect_local_cli
+      - inspect_browser_readiness
+      - choose_best_route
+    next: execute
+
+  execute:
+    do:
+      - run_chosen_route
+      - persist_evidence
+    next: complete
+
+  complete:
+    do:
+      - summarize_result
+      - collect_trace_cost
+      - project_recurrence_cost
+    next: ask_memory
+
+  ask_memory:
+    say: memory_offer
+    yes: save_route
+    no: digest
+
+  save_route:
+    do:
+      - save_working_route
+    next: ask_hub
+
+  ask_hub:
+    say: hub_offer
+    next: digest
+
+  digest:
+    do:
+      - write_digest
+    next: done
+
+commands:
+  search_remembered_routes:
+    description: Search saved work before starting fresh exploration.
+    template: "rote flow search {{ intent | shell_quote }}"
+    safety: read_only
+
+  collect_trace_cost:
+    description: Collect execution trace and dependency cost after task completion.
+    template: "rote trace --deps --format json"
+    safety: read_only
+    parse:
+      tokens: "$.totals.tokens"
+      estimated_cost_usd: "$.totals.estimated_cost_usd"
+      steps: "$.steps.length"
+
+  inspect_local_cli:
+    description: Detect candidate CLI availability without running mutating commands.
+    template: "command -v {{ command | shell_quote }}"
+    safety: local_read
+
+snippets:
+  task_entry:
+    text: "What would you like to do today?"
+
+  memory_offer:
+    text: |
+      This took {{ tokens }} tokens to discover.
+      Want rote to remember this so next time it skips rediscovery?
+
+  hub_offer:
+    text: |
+      Saved.
+
+      Push this to hub so you can use it across computers and share it with your team?
+
+proof:
+  metrics:
+    - steering_accuracy
+    - prompt_tokens_reduced
+    - failed_branches_avoided
+    - remembered_route_savings
+
+tests:
+  - name: browse calendar routes to browser
+    input: browse my calendar
+    expect:
+      route: browser
+      forbid:
+        - native_search_as_answer
+        - adapter_setup_first
+
+  - name: social profiles use browser not native search
+    input: browse each committer's social profile
+    expect:
+      route: browser
+      forbid:
+        - native_search_as_answer
+        - raw_playwright
+
+  - name: datadog alerts prefer saved service cli browser
+    input: check Datadog for alerts
+    expect:
+      route_order:
+        - remembered_route
+        - connected_service
+        - local_cli
+        - browser
+
+  - name: recurring task asks to remember after success
+    input: every morning check Datadog and tell me if anything is broken
+    expect:
+      after_success:
+        - collect_trace_cost
+        - ask_to_remember
+
