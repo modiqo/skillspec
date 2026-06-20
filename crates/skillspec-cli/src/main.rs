@@ -58,7 +58,7 @@ enum Command {
         #[arg(long)]
         trace_dir: Option<PathBuf>,
     },
-    #[command(about = "Inspect or compact SkillSpec decision traces")]
+    #[command(about = "Inspect, compact, or align SkillSpec decision traces")]
     Trace {
         #[command(subcommand)]
         command: TraceCommand,

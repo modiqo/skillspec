@@ -51,5 +51,6 @@ See [semantics.md](semantics.md) for behavior and
 [grammar.md](grammar.md) for the formal v0 grammar. See [imports.md](imports.md)
 for import resolution, section loading, and nesting rules. See
 [relationships.md](relationships.md) for how the concepts associate,
-[trace.md](trace.md) for event logs, and [skill.spec.schema.json](skill.spec.schema.json)
-for the strict v0 schema.
+[trace.md](trace.md) for event logs, [commandspec.md](commandspec.md) for the
+CLI command inventory, and [skill.spec.schema.json](skill.spec.schema.json) for
+the strict v0 schema.

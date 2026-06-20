@@ -253,6 +253,36 @@ fn validate_and_test_rich_spec_through_cli() {
 }
 
 #[test]
+fn help_lists_trace_align_arguments() {
+    let top = Command::new(bin()).arg("--help").output().unwrap();
+    assert_success(&top);
+    assert!(stdout(&top).contains("trace"));
+
+    let trace = Command::new(bin())
+        .arg("trace")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&trace);
+    let trace_help = stdout(&trace);
+    assert!(trace_help.contains("Inspect, compact, or align"));
+    assert!(trace_help.contains("align"));
+
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let align_help = stdout(&align);
+    assert!(align_help.contains("Usage: skillspec trace align"));
+    assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
+    assert!(align_help.contains("<PATH>"));
+    assert!(align_help.contains("--json"));
+}
+
+#[test]
 fn validate_rejects_unknown_fields_through_cli() {
     let dir = TempDir::new("validate-negative");
     let spec = dir.path().join("skill.spec.yml");
