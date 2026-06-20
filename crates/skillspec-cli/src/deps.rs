@@ -39,12 +39,16 @@ pub enum DependencyCheckMethod {
     HarnessRequired,
 }
 
-pub fn check(spec: &SkillSpec, command: Option<&str>) -> Result<DependencyCheckReport> {
+pub fn check(
+    spec: &SkillSpec,
+    spec_dir: &Path,
+    command: Option<&str>,
+) -> Result<DependencyCheckReport> {
     let dependency_ids = dependency_ids_for_command(spec, command)?;
     let dependencies = dependency_ids
         .iter()
         .filter_map(|id| spec.dependencies.get(id).map(|dependency| (id, dependency)))
-        .map(|(id, dependency)| check_dependency(id, dependency))
+        .map(|(id, dependency)| check_dependency(id, dependency, spec_dir))
         .collect::<Vec<_>>();
     let ok = dependencies
         .iter()
@@ -68,7 +72,7 @@ fn dependency_ids_for_command(spec: &SkillSpec, command: Option<&str>) -> Result
     Ok(command.requires.dependencies.iter().cloned().collect())
 }
 
-fn check_dependency(id: &str, dependency: &Dependency) -> DependencyCheckResult {
+fn check_dependency(id: &str, dependency: &Dependency, spec_dir: &Path) -> DependencyCheckResult {
     let permission_required = dependency
         .permission
         .as_ref()
@@ -80,7 +84,7 @@ fn check_dependency(id: &str, dependency: &Dependency) -> DependencyCheckResult 
 
     let (status, check, message) = match dependency.kind {
         DependencyKind::Cli => check_cli(id, dependency),
-        DependencyKind::File => check_file(id, dependency),
+        DependencyKind::File => check_file(id, dependency, spec_dir),
         DependencyKind::Env => check_env(id, dependency),
         DependencyKind::Package
         | DependencyKind::Service
@@ -133,6 +137,7 @@ fn check_cli(
 fn check_file(
     id: &str,
     dependency: &Dependency,
+    spec_dir: &Path,
 ) -> (DependencyStatus, DependencyCheckMethod, String) {
     let path = dependency
         .check
@@ -140,8 +145,9 @@ fn check_file(
         .and_then(|check| check.path.as_deref())
         .or(dependency.path.as_deref())
         .unwrap_or(id);
+    let resolved_path = resolve_spec_path(spec_dir, path);
 
-    if Path::new(path).exists() {
+    if resolved_path.exists() {
         (
             DependencyStatus::Present,
             DependencyCheckMethod::FileExists,
@@ -153,6 +159,15 @@ fn check_file(
             DependencyCheckMethod::FileExists,
             format!("{path} does not exist"),
         )
+    }
+}
+
+fn resolve_spec_path(spec_dir: &Path, path: &str) -> PathBuf {
+    let path = Path::new(path);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        spec_dir.join(path)
     }
 }
 
@@ -187,4 +202,44 @@ fn find_on_path(program: &str) -> Option<PathBuf> {
     env::split_paths(&path)
         .map(|dir| dir.join(program))
         .find(|candidate| candidate.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn file_dependencies_resolve_relative_to_spec_directory() {
+        let root = unique_temp_dir("skillspec-deps-relative");
+        let spec_dir = root.join("skill");
+        fs::create_dir_all(spec_dir.join("source")).unwrap();
+        fs::write(spec_dir.join("source/requirements.txt"), "pillow\n").unwrap();
+
+        let dependency = Dependency {
+            kind: DependencyKind::File,
+            description: None,
+            command: None,
+            path: Some("source/requirements.txt".to_owned()),
+            env: None,
+            check: None,
+            permission: None,
+            provision: None,
+        };
+
+        let (status, method, message) = check_file("requirements_txt", &dependency, &spec_dir);
+
+        assert_eq!(status, DependencyStatus::Present);
+        assert_eq!(method, DependencyCheckMethod::FileExists);
+        assert_eq!(message, "source/requirements.txt exists");
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("{prefix}-{nanos}"))
+    }
 }

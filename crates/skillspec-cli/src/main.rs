@@ -205,7 +205,8 @@ fn run() -> Result<()> {
         Command::Deps { command } => match command {
             DepsCommand::Check { path, command } => {
                 let spec = parser::load_spec(&path)?;
-                let report = deps::check(&spec, command.as_deref())?;
+                let spec_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+                let report = deps::check(&spec, spec_dir, command.as_deref())?;
                 report::json(&report)?;
                 if !report.ok {
                     std::process::exit(1);
