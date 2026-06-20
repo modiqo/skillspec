@@ -55,6 +55,7 @@ pub fn validate_spec(spec: &SkillSpec) -> Result<()> {
     validate_identifier("id", &spec.id)?;
     validate_routes(spec)?;
     validate_elicitations(spec)?;
+    validate_trace(spec)?;
     validate_rules(spec)?;
     validate_states(spec)?;
     validate_tests(spec)?;
@@ -199,6 +200,18 @@ fn validate_elicitations(spec: &SkillSpec) -> Result<()> {
                 validate_identifier("elicitations.required_when.missing", missing)?;
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_trace(spec: &SkillSpec) -> Result<()> {
+    let Some(trace) = &spec.trace else {
+        return Ok(());
+    };
+    let mut seen = BTreeSet::new();
+    for event in &trace.record {
+        let value = format!("{event:?}");
+        insert_unique("trace.record", &mut seen, &value)?;
     }
     Ok(())
 }

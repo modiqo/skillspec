@@ -83,6 +83,40 @@
         "additionalProperties": true
       }
     },
+    "trace": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["event_log"]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "record": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "input_received",
+              "spec_loaded",
+              "rule_evaluated",
+              "rule_matched",
+              "route_selected",
+              "route_order_set",
+              "forbid_added",
+              "allow_added",
+              "elicitation_requested",
+              "after_success_scheduled",
+              "outcome_recorded"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
     "states": {
       "type": "object",
       "additionalProperties": {

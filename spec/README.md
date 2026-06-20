@@ -28,6 +28,7 @@ small CLI.
 - `routes`: candidate ways to satisfy a task
 - `rules`: intent and guard rules
 - `states`: state machine for the skill
+- `trace`: append-only decision event contract
 - `commands`: command templates or command invocation instructions
 - `snippets`: reusable prose
 - `closures`: post-task behavior
@@ -37,5 +38,6 @@ small CLI.
 
 See [semantics.md](semantics.md) for behavior and
 [grammar.md](grammar.md) for the formal v0 grammar. See
-[relationships.md](relationships.md) for how the concepts associate and
-[skill.spec.schema.json](skill.spec.schema.json) for a permissive v0 schema.
+[relationships.md](relationships.md) for how the concepts associate,
+[trace.md](trace.md) for event logs, and [skill.spec.schema.json](skill.spec.schema.json)
+for a permissive v0 schema.

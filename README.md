@@ -15,6 +15,7 @@ that should be compact, testable, portable, and hard to misread:
 - user questions
 - completion closures
 - scenario tests
+- decision traces
 - proof metrics
 
 SkillSpec is not a workflow engine and not a replacement for skills. It is a
@@ -91,11 +92,17 @@ The CLI should make policies inspectable and testable:
 ```sh
 skillspec validate skill.spec.yml
 skillspec test skill.spec.yml
-skillspec decide skill.spec.yml --input "browse my calendar"
-skillspec explain skill.spec.yml --input "browse my calendar"
+skillspec decide skill.spec.yml --input='browse my calendar'
+skillspec decide skill.spec.yml --input='browse my calendar' --trace-dir .skillspec/traces
+skillspec explain skill.spec.yml --input='browse my calendar'
+skillspec trace compact .skillspec/traces/<run-id>
 skillspec compile skill.spec.yml --target codex-skill
 skillspec import-skill SKILL.md --out skill.spec.yml
 ```
+
+Pass only the task text to `--input`. Do not include the skill invocation
+prefix, and prefer single quotes when the task text contains `$skill-name`
+syntax so the shell does not expand it.
 
 `import-skill` is not magic. It should use deterministic extraction first
 frontmatter, headings, command blocks, tables, "always/never/forbid" language,
@@ -128,6 +135,7 @@ SkillSpec v0 has a formal grammar and relationship model:
   states, commands, snippets, tests, and proof associate.
 - [spec/rules.md](spec/rules.md) defines rule evaluation and negative
   steering.
+- [spec/trace.md](spec/trace.md) defines append-only decision traces.
 
 The core association is:
 
@@ -138,6 +146,7 @@ elicitations ask bounded questions
 commands perform named actions
 snippets preserve product language
 tests prove steering behavior
+trace records runtime causality
 proof summarizes accuracy and savings
 ```
 

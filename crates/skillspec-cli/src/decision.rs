@@ -1,4 +1,6 @@
-use crate::model::{Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec};
+use crate::model::{
+    Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec, TraceEventKind,
+};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -22,6 +24,48 @@ pub struct MatchedRule {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum DecisionEvent {
+    InputReceived {
+        input: String,
+    },
+    SpecLoaded {
+        skill_id: String,
+        schema: String,
+    },
+    RuleEvaluated {
+        rule_id: RuleId,
+        matched: bool,
+    },
+    RuleMatched {
+        rule_id: RuleId,
+        reason: Option<String>,
+    },
+    RouteSelected {
+        route: RouteId,
+    },
+    RouteOrderSet {
+        route_order: Vec<RouteId>,
+    },
+    ForbidAdded {
+        forbid: Vec<String>,
+    },
+    AllowAdded {
+        allow: BTreeMap<String, serde_yaml::Value>,
+    },
+    ElicitationRequested {
+        elicit: Vec<String>,
+    },
+    AfterSuccessScheduled {
+        after_success: Vec<String>,
+    },
+    OutcomeRecorded {
+        route: Option<RouteId>,
+        matched_rules: Vec<RuleId>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct TestRun {
     pub passed: Vec<TestCaseResult>,
     pub failed: Vec<TestCaseResult>,
@@ -36,6 +80,10 @@ pub struct TestCaseResult {
 }
 
 pub fn decide(spec: &SkillSpec, input: &str) -> Decision {
+    decide_with_events(spec, input).decision
+}
+
+pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
     let mut decision = Decision {
         input: input.to_owned(),
         route: None,
@@ -47,19 +95,55 @@ pub fn decide(spec: &SkillSpec, input: &str) -> Decision {
         matched_rules: Vec::new(),
         reason: None,
     };
+    let mut events = vec![
+        DecisionEvent::InputReceived {
+            input: input.to_owned(),
+        },
+        DecisionEvent::SpecLoaded {
+            skill_id: spec.id.clone(),
+            schema: spec.schema.clone(),
+        },
+    ];
 
-    for rule in spec.rules.iter().filter(|rule| matches_rule(rule, input)) {
-        apply_rule(&mut decision, rule);
+    for rule in &spec.rules {
+        let matched = matches_rule(rule, input);
+        events.push(DecisionEvent::RuleEvaluated {
+            rule_id: rule.id.clone(),
+            matched,
+        });
+        if matched {
+            apply_rule(&mut decision, &mut events, rule);
+        }
     }
 
     if decision.route.is_none() {
         decision.route = decision.route_order.first().cloned();
+        if let Some(route) = &decision.route {
+            events.push(DecisionEvent::RouteSelected {
+                route: route.clone(),
+            });
+        }
     }
 
     dedupe_strings(&mut decision.forbid);
     dedupe_strings(&mut decision.elicit);
     dedupe_strings(&mut decision.after_success);
-    decision
+    events.push(DecisionEvent::OutcomeRecorded {
+        route: decision.route.clone(),
+        matched_rules: decision
+            .matched_rules
+            .iter()
+            .map(|matched| matched.id.clone())
+            .collect(),
+    });
+
+    DecisionWithEvents { decision, events }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DecisionWithEvents {
+    pub decision: Decision,
+    pub events: Vec<DecisionEvent>,
 }
 
 pub fn run_tests(spec: &SkillSpec) -> TestRun {
@@ -152,7 +236,7 @@ fn matches_predicate(predicate: &Predicate, input: &str) -> bool {
         if !predicate
             .user_says_any
             .iter()
-            .any(|needle| normalized.contains(&needle.to_lowercase()))
+            .any(|needle| contains_phrase(&normalized, &needle.to_lowercase()))
         {
             return false;
         }
@@ -189,12 +273,42 @@ fn matches_predicate(predicate: &Predicate, input: &str) -> bool {
     has_condition
 }
 
-fn apply_rule(decision: &mut Decision, rule: &Rule) {
+fn apply_rule(decision: &mut Decision, events: &mut Vec<DecisionEvent>, rule: &Rule) {
+    events.push(DecisionEvent::RuleMatched {
+        rule_id: rule.id.clone(),
+        reason: rule.reason.clone(),
+    });
     if let Some(route) = &rule.prefer {
         decision.route = Some(route.clone());
+        events.push(DecisionEvent::RouteSelected {
+            route: route.clone(),
+        });
     }
     if !rule.route_order.is_empty() {
         decision.route_order = rule.route_order.clone();
+        events.push(DecisionEvent::RouteOrderSet {
+            route_order: rule.route_order.clone(),
+        });
+    }
+    if !rule.forbid.is_empty() {
+        events.push(DecisionEvent::ForbidAdded {
+            forbid: rule.forbid.clone(),
+        });
+    }
+    if !rule.allow.is_empty() {
+        events.push(DecisionEvent::AllowAdded {
+            allow: rule.allow.clone(),
+        });
+    }
+    if !rule.elicit.is_empty() {
+        events.push(DecisionEvent::ElicitationRequested {
+            elicit: rule.elicit.clone(),
+        });
+    }
+    if !rule.after_success.is_empty() {
+        events.push(DecisionEvent::AfterSuccessScheduled {
+            after_success: rule.after_success.clone(),
+        });
     }
     decision.forbid.extend(rule.forbid.clone());
     decision.elicit.extend(rule.elicit.clone());
@@ -205,6 +319,40 @@ fn apply_rule(decision: &mut Decision, rule: &Rule) {
         id: rule.id.clone(),
         reason: rule.reason.clone(),
     });
+}
+
+impl DecisionEvent {
+    pub fn kind(&self) -> TraceEventKind {
+        match self {
+            Self::InputReceived { .. } => TraceEventKind::InputReceived,
+            Self::SpecLoaded { .. } => TraceEventKind::SpecLoaded,
+            Self::RuleEvaluated { .. } => TraceEventKind::RuleEvaluated,
+            Self::RuleMatched { .. } => TraceEventKind::RuleMatched,
+            Self::RouteSelected { .. } => TraceEventKind::RouteSelected,
+            Self::RouteOrderSet { .. } => TraceEventKind::RouteOrderSet,
+            Self::ForbidAdded { .. } => TraceEventKind::ForbidAdded,
+            Self::AllowAdded { .. } => TraceEventKind::AllowAdded,
+            Self::ElicitationRequested { .. } => TraceEventKind::ElicitationRequested,
+            Self::AfterSuccessScheduled { .. } => TraceEventKind::AfterSuccessScheduled,
+            Self::OutcomeRecorded { .. } => TraceEventKind::OutcomeRecorded,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self.kind() {
+            TraceEventKind::InputReceived => "input_received",
+            TraceEventKind::SpecLoaded => "spec_loaded",
+            TraceEventKind::RuleEvaluated => "rule_evaluated",
+            TraceEventKind::RuleMatched => "rule_matched",
+            TraceEventKind::RouteSelected => "route_selected",
+            TraceEventKind::RouteOrderSet => "route_order_set",
+            TraceEventKind::ForbidAdded => "forbid_added",
+            TraceEventKind::AllowAdded => "allow_added",
+            TraceEventKind::ElicitationRequested => "elicitation_requested",
+            TraceEventKind::AfterSuccessScheduled => "after_success_scheduled",
+            TraceEventKind::OutcomeRecorded => "outcome_recorded",
+        }
+    }
 }
 
 fn default_route_order(spec: &SkillSpec) -> Vec<RouteId> {
@@ -226,7 +374,7 @@ fn recurrence_likely(input: &str) -> bool {
         "recurring",
     ]
     .iter()
-    .any(|needle| input.contains(needle))
+    .any(|needle| contains_phrase(input, needle))
 }
 
 fn domain_object_task(input: &str) -> bool {
@@ -245,7 +393,7 @@ fn domain_object_task(input: &str) -> bool {
         "incident",
     ]
     .iter()
-    .any(|needle| input.contains(needle))
+    .any(|needle| contains_phrase(input, needle))
 }
 
 fn long_running(input: &str) -> bool {
@@ -253,13 +401,13 @@ fn long_running(input: &str) -> bool {
         "test", "build", "release", "deploy", "server", "watch", "tail", "monitor",
     ]
     .iter()
-    .any(|needle| input.contains(needle))
+    .any(|needle| contains_phrase(input, needle))
 }
 
 fn interactive(input: &str) -> bool {
     ["login", "auth", "mfa", "otp", "password", "prompt"]
         .iter()
-        .any(|needle| input.contains(needle))
+        .any(|needle| contains_phrase(input, needle))
 }
 
 fn dedupe_strings(values: &mut Vec<String>) {
@@ -269,4 +417,47 @@ fn dedupe_strings(values: &mut Vec<String>) {
 
 fn route_names(routes: &[RouteId]) -> Vec<&str> {
     routes.iter().map(|route| route.0.as_str()).collect()
+}
+
+fn contains_phrase(input: &str, phrase: &str) -> bool {
+    let phrase = phrase.trim();
+    if phrase.is_empty() {
+        return false;
+    }
+    bounded_contains(input, phrase)
+        || plural_candidate(phrase).is_some_and(|plural| bounded_contains(input, &plural))
+}
+
+fn bounded_contains(input: &str, phrase: &str) -> bool {
+    let mut search_start = 0;
+    while let Some(offset) = input[search_start..].find(phrase) {
+        let start = search_start + offset;
+        let end = start + phrase.len();
+        if phrase_boundary(input, start, end) {
+            return true;
+        }
+        search_start = end;
+        if search_start >= input.len() {
+            return false;
+        }
+    }
+    false
+}
+
+fn plural_candidate(phrase: &str) -> Option<String> {
+    if phrase.ends_with('s') {
+        None
+    } else {
+        Some(format!("{phrase}s"))
+    }
+}
+
+fn phrase_boundary(input: &str, start: usize, end: usize) -> bool {
+    let before = input[..start].chars().next_back();
+    let after = input[end..].chars().next();
+    !before.is_some_and(is_identifier_char) && !after.is_some_and(is_identifier_char)
+}
+
+fn is_identifier_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || value == '_'
 }

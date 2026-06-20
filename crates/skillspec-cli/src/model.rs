@@ -28,6 +28,8 @@ pub struct SkillSpec {
     #[serde(default)]
     pub elicitations: BTreeMap<String, Elicitation>,
     #[serde(default)]
+    pub trace: Option<TraceConfig>,
+    #[serde(default)]
     pub commands: BTreeMap<String, CommandTemplate>,
     #[serde(default)]
     pub snippets: BTreeMap<String, Snippet>,
@@ -147,6 +149,37 @@ pub struct ElicitationChoice {
     pub next: Option<String>,
     #[serde(default)]
     pub safety: Option<SafetyClass>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TraceConfig {
+    pub mode: TraceMode,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub record: Vec<TraceEventKind>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TraceMode {
+    EventLog,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TraceEventKind {
+    InputReceived,
+    SpecLoaded,
+    RuleEvaluated,
+    RuleMatched,
+    RouteSelected,
+    RouteOrderSet,
+    ForbidAdded,
+    AllowAdded,
+    ElicitationRequested,
+    AfterSuccessScheduled,
+    OutcomeRecorded,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

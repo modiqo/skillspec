@@ -1,6 +1,6 @@
 use crate::model::{
     CommandTemplate, Elicitation, ElicitationChoice, Predicate, Route, Rule, SafetyClass,
-    ScenarioTest, SkillSpec, State,
+    ScenarioTest, SkillSpec, State, TraceEventKind,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -22,6 +22,7 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_routes(&mut output, spec);
     write_rules(&mut output, spec);
     write_elicitations(&mut output, spec);
+    write_trace(&mut output, spec);
     write_states(&mut output, spec);
     write_commands(&mut output, spec);
     write_snippets(&mut output, spec);
@@ -73,7 +74,12 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
     output.push_str("- `elicit` entries require bounded user questions before guessing.\n");
     output.push_str("- Use the scenario tests as examples of expected behavior.\n");
-    output.push_str("- When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.\n\n");
+    output.push_str("- When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.\n");
+    output.push_str("- When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/rote-shell-spec`, `$rote-shell-spec`, or `/my-skill` before setting `--input`.\n");
+    output.push_str("- Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.\n");
+    output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
+    output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
+    output.push_str("- After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {
@@ -238,6 +244,28 @@ fn write_elicitation_choice(output: &mut String, choice: &ElicitationChoice) {
     if let Some(safety) = &choice.safety {
         let _ = writeln!(output, "    safety: `{}`", safety_name(safety));
     }
+}
+
+fn write_trace(output: &mut String, spec: &SkillSpec) {
+    let Some(trace) = &spec.trace else {
+        return;
+    };
+    output.push_str("## Decision Trace\n\n");
+    output.push_str("When the `skillspec` CLI or a compatible harness evaluates this spec, record the decision path as append-only events. Rules trigger decisions; the evaluator writes the trace.\n\n");
+    output.push_str("- mode: `event_log`\n");
+    let _ = writeln!(output, "- required: {}", trace.required);
+    if !trace.record.is_empty() {
+        let events = trace
+            .record
+            .iter()
+            .map(|event| format!("`{}`", trace_event_name(event)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(output, "- record: {events}");
+    } else {
+        output.push_str("- record: all v0 decision events\n");
+    }
+    output.push('\n');
 }
 
 fn write_predicate(output: &mut String, predicate: &Predicate) {
@@ -442,12 +470,15 @@ fn write_review_required(output: &mut String, spec: &SkillSpec) {
 
 fn write_runtime_commands(output: &mut String) {
     output.push_str("## SkillSpec CLI Commands\n\n");
-    output.push_str("Use these commands when the `skillspec` CLI is available:\n\n");
+    output.push_str("Use these commands when the `skillspec` CLI is available. Replace `<skill-folder>` with the folder containing this generated `SKILL.md`. The default trace location is `${PWD}/.skillspec/traces`, where `PWD` is the task working directory.\n\n");
     output.push_str("```bash\n");
-    output.push_str("skillspec validate skill.spec.yml\n");
-    output.push_str("skillspec test skill.spec.yml\n");
-    output.push_str("skillspec decide skill.spec.yml --input \"<user task>\"\n");
-    output.push_str("skillspec explain skill.spec.yml --input \"<user task>\"\n");
+    output.push_str("skillspec validate <skill-folder>/skill.spec.yml\n");
+    output.push_str("skillspec test <skill-folder>/skill.spec.yml\n");
+    output.push_str(
+        "skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
+    );
+    output.push_str("skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("skillspec trace compact \"${PWD}/.skillspec/traces/<run-id>\"\n");
     output.push_str("```\n");
 }
 
@@ -523,6 +554,22 @@ fn safety_name(safety: &SafetyClass) -> &'static str {
         SafetyClass::BrowserAttach => "browser_attach",
         SafetyClass::CredentialRequest => "credential_request",
         SafetyClass::Destructive => "destructive",
+    }
+}
+
+fn trace_event_name(event: &TraceEventKind) -> &'static str {
+    match event {
+        TraceEventKind::InputReceived => "input_received",
+        TraceEventKind::SpecLoaded => "spec_loaded",
+        TraceEventKind::RuleEvaluated => "rule_evaluated",
+        TraceEventKind::RuleMatched => "rule_matched",
+        TraceEventKind::RouteSelected => "route_selected",
+        TraceEventKind::RouteOrderSet => "route_order_set",
+        TraceEventKind::ForbidAdded => "forbid_added",
+        TraceEventKind::AllowAdded => "allow_added",
+        TraceEventKind::ElicitationRequested => "elicitation_requested",
+        TraceEventKind::AfterSuccessScheduled => "after_success_scheduled",
+        TraceEventKind::OutcomeRecorded => "outcome_recorded",
     }
 }
 

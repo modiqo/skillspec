@@ -14,6 +14,7 @@ SkillSpec
   has many Rules
   has many States
   has many Elicitations
+  may have Trace contract
   has many Commands
   has many Snippets
   has many Tests
@@ -56,6 +57,11 @@ Test
 
 Proof
   summarizes aggregate Test and runtime evidence
+
+Trace
+  records Decision Events
+  is written by Evaluator or Harness
+  links Decisions to Evidence without owning Tool Payloads
 ```
 
 ## Where Rules Can Be Used
@@ -118,6 +124,7 @@ associations define the useful behavior.
 | `Closure` | Post-task behavior | commands, digest, memory, hub share | trace/cost evidence |
 | `Test` | Steering regression case | rules and expectations | `skillspec test` |
 | `Proof` | Aggregate confidence | metrics and evidence sources | reports and CI |
+| `Trace` | Runtime decision evidence | input, rules, routes, elicitations, closures, outcomes | event log and summary |
 
 ## Causality Shape
 
@@ -133,6 +140,7 @@ user input
   -> command/snippet execution plan
   -> captured evidence
   -> closure actions
+  -> decision trace
   -> proof metrics
 ```
 
@@ -152,6 +160,33 @@ It should make the steering chain inspectable:
 The association is also how we compare alternatives. If two routes can satisfy
 the same task, rules explain why one route wins and tests make that choice
 repeatable.
+
+## Trace Relationship
+
+Trace answers:
+
+```text
+Why did the agent choose this path during this run?
+```
+
+Rules, routes, elicitations, and closures describe possible behavior. Trace
+records the actual path taken by an evaluator or harness. The relationship is:
+
+```text
+Rule match
+  -> Decision event
+  -> Event log file
+  -> Compacted trace.jsonl and summary.json
+```
+
+A rule should not contain logging instructions. The evaluator owns event
+emission because it knows which rules were evaluated, which matched, which
+effects were applied, and what final outcome was produced.
+
+Trace is intentionally payload-light. It records causal decisions and may link
+to host evidence, but it does not inline command output, screenshots, API
+responses, or secrets. That lets the same SkillSpec trace design work in Codex,
+Claude, rote, a browser harness, or a future runtime.
 
 ## Route And State Relationship
 

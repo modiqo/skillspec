@@ -21,6 +21,7 @@ command-id      = identifier ;
 choice-id       = identifier ;
 snippet-id      = identifier ;
 metric-id       = identifier ;
+trace-event-id  = identifier ;
 string          = YAML string scalar ;
 number          = YAML integer or float scalar ;
 boolean         = "true" | "false" ;
@@ -50,6 +51,7 @@ References are symbolic. A v0 document is well-formed when:
 - every `Test.expect.route` references an existing `Route.id`
 - every `Test.expect.route_order` item references an existing `Route.id`
 - every `Test.expect.elicit` item references an existing elicitation
+- every `Trace.record` item is one of the v0 trace event kinds
 
 V0 CLI validation performs these structural and cross-reference checks.
 
@@ -62,6 +64,7 @@ skillspec       = header ,
                   [ routes ] ,
                   [ rules ] ,
                   [ elicitations ] ,
+                  [ trace ] ,
                   [ states ] ,
                   [ commands ] ,
                   [ snippets ] ,
@@ -205,6 +208,38 @@ question.
 
 Choices may set facts, steer a route, or advance to a state. They do not
 execute commands by themselves.
+
+## Trace
+
+```text
+trace           = "trace" ":" mapping ;
+trace.mode      = "mode" ":" trace-mode ;
+trace.required  = [ "required" ":" boolean ] ;
+trace.record    = [ "record" ":" sequence-of trace-event-kind ] ;
+
+trace-mode      = "event_log" ;
+
+trace-event-kind
+                = "input_received"
+                | "spec_loaded"
+                | "rule_evaluated"
+                | "rule_matched"
+                | "route_selected"
+                | "route_order_set"
+                | "forbid_added"
+                | "allow_added"
+                | "elicitation_requested"
+                | "after_success_scheduled"
+                | "outcome_recorded" ;
+```
+
+Trace declares which decision events should be persisted by an evaluator or
+harness. A rule causes a decision; the evaluator writes the event. The spec
+does not contain per-rule file writing instructions.
+
+If `record` is empty or absent, an evaluator may record every v0 event kind.
+If `required` is true, a conforming harness should either write the trace or
+state that tracing is unavailable before relying on the decision.
 
 ## States
 

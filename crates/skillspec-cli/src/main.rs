@@ -5,6 +5,7 @@ mod importer;
 mod model;
 mod parser;
 mod report;
+mod trace;
 
 use clap::{Parser, Subcommand};
 use error::Result;
@@ -28,13 +29,21 @@ enum Command {
     },
     Decide {
         path: PathBuf,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         input: String,
+        #[arg(long)]
+        trace_dir: Option<PathBuf>,
     },
     Explain {
         path: PathBuf,
-        #[arg(long)]
+        #[arg(long, allow_hyphen_values = true)]
         input: String,
+        #[arg(long)]
+        trace_dir: Option<PathBuf>,
+    },
+    Trace {
+        #[command(subcommand)]
+        command: TraceCommand,
     },
     Compile {
         path: PathBuf,
@@ -53,6 +62,11 @@ enum CompileTarget {
     CodexSkill,
     ClaudeSkill,
     Markdown,
+}
+
+#[derive(Debug, Subcommand)]
+enum TraceCommand {
+    Compact { run_dir: PathBuf },
 }
 
 fn main() {
@@ -78,16 +92,38 @@ fn run() -> Result<()> {
                 std::process::exit(1);
             }
         }
-        Command::Decide { path, input } => {
+        Command::Decide {
+            path,
+            input,
+            trace_dir,
+        } => {
             let spec = parser::load_spec(&path)?;
-            let decision = decision::decide(&spec, &input);
-            report::json(&decision)?;
+            let decision = decision::decide_with_events(&spec, &input);
+            if let Some(trace_dir) = trace_dir {
+                let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
+                report::trace_written(&trace)?;
+            }
+            report::json(&decision.decision)?;
         }
-        Command::Explain { path, input } => {
+        Command::Explain {
+            path,
+            input,
+            trace_dir,
+        } => {
             let spec = parser::load_spec(&path)?;
-            let decision = decision::decide(&spec, &input);
-            report::explain(&decision)?;
+            let decision = decision::decide_with_events(&spec, &input);
+            if let Some(trace_dir) = trace_dir {
+                let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
+                report::trace_written(&trace)?;
+            }
+            report::explain(&decision.decision)?;
         }
+        Command::Trace { command } => match command {
+            TraceCommand::Compact { run_dir } => {
+                let trace = trace::compact(&run_dir)?;
+                report::json(&trace)?;
+            }
+        },
         Command::Compile { path, target } => {
             let spec = parser::load_spec(&path)?;
             let markdown = compiler::compile(&spec, target.into());

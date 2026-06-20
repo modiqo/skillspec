@@ -1,6 +1,7 @@
 use crate::decision::{Decision, TestRun};
 use crate::error::Result;
 use crate::model::SkillSpec;
+use crate::trace::TraceWriteResult;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -92,6 +93,19 @@ pub fn json<T: serde::Serialize>(value: &T) -> Result<()> {
 pub fn text(value: &str) -> Result<()> {
     let mut stdout = io::stdout().lock();
     writeln!(stdout, "{value}")?;
+    Ok(())
+}
+
+pub fn trace_written(trace: &TraceWriteResult) -> Result<()> {
+    let mut stderr = io::stderr().lock();
+    writeln!(
+        stderr,
+        "trace: wrote {} event(s) to {}",
+        trace.event_count,
+        trace.run_dir.display()
+    )?;
+    writeln!(stderr, "trace: jsonl {}", trace.trace_jsonl.display())?;
+    writeln!(stderr, "trace: summary {}", trace.summary_json.display())?;
     Ok(())
 }
 

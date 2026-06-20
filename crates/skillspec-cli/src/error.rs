@@ -22,6 +22,12 @@ pub enum Error {
         #[source]
         source: serde_yaml::Error,
     },
+    #[error("failed to parse JSON from {path}: {source}")]
+    ParseJson {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
     #[error("failed to render YAML for {path}: {source}")]
     RenderYaml {
         path: PathBuf,

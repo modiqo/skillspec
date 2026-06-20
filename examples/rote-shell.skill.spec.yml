@@ -79,6 +79,29 @@ rules:
       - browser_mode
     reason: Browser intent must be satisfied by browser evidence, not search summaries or raw browser automation.
 
+  - id: durable_work_requires_named_workspace
+    when:
+      user_says_any:
+        - rote exec
+        - gh
+        - git
+        - repo
+        - remote
+        - browse
+        - evidence
+        - remember
+        - query later
+    forbid:
+      - rote_exec_outside_workspace
+      - anonymous_workspace
+      - final_summary_without_workspace
+      - final_summary_without_trace_math
+    after_success:
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Durable shell work must start in a named rote workspace and finish with workspace evidence, dependency trace, and token math.
+
   - id: durable_result_uses_rote_exec
     when:
       user_says_any:
@@ -226,6 +249,22 @@ rules:
       - browser_payload_in_large_argv
     reason: Browser state should be materialized as a response, snapshot, slice, or file before local CLI processing.
 
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - allow_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+
 elicitations:
   browser_mode:
     question: How should I access the browser state for this task?
@@ -327,6 +366,7 @@ states:
   start:
     do:
       - choose_shell_route
+      - derive_workspace_name
     next: prepare_workspace
   choose_browser_mode:
     ask: browser_mode
@@ -340,6 +380,7 @@ states:
   prepare_workspace:
     do:
       - initialize_rote_workspace
+      - confirm_workspace_context
     next: execute
   execute:
     do:
@@ -352,7 +393,10 @@ states:
     next: complete
   complete:
     do:
+      - compute_workspace_trace
+      - compute_workspace_stats
       - summarize_evidence
+      - report_workspace_evidence_and_token_math
     next: done
   done:
     say: done_summary
@@ -365,8 +409,16 @@ commands:
 
   initialize_rote_workspace:
     description: Create or enter a rote workspace before durable CLI work.
-    template: "rote init <workspace> --seq --force && rote workspace sandbox <workspace> off"
+    template: |
+      rote init <task-derived-workspace-slug> --seq --force
+      eval "$(rote cd <task-derived-workspace-slug>)"
+      rote workspace sandbox <task-derived-workspace-slug> off
     safety: local_write
+
+  confirm_workspace_context:
+    description: Confirm the active workspace before running any durable rote shell command.
+    template: "rote whoami"
+    safety: read_only
 
   exec:
     description: Capture a finite command as a typed process response.
@@ -438,9 +490,21 @@ commands:
     template: "rote deno run --allow-all ~/.rote/flows/<name>/main.ts"
     safety: local_read
 
+  trace_deps:
+    description: Show the dependency trace for the current rote workspace.
+    template: "rote trace --deps"
+    safety: read_only
+
+  workspace_stats_json:
+    description: Collect workspace token and cost statistics as JSON when available.
+    template: "rote workspace stats <workspace> --json"
+    safety: read_only
+
 closures:
   choose_shell_route:
     description: Choose the narrowest shipped rote shell primitive that preserves necessary evidence.
+  derive_workspace_name:
+    description: Derive a short, stable, task-specific workspace slug before any durable rote command, such as `tulving-rote-remote-check`.
   run_selected_rote_primitive:
     description: Execute the selected shipped rote shell primitive, not an invented roadmap command.
   query_typed_response:
@@ -449,6 +513,12 @@ closures:
     description: Ask whether to crystallize after the workflow has worked and recurrence or reuse is likely.
   summarize_evidence:
     description: Summarize from typed output, artifacts, streams, and leases rather than terminal scrollback.
+  compute_workspace_trace:
+    description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
+  compute_workspace_stats:
+    description: Run JSON workspace stats when available and extract token/cost totals for recurrence math.
+  report_workspace_evidence_and_token_math:
+    description: End with the workspace name, important response ids, SkillSpec trace run directory, and token math including estimated savings from future filesystem recall.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -464,7 +534,11 @@ closures:
 
 snippets:
   done_summary:
-    text: Summarize the saved response id, command evidence, and any next query or replay command.
+    text: |
+      Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
+      SkillSpec route trace: {{ skillspec_trace_dir }}.
+      Rote dependency trace: captured with `rote trace --deps`.
+      Token math: exploration used {{ tokens_used }} tokens; future replay/recall is estimated to save {{ tokens_saved }} tokens per run by reusing the rote filesystem and typed response handles.
 
 proof:
   metrics:
@@ -484,12 +558,43 @@ tests:
         - native_search_as_answer
         - raw_playwright
 
+  - name: browsing profiles does not trigger file io
+    input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
+    expect:
+      route: browser_handoff
+      elicit:
+        - browser_mode
+      after_success:
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - native_search_as_answer
+        - rote_exec_outside_workspace
+
   - name: durable evidence uses rote exec
     input: run git status and remember the result so I can query it later
     expect:
       route: one_shot_process
+      after_success:
+        - compute_workspace_trace
+        - report_workspace_evidence_and_token_math
       forbid:
         - untracked_stdout_scrollback
+        - final_summary_without_trace_math
+
+  - name: rote exec requires named workspace and token math
+    input: rote exec ls the repo and remember the evidence
+    expect:
+      route: one_shot_process
+      after_success:
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - rote_exec_outside_workspace
+        - anonymous_workspace
+        - final_summary_without_workspace
 
   - name: file output uses declared file io
     input: save the command output to a report file
