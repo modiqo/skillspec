@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
+</p>
+
 # SkillSpec
 
 [![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
