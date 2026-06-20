@@ -126,6 +126,9 @@ states:
       - write_digest
     next: done
 
+  done:
+    say: done_summary
+
 commands:
   search_remembered_routes:
     description: Search saved work before starting fresh exploration.
@@ -160,6 +163,35 @@ snippets:
       Saved.
 
       Push this to hub so you can use it across computers and share it with your team?
+
+  done_summary:
+    text: "Done. I saved the useful evidence and updated the digest."
+
+closures:
+  readiness_check:
+    description: Check whether rote, adapters, shell, and browser foundations are usable.
+  load_recent_digest:
+    description: Load the recent work digest so the agent can associate today's task with recent work.
+  inspect_available_connections:
+    description: Inspect configured service connections before falling back to CLI or browser.
+  inspect_browser_readiness:
+    description: Decide whether browser work needs attach-existing, headed, or headless mode.
+  choose_best_route:
+    description: Choose the route after rules, available connections, CLI probes, and browser readiness are known.
+  run_chosen_route:
+    description: Execute the selected remembered, service, CLI, or browser route.
+  persist_evidence:
+    description: Save the task evidence so the result can be queried and replayed.
+  summarize_result:
+    description: Summarize the task outcome in user language.
+  project_recurrence_cost:
+    description: Estimate repeated monthly token and dollar cost from trace evidence.
+  ask_to_remember:
+    description: Ask whether to save the route for future reuse.
+  save_working_route:
+    description: Save the working route as a remembered flow.
+  write_digest:
+    description: Append a compact session digest for future association.
 
 proof:
   metrics:
@@ -200,4 +232,3 @@ tests:
       after_success:
         - collect_trace_cost
         - ask_to_remember
-

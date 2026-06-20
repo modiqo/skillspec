@@ -36,5 +36,6 @@ small CLI.
 - `review_required`: uncertainties that require human review
 
 See [semantics.md](semantics.md) for behavior and
+[grammar.md](grammar.md) for the formal v0 grammar. See
+[relationships.md](relationships.md) for how the concepts associate and
 [skill.spec.schema.json](skill.spec.schema.json) for a permissive v0 schema.
-

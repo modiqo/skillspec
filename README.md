@@ -111,10 +111,30 @@ crates/     reference Rust CLI
 fixtures/   sample skills and expected outputs
 ```
 
+## Formal Model
+
+SkillSpec v0 has a formal grammar and relationship model:
+
+- [spec/grammar.md](spec/grammar.md) defines the v0 tree.
+- [spec/relationships.md](spec/relationships.md) explains how routes, rules,
+  states, commands, snippets, tests, and proof associate.
+- [spec/rules.md](spec/rules.md) defines rule evaluation and negative
+  steering.
+
+The core association is:
+
+```text
+rules steer routes and closures
+states organize lifecycle
+commands perform named actions
+snippets preserve product language
+tests prove steering behavior
+proof summarizes accuracy and savings
+```
+
 ## Status
 
-Pre-alpha. This repository starts with the specification shape and a tiny CLI
-skeleton. The first flagship example is `rote-computer`, a task-first supertool
-policy for routing work across remembered routes, services, CLIs, browsers, and
-completion memory.
-
+Pre-alpha. This repository starts with a focused v0 spec, a typed Rust CLI, and
+examples for `rote-computer`, `rote-shell`, and repo readiness. The first
+flagship example is `rote-computer`, a task-first supertool policy for routing
+work across remembered routes, services, CLIs, browsers, and completion memory.
