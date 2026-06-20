@@ -106,6 +106,7 @@ states, but uncertainty must be marked as `review_required`.
 ```text
 spec/       specification, schema, semantics, security notes
 examples/   complete SkillSpec examples
+skills/     companion skills for authoring, importing, and dogfooding specs
 generators/ compiler target notes for Codex, Claude, Markdown
 crates/     reference Rust CLI
 fixtures/   sample skills and expected outputs
@@ -138,3 +139,9 @@ Pre-alpha. This repository starts with a focused v0 spec, a typed Rust CLI, and
 examples for `rote-computer`, `rote-shell`, and repo readiness. The first
 flagship example is `rote-computer`, a task-first supertool policy for routing
 work across remembered routes, services, CLIs, browsers, and completion memory.
+
+`examples/rote-shell.skill.spec.yml` is the first serious port target: it
+turns the current rote-shell prose skill into routes, rules, states, commands,
+closures, and scenario tests. `skills/skillspec-importer/SKILL.md` is the
+companion agent skill for importing old prose skills into this structured
+format without pretending the deterministic importer can infer everything.

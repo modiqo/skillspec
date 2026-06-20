@@ -1,64 +1,411 @@
 schema: skillspec/v0
 id: rote.shell
 title: rote shell
-description: Structured policy sketch for durable CLI and shell work through rote.
+description: Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work.
+
+applies_when:
+  - user_intent:
+      - run a local command and remember the result
+      - inspect CLI output with provenance
+      - follow a log or process stream
+      - start or observe a background job
+      - capture terminal-sensitive output
+      - crystallize shell work into a TypeScript flow
+      - combine local CLI facts with adapters or browser observations
+
+entry:
+  prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
 
 routes:
-  - id: one_shot_process
-    label: Run one durable command
-    rank: 10
-  - id: background_process
-    label: Run a tracked background job
-    rank: 20
-  - id: stream_follow
-    label: Follow a file or process stream
-    rank: 30
-  - id: pty_transcript
-    label: Capture terminal-sensitive output
-    rank: 40
   - id: browser_handoff
-    label: Hand off to browser
+    label: Hand off to rote-browse for browser state
     rank: 5
+    description: Use when the user asks to browse, click, snapshot, attach to a browser, or extract from live page state.
+  - id: one_shot_process
+    label: Capture a one-shot process
+    rank: 10
+    description: Use `rote exec --` for finite commands whose stdout, stderr, exit, or file outputs should be remembered.
+  - id: declared_file_io
+    label: Capture declared file inputs or outputs
+    rank: 20
+    description: Use stdin, stdout, stderr, and capture-file declarations when files are part of the evidence.
+  - id: stream_follow
+    label: Follow a moving file or process stream
+    rank: 30
+    description: Use stream capture when the source of truth is a log or evolving process stream.
+  - id: background_process
+    label: Start and track a background process lease
+    rank: 40
+    description: Use for long finite non-interactive jobs and services that need status, wait, follow, or cleanup.
+  - id: pty_transcript
+    label: Capture a one-shot PTY transcript
+    rank: 50
+    description: Use only when terminal behavior is the point or a bounded interactive prompt can be scripted safely.
+  - id: dependency_preflight
+    label: Check dependencies before replay or release
+    rank: 60
+    description: Use `rote deps check` before marking shell-derived flows released.
+  - id: crystallized_flow
+    label: Crystallize or replay a shell flow
+    rank: 70
+    description: Use TypeScript SDK shell wrappers or declarative process steps when the work should become reusable.
+  - id: raw_shell
+    label: Use raw shell for disposable inspection only
+    rank: 100
+    description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
 
 rules:
-  - id: browser_intent_handoff
+  - id: browser_words_handoff_to_browse
     when:
       user_says_any:
         - browse
         - open this site
+        - attach to my browser
         - click
+        - type
         - snapshot
         - extract from page
+        - social profile
+        - gmail in browser
     prefer: browser_handoff
     forbid:
       - native_search_as_answer
       - raw_playwright
-      - curl
+      - curl_as_browser_substitute
+      - adapter_setup_before_browser_fallback
+    allow:
+      native_search: url_discovery_only
+    reason: Browser intent must be satisfied by browser evidence, not search summaries or raw browser automation.
 
-  - id: long_finite_job_background
+  - id: durable_result_uses_rote_exec
+    when:
+      user_says_any:
+        - remember
+        - query later
+        - compare
+        - replay
+        - evidence
+        - audit
+    prefer: one_shot_process
+    forbid:
+      - untracked_stdout_scrollback
+      - ad_hoc_redirect_for_evidence
+    reason: Durable CLI facts should be captured as typed process responses.
+
+  - id: file_inputs_outputs_are_declared
+    when:
+      user_says_any:
+        - file
+        - stdin
+        - stdout
+        - stderr
+        - artifact
+        - write report
+        - save output
+    prefer: declared_file_io
+    forbid:
+      - implicit_file_side_effects
+    reason: File inputs and outputs need explicit provenance, hashes, and artifact pointers.
+
+  - id: long_noninteractive_jobs_use_background
     when:
       command_likely_long_running: true
       interactive_prompt_likely: false
     prefer: background_process
+    after_success:
+      - query_lease_status
+      - follow_process_stream
+      - wait_for_process
+    reason: Long finite non-interactive jobs should be leased, observable, and joined.
+
+  - id: moving_logs_use_stream_follow
+    when:
+      user_says_any:
+        - tail
+        - follow log
+        - watch log
+        - until ready
+        - readiness log
+    prefer: stream_follow
+    reason: Moving logs should be followed with offsets, chunks, and stop conditions.
+
+  - id: interactive_prompts_do_not_background
+    when:
+      interactive_prompt_likely: true
+    route_order:
+      - pty_transcript
+      - browser_handoff
+      - one_shot_process
+    forbid:
+      - background_without_human_confirm
+      - hidden_credential_prompt
+      - secret_in_pty_input
+    reason: Interactive prompts require visible bounded handling, never hidden background execution.
+
+  - id: terminal_sensitive_commands_use_pty
+    when:
+      user_says_any:
+        - tty
+        - terminal
+        - isatty
+        - interactive
+        - prompt
+        - auth status
+    prefer: pty_transcript
+    forbid:
+      - persistent_repl_pty
+      - secret_in_pty_input
+    reason: PTY is for one-shot terminal behavior, not persistent sessions or secret entry.
+
+  - id: release_publish_is_guarded
+    when:
+      user_says_any:
+        - release
+        - publish
+        - deploy
+    route_order:
+      - dependency_preflight
+      - one_shot_process
+      - background_process
+    forbid:
+      - irreversible_background_without_approval
+      - release_without_dry_run
+      - release_without_dependency_preflight
+    reason: Mutating release work needs dependency checks, dry-run when available, and explicit approval.
+
+  - id: crystallization_requires_deps_and_qa
+    when:
+      user_says_any:
+        - crystallize
+        - reusable flow
+        - save as flow
+        - release flow
+        - rote deno run
+    prefer: crystallized_flow
+    after_success:
+      - run_dependency_preflight
+      - run_flow_qa
+      - mark_released_after_evidence
+    forbid:
+      - released_without_deps_toml
+      - released_without_replay_qa
+    reason: Shell-derived flows need deps.toml and replay evidence before release.
+
+  - id: mixed_browser_shell_bridges_files
+    when:
+      user_says_any:
+        - browser plus shell
+        - snapshot then process
+        - page then cli
+        - browse and save
+    route_order:
+      - browser_handoff
+      - declared_file_io
+      - one_shot_process
+    forbid:
+      - raw_playwright
+      - browser_payload_in_large_argv
+    reason: Browser state should be materialized as a response, snapshot, slice, or file before local CLI processing.
+
+states:
+  start:
+    do:
+      - choose_shell_route
+    next: prepare_workspace
+  prepare_workspace:
+    do:
+      - initialize_rote_workspace
+    next: execute
+  execute:
+    do:
+      - run_selected_rote_primitive
+      - query_typed_response
+    next: assess_reuse
+  assess_reuse:
+    do:
+      - decide_whether_to_crystallize
+    next: complete
+  complete:
+    do:
+      - summarize_evidence
+    next: done
+  done:
+    say: done_summary
 
 commands:
-  exec:
-    template: "rote exec -- {{ argv }}"
-    safety: local_read
-
-  exec_background:
-    template: "rote exec --background --stdout-file {{ stdout }} --stderr-file {{ stderr }} -- {{ argv }}"
-    safety: local_write
-
-  exec_wait:
-    template: "rote exec wait {{ lease }} --timeout-ms {{ timeout_ms }} --poll-ms {{ poll_ms }}"
+  rote_guidance_shell:
+    description: Load the complete shell command model.
+    template: "rote guidance shell essential"
     safety: read_only
 
+  initialize_rote_workspace:
+    description: Create or enter a rote workspace before durable CLI work.
+    template: "rote init <workspace> --seq --force && rote workspace sandbox <workspace> off"
+    safety: local_write
+
+  exec:
+    description: Capture a finite command as a typed process response.
+    template: "rote exec -- <program> [args...]"
+    safety: local_read
+
+  exec_with_stdin_file:
+    description: Capture stdin provenance from a declared input file.
+    template: "rote exec --stdin-file <input> -- <program> [args...]"
+    safety: local_read
+
+  exec_with_file_capture:
+    description: Capture an output file as a named artifact.
+    template: "rote exec --capture-file <label>:<path> -- <program> [args...]"
+    safety: local_write
+
+  exec_with_stream_files:
+    description: Save stdout and stderr streams to durable files.
+    template: "rote exec --stdout-file <stdout-path> --stderr-file <stderr-path> -- <program> [args...]"
+    safety: local_write
+
+  follow_file:
+    description: Follow a moving log or file with an optional readiness pattern.
+    template: "rote stream follow --file <path> --until <pattern>"
+    safety: read_only
+
+  exec_background:
+    description: Start a tracked background process lease.
+    template: "rote exec --background --stdout-file <stdout-log> --stderr-file <stderr-log> -- <program> [args...]"
+    safety: local_write
+
+  exec_background_ready_log:
+    description: Start a tracked background process and wait for log readiness.
+    template: "rote exec --background --ready-log <pattern> --ready-timeout-ms <ms> -- <program> [args...]"
+    safety: local_write
+
+  exec_status:
+    description: Query a background process lease before making claims.
+    template: "rote exec status <lease>"
+    safety: read_only
+
+  exec_wait:
+    description: Join a tracked finite background job.
+    template: "rote exec wait <lease> --timeout-ms <ms> --poll-ms <ms>"
+    safety: read_only
+
+  follow_process:
+    description: Follow stdout or stderr from a tracked process lease.
+    template: "rote stream follow-process <lease> --stream <stdout-or-stderr> --from-start --max-bytes <bytes>"
+    safety: read_only
+
+  exec_stop:
+    description: Stop a tracked background process lease and record cleanup evidence.
+    template: "rote exec stop <lease>"
+    safety: local_write
+
+  pty_run:
+    description: Capture one-shot terminal-sensitive output.
+    template: "rote pty run --cols <cols> --rows <rows> -- <program> [args...]"
+    safety: local_read
+
+  deps_check:
+    description: Verify required local tools and files before replay or release.
+    template: "rote deps check deps.toml"
+    safety: read_only
+
+  deno_replay:
+    description: Replay a crystallized TypeScript flow.
+    template: "rote deno run --allow-all ~/.rote/flows/<name>/main.ts"
+    safety: local_read
+
+closures:
+  choose_shell_route:
+    description: Choose the narrowest shipped rote shell primitive that preserves necessary evidence.
+  run_selected_rote_primitive:
+    description: Execute the selected shipped rote shell primitive, not an invented roadmap command.
+  query_typed_response:
+    description: Query the saved typed response with the exact query in @@result or @proc addresses.
+  decide_whether_to_crystallize:
+    description: Ask whether to crystallize after the workflow has worked and recurrence or reuse is likely.
+  summarize_evidence:
+    description: Summarize from typed output, artifacts, streams, and leases rather than terminal scrollback.
+  query_lease_status:
+    description: Query the lease status before acting on background process assumptions.
+  follow_process_stream:
+    description: Inspect process stdout or stderr with `rote stream follow-process`.
+  wait_for_process:
+    description: Establish completion with `rote exec wait`.
+  run_dependency_preflight:
+    description: Run `rote deps check deps.toml` before release.
+  run_flow_qa:
+    description: Run help, dependency, replay, and lint/validate checks appropriate to the flow shape.
+  mark_released_after_evidence:
+    description: Mark a flow released only after dependency and replay evidence pass.
+
+snippets:
+  done_summary:
+    text: Summarize the saved response id, command evidence, and any next query or replay command.
+
+proof:
+  metrics:
+    - route_decision_accuracy
+    - forbidden_substitution_coverage
+    - captured_artifact_completeness
+    - crystallization_readiness
+
 tests:
-  - name: browse request hands off to browser
+  - name: browser intent hands off to browser
     input: browse the active dashboard and summarize it
     expect:
       route: browser_handoff
       forbid:
         - native_search_as_answer
+        - raw_playwright
 
+  - name: durable evidence uses rote exec
+    input: run git status and remember the result so I can query it later
+    expect:
+      route: one_shot_process
+      forbid:
+        - untracked_stdout_scrollback
+
+  - name: file output uses declared file io
+    input: save the command output to a report file
+    expect:
+      route: declared_file_io
+      forbid:
+        - implicit_file_side_effects
+
+  - name: tailing logs uses stream follow
+    input: tail the server log until ready
+    expect:
+      route: stream_follow
+
+  - name: long cargo test uses background process
+    input: run cargo test and check gh status while it runs
+    expect:
+      route: background_process
+      after_success:
+        - wait_for_process
+        - follow_process_stream
+
+  - name: terminal auth status uses pty
+    input: run gh auth status in a terminal
+    expect:
+      route: pty_transcript
+      forbid:
+        - secret_in_pty_input
+
+  - name: release work is guarded
+    input: publish a release
+    expect:
+      route_order:
+        - dependency_preflight
+        - one_shot_process
+        - background_process
+      forbid:
+        - release_without_dry_run
+        - release_without_dependency_preflight
+
+  - name: crystallization requires deps and qa
+    input: crystallize this shell workflow as a reusable flow
+    expect:
+      route: crystallized_flow
+      after_success:
+        - run_dependency_preflight
+        - run_flow_qa
