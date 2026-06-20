@@ -1,0 +1,385 @@
+schema: skillspec/v0
+id: local.csv_report
+title: local csv report
+description: Use rote shell to turn a local CSV into durable JSON and text reports with file provenance, dependency checks, privacy guardrails, and optional reuse.
+
+applies_when:
+  - user_intent:
+      - summarize a local CSV
+      - convert a file into a report
+      - create JSON from local data
+      - analyze local exports without uploading them
+      - remember a recurring local reporting task
+
+entry:
+  prompt: Identify the local input file, desired report format, and whether the data is sensitive before running commands.
+
+routes:
+  - id: remembered_report
+    label: Reuse a saved local report workflow
+    rank: 10
+    description: Use when this file/report shape has already been crystallized and replayed.
+  - id: local_file_report
+    label: Build a report from local files
+    rank: 20
+    description: Use rote shell file provenance and local CLI tools to parse, summarize, and save report artifacts.
+  - id: dependency_preflight
+    label: Check local tools before report generation
+    rank: 30
+    description: Check required CLI tools and files before running the transformation.
+  - id: crystallized_flow
+    label: Save as a reusable local reporting flow
+    rank: 40
+    description: Use when the report is recurring or likely to be shared/replayed.
+  - id: ask_user
+    label: Ask for missing report details
+    rank: 90
+    description: Use when file path, output format, or sensitivity is unclear.
+
+rules:
+  - id: local_csv_uses_file_report
+    when:
+      user_says_any:
+        - csv
+        - spreadsheet export
+        - local file
+        - summarize file
+        - report from file
+    prefer: local_file_report
+    forbid:
+      - upload_to_web
+      - native_search_as_answer
+      - untracked_stdout_scrollback
+    reason: Local file reporting should keep source data local and capture typed file provenance.
+
+  - id: sensitive_data_stays_local
+    when:
+      user_says_any:
+        - private
+        - sensitive
+        - customer
+        - revenue
+        - finance
+        - pii
+    route_order:
+      - local_file_report
+      - dependency_preflight
+      - ask_user
+    forbid:
+      - network_upload
+      - browser_upload
+      - paste_data_into_prompt
+    elicit:
+      - data_sensitivity
+    reason: Sensitive CSV work should stay local and require explicit sensitivity handling.
+
+  - id: missing_file_details_ask_user
+    when:
+      user_says_any:
+        - summarize my CSV
+        - make a report
+        - analyze the export
+    prefer: ask_user
+    elicit:
+      - file_and_output_paths
+    reason: A local report cannot be durable without explicit input and output paths.
+
+  - id: missing_dependencies_ask_install_scope
+    when:
+      user_says_any:
+        - missing dependency
+        - install missing tool
+        - deps check failed
+    prefer: dependency_preflight
+    elicit:
+      - install_scope
+    forbid:
+      - silent_global_install
+    reason: Missing local tools require explicit provision scope before machine mutation.
+
+  - id: recurring_report_can_be_crystallized
+    when:
+      user_says_any:
+        - recurring
+        - every day
+        - every week
+        - every Friday
+        - weekly
+        - monthly
+    prefer: crystallized_flow
+    after_success:
+      - run_dependency_preflight
+      - replay_flow
+      - ask_to_remember
+    reason: Recurring reporting should be saved so the user does not pay discovery cost every time.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+
+elicitations:
+  file_and_output_paths:
+    question: Which local CSV should I read, and where should I write the report artifacts?
+    max_choices: 1
+    choices:
+      - id: provide_paths
+        label: Provide paths
+        description: Continue after the user provides input CSV, JSON output path, and text report path.
+        sets:
+          input_path: required
+          summary_json_path: required
+          report_text_path: required
+        route: local_file_report
+        next: prepare_workspace
+        safety: local_read
+
+  data_sensitivity:
+    question: How should I treat this file's data?
+    default: local_only
+    max_choices: 1
+    choices:
+      - id: local_only
+        label: Keep local only
+        description: Do not upload, browse, or paste rows into prompts; summarize from local artifacts only.
+        sets:
+          data_boundary: local_only
+        route: local_file_report
+        next: prepare_workspace
+        safety: local_read
+      - id: allow_redacted_summary
+        label: Redacted summary only
+        description: Allow only aggregate counts and redacted examples in the final answer.
+        sets:
+          data_boundary: redacted_summary
+        route: local_file_report
+        next: prepare_workspace
+        safety: local_read
+
+  install_scope:
+    question: How should missing local tools be provisioned?
+    max_choices: 1
+    choices:
+      - id: project_local
+        label: Project-local or rote-managed
+        description: Prefer isolated setup that does not mutate the whole machine.
+        sets:
+          dependency_install_scope: project_local
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: user_global
+        label: User/global package manager
+        description: Allow broader machine mutation only after explicit approval.
+        sets:
+          dependency_install_scope: user_global
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: stop
+        label: Stop
+        description: Do not install anything.
+        sets:
+          dependency_install_scope: none
+        next: done
+        safety: read_only
+
+dependencies:
+  rote:
+    kind: cli
+    description: Rote CLI is required to create a workspace, capture file provenance, save artifacts, and crystallize/replay the report.
+    command: rote
+    check:
+      command: rote
+    provision:
+      elicit: install_scope
+      options:
+        - id: project_local
+          label: Install or upgrade through the project-approved rote path
+          safety: local_write
+        - id: stop
+          label: Stop until rote is available
+          safety: read_only
+  python3:
+    kind: cli
+    description: Python is used for local CSV parsing and report generation.
+    command: python3
+    check:
+      command: python3
+    permission:
+      required: true
+      reason: Python executes local code against the user's file.
+      safety: local_read
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install Python with a user package manager
+          command: brew install python
+          safety: local_write
+        - id: stop
+          label: Stop until Python is available
+          safety: read_only
+  jq:
+    kind: cli
+    description: jq is optional but useful for validating and formatting generated JSON summaries.
+    command: jq
+    check:
+      command: jq
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install jq with a user package manager
+          command: brew install jq
+          safety: local_write
+        - id: stop
+          label: Stop until jq is available
+          safety: read_only
+
+states:
+  start:
+    do:
+      - choose_report_route
+    next: prepare_workspace
+  prepare_workspace:
+    do:
+      - initialize_workspace
+      - check_report_dependencies
+    next: inspect_input
+  inspect_input:
+    do:
+      - inspect_csv_head
+    next: generate_report
+  generate_report:
+    do:
+      - run_csv_summary
+      - validate_summary_json
+    next: complete
+  complete:
+    do:
+      - summarize_artifacts
+      - ask_to_remember
+    next: done
+  done:
+    say: done_summary
+
+commands:
+  initialize_workspace:
+    description: Create or enter a named rote workspace for the reporting task.
+    template: |
+      rote init <task-derived-workspace-slug> --seq --force
+      eval "$(rote cd <task-derived-workspace-slug>)"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  check_report_dependencies:
+    description: Check only the dependencies needed by the report-generation command before use.
+    template: "skillspec deps check <skill.spec.yml> --command run_csv_summary"
+    safety: read_only
+
+  inspect_csv_head:
+    description: Capture the input CSV header and first rows without uploading the file.
+    template: "rote exec --capture-file csv_input:<input_path> -- python3 -c '<print csv header and first N rows>'"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+        - python3
+      files:
+        - <input_path>
+
+  run_csv_summary:
+    description: Generate JSON and text report artifacts from the local CSV.
+    template: "rote exec --capture-file summary_json:<summary_json_path> --capture-file report_text:<report_text_path> -- python3 <generated-summary-script.py> <input_path> <summary_json_path> <report_text_path>"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+        - python3
+      files:
+        - <input_path>
+
+  validate_summary_json:
+    description: Validate generated JSON before summarizing it to the user.
+    template: "rote exec -- jq . <summary_json_path>"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+        - jq
+      files:
+        - <summary_json_path>
+
+closures:
+  choose_report_route:
+    description: Choose local file report unless a remembered route already exists.
+  summarize_artifacts:
+    description: Report the JSON and text artifact paths, file provenance, and any redaction boundary.
+  run_dependency_preflight:
+    description: Run command-scoped dependency checks before marking the report workflow reusable.
+  replay_flow:
+    description: Replay the crystallized flow against a small fixture before release.
+  ask_to_remember:
+    description: Ask whether this report should become a reusable local flow.
+
+snippets:
+  done_summary:
+    text: "Done. I captured the input provenance and saved the JSON/text report artifacts locally."
+
+proof:
+  metrics:
+    - local_data_boundary_preserved
+    - artifact_completeness
+    - dependency_preflight_coverage
+    - replay_readiness
+
+tests:
+  - name: csv report stays local
+    input: summarize this customer CSV into a report
+    expect:
+      route: local_file_report
+      forbid:
+        - upload_to_web
+        - untracked_stdout_scrollback
+
+  - name: sensitive finance file asks boundary
+    input: summarize this sensitive revenue export
+    expect:
+      route_order:
+        - local_file_report
+        - dependency_preflight
+        - ask_user
+      forbid:
+        - network_upload
+        - paste_data_into_prompt
+      elicit:
+        - data_sensitivity
+
+  - name: missing paths asks for file details
+    input: make a report from my CSV
+    expect:
+      route: ask_user
+      elicit:
+        - file_and_output_paths
+
+  - name: recurring local report can be saved
+    input: every Friday summarize this payroll CSV
+    expect:
+      route: crystallized_flow
+      after_success:
+        - run_dependency_preflight
+        - replay_flow
+        - ask_to_remember

@@ -362,6 +362,93 @@ elicitations:
         next: done
         safety: read_only
 
+dependencies:
+  rote:
+    kind: cli
+    description: Rote CLI is required for workspace setup, process capture, stream capture, PTY capture, dependency preflight, traces, and replay.
+    command: rote
+    check:
+      command: rote
+    provision:
+      elicit: install_scope
+      options:
+        - id: rote_managed
+          label: Install or upgrade through the project-approved rote path
+          description: Use the local project's install/update path rather than silently mutating the machine.
+          safety: local_write
+        - id: leave_draft
+          label: Leave the flow in draft
+          description: Do not install rote; keep the work unreleased until the tool is available.
+          safety: read_only
+  gh:
+    kind: cli
+    description: GitHub CLI may be used by shell workflows that inspect repositories, pull requests, users, or auth state.
+    command: gh
+    check:
+      command: gh
+    permission:
+      required: true
+      reason: GitHub CLI commands can use authenticated account state and network access.
+      safety: network_read
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install GitHub CLI with a user package manager
+          command: brew install gh
+          safety: local_write
+        - id: leave_draft
+          label: Leave flow in draft
+          safety: read_only
+  git:
+    kind: cli
+    description: Git may be used for repository status, remotes, branches, and local history.
+    command: git
+    check:
+      command: git
+  cargo:
+    kind: cli
+    description: Cargo may be used for Rust project checks, tests, metadata, and release dry-runs.
+    command: cargo
+    check:
+      command: cargo
+    permission:
+      required: true
+      reason: Cargo commands may execute project build scripts and tests.
+      safety: local_read
+  deno:
+    kind: cli
+    description: Deno is required for TypeScript flow replay through `rote deno run`.
+    command: deno
+    check:
+      command: deno
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install Deno with a user package manager
+          command: brew install deno
+          safety: local_write
+        - id: leave_draft
+          label: Leave flow in draft
+          safety: read_only
+  curl:
+    kind: cli
+    description: Curl may be used only for URL discovery or API checks when the selected route permits it.
+    command: curl
+    check:
+      command: curl
+    permission:
+      required: true
+      reason: Curl may perform network reads and must not substitute for browser evidence.
+      safety: network_read
+  deps_toml:
+    kind: file
+    description: Shell-crystallized flows should carry a dependency manifest before release.
+    path: deps.toml
+    check:
+      path: deps.toml
+
 states:
   start:
     do:
@@ -406,6 +493,9 @@ commands:
     description: Load the complete shell command model.
     template: "rote guidance shell essential"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   initialize_rote_workspace:
     description: Create or enter a rote workspace before durable CLI work.
@@ -414,91 +504,147 @@ commands:
       eval "$(rote cd <task-derived-workspace-slug>)"
       rote workspace sandbox <task-derived-workspace-slug> off
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   confirm_workspace_context:
     description: Confirm the active workspace before running any durable rote shell command.
     template: "rote whoami"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   exec:
     description: Capture a finite command as a typed process response.
     template: "rote exec -- <program> [args...]"
     safety: local_read
+    requires:
+      dependencies:
+        - rote
 
   exec_with_stdin_file:
     description: Capture stdin provenance from a declared input file.
     template: "rote exec --stdin-file <input> -- <program> [args...]"
     safety: local_read
+    requires:
+      dependencies:
+        - rote
 
   exec_with_file_capture:
     description: Capture an output file as a named artifact.
     template: "rote exec --capture-file <label>:<path> -- <program> [args...]"
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   exec_with_stream_files:
     description: Save stdout and stderr streams to durable files.
     template: "rote exec --stdout-file <stdout-path> --stderr-file <stderr-path> -- <program> [args...]"
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   follow_file:
     description: Follow a moving log or file with an optional readiness pattern.
     template: "rote stream follow --file <path> --until <pattern>"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   exec_background:
     description: Start a tracked background process lease.
     template: "rote exec --background --stdout-file <stdout-log> --stderr-file <stderr-log> -- <program> [args...]"
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   exec_background_ready_log:
     description: Start a tracked background process and wait for log readiness.
     template: "rote exec --background --ready-log <pattern> --ready-timeout-ms <ms> -- <program> [args...]"
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   exec_status:
     description: Query a background process lease before making claims.
     template: "rote exec status <lease>"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   exec_wait:
     description: Join a tracked finite background job.
     template: "rote exec wait <lease> --timeout-ms <ms> --poll-ms <ms>"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   follow_process:
     description: Follow stdout or stderr from a tracked process lease.
     template: "rote stream follow-process <lease> --stream <stdout-or-stderr> --from-start --max-bytes <bytes>"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   exec_stop:
     description: Stop a tracked background process lease and record cleanup evidence.
     template: "rote exec stop <lease>"
     safety: local_write
+    requires:
+      dependencies:
+        - rote
 
   pty_run:
     description: Capture one-shot terminal-sensitive output.
     template: "rote pty run --cols <cols> --rows <rows> -- <program> [args...]"
     safety: local_read
+    requires:
+      dependencies:
+        - rote
 
   deps_check:
     description: Verify required local tools and files before replay or release.
     template: "rote deps check deps.toml"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
+        - deps_toml
 
   deno_replay:
     description: Replay a crystallized TypeScript flow.
     template: "rote deno run --allow-all ~/.rote/flows/<name>/main.ts"
     safety: local_read
+    requires:
+      dependencies:
+        - rote
+        - deno
 
   trace_deps:
     description: Show the dependency trace for the current rote workspace.
     template: "rote trace --deps"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   workspace_stats_json:
     description: Collect workspace token and cost statistics as JSON when available.
     template: "rote workspace stats <workspace> --json"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
 closures:
   choose_shell_route:

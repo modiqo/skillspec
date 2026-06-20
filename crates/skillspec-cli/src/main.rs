@@ -1,5 +1,6 @@
 mod compiler;
 mod decision;
+mod deps;
 mod error;
 mod importer;
 mod model;
@@ -21,37 +22,61 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    #[command(about = "Validate a skill.spec.yml file")]
     Validate {
+        /// Path to a skill.spec.yml file.
         path: PathBuf,
     },
+    #[command(about = "Run scenario tests declared in a SkillSpec")]
     Test {
+        /// Path to a skill.spec.yml file.
         path: PathBuf,
     },
+    #[command(about = "Evaluate routing rules for a user task and emit JSON")]
     Decide {
+        /// Path to a skill.spec.yml file.
         path: PathBuf,
+        /// User task text to route. Strip skill invocation prefixes before passing it.
         #[arg(long, allow_hyphen_values = true)]
         input: String,
+        /// Directory where append-only decision trace events should be written.
         #[arg(long)]
         trace_dir: Option<PathBuf>,
     },
+    #[command(about = "Explain routing decisions for a user task")]
     Explain {
+        /// Path to a skill.spec.yml file.
         path: PathBuf,
+        /// User task text to explain. Strip skill invocation prefixes before passing it.
         #[arg(long, allow_hyphen_values = true)]
         input: String,
+        /// Directory where append-only decision trace events should be written.
         #[arg(long)]
         trace_dir: Option<PathBuf>,
     },
+    #[command(about = "Inspect or compact SkillSpec decision traces")]
     Trace {
         #[command(subcommand)]
         command: TraceCommand,
     },
+    #[command(about = "Check declared SkillSpec dependencies")]
+    Deps {
+        #[command(subcommand)]
+        command: DepsCommand,
+    },
+    #[command(about = "Compile a SkillSpec into harness guidance")]
     Compile {
+        /// Path to a skill.spec.yml file.
         path: PathBuf,
+        /// Output target to render.
         #[arg(long)]
         target: CompileTarget,
     },
+    #[command(about = "Create a mechanical draft SkillSpec from a local skill file or folder")]
     ImportSkill {
+        /// Local SKILL.md file or skill folder to import.
         path: PathBuf,
+        /// Output path for the generated skill.spec.yml draft.
         #[arg(long)]
         out: PathBuf,
     },
@@ -66,7 +91,23 @@ enum CompileTarget {
 
 #[derive(Debug, Subcommand)]
 enum TraceCommand {
-    Compact { run_dir: PathBuf },
+    #[command(about = "Compact append-only trace events from a run directory into JSON")]
+    Compact {
+        /// Trace run directory produced by decide/explain --trace-dir.
+        run_dir: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DepsCommand {
+    #[command(about = "Check declared dependencies, optionally scoped to one command template")]
+    Check {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Check only dependencies required by this command id.
+        #[arg(long)]
+        command: Option<String>,
+    },
 }
 
 fn main() {
@@ -122,6 +163,16 @@ fn run() -> Result<()> {
             TraceCommand::Compact { run_dir } => {
                 let trace = trace::compact(&run_dir)?;
                 report::json(&trace)?;
+            }
+        },
+        Command::Deps { command } => match command {
+            DepsCommand::Check { path, command } => {
+                let spec = parser::load_spec(&path)?;
+                let report = deps::check(&spec, command.as_deref())?;
+                report::json(&report)?;
+                if !report.ok {
+                    std::process::exit(1);
+                }
             }
         },
         Command::Compile { path, target } => {

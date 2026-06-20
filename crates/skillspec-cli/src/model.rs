@@ -30,6 +30,16 @@ pub struct SkillSpec {
     #[serde(default)]
     pub trace: Option<TraceConfig>,
     #[serde(default)]
+    pub dependencies: BTreeMap<String, Dependency>,
+    #[serde(default)]
+    pub resources: BTreeMap<String, Resource>,
+    #[serde(default)]
+    pub code: BTreeMap<String, CodeBlock>,
+    #[serde(default)]
+    pub artifacts: BTreeMap<String, Artifact>,
+    #[serde(default)]
+    pub recipes: BTreeMap<String, Recipe>,
+    #[serde(default)]
     pub commands: BTreeMap<String, CommandTemplate>,
     #[serde(default)]
     pub snippets: BTreeMap<String, Snippet>,
@@ -190,11 +200,331 @@ pub struct CommandTemplate {
     #[serde(default)]
     pub safety: Option<SafetyClass>,
     #[serde(default)]
-    pub requires: BTreeMap<String, serde_yaml::Value>,
+    pub requires: CommandRequires,
     #[serde(default)]
     pub parse: BTreeMap<String, String>,
     #[serde(default)]
     pub success_when: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CommandRequires {
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<String>,
+    #[serde(default)]
+    pub auth: Vec<String>,
+    #[serde(default)]
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml::Value>,
+}
+
+impl CommandRequires {
+    pub fn is_empty(&self) -> bool {
+        self.dependencies.is_empty()
+            && self.files.is_empty()
+            && self.env.is_empty()
+            && self.auth.is_empty()
+            && self.extra.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Dependency {
+    pub kind: DependencyKind,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub env: Option<String>,
+    #[serde(default)]
+    pub check: Option<DependencyCheck>,
+    #[serde(default)]
+    pub permission: Option<DependencyPermission>,
+    #[serde(default)]
+    pub provision: Option<DependencyProvision>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DependencyKind {
+    Cli,
+    Package,
+    File,
+    Env,
+    Service,
+    Adapter,
+    Browser,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DependencyCheck {
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub env: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DependencyPermission {
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub safety: Option<SafetyClass>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DependencyProvision {
+    #[serde(default)]
+    pub elicit: Option<String>,
+    #[serde(default)]
+    pub options: Vec<DependencyProvisionOption>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DependencyProvisionOption {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub safety: Option<SafetyClass>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Resource {
+    pub path: String,
+    pub role: ResourceRole,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub used_by: Vec<ResourceUse>,
+    #[serde(default)]
+    pub load_when: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceRole {
+    SourceMaterial,
+    Reference,
+    RequiredProcedure,
+    Example,
+    Script,
+    Asset,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ResourceUse {
+    pub kind: ResourceUseKind,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceUseKind {
+    Route,
+    Rule,
+    State,
+    Elicitation,
+    Dependency,
+    Command,
+    Code,
+    Artifact,
+    Recipe,
+    Snippet,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CodeBlock {
+    pub language: String,
+    pub kind: CodeKind,
+    pub source: CodeSource,
+    #[serde(default)]
+    pub provenance: Option<CodeProvenance>,
+    #[serde(default)]
+    pub purpose: Option<String>,
+    #[serde(default)]
+    pub requires: CodeRequires,
+    #[serde(default)]
+    pub inputs: Vec<String>,
+    #[serde(default)]
+    pub outputs: Vec<String>,
+    #[serde(default)]
+    pub safety: CodeSafety,
+    #[serde(default)]
+    pub use_when: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CodeKind {
+    Example,
+    RunnableScript,
+    Probe,
+    Transform,
+    Validator,
+    Troubleshooting,
+    Reference,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CodeSource {
+    Inline { inline: String },
+    File(CodeFileSource),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CodeFileSource {
+    pub file: String,
+    #[serde(default)]
+    pub from_resource: Option<String>,
+    #[serde(default)]
+    pub fence_index: Option<u32>,
+    #[serde(default)]
+    pub heading: Option<String>,
+    #[serde(default)]
+    pub sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CodeProvenance {
+    pub resource: String,
+    #[serde(default)]
+    pub fence_index: Option<u32>,
+    #[serde(default)]
+    pub heading: Option<String>,
+    #[serde(default)]
+    pub line_start: Option<u32>,
+    #[serde(default)]
+    pub line_end: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CodeRequires {
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
+    pub artifacts: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CodeSafety {
+    #[serde(default)]
+    pub mutates_input: bool,
+    #[serde(default)]
+    pub writes_files: bool,
+    #[serde(default)]
+    pub network: bool,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Artifact {
+    pub kind: ArtifactKind,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub schema: Option<serde_yaml::Value>,
+    #[serde(default)]
+    pub produced_by: Vec<ProducerRef>,
+    #[serde(default)]
+    pub consumed_by: Vec<ConsumerRef>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactKind {
+    File,
+    Directory,
+    Json,
+    Text,
+    Image,
+    Pdf,
+    Transcript,
+    Report,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProducerRef {
+    pub kind: ExecutableRefKind,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConsumerRef {
+    pub kind: ExecutableRefKind,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutableRefKind {
+    Command,
+    Code,
+    Recipe,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Recipe {
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub ordered: bool,
+    #[serde(default)]
+    pub requires: RecipeRequires,
+    #[serde(default)]
+    pub steps: Vec<RecipeStep>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct RecipeRequires {
+    #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub artifacts: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RecipeStep {
+    LoadResource { load_resource: String },
+    RunCommand { run_command: String },
+    RunCode { run_code: String },
+    ProduceArtifact { produce_artifact: String },
+    ConsumeArtifact { consume_artifact: String },
+    Ask { ask: String },
+    Branch { branch: RecipeBranch },
+    Note { note: String },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RecipeBranch {
+    #[serde(rename = "if")]
+    pub if_condition: String,
+    pub then: String,
+    #[serde(default)]
+    pub otherwise: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

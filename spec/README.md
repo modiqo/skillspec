@@ -29,6 +29,14 @@ small CLI.
 - `rules`: intent and guard rules
 - `states`: state machine for the skill
 - `trace`: append-only decision event contract
+- `dependencies`: declared tools, files, env vars, services, adapters, browsers,
+  packages, checks, permissions, and provision choices
+- `resources`: source files preserved from imported multi-file skills
+- `code`: fenced snippets or scripts with provenance, requirements, safety, and
+  artifact links
+- `artifacts`: named files or data products consumed and produced by behavior
+- `recipes`: ordered procedures that bind resources, code, commands, artifacts,
+  and elicitations
 - `commands`: command templates or command invocation instructions
 - `snippets`: reusable prose
 - `closures`: post-task behavior

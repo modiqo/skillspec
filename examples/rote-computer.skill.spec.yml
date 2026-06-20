@@ -74,6 +74,25 @@ rules:
       - browser
     reason: Structured service tasks should reuse memory first, then direct connection, then CLI or browser fallback.
 
+dependencies:
+  rote:
+    kind: cli
+    description: Rote CLI is required for remembered route search, trace cost, and durable evidence capture.
+    command: rote
+    check:
+      command: rote
+    provision:
+      options:
+        - id: install_rote
+          label: Install or upgrade rote through the project-approved path
+          safety: local_write
+  shell:
+    kind: cli
+    description: A POSIX-compatible shell is required for local CLI discovery commands such as `command -v`.
+    command: sh
+    check:
+      command: sh
+
 states:
   start:
     do:
@@ -134,11 +153,17 @@ commands:
     description: Search saved work before starting fresh exploration.
     template: "rote flow search {{ intent | shell_quote }}"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   collect_trace_cost:
     description: Collect execution trace and dependency cost after task completion.
     template: "rote trace --deps --format json"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
     parse:
       tokens: "$.totals.tokens"
       estimated_cost_usd: "$.totals.estimated_cost_usd"
@@ -148,6 +173,9 @@ commands:
     description: Detect candidate CLI availability without running mutating commands.
     template: "command -v {{ command | shell_quote }}"
     safety: local_read
+    requires:
+      dependencies:
+        - shell
 
 snippets:
   task_entry:

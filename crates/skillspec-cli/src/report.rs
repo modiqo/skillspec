@@ -15,12 +15,31 @@ pub fn validation_ok(path: &Path, spec: &SkillSpec) -> Result<()> {
 }
 
 pub fn import_ok(path: &Path, out: &Path, spec: &SkillSpec) -> Result<()> {
-    text(&format!(
+    let mut stdout = io::stdout().lock();
+    writeln!(
+        stdout,
         "ok: imported {} into {} with {} review note(s)",
         path.display(),
         out.display(),
         spec.review_required.len()
-    ))
+    )?;
+    if spec.dependencies.is_empty() {
+        writeln!(stdout, "deps: none inferred")?;
+    } else {
+        let deps = spec
+            .dependencies
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(stdout, "deps: inferred {deps}")?;
+        writeln!(
+            stdout,
+            "next: run `skillspec deps check {}` and review permissions/provisioning before install",
+            out.display()
+        )?;
+    }
+    Ok(())
 }
 
 pub fn test_result(result: &TestRun) -> Result<()> {

@@ -1,6 +1,8 @@
 use crate::model::{
-    CommandTemplate, Elicitation, ElicitationChoice, Predicate, Route, Rule, SafetyClass,
-    ScenarioTest, SkillSpec, State, TraceEventKind,
+    Artifact, ArtifactKind, CodeBlock, CodeKind, CodeSource, CommandRequires, CommandTemplate,
+    Dependency, DependencyKind, Elicitation, ElicitationChoice, Predicate, Recipe, RecipeStep,
+    Resource, ResourceRole, ResourceUse, ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest,
+    SkillSpec, State, TraceEventKind,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -23,6 +25,11 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_rules(&mut output, spec);
     write_elicitations(&mut output, spec);
     write_trace(&mut output, spec);
+    write_dependencies(&mut output, spec);
+    write_resources(&mut output, spec);
+    write_code(&mut output, spec);
+    write_artifacts(&mut output, spec);
+    write_recipes(&mut output, spec);
     write_states(&mut output, spec);
     write_commands(&mut output, spec);
     write_snippets(&mut output, spec);
@@ -32,6 +39,272 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_review_required(&mut output, spec);
     write_runtime_commands(&mut output);
     output
+}
+
+fn write_resources(output: &mut String, spec: &SkillSpec) {
+    if spec.resources.is_empty() {
+        return;
+    }
+    output.push_str("## Resources\n\n");
+    output.push_str("Resources are source material and provenance, not hidden control flow. Use structured routes, rules, code, commands, and recipes for behavior.\n\n");
+    for (id, resource) in &spec.resources {
+        write_resource(output, id, resource);
+    }
+}
+
+fn write_resource(output: &mut String, id: &str, resource: &Resource) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- path: `{}`", resource.path);
+    let _ = writeln!(output, "- role: `{}`", resource_role_name(resource));
+    if let Some(description) = &resource.description {
+        let _ = writeln!(output, "- description: {description}");
+    }
+    if !resource.used_by.is_empty() {
+        output.push_str("- used_by:\n");
+        for use_ref in &resource.used_by {
+            let _ = writeln!(
+                output,
+                "  - {}: `{}`",
+                resource_use_kind_name(use_ref),
+                use_ref.id
+            );
+        }
+    }
+    if !resource.load_when.is_empty() {
+        let _ = writeln!(output, "- load_when: {}", code_list(&resource.load_when));
+    }
+    output.push('\n');
+}
+
+fn write_code(output: &mut String, spec: &SkillSpec) {
+    if spec.code.is_empty() {
+        return;
+    }
+    output.push_str("## Code Blocks\n\n");
+    output.push_str("Code blocks preserve executable knowledge from source skills. Review safety, dependencies, inputs, and outputs before running or promoting code into a recipe.\n\n");
+    for (id, code) in &spec.code {
+        write_code_block(output, id, code);
+    }
+}
+
+fn write_code_block(output: &mut String, id: &str, code: &CodeBlock) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- language: `{}`", code.language);
+    let _ = writeln!(output, "- kind: `{}`", code_kind_name(code));
+    if let Some(purpose) = &code.purpose {
+        let _ = writeln!(output, "- purpose: {purpose}");
+    }
+    if let Some(provenance) = &code.provenance {
+        let _ = writeln!(output, "- provenance: `{}`", provenance.resource);
+        if let Some(fence_index) = provenance.fence_index {
+            let _ = writeln!(output, "  - fence_index: {fence_index}");
+        }
+        if let Some(heading) = &provenance.heading {
+            let _ = writeln!(output, "  - heading: {heading}");
+        }
+    }
+    if !code.requires.dependencies.is_empty()
+        || !code.requires.resources.is_empty()
+        || !code.requires.artifacts.is_empty()
+    {
+        output.push_str("- requires:\n");
+        if !code.requires.dependencies.is_empty() {
+            let _ = writeln!(
+                output,
+                "  - dependencies: {}",
+                code_list(&code.requires.dependencies)
+            );
+        }
+        if !code.requires.resources.is_empty() {
+            let _ = writeln!(
+                output,
+                "  - resources: {}",
+                code_list(&code.requires.resources)
+            );
+        }
+        if !code.requires.artifacts.is_empty() {
+            let _ = writeln!(
+                output,
+                "  - artifacts: {}",
+                code_list(&code.requires.artifacts)
+            );
+        }
+    }
+    if !code.inputs.is_empty() {
+        let _ = writeln!(output, "- inputs: {}", code_list(&code.inputs));
+    }
+    if !code.outputs.is_empty() {
+        let _ = writeln!(output, "- outputs: {}", code_list(&code.outputs));
+    }
+    output.push_str("- source:\n\n");
+    match &code.source {
+        CodeSource::Inline { inline } => {
+            let _ = writeln!(output, "```{}", code.language);
+            output.push_str(inline);
+            output.push_str("\n```\n");
+        }
+        CodeSource::File(file) => {
+            let _ = writeln!(output, "`{}`\n", file.file);
+        }
+    }
+    output.push('\n');
+}
+
+fn write_artifacts(output: &mut String, spec: &SkillSpec) {
+    if spec.artifacts.is_empty() {
+        return;
+    }
+    output.push_str("## Artifacts\n\n");
+    output.push_str("Artifacts describe named files or data products that code, commands, and recipes consume or produce.\n\n");
+    for (id, artifact) in &spec.artifacts {
+        write_artifact(output, id, artifact);
+    }
+}
+
+fn write_artifact(output: &mut String, id: &str, artifact: &Artifact) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- kind: `{}`", artifact_kind_name(artifact));
+    if let Some(description) = &artifact.description {
+        let _ = writeln!(output, "- description: {description}");
+    }
+    if let Some(path) = &artifact.path {
+        let _ = writeln!(output, "- path: `{path}`");
+    }
+    output.push('\n');
+}
+
+fn write_recipes(output: &mut String, spec: &SkillSpec) {
+    if spec.recipes.is_empty() {
+        return;
+    }
+    output.push_str("## Recipes\n\n");
+    output.push_str("Recipes are ordered procedures with explicit resource, dependency, code, command, elicitation, and artifact references.\n\n");
+    for (id, recipe) in &spec.recipes {
+        write_recipe(output, id, recipe);
+    }
+}
+
+fn write_recipe(output: &mut String, id: &str, recipe: &Recipe) {
+    let _ = writeln!(output, "### `{id}`");
+    if let Some(description) = &recipe.description {
+        let _ = writeln!(output, "- description: {description}");
+    }
+    let _ = writeln!(output, "- ordered: {}", recipe.ordered);
+    if !recipe.steps.is_empty() {
+        output.push_str("- steps:\n");
+        for step in &recipe.steps {
+            write_recipe_step(output, step);
+        }
+    }
+    output.push('\n');
+}
+
+fn write_recipe_step(output: &mut String, step: &RecipeStep) {
+    match step {
+        RecipeStep::LoadResource { load_resource } => {
+            let _ = writeln!(output, "  - load_resource: `{load_resource}`");
+        }
+        RecipeStep::RunCommand { run_command } => {
+            let _ = writeln!(output, "  - run_command: `{run_command}`");
+        }
+        RecipeStep::RunCode { run_code } => {
+            let _ = writeln!(output, "  - run_code: `{run_code}`");
+        }
+        RecipeStep::ProduceArtifact { produce_artifact } => {
+            let _ = writeln!(output, "  - produce_artifact: `{produce_artifact}`");
+        }
+        RecipeStep::ConsumeArtifact { consume_artifact } => {
+            let _ = writeln!(output, "  - consume_artifact: `{consume_artifact}`");
+        }
+        RecipeStep::Ask { ask } => {
+            let _ = writeln!(output, "  - ask: `{ask}`");
+        }
+        RecipeStep::Branch { branch } => {
+            let _ = writeln!(
+                output,
+                "  - branch: if `{}` then `{}`",
+                branch.if_condition, branch.then
+            );
+            if let Some(otherwise) = &branch.otherwise {
+                let _ = writeln!(output, "    otherwise `{otherwise}`");
+            }
+        }
+        RecipeStep::Note { note } => {
+            let _ = writeln!(output, "  - note: {note}");
+        }
+    }
+}
+
+fn write_dependencies(output: &mut String, spec: &SkillSpec) {
+    if spec.dependencies.is_empty() {
+        return;
+    }
+    output.push_str("## Dependencies\n\n");
+    output.push_str("Check declared dependencies before using commands that require them. Missing dependencies must be handled through the declared provision or elicitation path; do not silently install global tools.\n\n");
+    for (id, dependency) in &spec.dependencies {
+        write_dependency(output, id, dependency);
+    }
+}
+
+fn write_dependency(output: &mut String, id: &str, dependency: &Dependency) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- kind: `{}`", dependency_kind_name(dependency));
+    if let Some(description) = &dependency.description {
+        let _ = writeln!(output, "- description: {description}");
+    }
+    if let Some(command) = &dependency.command {
+        let _ = writeln!(output, "- command: `{command}`");
+    }
+    if let Some(path) = &dependency.path {
+        let _ = writeln!(output, "- path: `{path}`");
+    }
+    if let Some(env) = &dependency.env {
+        let _ = writeln!(output, "- env: `{env}`");
+    }
+    if let Some(check) = &dependency.check {
+        output.push_str("- check:\n");
+        if let Some(command) = &check.command {
+            let _ = writeln!(output, "  - command: `{command}`");
+        }
+        if let Some(path) = &check.path {
+            let _ = writeln!(output, "  - path: `{path}`");
+        }
+        if let Some(env) = &check.env {
+            let _ = writeln!(output, "  - env: `{env}`");
+        }
+    }
+    if let Some(permission) = &dependency.permission {
+        output.push_str("- permission:\n");
+        let _ = writeln!(output, "  - required: {}", permission.required);
+        if let Some(reason) = &permission.reason {
+            let _ = writeln!(output, "  - reason: {reason}");
+        }
+        if let Some(safety) = &permission.safety {
+            let _ = writeln!(output, "  - safety: `{}`", safety_name(safety));
+        }
+    }
+    if let Some(provision) = &dependency.provision {
+        output.push_str("- provision:\n");
+        if let Some(elicitation) = &provision.elicit {
+            let _ = writeln!(output, "  - elicit: `{elicitation}`");
+        }
+        if !provision.options.is_empty() {
+            output.push_str("  - options:\n");
+            for option in &provision.options {
+                let _ = writeln!(output, "    - `{}`: {}", option.id, option.label);
+                if let Some(description) = &option.description {
+                    let _ = writeln!(output, "      description: {description}");
+                }
+                if let Some(command) = &option.command {
+                    let _ = writeln!(output, "      command: `{command}`");
+                }
+                if let Some(safety) = &option.safety {
+                    let _ = writeln!(output, "      safety: `{}`", safety_name(safety));
+                }
+            }
+        }
+    }
+    output.push('\n');
 }
 
 fn write_frontmatter(output: &mut String, spec: &SkillSpec, target: Target) {
@@ -350,7 +623,7 @@ fn write_command(output: &mut String, id: &str, command: &CommandTemplate) {
     output.push_str("\n```\n");
     if !command.requires.is_empty() {
         output.push_str("- requires:\n");
-        write_yaml_map(output, &command.requires, 2);
+        write_command_requires(output, &command.requires);
     }
     if !command.parse.is_empty() {
         output.push_str("- parse:\n");
@@ -363,6 +636,28 @@ fn write_command(output: &mut String, id: &str, command: &CommandTemplate) {
         write_yaml_map(output, &command.success_when, 2);
     }
     output.push('\n');
+}
+
+fn write_command_requires(output: &mut String, requires: &CommandRequires) {
+    if !requires.dependencies.is_empty() {
+        let _ = writeln!(
+            output,
+            "  - dependencies: {}",
+            code_list(&requires.dependencies)
+        );
+    }
+    if !requires.files.is_empty() {
+        let _ = writeln!(output, "  - files: {}", code_list(&requires.files));
+    }
+    if !requires.env.is_empty() {
+        let _ = writeln!(output, "  - env: {}", code_list(&requires.env));
+    }
+    if !requires.auth.is_empty() {
+        let _ = writeln!(output, "  - auth: {}", code_list(&requires.auth));
+    }
+    if !requires.extra.is_empty() {
+        write_yaml_map(output, &requires.extra, 2);
+    }
 }
 
 fn write_snippets(output: &mut String, spec: &SkillSpec) {
@@ -474,6 +769,8 @@ fn write_runtime_commands(output: &mut String) {
     output.push_str("```bash\n");
     output.push_str("skillspec validate <skill-folder>/skill.spec.yml\n");
     output.push_str("skillspec test <skill-folder>/skill.spec.yml\n");
+    output.push_str("skillspec deps check <skill-folder>/skill.spec.yml\n");
+    output.push_str("skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>\n");
     output.push_str(
         "skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
     );
@@ -554,6 +851,69 @@ fn safety_name(safety: &SafetyClass) -> &'static str {
         SafetyClass::BrowserAttach => "browser_attach",
         SafetyClass::CredentialRequest => "credential_request",
         SafetyClass::Destructive => "destructive",
+    }
+}
+
+fn dependency_kind_name(dependency: &Dependency) -> &'static str {
+    match dependency.kind {
+        DependencyKind::Cli => "cli",
+        DependencyKind::Package => "package",
+        DependencyKind::File => "file",
+        DependencyKind::Env => "env",
+        DependencyKind::Service => "service",
+        DependencyKind::Adapter => "adapter",
+        DependencyKind::Browser => "browser",
+    }
+}
+
+fn resource_role_name(resource: &Resource) -> &'static str {
+    match &resource.role {
+        ResourceRole::SourceMaterial => "source_material",
+        ResourceRole::Reference => "reference",
+        ResourceRole::RequiredProcedure => "required_procedure",
+        ResourceRole::Example => "example",
+        ResourceRole::Script => "script",
+        ResourceRole::Asset => "asset",
+    }
+}
+
+fn resource_use_kind_name(use_ref: &ResourceUse) -> &'static str {
+    match &use_ref.kind {
+        ResourceUseKind::Route => "route",
+        ResourceUseKind::Rule => "rule",
+        ResourceUseKind::State => "state",
+        ResourceUseKind::Elicitation => "elicitation",
+        ResourceUseKind::Dependency => "dependency",
+        ResourceUseKind::Command => "command",
+        ResourceUseKind::Code => "code",
+        ResourceUseKind::Artifact => "artifact",
+        ResourceUseKind::Recipe => "recipe",
+        ResourceUseKind::Snippet => "snippet",
+    }
+}
+
+fn code_kind_name(code: &CodeBlock) -> &'static str {
+    match &code.kind {
+        CodeKind::Example => "example",
+        CodeKind::RunnableScript => "runnable_script",
+        CodeKind::Probe => "probe",
+        CodeKind::Transform => "transform",
+        CodeKind::Validator => "validator",
+        CodeKind::Troubleshooting => "troubleshooting",
+        CodeKind::Reference => "reference",
+    }
+}
+
+fn artifact_kind_name(artifact: &Artifact) -> &'static str {
+    match &artifact.kind {
+        ArtifactKind::File => "file",
+        ArtifactKind::Directory => "directory",
+        ArtifactKind::Json => "json",
+        ArtifactKind::Text => "text",
+        ArtifactKind::Image => "image",
+        ArtifactKind::Pdf => "pdf",
+        ArtifactKind::Transcript => "transcript",
+        ArtifactKind::Report => "report",
     }
 }
 

@@ -15,6 +15,7 @@ SkillSpec
   has many States
   has many Elicitations
   may have Trace contract
+  has many Dependencies
   has many Commands
   has many Snippets
   has many Tests
@@ -45,10 +46,17 @@ State
   may branch to State by user answer
 
 Command
-  may require Tool/File/Env
+  may require Dependency/File/Env/Auth
   has SafetyClass
   may parse Output
   may prove State or Closure
+
+Dependency
+  declares Tool/File/Env/Service/Adapter/Browser/Package
+  may define Check
+  may require Permission
+  may offer Provision options through Elicitation
+  may be required by Command
 
 Test
   provides Input
@@ -120,6 +128,7 @@ associations define the useful behavior.
 | `Elicitation` | A bounded question | choices, facts, route, next state | scenario tests and user answers |
 | `State` | Lifecycle position | commands, snippets, elicitations, next/yes/no states | state graph review and flow replay |
 | `Command` | A named action template | required tools/files/env, parse rules, safety class | captured command output |
+| `Dependency` | Required local or remote capability | commands, checks, permissions, provision elicitations | dependency checks and user approvals |
 | `Snippet` | Stable human-facing prose | states or generated skill docs | generated skill output |
 | `Closure` | Post-task behavior | commands, digest, memory, hub share | trace/cost evidence |
 | `Test` | Steering regression case | rules and expectations | `skillspec test` |
@@ -136,6 +145,7 @@ user input
   -> matched rules
   -> route choice, route order, and required elicitations
   -> bounded user choice when needed
+  -> dependency checks and provision choices
   -> state lifecycle
   -> command/snippet execution plan
   -> captured evidence

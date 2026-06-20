@@ -117,6 +117,304 @@
       },
       "additionalProperties": false
     },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["cli", "package", "file", "env", "service", "adapter", "browser"]
+          },
+          "description": { "type": "string" },
+          "command": { "type": "string" },
+          "path": { "type": "string" },
+          "env": { "type": "string" },
+          "check": {
+            "type": "object",
+            "properties": {
+              "command": { "type": "string" },
+              "path": { "type": "string" },
+              "env": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "permission": {
+            "type": "object",
+            "properties": {
+              "required": { "type": "boolean" },
+              "reason": { "type": "string" },
+              "safety": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "provision": {
+            "type": "object",
+            "properties": {
+              "elicit": { "type": "string" },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "label"],
+                  "properties": {
+                    "id": { "type": "string", "minLength": 1 },
+                    "label": { "type": "string", "minLength": 1 },
+                    "description": { "type": "string" },
+                    "command": { "type": "string" },
+                    "safety": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path", "role"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "role": {
+            "type": "string",
+            "enum": [
+              "source_material",
+              "reference",
+              "required_procedure",
+              "example",
+              "script",
+              "asset"
+            ]
+          },
+          "description": { "type": "string" },
+          "used_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "id"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "route",
+                    "rule",
+                    "state",
+                    "elicitation",
+                    "dependency",
+                    "command",
+                    "code",
+                    "artifact",
+                    "recipe",
+                    "snippet"
+                  ]
+                },
+                "id": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "load_when": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["language", "kind", "source"],
+        "properties": {
+          "language": { "type": "string", "minLength": 1 },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "example",
+              "runnable_script",
+              "probe",
+              "transform",
+              "validator",
+              "troubleshooting",
+              "reference"
+            ]
+          },
+          "source": {
+            "type": "object",
+            "oneOf": [
+              { "required": ["inline"] },
+              { "required": ["file"] }
+            ],
+            "properties": {
+              "inline": { "type": "string" },
+              "file": { "type": "string" },
+              "from_resource": { "type": "string" },
+              "fence_index": { "type": "integer", "minimum": 1 },
+              "heading": { "type": "string" },
+              "sha256": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "provenance": {
+            "type": "object",
+            "required": ["resource"],
+            "properties": {
+              "resource": { "type": "string" },
+              "fence_index": { "type": "integer", "minimum": 1 },
+              "heading": { "type": "string" },
+              "line_start": { "type": "integer", "minimum": 1 },
+              "line_end": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": true
+          },
+          "purpose": { "type": "string" },
+          "requires": {
+            "type": "object",
+            "properties": {
+              "dependencies": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "resources": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "artifacts": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": true
+          },
+          "inputs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "outputs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "safety": {
+            "type": "object",
+            "properties": {
+              "mutates_input": { "type": "boolean" },
+              "writes_files": { "type": "boolean" },
+              "network": { "type": "boolean" },
+              "notes": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": true
+          },
+          "use_when": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "file",
+              "directory",
+              "json",
+              "text",
+              "image",
+              "pdf",
+              "transcript",
+              "report"
+            ]
+          },
+          "description": { "type": "string" },
+          "path": { "type": "string" },
+          "schema": {},
+          "produced_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "id"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["command", "code", "recipe"]
+                },
+                "id": { "type": "string" }
+              },
+              "additionalProperties": true
+            }
+          },
+          "consumed_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "id"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["command", "code", "recipe"]
+                },
+                "id": { "type": "string" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "recipes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "ordered": { "type": "boolean" },
+          "requires": {
+            "type": "object",
+            "properties": {
+              "resources": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "dependencies": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "artifacts": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": true
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
     "states": {
       "type": "object",
       "additionalProperties": {
@@ -126,7 +424,37 @@
     "commands": {
       "type": "object",
       "additionalProperties": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "template": { "type": "string" },
+          "safety": { "type": "string" },
+          "requires": {
+            "type": "object",
+            "properties": {
+              "dependencies": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "files": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "auth": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": true
+          },
+          "parse": { "type": "object" },
+          "success_when": { "type": "object" }
+        },
+        "additionalProperties": true
       }
     },
     "snippets": {

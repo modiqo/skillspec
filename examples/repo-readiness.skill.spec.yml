@@ -72,6 +72,46 @@ rules:
       - hidden_credential_prompt
     reason: Interactive auth should stay visible and bounded.
 
+dependencies:
+  git:
+    kind: cli
+    description: Git is required for local repository branch and sync state.
+    command: git
+    check:
+      command: git
+  gh:
+    kind: cli
+    description: GitHub CLI is required for authenticated remote repository inspection.
+    command: gh
+    check:
+      command: gh
+    permission:
+      required: true
+      reason: GitHub CLI may use authenticated account state and network access.
+      safety: network_read
+    provision:
+      options:
+        - id: user_global
+          label: Install GitHub CLI with a user package manager
+          command: brew install gh
+          safety: local_write
+  rote:
+    kind: cli
+    description: Rote CLI is required for tracked background jobs, process streams, and dependency traces.
+    command: rote
+    check:
+      command: rote
+  cargo:
+    kind: cli
+    description: Cargo is required for Rust repository checks and tests.
+    command: cargo
+    check:
+      command: cargo
+    permission:
+      required: true
+      reason: Cargo commands may execute project build scripts and tests.
+      safety: local_read
+
 states:
   start:
     do:
@@ -96,18 +136,24 @@ commands:
     description: Check local branch state.
     template: "git status --short --branch"
     safety: local_read
+    requires:
+      dependencies:
+        - git
 
   gh_repo:
     description: Inspect remote repository state through GitHub CLI.
     template: "gh repo view --json nameWithOwner,defaultBranchRef,pushedAt"
     safety: network_read
+    requires:
+      dependencies:
+        - gh
 
   cargo_tests_background:
     description: Run cargo tests as a tracked background job and observe stderr/stdout through process streams.
     template: "rote exec --background --stdout-file logs/cargo-test.stdout.log --stderr-file logs/cargo-test.stderr.log -- cargo test --features test-helpers"
     safety: local_read
     requires:
-      tools:
+      dependencies:
         - cargo
         - rote
 
@@ -115,16 +161,25 @@ commands:
     description: Join a tracked finite job before making completion claims.
     template: "rote exec wait <lease> --timeout-ms 600000 --poll-ms 1000"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   summarize_streams:
     description: Read tracked stdout and stderr artifacts rather than terminal scrollback.
     template: "rote stream follow-process <lease> --stream stderr --from-start --max-bytes 65536"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
   collect_trace_cost:
     description: Collect work cost after completion.
     template: "rote trace --deps --format json"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
 
 closures:
   choose_route:
