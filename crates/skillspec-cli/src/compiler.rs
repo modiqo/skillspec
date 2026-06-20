@@ -17,6 +17,11 @@ pub enum Target {
 pub fn compile(spec: &SkillSpec, target: Target) -> String {
     let mut output = String::new();
     write_frontmatter(&mut output, spec, target);
+    if matches!(target, Target::CodexSkill | Target::ClaudeSkill) {
+        write_loader_skill(&mut output, spec);
+        return output;
+    }
+
     write_overview(&mut output, spec, target);
     write_runtime_contract(&mut output);
     write_entry(&mut output, spec);
@@ -39,6 +44,41 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_review_required(&mut output, spec);
     write_runtime_commands(&mut output);
     output
+}
+
+fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
+    let _ = writeln!(output, "# {}", spec.title);
+    output.push('\n');
+    let _ = writeln!(output, "{}", spec.description);
+    output.push('\n');
+    output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, resources, recipes, tests, and trace requirements.\n\n");
+    output.push_str("## Runtime Contract\n\n");
+    output.push_str(
+        "1. Load `./skill.spec.yml` from this skill folder before taking task actions.\n",
+    );
+    output.push_str("2. When the `skillspec` CLI is available, run:\n\n");
+    output.push_str("   ```bash\n");
+    output.push_str("   skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("   ```\n\n");
+    output.push_str("3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.\n");
+    output.push_str("4. Preserve the emitted trace `run_dir`; mention it in the completion report so the decision path can be inspected.\n");
+    output.push_str("5. Follow the selected route, matched rules, forbids, elicitations, dependencies, recipes, and closures from `skill.spec.yml`.\n");
+    output.push_str("6. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.\n\n");
+    output.push_str("## Quick Commands\n\n");
+    output.push_str("```bash\n");
+    output.push_str("skillspec validate ./skill.spec.yml\n");
+    output.push_str("skillspec test ./skill.spec.yml\n");
+    output.push_str("skillspec deps check ./skill.spec.yml\n");
+    output.push_str("skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("```\n\n");
+    if !spec.routes.is_empty() {
+        output.push_str("## Route Hints\n\n");
+        let mut routes = spec.routes.iter().collect::<Vec<_>>();
+        routes.sort_by_key(|route| route.rank.unwrap_or(i64::MAX));
+        for route in routes {
+            let _ = writeln!(output, "- `{}`: {}", route.id.0, route.label);
+        }
+    }
 }
 
 fn write_resources(output: &mut String, spec: &SkillSpec) {
@@ -951,4 +991,53 @@ fn skill_name(id: &str) -> String {
         }
     }
     name.trim_matches('-').to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn harness_skill_targets_emit_minimal_loader() {
+        let spec = SkillSpec {
+            schema: "skillspec/v0".to_owned(),
+            id: "generic.code_review".to_owned(),
+            title: "Code Review".to_owned(),
+            description: "Review code changes.".to_owned(),
+            applies_when: Vec::new(),
+            entry: None,
+            routes: vec![Route {
+                id: crate::model::RouteId("current_pr".to_owned()),
+                label: "Review current pull request".to_owned(),
+                rank: Some(10),
+                description: None,
+                checks: Vec::new(),
+            }],
+            rules: Vec::new(),
+            states: BTreeMap::new(),
+            elicitations: BTreeMap::new(),
+            trace: None,
+            dependencies: BTreeMap::new(),
+            resources: BTreeMap::new(),
+            code: BTreeMap::new(),
+            artifacts: BTreeMap::new(),
+            recipes: BTreeMap::new(),
+            commands: BTreeMap::new(),
+            snippets: BTreeMap::new(),
+            closures: BTreeMap::new(),
+            proof: None,
+            tests: Vec::new(),
+            review_required: Vec::new(),
+            metadata: BTreeMap::new(),
+        };
+
+        let output = compile(&spec, Target::ClaudeSkill);
+
+        assert!(output.contains("thin loader"));
+        assert!(output.contains("skill.spec.yml"));
+        assert!(output.contains("--trace-dir"));
+        assert!(output.contains("run_dir"));
+        assert!(!output.contains("## Rules"));
+        assert!(!output.contains("## Dependencies"));
+    }
 }
