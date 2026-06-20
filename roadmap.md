@@ -104,18 +104,34 @@ wastes fewer tokens, and leaves better evidence.
 
 ## What We Should Build Next
 
-### 1. Better Imports
+### 1. Better Imports And Composition
 
 - Import local skill folders and public GitHub skill folders into a staged local
   workspace before conversion.
 - Preserve every source file under `source/` and link useful pieces back into
-  `resources`, `code`, `artifacts`, and `recipes`.
-- Separate reference prose, executable snippets, command templates, dependency
-  declarations, and route/rule candidates.
+  `imports`, `resources`, `code`, `artifacts`, and `recipes`.
+- Treat runtime-loadable Markdown as `imports` first, and use `resources` for
+  provenance, assets, scripts, fixtures, and source material that should not be
+  loaded as active guidance.
+- Separate reference prose, procedures, executable snippets, command templates,
+  dependency declarations, and route/rule candidates.
 - Emit review notes where the importer is unsure. Do not flatten ambiguity into
   fake confidence.
-- Validate missing resources, orphaned resources, unused snippets, and stale
-  links.
+- Validate missing imports/resources, orphaned imports/resources, unused
+  snippets, and stale links.
+- Design spec-to-spec composition separately from imports. Importing
+  `skill.spec.yml` as guidance is not enough; composition needs explicit merge
+  semantics for routes, rules, commands, imports, resources, tests, proof, and
+  trace requirements.
+- Decide the composition shape: `extends` for inheritance, `includes` for
+  reusable partial specs, or both.
+- Define conflict and namespacing rules before implementation: duplicate ids,
+  route/rule ordering, dependency merging, command overrides, test ownership,
+  and whether imported specs expose namespaced ids or merge into the local id
+  space.
+- Make safety weakening explicit and review-gated. A composed spec must not
+  silently remove forbids, relax permissions, bypass elicitations, or downgrade
+  dependency checks from a base spec.
 
 ### 2. Better Runtime Discipline
 
@@ -167,7 +183,9 @@ wastes fewer tokens, and leaves better evidence.
 
 - `skillspec import-skill` can import multi-file public GitHub skill folders and
   local skill folders into a reviewed project shape.
-- `skillspec validate` catches orphaned resources and missing local files.
+- `skillspec validate` catches orphaned imports/resources and broken references.
+- `skillspec imports check` reports import path resolution, sections, nesting,
+  and load order.
 - `skillspec deps check` reports declared dependencies with clear provisioning
   guidance.
 - `skillspec compile --target codex-skill|claude-skill` emits a minimal loader,
