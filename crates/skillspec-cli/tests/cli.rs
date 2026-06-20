@@ -202,11 +202,11 @@ routes:
   - id: local
     label: Local
 dependencies:
-  cargo:
+  present_cli:
     kind: cli
-    command: cargo
+    command: present-cli
     check:
-      command: cargo
+      command: present-cli
   missing_file:
     kind: file
     path: absent.txt
@@ -214,9 +214,9 @@ dependencies:
     kind: package
 commands:
   present:
-    template: cargo --version
+    template: present-cli --version
     requires:
-      dependencies: [cargo]
+      dependencies: [present_cli]
   missing:
     template: cat absent.txt
     requires:
@@ -381,9 +381,13 @@ fn decide_enforces_required_trace_and_trace_compaction() {
 fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     let dir = TempDir::new("deps");
     let spec = dir.path().join("skill.spec.yml");
+    let cli_dir = dir.path().join("bin");
+    write_file(&cli_dir.join("present-cli"), "");
+    let test_path = std::env::join_paths([cli_dir]).unwrap();
     write_file(&spec, deps_spec());
 
     let all = Command::new(bin())
+        .env("PATH", &test_path)
         .arg("deps")
         .arg("check")
         .arg(&spec)
@@ -397,6 +401,7 @@ fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     assert!(statuses.iter().any(|dep| dep["status"] == "deferred"));
 
     let scoped = Command::new(bin())
+        .env("PATH", &test_path)
         .arg("deps")
         .arg("check")
         .arg(&spec)
@@ -408,7 +413,7 @@ fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     let scoped_report = json_stdout(&scoped);
     assert_eq!(scoped_report["ok"], true);
     assert_eq!(scoped_report["dependencies"].as_array().unwrap().len(), 1);
-    assert_eq!(scoped_report["dependencies"][0]["id"], "cargo");
+    assert_eq!(scoped_report["dependencies"][0]["id"], "present_cli");
 }
 
 #[test]

@@ -48,6 +48,10 @@ The CI workflow runs the same categories of checks. It provides small command st
 CI also runs locked native build and test jobs on Linux, macOS, and Windows so
 platform assumptions are caught before release.
 
+The release workflow builds native CLI archives for Linux, macOS, and Windows
+on `v*` tags and manual dispatch. It uploads workflow artifacts for every run
+and attaches archives plus SHA-256 checksums to tagged GitHub releases.
+
 ## Changing The Spec
 
 Spec changes should update these surfaces together:

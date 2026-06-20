@@ -1,0 +1,95 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact_suffix }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_suffix: linux-x86_64
+            archive_ext: tar.gz
+          - os: macos-latest
+            artifact_suffix: macos
+            archive_ext: tar.gz
+          - os: windows-latest
+            artifact_suffix: windows-x86_64
+            archive_ext: zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Build release binary
+        run: cargo build --locked --release -p skillspec
+
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="skillspec-${{ matrix.artifact_suffix }}.${{ matrix.archive_ext }}"
+          mkdir -p dist
+          cp target/release/skillspec dist/skillspec
+          tar -C dist -czf "${artifact}" skillspec
+          shasum -a 256 "${artifact}" > "${artifact}.sha256"
+
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $artifact = "skillspec-${{ matrix.artifact_suffix }}.${{ matrix.archive_ext }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target/release/skillspec.exe dist/skillspec.exe
+          Compress-Archive -Path dist/skillspec.exe -DestinationPath $artifact -Force
+          $hash = Get-FileHash -Algorithm SHA256 $artifact
+          "$($hash.Hash.ToLowerInvariant())  $artifact" | Out-File -Encoding ascii "$artifact.sha256"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspec-${{ matrix.artifact_suffix }}
+          path: |
+            skillspec-${{ matrix.artifact_suffix }}.${{ matrix.archive_ext }}
+            skillspec-${{ matrix.artifact_suffix }}.${{ matrix.archive_ext }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: skillspec-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Attach artifact to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/*

@@ -283,6 +283,9 @@ output.
 CI runs a full Ubuntu quality gate plus native locked build/test jobs on Linux,
 macOS, and Windows.
 
+Tagged releases and manual release runs build native CLI archives for Linux,
+macOS, and Windows with SHA-256 checksums.
+
 The minimum compliance gate for a SkillSpec-backed skill is:
 
 ```sh
