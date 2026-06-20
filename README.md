@@ -112,9 +112,11 @@ skillspec test my-skill/skill.spec.yml
 skillspec deps check my-skill/skill.spec.yml
 ```
 
-If `deps check` reports missing tools or packages, leave the skill draft-only
-or add explicit provision choices. SkillSpec should not silently install global
-dependencies.
+If `deps check` reports confirmed missing local dependencies, leave the skill
+draft-only or add explicit provision choices. Package, service, adapter, and
+browser checks may be reported as `deferred`; those remain visible and must be
+verified by the harness or runtime path before use. SkillSpec should not
+silently install global dependencies.
 
 Current install targets:
 
@@ -239,6 +241,29 @@ Useful examples:
 - [examples/local-csv-report.skill.spec.yml](examples/local-csv-report.skill.spec.yml)
 - [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
 
+## Verification Suite
+
+Run the Rust unit and CLI integration suite:
+
+```sh
+cargo test
+```
+
+Run the repository-level conformance sweep:
+
+```sh
+cargo build
+jq empty spec/skill.spec.schema.json
+find examples -name '*.yml' -exec target/debug/skillspec validate {} \;
+find examples -name '*.yml' -exec target/debug/skillspec test {} \;
+find examples -name '*.yml' -exec target/debug/skillspec deps check {} \;
+```
+
+The test suite covers strict typo rejection across typed grammar nodes,
+scenario-test pass/fail behavior, required trace enforcement and compaction,
+dependency status semantics and command scoping, compiler targets, importer
+draft generation, install target behavior, and schema strictness smoke checks.
+
 Repo-local skills live in `.claude/skills/<name>/` and are checked in despite
 common global ignores for `.claude*`. Each one keeps:
 
@@ -259,8 +284,8 @@ SkillSpec v0 has a formal grammar and relationship model:
 - [spec/rules.md](spec/rules.md) defines rule evaluation and negative
   steering.
 - [spec/trace.md](spec/trace.md) defines append-only decision traces.
-- [spec/skill.spec.schema.json](spec/skill.spec.schema.json) is the permissive
-  JSON schema.
+- [spec/skill.spec.schema.json](spec/skill.spec.schema.json) is the strict JSON
+  schema for typed v0 fields.
 
 The core association is:
 

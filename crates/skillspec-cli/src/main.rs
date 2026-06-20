@@ -176,6 +176,7 @@ fn run() -> Result<()> {
             trace_dir,
         } => {
             let spec = parser::load_spec(&path)?;
+            ensure_trace_available(&spec, trace_dir.as_ref())?;
             let decision = decision::decide_with_events(&spec, &input);
             if let Some(trace_dir) = trace_dir {
                 let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
@@ -189,6 +190,7 @@ fn run() -> Result<()> {
             trace_dir,
         } => {
             let spec = parser::load_spec(&path)?;
+            ensure_trace_available(&spec, trace_dir.as_ref())?;
             let decision = decision::decide_with_events(&spec, &input);
             if let Some(trace_dir) = trace_dir {
                 let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
@@ -254,6 +256,20 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+fn ensure_trace_available(spec: &model::SkillSpec, trace_dir: Option<&PathBuf>) -> Result<()> {
+    if spec
+        .trace
+        .as_ref()
+        .is_some_and(|trace| trace.required && trace_dir.is_none())
+    {
+        return Err(error::Error::InvalidInput {
+            message: "trace.required is true; pass --trace-dir or use a spec that does not require tracing"
+                .to_owned(),
+        });
+    }
+    Ok(())
+}
+
 impl From<InstallTargetArg> for HarnessTarget {
     fn from(value: InstallTargetArg) -> Self {
         match value {
@@ -271,5 +287,36 @@ impl From<CompileTarget> for compiler::Target {
             CompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
             CompileTarget::Markdown => compiler::Target::Markdown,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trace_required_requires_trace_dir() {
+        let yaml = r#"
+schema: skillspec/v0
+id: trace.required
+title: Trace Required
+description: Requires trace output.
+routes:
+  - id: local
+    label: Local
+trace:
+  mode: event_log
+  required: true
+tests:
+  - name: route assertion
+    input: run this
+    expect:
+      route: local
+"#;
+        let spec = serde_yaml::from_str::<model::SkillSpec>(yaml).unwrap();
+        let trace_dir = PathBuf::from(".skillspec/traces");
+
+        assert!(ensure_trace_available(&spec, None).is_err());
+        assert!(ensure_trace_available(&spec, Some(&trace_dir)).is_ok());
     }
 }

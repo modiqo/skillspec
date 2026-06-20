@@ -69,6 +69,7 @@ tests:
       forbid: [native_search_as_answer]
 ```
 
-The reference CLI should eventually evaluate tests by running the same rule
-matcher used by `skillspec decide`.
-
+The reference CLI evaluates tests by running the same rule matcher used by
+`skillspec decide`. Positive list expectations assert inclusion, `*_exact`
+expectations assert exact sets, and `not_*` expectations assert absence. Empty
+expectations are invalid because they cannot prove behavior.

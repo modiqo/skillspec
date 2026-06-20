@@ -50,6 +50,9 @@ The writer can be:
 - an agent harness that interprets the spec directly
 - a future SDK/runtime that exposes typed trace calls
 
+When `trace.required` is true, the reference CLI rejects `decide` and `explain`
+calls that omit `--trace-dir`.
+
 The spec must not embed imperative "write this event file now" instructions in
 each rule. That would turn a behavior contract into a logging script.
 

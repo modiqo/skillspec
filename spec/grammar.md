@@ -70,8 +70,15 @@ References are symbolic. A v0 document is well-formed when:
   or recipe
 - every recipe dependency/resource/artifact/code/command/elicitation reference
   points at an existing id
+- every scenario test declares at least one concrete expectation
+- every expectation reference to a route, elicitation, action, or rule points at
+  an existing id
 
-V0 CLI validation performs these structural and cross-reference checks.
+V0 CLI validation performs these structural and cross-reference checks. Typed v0
+objects are strict: unknown fields are invalid so misspelled behavior does not
+silently disappear. Explicit extension surfaces such as `metadata`, `allow`,
+choice `sets`, artifact `schema`, command `success_when`, and `closures` may
+carry arbitrary structured values.
 
 ## Document
 
@@ -550,12 +557,23 @@ scenario-test   = "name" ":" string ,
 expectation     = [ "route" ":" route-id ] ,
                   [ "route_order" ":" sequence-of route-id ] ,
                   [ "forbid" ":" sequence-of identifier ] ,
+                  [ "forbid_exact" ":" sequence-of identifier ] ,
+                  [ "not_forbid" ":" sequence-of identifier ] ,
                   [ "elicit" ":" sequence-of elicitation-id ] ,
-                  [ "after_success" ":" sequence-of command-id-or-closure-id ] ;
+                  [ "elicit_exact" ":" sequence-of elicitation-id ] ,
+                  [ "not_elicit" ":" sequence-of elicitation-id ] ,
+                  [ "after_success" ":" sequence-of command-id-or-closure-id ] ,
+                  [ "after_success_exact" ":" sequence-of command-id-or-closure-id ] ,
+                  [ "not_after_success" ":" sequence-of command-id-or-closure-id ] ,
+                  [ "matched_rules" ":" sequence-of rule-id ] ,
+                  [ "matched_rules_exact" ":" sequence-of rule-id ] ,
+                  [ "not_matched_rules" ":" sequence-of rule-id ] ;
 ```
 
 Tests are the proof mechanism. Every meaningful route rule should have at least
-one scenario.
+one scenario. An expectation must contain at least one assertion. Plain list
+expectations assert inclusion; `*_exact` expectations assert the exact set; and
+`not_*` expectations assert absence.
 
 ## Proof
 

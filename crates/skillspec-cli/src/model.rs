@@ -10,6 +10,7 @@ pub struct RuleId(pub String);
 pub struct RouteId(pub String);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SkillSpec {
     pub schema: String,
     pub id: String,
@@ -56,11 +57,13 @@ pub struct SkillSpec {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Entry {
     pub prompt: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Route {
     pub id: RouteId,
     pub label: String,
@@ -73,6 +76,7 @@ pub struct Route {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rule {
     pub id: RuleId,
     #[serde(default)]
@@ -94,6 +98,7 @@ pub struct Rule {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Predicate {
     #[serde(default)]
     pub user_says_any: Vec<String>,
@@ -108,6 +113,7 @@ pub struct Predicate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct State {
     #[serde(default)]
     pub r#do: Vec<String>,
@@ -124,6 +130,7 @@ pub struct State {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Elicitation {
     pub question: String,
     #[serde(default)]
@@ -136,6 +143,7 @@ pub struct Elicitation {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ElicitationCondition {
     #[serde(default)]
     pub route: Option<RouteId>,
@@ -146,6 +154,7 @@ pub struct ElicitationCondition {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ElicitationChoice {
     pub id: String,
     pub label: String,
@@ -162,6 +171,7 @@ pub struct ElicitationChoice {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TraceConfig {
     pub mode: TraceMode,
     #[serde(default)]
@@ -193,6 +203,7 @@ pub enum TraceEventKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CommandTemplate {
     #[serde(default)]
     pub description: Option<String>,
@@ -208,6 +219,7 @@ pub struct CommandTemplate {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CommandRequires {
     #[serde(default)]
     pub dependencies: Vec<String>,
@@ -217,9 +229,6 @@ pub struct CommandRequires {
     pub env: Vec<String>,
     #[serde(default)]
     pub auth: Vec<String>,
-    #[serde(default)]
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, serde_yaml::Value>,
 }
 
 impl CommandRequires {
@@ -228,11 +237,11 @@ impl CommandRequires {
             && self.files.is_empty()
             && self.env.is_empty()
             && self.auth.is_empty()
-            && self.extra.is_empty()
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Dependency {
     pub kind: DependencyKind,
     #[serde(default)]
@@ -264,6 +273,7 @@ pub enum DependencyKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyCheck {
     #[serde(default)]
     pub command: Option<String>,
@@ -274,6 +284,7 @@ pub struct DependencyCheck {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyPermission {
     #[serde(default)]
     pub required: bool,
@@ -284,6 +295,7 @@ pub struct DependencyPermission {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyProvision {
     #[serde(default)]
     pub elicit: Option<String>,
@@ -292,6 +304,7 @@ pub struct DependencyProvision {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyProvisionOption {
     pub id: String,
     pub label: String,
@@ -304,6 +317,7 @@ pub struct DependencyProvisionOption {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Resource {
     pub path: String,
     pub role: ResourceRole,
@@ -327,6 +341,7 @@ pub enum ResourceRole {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResourceUse {
     pub kind: ResourceUseKind,
     pub id: String,
@@ -348,6 +363,7 @@ pub enum ResourceUseKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CodeBlock {
     pub language: String,
     pub kind: CodeKind,
@@ -383,11 +399,18 @@ pub enum CodeKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CodeSource {
-    Inline { inline: String },
+    Inline(CodeInlineSource),
     File(CodeFileSource),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CodeInlineSource {
+    pub inline: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CodeFileSource {
     pub file: String,
     #[serde(default)]
@@ -401,6 +424,7 @@ pub struct CodeFileSource {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CodeProvenance {
     pub resource: String,
     #[serde(default)]
@@ -414,6 +438,7 @@ pub struct CodeProvenance {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CodeRequires {
     #[serde(default)]
     pub dependencies: Vec<String>,
@@ -424,6 +449,7 @@ pub struct CodeRequires {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CodeSafety {
     #[serde(default)]
     pub mutates_input: bool,
@@ -436,6 +462,7 @@ pub struct CodeSafety {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Artifact {
     pub kind: ArtifactKind,
     #[serde(default)]
@@ -464,12 +491,14 @@ pub enum ArtifactKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProducerRef {
     pub kind: ExecutableRefKind,
     pub id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConsumerRef {
     pub kind: ExecutableRefKind,
     pub id: String,
@@ -484,6 +513,7 @@ pub enum ExecutableRefKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Recipe {
     #[serde(default)]
     pub description: Option<String>,
@@ -496,6 +526,7 @@ pub struct Recipe {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecipeRequires {
     #[serde(default)]
     pub resources: Vec<String>,
@@ -508,17 +539,66 @@ pub struct RecipeRequires {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RecipeStep {
-    LoadResource { load_resource: String },
-    RunCommand { run_command: String },
-    RunCode { run_code: String },
-    ProduceArtifact { produce_artifact: String },
-    ConsumeArtifact { consume_artifact: String },
-    Ask { ask: String },
-    Branch { branch: RecipeBranch },
-    Note { note: String },
+    LoadResource(RecipeStepLoadResource),
+    RunCommand(RecipeStepRunCommand),
+    RunCode(RecipeStepRunCode),
+    ProduceArtifact(RecipeStepProduceArtifact),
+    ConsumeArtifact(RecipeStepConsumeArtifact),
+    Ask(RecipeStepAsk),
+    Branch(RecipeStepBranch),
+    Note(RecipeStepNote),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepLoadResource {
+    pub load_resource: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepRunCommand {
+    pub run_command: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepRunCode {
+    pub run_code: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepProduceArtifact {
+    pub produce_artifact: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepConsumeArtifact {
+    pub consume_artifact: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepAsk {
+    pub ask: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepBranch {
+    pub branch: RecipeBranch,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepNote {
+    pub note: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecipeBranch {
     #[serde(rename = "if")]
     pub if_condition: String,
@@ -541,17 +621,20 @@ pub enum SafetyClass {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Snippet {
     pub text: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Proof {
     #[serde(default)]
     pub metrics: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScenarioTest {
     pub name: String,
     pub input: String,
@@ -559,6 +642,7 @@ pub struct ScenarioTest {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Expectation {
     #[serde(default)]
     pub route: Option<RouteId>,
@@ -567,7 +651,44 @@ pub struct Expectation {
     #[serde(default)]
     pub forbid: Vec<String>,
     #[serde(default)]
+    pub forbid_exact: Option<Vec<String>>,
+    #[serde(default)]
+    pub not_forbid: Vec<String>,
+    #[serde(default)]
     pub elicit: Vec<String>,
     #[serde(default)]
+    pub elicit_exact: Option<Vec<String>>,
+    #[serde(default)]
+    pub not_elicit: Vec<String>,
+    #[serde(default)]
     pub after_success: Vec<String>,
+    #[serde(default)]
+    pub after_success_exact: Option<Vec<String>>,
+    #[serde(default)]
+    pub not_after_success: Vec<String>,
+    #[serde(default)]
+    pub matched_rules: Vec<RuleId>,
+    #[serde(default)]
+    pub matched_rules_exact: Option<Vec<RuleId>>,
+    #[serde(default)]
+    pub not_matched_rules: Vec<RuleId>,
+}
+
+impl Expectation {
+    pub fn has_assertions(&self) -> bool {
+        self.route.is_some()
+            || !self.route_order.is_empty()
+            || !self.forbid.is_empty()
+            || self.forbid_exact.is_some()
+            || !self.not_forbid.is_empty()
+            || !self.elicit.is_empty()
+            || self.elicit_exact.is_some()
+            || !self.not_elicit.is_empty()
+            || !self.after_success.is_empty()
+            || self.after_success_exact.is_some()
+            || !self.not_after_success.is_empty()
+            || !self.matched_rules.is_empty()
+            || self.matched_rules_exact.is_some()
+            || !self.not_matched_rules.is_empty()
+    }
 }

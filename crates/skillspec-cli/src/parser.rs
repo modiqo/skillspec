@@ -145,6 +145,11 @@ fn validate_tests(spec: &SkillSpec) -> Result<()> {
     let elicitation_ids = elicitation_ids(spec);
 
     for test in &spec.tests {
+        if !test.expect.has_assertions() {
+            return Err(Error::MissingField {
+                field: "tests.expect assertion",
+            });
+        }
         if let Some(route) = &test.expect.route {
             validate_known_route("tests.expect.route", &route_ids, route)?;
         }
@@ -154,8 +159,40 @@ fn validate_tests(spec: &SkillSpec) -> Result<()> {
         for action in &test.expect.after_success {
             validate_known_action("tests.expect.after_success", &action_ids, action)?;
         }
+        if let Some(actions) = &test.expect.after_success_exact {
+            for action in actions {
+                validate_known_action("tests.expect.after_success_exact", &action_ids, action)?;
+            }
+        }
+        for action in &test.expect.not_after_success {
+            validate_known_action("tests.expect.not_after_success", &action_ids, action)?;
+        }
         for elicitation in &test.expect.elicit {
             validate_known_elicitation("tests.expect.elicit", &elicitation_ids, elicitation)?;
+        }
+        if let Some(elicitations) = &test.expect.elicit_exact {
+            for elicitation in elicitations {
+                validate_known_elicitation(
+                    "tests.expect.elicit_exact",
+                    &elicitation_ids,
+                    elicitation,
+                )?;
+            }
+        }
+        for elicitation in &test.expect.not_elicit {
+            validate_known_elicitation("tests.expect.not_elicit", &elicitation_ids, elicitation)?;
+        }
+        let rule_ids = rule_ids(spec);
+        for rule in &test.expect.matched_rules {
+            validate_known_rule("tests.expect.matched_rules", &rule_ids, rule)?;
+        }
+        if let Some(rules) = &test.expect.matched_rules_exact {
+            for rule in rules {
+                validate_known_rule("tests.expect.matched_rules_exact", &rule_ids, rule)?;
+            }
+        }
+        for rule in &test.expect.not_matched_rules {
+            validate_known_rule("tests.expect.not_matched_rules", &rule_ids, rule)?;
         }
     }
     Ok(())
@@ -290,8 +327,8 @@ fn validate_code(spec: &SkillSpec) -> Result<()> {
 
 fn validate_code_source(resource_ids: &BTreeSet<String>, source: &CodeSource) -> Result<()> {
     match source {
-        CodeSource::Inline { inline } => {
-            if inline.trim().is_empty() {
+        CodeSource::Inline(inline_source) => {
+            if inline_source.inline.trim().is_empty() {
                 return Err(Error::MissingField {
                     field: "code.source.inline",
                 });
@@ -377,29 +414,32 @@ fn validate_recipe_step(
     elicitation_ids: &BTreeSet<String>,
 ) -> Result<()> {
     match step {
-        RecipeStep::LoadResource { load_resource } => {
-            validate_known_resource("recipes.steps.load_resource", resource_ids, load_resource)
+        RecipeStep::LoadResource(step) => validate_known_resource(
+            "recipes.steps.load_resource",
+            resource_ids,
+            &step.load_resource,
+        ),
+        RecipeStep::RunCommand(step) => {
+            validate_known_action("recipes.steps.run_command", command_ids, &step.run_command)
         }
-        RecipeStep::RunCommand { run_command } => {
-            validate_known_action("recipes.steps.run_command", command_ids, run_command)
+        RecipeStep::RunCode(step) => {
+            validate_known_code("recipes.steps.run_code", code_ids, &step.run_code)
         }
-        RecipeStep::RunCode { run_code } => {
-            validate_known_code("recipes.steps.run_code", code_ids, run_code)
-        }
-        RecipeStep::ProduceArtifact { produce_artifact } => validate_known_artifact(
+        RecipeStep::ProduceArtifact(step) => validate_known_artifact(
             "recipes.steps.produce_artifact",
             artifact_ids,
-            produce_artifact,
+            &step.produce_artifact,
         ),
-        RecipeStep::ConsumeArtifact { consume_artifact } => validate_known_artifact(
+        RecipeStep::ConsumeArtifact(step) => validate_known_artifact(
             "recipes.steps.consume_artifact",
             artifact_ids,
-            consume_artifact,
+            &step.consume_artifact,
         ),
-        RecipeStep::Ask { ask } => {
-            validate_known_elicitation("recipes.steps.ask", elicitation_ids, ask)
+        RecipeStep::Ask(step) => {
+            validate_known_elicitation("recipes.steps.ask", elicitation_ids, &step.ask)
         }
-        RecipeStep::Branch { branch } => {
+        RecipeStep::Branch(step) => {
+            let branch = &step.branch;
             if branch.if_condition.trim().is_empty() {
                 return Err(Error::MissingField {
                     field: "recipes.steps.branch.if",
@@ -423,8 +463,8 @@ fn validate_recipe_step(
             }
             Ok(())
         }
-        RecipeStep::Note { note } => {
-            if note.trim().is_empty() {
+        RecipeStep::Note(step) => {
+            if step.note.trim().is_empty() {
                 return Err(Error::MissingField {
                     field: "recipes.steps.note",
                 });
@@ -535,6 +575,10 @@ fn route_ids(spec: &SkillSpec) -> BTreeSet<String> {
     spec.routes.iter().map(|route| route.id.0.clone()).collect()
 }
 
+fn rule_ids(spec: &SkillSpec) -> BTreeSet<String> {
+    spec.rules.iter().map(|rule| rule.id.0.clone()).collect()
+}
+
 fn action_ids(spec: &SkillSpec) -> BTreeSet<String> {
     spec.commands
         .keys()
@@ -605,6 +649,21 @@ fn validate_known_elicitation(
         Err(Error::UnknownReference {
             field,
             value: elicitation.to_owned(),
+        })
+    }
+}
+
+fn validate_known_rule(
+    field: &'static str,
+    rule_ids: &BTreeSet<String>,
+    rule: &RuleId,
+) -> Result<()> {
+    if rule_ids.contains(&rule.0) {
+        Ok(())
+    } else {
+        Err(Error::UnknownReference {
+            field,
+            value: rule.0.clone(),
         })
     }
 }
@@ -772,8 +831,8 @@ fn resource_references(spec: &SkillSpec) -> BTreeMap<String, usize> {
             increment(&mut references, resource);
         }
         for step in &recipe.steps {
-            if let RecipeStep::LoadResource { load_resource } = step {
-                increment(&mut references, load_resource);
+            if let RecipeStep::LoadResource(step) = step {
+                increment(&mut references, &step.load_resource);
             }
         }
     }
@@ -821,5 +880,304 @@ fn validate_identifier(field: &'static str, value: &str) -> Result<()> {
             field,
             value: value.to_owned(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_rule_fields_are_rejected() {
+        let yaml = r#"
+schema: skillspec/v0
+id: typo.spec
+title: Typo Spec
+description: Demonstrates ignored fields.
+routes:
+  - id: local
+    label: Local
+rules:
+  - id: typo_rule
+    when:
+      user_says_anny: ["run"]
+    preferr: local
+tests:
+  - name: route assertion
+    input: run this
+    expect:
+      route: local
+"#;
+
+        let error = serde_yaml::from_str::<SkillSpec>(yaml).unwrap_err();
+
+        assert!(
+            error.to_string().contains("unknown field"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn unknown_fields_are_rejected_across_typed_grammar() {
+        let cases = [
+            ("top_level", "unexpected: true"),
+            ("entry", "entry:\n  prompt: Start\n  unexpected: true"),
+            (
+                "route",
+                "routes:\n  - id: local\n    label: Local\n    unexpected: true",
+            ),
+            (
+                "rule",
+                "rules:\n  - id: local_rule\n    prefer: local\n    unexpected: true",
+            ),
+            (
+                "predicate",
+                "rules:\n  - id: local_rule\n    when:\n      user_says_anny: [run]",
+            ),
+            ("state", "states:\n  start:\n    nexxt: done"),
+            (
+                "elicitation",
+                "elicitations:\n  mode:\n    question: Mode?\n    choices:\n      - id: fast\n        label: Fast\n    unexpected: true",
+            ),
+            (
+                "elicitation_condition",
+                "elicitations:\n  mode:\n    question: Mode?\n    required_when:\n      - route: local\n        unexpected: true\n    choices:\n      - id: fast\n        label: Fast",
+            ),
+            (
+                "elicitation_choice",
+                "elicitations:\n  mode:\n    question: Mode?\n    choices:\n      - id: fast\n        label: Fast\n        unexpected: true",
+            ),
+            (
+                "trace",
+                "trace:\n  mode: event_log\n  unexpected: true",
+            ),
+            (
+                "dependency",
+                "dependencies:\n  git:\n    kind: cli\n    unexpected: true",
+            ),
+            (
+                "dependency_check",
+                "dependencies:\n  git:\n    kind: cli\n    check:\n      command: git\n      unexpected: true",
+            ),
+            (
+                "dependency_permission",
+                "dependencies:\n  git:\n    kind: cli\n    permission:\n      required: true\n      unexpected: true",
+            ),
+            (
+                "dependency_provision",
+                "dependencies:\n  git:\n    kind: cli\n    provision:\n      unexpected: true",
+            ),
+            (
+                "dependency_provision_option",
+                "dependencies:\n  git:\n    kind: cli\n    provision:\n      options:\n        - id: install\n          label: Install\n          unexpected: true",
+            ),
+            (
+                "resource",
+                "resources:\n  source:\n    path: SKILL.md\n    role: source_material\n    unexpected: true",
+            ),
+            (
+                "resource_use",
+                "resources:\n  source:\n    path: SKILL.md\n    role: source_material\n    used_by:\n      - kind: route\n        id: local\n        unexpected: true",
+            ),
+            (
+                "command",
+                "commands:\n  run:\n    template: echo ok\n    unexpected: true",
+            ),
+            (
+                "command_requires",
+                "commands:\n  run:\n    template: echo ok\n    requires:\n      dependencies: []\n      unexpected: true",
+            ),
+            (
+                "code_block",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      inline: ok\n    unexpected: true",
+            ),
+            (
+                "code_source_inline",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      inline: ok\n      unexpected: true",
+            ),
+            (
+                "code_source_file",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      file: script.sh\n      unexpected: true",
+            ),
+            (
+                "code_provenance",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      inline: ok\n    provenance:\n      resource: source\n      unexpected: true",
+            ),
+            (
+                "code_requires",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      inline: ok\n    requires:\n      dependencies: []\n      unexpected: true",
+            ),
+            (
+                "code_safety",
+                "code:\n  sample:\n    language: text\n    kind: example\n    source:\n      inline: ok\n    safety:\n      writes_files: false\n      unexpected: true",
+            ),
+            (
+                "artifact",
+                "artifacts:\n  report:\n    kind: report\n    unexpected: true",
+            ),
+            (
+                "producer_ref",
+                "artifacts:\n  report:\n    kind: report\n    produced_by:\n      - kind: command\n        id: run\n        unexpected: true",
+            ),
+            (
+                "consumer_ref",
+                "artifacts:\n  report:\n    kind: report\n    consumed_by:\n      - kind: command\n        id: run\n        unexpected: true",
+            ),
+            (
+                "recipe",
+                "recipes:\n  main:\n    ordered: true\n    unexpected: true",
+            ),
+            (
+                "recipe_requires",
+                "recipes:\n  main:\n    requires:\n      dependencies: []\n      unexpected: true",
+            ),
+            (
+                "recipe_step_load_resource",
+                "recipes:\n  main:\n    steps:\n      - load_resource: source\n        unexpected: true",
+            ),
+            (
+                "recipe_step_run_command",
+                "recipes:\n  main:\n    steps:\n      - run_command: run\n        unexpected: true",
+            ),
+            (
+                "recipe_step_run_code",
+                "recipes:\n  main:\n    steps:\n      - run_code: sample\n        unexpected: true",
+            ),
+            (
+                "recipe_step_produce_artifact",
+                "recipes:\n  main:\n    steps:\n      - produce_artifact: report\n        unexpected: true",
+            ),
+            (
+                "recipe_step_consume_artifact",
+                "recipes:\n  main:\n    steps:\n      - consume_artifact: report\n        unexpected: true",
+            ),
+            (
+                "recipe_step_ask",
+                "recipes:\n  main:\n    steps:\n      - ask: mode\n        unexpected: true",
+            ),
+            (
+                "recipe_step_branch",
+                "recipes:\n  main:\n    steps:\n      - branch:\n          if: condition\n          then: main\n        unexpected: true",
+            ),
+            (
+                "recipe_branch",
+                "recipes:\n  main:\n    steps:\n      - branch:\n          if: condition\n          then: main\n          unexpected: true",
+            ),
+            (
+                "recipe_step_note",
+                "recipes:\n  main:\n    steps:\n      - note: remember this\n        unexpected: true",
+            ),
+            (
+                "snippet",
+                "snippets:\n  summary:\n    text: ok\n    unexpected: true",
+            ),
+            (
+                "proof",
+                "proof:\n  metrics: []\n  unexpected: true",
+            ),
+            (
+                "scenario_test",
+                "tests:\n  - name: route assertion\n    input: run\n    expect:\n      route: local\n    unexpected: true",
+            ),
+            (
+                "expectation",
+                "tests:\n  - name: route assertion\n    input: run\n    expect:\n      route: local\n      unexpected: true",
+            ),
+        ];
+
+        for (name, body) in cases {
+            let yaml = spec_with(body);
+            assert!(
+                serde_yaml::from_str::<SkillSpec>(&yaml).is_err(),
+                "case {name} unexpectedly parsed"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_extension_surfaces_accept_arbitrary_fields() {
+        let yaml = spec_with(
+            r#"
+applies_when:
+  - product_specific_hint:
+      nested: true
+routes:
+  - id: local
+    label: Local
+rules:
+  - id: local_rule
+    prefer: local
+    allow:
+      product_specific_fallback:
+        nested: true
+elicitations:
+  mode:
+    question: Mode?
+    choices:
+      - id: fast
+        label: Fast
+        sets:
+          product_specific_fact:
+            nested: true
+commands:
+  run:
+    template: echo ok
+    success_when:
+      product_specific_check:
+        nested: true
+artifacts:
+  report:
+    kind: report
+    schema:
+      product_specific_schema:
+        nested: true
+closures:
+  product_specific_closure:
+    nested: true
+metadata:
+  product_specific_metadata:
+    nested: true
+tests:
+  - name: route assertion
+    input: run
+    expect:
+      route: local
+"#,
+        );
+
+        let spec = serde_yaml::from_str::<SkillSpec>(&yaml).unwrap();
+        validate_spec(&spec).unwrap();
+    }
+
+    #[test]
+    fn tests_must_have_at_least_one_assertion() {
+        let yaml = r#"
+schema: skillspec/v0
+id: empty.expectation
+title: Empty Expectation
+description: Demonstrates empty expectation rejection.
+routes:
+  - id: local
+    label: Local
+tests:
+  - name: empty expectation
+    input: run this
+    expect: {}
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        let error = validate_spec(&spec).unwrap_err();
+
+        assert!(error.to_string().contains("tests.expect assertion"));
+    }
+
+    fn spec_with(body: &str) -> String {
+        format!(
+            r#"schema: skillspec/v0
+id: typo.coverage
+title: Typo Coverage
+description: Tests strict grammar coverage.
+{body}
+"#
+        )
     }
 }

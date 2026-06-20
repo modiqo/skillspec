@@ -1,8 +1,8 @@
 use crate::error::{Error, Result};
 use crate::model::{
-    CodeBlock, CodeKind, CodeProvenance, CodeRequires, CodeSafety, CodeSource, CommandRequires,
-    CommandTemplate, Dependency, DependencyCheck, DependencyKind, Resource, ResourceRole,
-    ResourceUse, ResourceUseKind, SkillSpec, Snippet,
+    CodeBlock, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires, CodeSafety, CodeSource,
+    CommandRequires, CommandTemplate, Dependency, DependencyCheck, DependencyKind, Resource,
+    ResourceRole, ResourceUse, ResourceUseKind, SkillSpec, Snippet,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -107,7 +107,6 @@ fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTe
                         files: Vec::new(),
                         env: Vec::new(),
                         auth: Vec::new(),
-                        extra: BTreeMap::new(),
                     },
                     parse: BTreeMap::new(),
                     success_when: BTreeMap::new(),
@@ -159,9 +158,9 @@ fn resources_and_code(
             CodeBlock {
                 language: block.language.clone(),
                 kind: classify_code(&block.language),
-                source: CodeSource::Inline {
+                source: CodeSource::Inline(CodeInlineSource {
                     inline: block.text.clone(),
-                },
+                }),
                 provenance: Some(CodeProvenance {
                     resource: block.resource_id.clone(),
                     fence_index: Some(block.fence_index),

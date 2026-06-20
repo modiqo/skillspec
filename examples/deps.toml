@@ -1,0 +1,3 @@
+# Example dependency manifest placeholder for rote-shell.skill.spec.yml.
+# Real released rote flows should replace this with the manifest format expected
+# by their target rote runtime.

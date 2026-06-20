@@ -27,7 +27,7 @@ pub struct DependencyCheckResult {
 pub enum DependencyStatus {
     Present,
     Missing,
-    Unknown,
+    Deferred,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -52,7 +52,7 @@ pub fn check(
         .collect::<Vec<_>>();
     let ok = dependencies
         .iter()
-        .all(|dependency| dependency.status == DependencyStatus::Present);
+        .all(|dependency| dependency.status != DependencyStatus::Missing);
 
     Ok(DependencyCheckReport { ok, dependencies })
 }
@@ -90,9 +90,9 @@ fn check_dependency(id: &str, dependency: &Dependency, spec_dir: &Path) -> Depen
         | DependencyKind::Service
         | DependencyKind::Adapter
         | DependencyKind::Browser => (
-            DependencyStatus::Unknown,
+            DependencyStatus::Deferred,
             DependencyCheckMethod::HarnessRequired,
-            "requires harness-specific check".to_owned(),
+            "not locally checkable; requires harness-specific verification before use".to_owned(),
         ),
     };
 
@@ -233,6 +233,34 @@ mod tests {
         assert_eq!(status, DependencyStatus::Present);
         assert_eq!(method, DependencyCheckMethod::FileExists);
         assert_eq!(message, "source/requirements.txt exists");
+    }
+
+    #[test]
+    fn package_dependencies_are_deferred_not_failed() {
+        let yaml = r#"
+schema: skillspec/v0
+id: package.dependency
+title: Package Dependency
+description: Keeps package checks visible without failing local preflight.
+routes:
+  - id: local
+    label: Local
+dependencies:
+  pypdf:
+    kind: package
+tests:
+  - name: route assertion
+    input: inspect pdf
+    expect:
+      route: local
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        crate::parser::validate_spec(&spec).unwrap();
+
+        let report = check(&spec, Path::new("."), None).unwrap();
+
+        assert!(report.ok);
+        assert_eq!(report.dependencies[0].status, DependencyStatus::Deferred);
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

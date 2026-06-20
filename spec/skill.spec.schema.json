@@ -5,478 +5,724 @@
   "type": "object",
   "required": ["schema", "id", "title", "description"],
   "properties": {
-    "schema": {
-      "const": "skillspec/v0"
-    },
-    "id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "title": {
-      "type": "string",
-      "minLength": 1
-    },
-    "description": {
-      "type": "string",
-      "minLength": 1
-    },
+    "schema": { "const": "skillspec/v0" },
+    "id": { "$ref": "#/$defs/identifier" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
     "applies_when": {
       "type": "array",
-      "items": {
-        "type": "object"
-      }
+      "items": { "type": "object", "additionalProperties": true }
     },
+    "entry": { "$ref": "#/$defs/entry" },
     "routes": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "label"],
-        "properties": {
-          "id": { "type": "string" },
-          "label": { "type": "string" },
-          "rank": { "type": "integer" },
-          "description": { "type": "string" }
-        },
-        "additionalProperties": true
-      }
+      "items": { "$ref": "#/$defs/route" }
     },
     "rules": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id"],
-        "additionalProperties": true
-      }
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "states": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/state" }
     },
     "elicitations": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["question", "choices"],
-        "properties": {
-          "question": { "type": "string", "minLength": 1 },
-          "required_when": {
-            "type": "array",
-            "items": { "type": "object" }
-          },
-          "choices": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "required": ["id", "label"],
-              "properties": {
-                "id": { "type": "string", "minLength": 1 },
-                "label": { "type": "string", "minLength": 1 },
-                "description": { "type": "string" },
-                "sets": { "type": "object" },
-                "route": { "type": "string" },
-                "next": { "type": "string" },
-                "safety": { "type": "string" }
-              },
-              "additionalProperties": true
-            }
-          },
-          "default": { "type": "string" },
-          "max_choices": { "type": "integer", "minimum": 1 }
+      "additionalProperties": { "$ref": "#/$defs/elicitation" }
+    },
+    "trace": { "$ref": "#/$defs/trace" },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/dependency" }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/resource" }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/code_block" }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/artifact" }
+    },
+    "recipes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/recipe" }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/command" }
+    },
+    "snippets": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/snippet" }
+    },
+    "closures": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "proof": { "$ref": "#/$defs/proof" },
+    "tests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/test" }
+    },
+    "review_required": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "safety_class": {
+      "type": "string",
+      "enum": [
+        "read_only",
+        "local_read",
+        "local_write",
+        "network_read",
+        "network_write",
+        "browser_attach",
+        "credential_request",
+        "destructive"
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "required": ["prompt"],
+      "properties": {
+        "prompt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "route": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "label": { "type": "string" },
+        "rank": { "type": "integer" },
+        "description": { "type": "string" },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "predicate": {
+      "type": "object",
+      "properties": {
+        "user_says_any": {
+          "type": "array",
+          "items": { "type": "string" }
         },
-        "additionalProperties": true
-      }
+        "task_recurrence_likely": { "type": "boolean" },
+        "domain_object_task": { "type": "boolean" },
+        "interactive_prompt_likely": { "type": "boolean" },
+        "command_likely_long_running": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "when": { "$ref": "#/$defs/predicate" },
+        "prefer": { "$ref": "#/$defs/identifier" },
+        "route_order": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "forbid": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "allow": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "elicit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "after_success": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "do": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "say": { "$ref": "#/$defs/identifier" },
+        "ask": { "$ref": "#/$defs/identifier" },
+        "next": { "$ref": "#/$defs/identifier" },
+        "yes": { "$ref": "#/$defs/identifier" },
+        "no": { "$ref": "#/$defs/identifier" }
+      },
+      "additionalProperties": false
+    },
+    "elicitation": {
+      "type": "object",
+      "required": ["question", "choices"],
+      "properties": {
+        "question": { "type": "string", "minLength": 1 },
+        "required_when": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elicitation_condition" }
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/elicitation_choice" }
+        },
+        "default": { "$ref": "#/$defs/identifier" },
+        "max_choices": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "elicitation_condition": {
+      "type": "object",
+      "properties": {
+        "route": { "$ref": "#/$defs/identifier" },
+        "missing": { "$ref": "#/$defs/identifier" },
+        "predicate": { "$ref": "#/$defs/predicate" }
+      },
+      "additionalProperties": false
+    },
+    "elicitation_choice": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "sets": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "route": { "$ref": "#/$defs/identifier" },
+        "next": { "$ref": "#/$defs/identifier" },
+        "safety": { "$ref": "#/$defs/safety_class" }
+      },
+      "additionalProperties": false
     },
     "trace": {
       "type": "object",
       "required": ["mode"],
       "properties": {
-        "mode": {
-          "type": "string",
-          "enum": ["event_log"]
-        },
-        "required": {
-          "type": "boolean"
-        },
+        "mode": { "const": "event_log" },
+        "required": { "type": "boolean" },
         "record": {
           "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "input_received",
-              "spec_loaded",
-              "rule_evaluated",
-              "rule_matched",
-              "route_selected",
-              "route_order_set",
-              "forbid_added",
-              "allow_added",
-              "elicitation_requested",
-              "after_success_scheduled",
-              "outcome_recorded"
-            ]
-          },
+          "items": { "$ref": "#/$defs/trace_event" },
           "uniqueItems": true
         }
       },
       "additionalProperties": false
     },
-    "dependencies": {
+    "trace_event": {
+      "type": "string",
+      "enum": [
+        "input_received",
+        "spec_loaded",
+        "rule_evaluated",
+        "rule_matched",
+        "route_selected",
+        "route_order_set",
+        "forbid_added",
+        "allow_added",
+        "elicitation_requested",
+        "after_success_scheduled",
+        "outcome_recorded"
+      ]
+    },
+    "dependency": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["kind"],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": ["cli", "package", "file", "env", "service", "adapter", "browser"]
-          },
-          "description": { "type": "string" },
-          "command": { "type": "string" },
-          "path": { "type": "string" },
-          "env": { "type": "string" },
-          "check": {
-            "type": "object",
-            "properties": {
-              "command": { "type": "string" },
-              "path": { "type": "string" },
-              "env": { "type": "string" }
-            },
-            "additionalProperties": true
-          },
-          "permission": {
-            "type": "object",
-            "properties": {
-              "required": { "type": "boolean" },
-              "reason": { "type": "string" },
-              "safety": { "type": "string" }
-            },
-            "additionalProperties": true
-          },
-          "provision": {
-            "type": "object",
-            "properties": {
-              "elicit": { "type": "string" },
-              "options": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["id", "label"],
-                  "properties": {
-                    "id": { "type": "string", "minLength": 1 },
-                    "label": { "type": "string", "minLength": 1 },
-                    "description": { "type": "string" },
-                    "command": { "type": "string" },
-                    "safety": { "type": "string" }
-                  },
-                  "additionalProperties": true
-                }
-              }
-            },
-            "additionalProperties": true
-          }
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["cli", "package", "file", "env", "service", "adapter", "browser"]
         },
-        "additionalProperties": true
-      }
+        "description": { "type": "string" },
+        "command": { "type": "string" },
+        "path": { "type": "string" },
+        "env": { "type": "string" },
+        "check": { "$ref": "#/$defs/dependency_check" },
+        "permission": { "$ref": "#/$defs/dependency_permission" },
+        "provision": { "$ref": "#/$defs/dependency_provision" }
+      },
+      "additionalProperties": false
     },
-    "resources": {
+    "dependency_check": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["path", "role"],
-        "properties": {
-          "path": { "type": "string", "minLength": 1 },
-          "role": {
-            "type": "string",
-            "enum": [
-              "source_material",
-              "reference",
-              "required_procedure",
-              "example",
-              "script",
-              "asset"
-            ]
-          },
-          "description": { "type": "string" },
-          "used_by": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["kind", "id"],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "route",
-                    "rule",
-                    "state",
-                    "elicitation",
-                    "dependency",
-                    "command",
-                    "code",
-                    "artifact",
-                    "recipe",
-                    "snippet"
-                  ]
-                },
-                "id": { "type": "string", "minLength": 1 }
-              },
-              "additionalProperties": false
-            }
-          },
-          "load_when": {
-            "type": "array",
-            "items": { "type": "string" }
-          }
+      "properties": {
+        "command": { "type": "string" },
+        "path": { "type": "string" },
+        "env": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "dependency_permission": {
+      "type": "object",
+      "properties": {
+        "required": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "safety": { "$ref": "#/$defs/safety_class" }
+      },
+      "additionalProperties": false
+    },
+    "dependency_provision": {
+      "type": "object",
+      "properties": {
+        "elicit": { "$ref": "#/$defs/identifier" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependency_provision_option" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependency_provision_option": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "command": { "type": "string" },
+        "safety": { "$ref": "#/$defs/safety_class" }
+      },
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "required": ["path", "role"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": "string",
+          "enum": [
+            "source_material",
+            "reference",
+            "required_procedure",
+            "example",
+            "script",
+            "asset"
+          ]
         },
-        "additionalProperties": true
-      }
-    },
-    "code": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["language", "kind", "source"],
-        "properties": {
-          "language": { "type": "string", "minLength": 1 },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "example",
-              "runnable_script",
-              "probe",
-              "transform",
-              "validator",
-              "troubleshooting",
-              "reference"
-            ]
-          },
-          "source": {
-            "type": "object",
-            "oneOf": [
-              { "required": ["inline"] },
-              { "required": ["file"] }
-            ],
-            "properties": {
-              "inline": { "type": "string" },
-              "file": { "type": "string" },
-              "from_resource": { "type": "string" },
-              "fence_index": { "type": "integer", "minimum": 1 },
-              "heading": { "type": "string" },
-              "sha256": { "type": "string" }
-            },
-            "additionalProperties": true
-          },
-          "provenance": {
-            "type": "object",
-            "required": ["resource"],
-            "properties": {
-              "resource": { "type": "string" },
-              "fence_index": { "type": "integer", "minimum": 1 },
-              "heading": { "type": "string" },
-              "line_start": { "type": "integer", "minimum": 1 },
-              "line_end": { "type": "integer", "minimum": 1 }
-            },
-            "additionalProperties": true
-          },
-          "purpose": { "type": "string" },
-          "requires": {
-            "type": "object",
-            "properties": {
-              "dependencies": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "resources": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "artifacts": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-            "additionalProperties": true
-          },
-          "inputs": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "outputs": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "safety": {
-            "type": "object",
-            "properties": {
-              "mutates_input": { "type": "boolean" },
-              "writes_files": { "type": "boolean" },
-              "network": { "type": "boolean" },
-              "notes": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-            "additionalProperties": true
-          },
-          "use_when": {
-            "type": "array",
-            "items": { "type": "string" }
-          }
+        "description": { "type": "string" },
+        "used_by": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resource_use" }
         },
-        "additionalProperties": true
-      }
+        "load_when": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
     },
-    "artifacts": {
+    "resource_use": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["kind"],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "file",
-              "directory",
-              "json",
-              "text",
-              "image",
-              "pdf",
-              "transcript",
-              "report"
-            ]
-          },
-          "description": { "type": "string" },
-          "path": { "type": "string" },
-          "schema": {},
-          "produced_by": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["kind", "id"],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "enum": ["command", "code", "recipe"]
-                },
-                "id": { "type": "string" }
-              },
-              "additionalProperties": true
-            }
-          },
-          "consumed_by": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["kind", "id"],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "enum": ["command", "code", "recipe"]
-                },
-                "id": { "type": "string" }
-              },
-              "additionalProperties": true
-            }
-          }
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "route",
+            "rule",
+            "state",
+            "elicitation",
+            "dependency",
+            "command",
+            "code",
+            "artifact",
+            "recipe",
+            "snippet"
+          ]
         },
-        "additionalProperties": true
-      }
+        "id": { "$ref": "#/$defs/identifier" }
+      },
+      "additionalProperties": false
     },
-    "recipes": {
+    "code_block": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "description": { "type": "string" },
-          "ordered": { "type": "boolean" },
-          "requires": {
-            "type": "object",
-            "properties": {
-              "resources": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "dependencies": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "artifacts": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-            "additionalProperties": true
-          },
-          "steps": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
+      "required": ["language", "kind", "source"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "example",
+            "runnable_script",
+            "probe",
+            "transform",
+            "validator",
+            "troubleshooting",
+            "reference"
+          ]
         },
-        "additionalProperties": true
-      }
-    },
-    "states": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object"
-      }
-    },
-    "commands": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "description": { "type": "string" },
-          "template": { "type": "string" },
-          "safety": { "type": "string" },
-          "requires": {
-            "type": "object",
-            "properties": {
-              "dependencies": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "files": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "env": {
-                "type": "array",
-                "items": { "type": "string" }
-              },
-              "auth": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-            "additionalProperties": true
-          },
-          "parse": { "type": "object" },
-          "success_when": { "type": "object" }
+        "source": { "$ref": "#/$defs/code_source" },
+        "provenance": { "$ref": "#/$defs/code_provenance" },
+        "purpose": { "type": "string" },
+        "requires": { "$ref": "#/$defs/code_requires" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
         },
-        "additionalProperties": true
-      }
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "safety": { "$ref": "#/$defs/code_safety" },
+        "use_when": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
     },
-    "snippets": {
+    "code_source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["inline"],
+          "properties": {
+            "inline": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["file"],
+          "properties": {
+            "file": { "type": "string" },
+            "from_resource": { "$ref": "#/$defs/identifier" },
+            "fence_index": { "type": "integer", "minimum": 1 },
+            "heading": { "type": "string" },
+            "sha256": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "code_provenance": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object"
-      }
+      "required": ["resource"],
+      "properties": {
+        "resource": { "$ref": "#/$defs/identifier" },
+        "fence_index": { "type": "integer", "minimum": 1 },
+        "heading": { "type": "string" },
+        "line_start": { "type": "integer", "minimum": 1 },
+        "line_end": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
     },
-    "tests": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "input", "expect"],
-        "additionalProperties": true
-      }
+    "code_requires": {
+      "type": "object",
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
     },
-    "review_required": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "code_safety": {
+      "type": "object",
+      "properties": {
+        "mutates_input": { "type": "boolean" },
+        "writes_files": { "type": "boolean" },
+        "network": { "type": "boolean" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["file", "directory", "json", "text", "image", "pdf", "transcript", "report"]
+        },
+        "description": { "type": "string" },
+        "path": { "type": "string" },
+        "schema": true,
+        "produced_by": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executable_ref" }
+        },
+        "consumed_by": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executable_ref" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "executable_ref": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["command", "code", "recipe"]
+        },
+        "id": { "$ref": "#/$defs/identifier" }
+      },
+      "additionalProperties": false
+    },
+    "recipe": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "ordered": { "type": "boolean" },
+        "requires": { "$ref": "#/$defs/recipe_requires" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/recipe_step" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recipe_requires": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recipe_step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["load_resource"],
+          "properties": { "load_resource": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["run_command"],
+          "properties": { "run_command": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["run_code"],
+          "properties": { "run_code": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["produce_artifact"],
+          "properties": { "produce_artifact": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["consume_artifact"],
+          "properties": { "consume_artifact": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["ask"],
+          "properties": { "ask": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["branch"],
+          "properties": { "branch": { "$ref": "#/$defs/recipe_branch" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["note"],
+          "properties": { "note": { "type": "string" } },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "recipe_branch": {
+      "type": "object",
+      "required": ["if", "then"],
+      "properties": {
+        "if": { "type": "string" },
+        "then": { "$ref": "#/$defs/identifier" },
+        "otherwise": { "$ref": "#/$defs/identifier" }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "required": ["template"],
+      "properties": {
+        "description": { "type": "string" },
+        "template": { "type": "string" },
+        "safety": { "$ref": "#/$defs/safety_class" },
+        "requires": { "$ref": "#/$defs/command_requires" },
+        "parse": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "success_when": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "command_requires": {
+      "type": "object",
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "env": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "auth": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "snippet": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "proof": {
+      "type": "object",
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "test": {
+      "type": "object",
+      "required": ["name", "input", "expect"],
+      "properties": {
+        "name": { "type": "string" },
+        "input": { "type": "string" },
+        "expect": { "$ref": "#/$defs/expectation" }
+      },
+      "additionalProperties": false
+    },
+    "expectation": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "route": { "$ref": "#/$defs/identifier" },
+        "route_order": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "forbid": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "forbid_exact": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "not_forbid": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "elicit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "elicit_exact": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "not_elicit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "after_success": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "after_success_exact": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "not_after_success": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "matched_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "matched_rules_exact": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "not_matched_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
     }
-  },
-  "additionalProperties": true
+  }
 }

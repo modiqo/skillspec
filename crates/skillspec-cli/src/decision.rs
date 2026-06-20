@@ -2,7 +2,7 @@ use crate::model::{
     Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec, TraceEventKind,
 };
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Decision {
@@ -203,6 +203,14 @@ fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<St
             failures.push(format!("expected forbid {expected:?}"));
         }
     }
+    if let Some(expected) = &expectation.forbid_exact {
+        compare_string_set("forbid_exact", expected, &decision.forbid, &mut failures);
+    }
+    for expected in &expectation.not_forbid {
+        if decision.forbid.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected forbid not to contain {expected:?}"));
+        }
+    }
 
     for expected in &expectation.after_success {
         if !decision
@@ -213,14 +221,100 @@ fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<St
             failures.push(format!("expected after_success {expected:?}"));
         }
     }
+    if let Some(expected) = &expectation.after_success_exact {
+        compare_string_set(
+            "after_success_exact",
+            expected,
+            &decision.after_success,
+            &mut failures,
+        );
+    }
+    for expected in &expectation.not_after_success {
+        if decision
+            .after_success
+            .iter()
+            .any(|actual| actual == expected)
+        {
+            failures.push(format!(
+                "expected after_success not to contain {expected:?}"
+            ));
+        }
+    }
 
     for expected in &expectation.elicit {
         if !decision.elicit.iter().any(|actual| actual == expected) {
             failures.push(format!("expected elicit {expected:?}"));
         }
     }
+    if let Some(expected) = &expectation.elicit_exact {
+        compare_string_set("elicit_exact", expected, &decision.elicit, &mut failures);
+    }
+    for expected in &expectation.not_elicit {
+        if decision.elicit.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected elicit not to contain {expected:?}"));
+        }
+    }
+
+    let matched_rules = decision
+        .matched_rules
+        .iter()
+        .map(|matched| matched.id.clone())
+        .collect::<Vec<_>>();
+    for expected in &expectation.matched_rules {
+        if !matched_rules.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected matched_rule {:?}", expected.0));
+        }
+    }
+    if let Some(expected) = &expectation.matched_rules_exact {
+        compare_rule_set(
+            "matched_rules_exact",
+            expected,
+            &matched_rules,
+            &mut failures,
+        );
+    }
+    for expected in &expectation.not_matched_rules {
+        if matched_rules.iter().any(|actual| actual == expected) {
+            failures.push(format!(
+                "expected matched_rules not to contain {:?}",
+                expected.0
+            ));
+        }
+    }
 
     failures
+}
+
+fn compare_string_set(
+    label: &str,
+    expected: &[String],
+    actual: &[String],
+    failures: &mut Vec<String>,
+) {
+    let expected = expected.iter().cloned().collect::<BTreeSet<_>>();
+    let actual = actual.iter().cloned().collect::<BTreeSet<_>>();
+    if expected != actual {
+        failures.push(format!("expected {label} {:?}, got {:?}", expected, actual));
+    }
+}
+
+fn compare_rule_set(
+    label: &str,
+    expected: &[RuleId],
+    actual: &[RuleId],
+    failures: &mut Vec<String>,
+) {
+    let expected = expected
+        .iter()
+        .map(|rule| rule.0.clone())
+        .collect::<BTreeSet<_>>();
+    let actual = actual
+        .iter()
+        .map(|rule| rule.0.clone())
+        .collect::<BTreeSet<_>>();
+    if expected != actual {
+        failures.push(format!("expected {label} {:?}, got {:?}", expected, actual));
+    }
 }
 
 fn matches_rule(rule: &Rule, input: &str) -> bool {
@@ -460,4 +554,51 @@ fn phrase_boundary(input: &str, start: usize, end: usize) -> bool {
 
 fn is_identifier_char(value: char) -> bool {
     value.is_ascii_alphanumeric() || value == '_'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scenario_tests_support_exact_negative_and_matched_rule_expectations() {
+        let yaml = r#"
+schema: skillspec/v0
+id: decision.expectations
+title: Decision Expectations
+description: Exercises richer scenario assertions.
+routes:
+  - id: local
+    label: Local
+    rank: 10
+  - id: browser
+    label: Browser
+    rank: 20
+rules:
+  - id: browse_rule
+    when:
+      user_says_any: ["browse"]
+    prefer: browser
+    forbid: [native_search_as_answer]
+    reason: Browser requests must use browser route.
+tests:
+  - name: browse selects browser exactly
+    input: browse the page
+    expect:
+      route: browser
+      forbid_exact: [native_search_as_answer]
+      not_forbid: [raw_shell]
+      elicit_exact: []
+      after_success_exact: []
+      matched_rules_exact: [browse_rule]
+      not_matched_rules: []
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        crate::parser::validate_spec(&spec).unwrap();
+
+        let result = run_tests(&spec);
+
+        assert_eq!(result.passed.len(), 1);
+        assert!(result.failed.is_empty());
+    }
 }

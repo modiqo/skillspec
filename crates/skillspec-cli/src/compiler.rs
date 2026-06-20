@@ -178,9 +178,9 @@ fn write_code_block(output: &mut String, id: &str, code: &CodeBlock) {
     }
     output.push_str("- source:\n\n");
     match &code.source {
-        CodeSource::Inline { inline } => {
+        CodeSource::Inline(inline_source) => {
             let _ = writeln!(output, "```{}", code.language);
-            output.push_str(inline);
+            output.push_str(&inline_source.inline);
             output.push_str("\n```\n");
         }
         CodeSource::File(file) => {
@@ -241,36 +241,36 @@ fn write_recipe(output: &mut String, id: &str, recipe: &Recipe) {
 
 fn write_recipe_step(output: &mut String, step: &RecipeStep) {
     match step {
-        RecipeStep::LoadResource { load_resource } => {
-            let _ = writeln!(output, "  - load_resource: `{load_resource}`");
+        RecipeStep::LoadResource(step) => {
+            let _ = writeln!(output, "  - load_resource: `{}`", step.load_resource);
         }
-        RecipeStep::RunCommand { run_command } => {
-            let _ = writeln!(output, "  - run_command: `{run_command}`");
+        RecipeStep::RunCommand(step) => {
+            let _ = writeln!(output, "  - run_command: `{}`", step.run_command);
         }
-        RecipeStep::RunCode { run_code } => {
-            let _ = writeln!(output, "  - run_code: `{run_code}`");
+        RecipeStep::RunCode(step) => {
+            let _ = writeln!(output, "  - run_code: `{}`", step.run_code);
         }
-        RecipeStep::ProduceArtifact { produce_artifact } => {
-            let _ = writeln!(output, "  - produce_artifact: `{produce_artifact}`");
+        RecipeStep::ProduceArtifact(step) => {
+            let _ = writeln!(output, "  - produce_artifact: `{}`", step.produce_artifact);
         }
-        RecipeStep::ConsumeArtifact { consume_artifact } => {
-            let _ = writeln!(output, "  - consume_artifact: `{consume_artifact}`");
+        RecipeStep::ConsumeArtifact(step) => {
+            let _ = writeln!(output, "  - consume_artifact: `{}`", step.consume_artifact);
         }
-        RecipeStep::Ask { ask } => {
-            let _ = writeln!(output, "  - ask: `{ask}`");
+        RecipeStep::Ask(step) => {
+            let _ = writeln!(output, "  - ask: `{}`", step.ask);
         }
-        RecipeStep::Branch { branch } => {
+        RecipeStep::Branch(step) => {
             let _ = writeln!(
                 output,
                 "  - branch: if `{}` then `{}`",
-                branch.if_condition, branch.then
+                step.branch.if_condition, step.branch.then
             );
-            if let Some(otherwise) = &branch.otherwise {
+            if let Some(otherwise) = &step.branch.otherwise {
                 let _ = writeln!(output, "    otherwise `{otherwise}`");
             }
         }
-        RecipeStep::Note { note } => {
-            let _ = writeln!(output, "  - note: {note}");
+        RecipeStep::Note(step) => {
+            let _ = writeln!(output, "  - note: {}", step.note);
         }
     }
 }
@@ -694,9 +694,6 @@ fn write_command_requires(output: &mut String, requires: &CommandRequires) {
     }
     if !requires.auth.is_empty() {
         let _ = writeln!(output, "  - auth: {}", code_list(&requires.auth));
-    }
-    if !requires.extra.is_empty() {
-        write_yaml_map(output, &requires.extra, 2);
     }
 }
 
