@@ -101,6 +101,11 @@ frontmatter, headings, command blocks, tables, "always/never/forbid" language,
 examples, and references. An optional agent-assisted pass can propose rules and
 states, but uncertainty must be marked as `review_required`.
 
+`compile` is a complete renderer, not a summary generator. Codex/Claude skill
+targets include the runtime contract, activation hints, ranked routes, ordered
+rules, lifecycle states, command templates, snippets, closures, scenario tests,
+proof metrics, review notes, and CLI commands for validation and explanation.
+
 ## Repository Layout
 
 ```text

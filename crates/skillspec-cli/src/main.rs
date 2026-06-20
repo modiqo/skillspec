@@ -1,3 +1,4 @@
+mod compiler;
 mod decision;
 mod error;
 mod importer;
@@ -89,11 +90,7 @@ fn run() -> Result<()> {
         }
         Command::Compile { path, target } => {
             let spec = parser::load_spec(&path)?;
-            let markdown = match target {
-                CompileTarget::CodexSkill
-                | CompileTarget::ClaudeSkill
-                | CompileTarget::Markdown => report::compile_markdown(&spec),
-            };
+            let markdown = compiler::compile(&spec, target.into());
             report::text(&markdown)?;
         }
         Command::ImportSkill { path, out } => {
@@ -104,4 +101,14 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+impl From<CompileTarget> for compiler::Target {
+    fn from(value: CompileTarget) -> Self {
+        match value {
+            CompileTarget::CodexSkill => compiler::Target::CodexSkill,
+            CompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
+            CompileTarget::Markdown => compiler::Target::Markdown,
+        }
+    }
 }

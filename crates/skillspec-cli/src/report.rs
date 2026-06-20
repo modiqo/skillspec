@@ -79,23 +79,6 @@ pub fn explain(decision: &Decision) -> Result<()> {
     Ok(())
 }
 
-pub fn compile_markdown(spec: &SkillSpec) -> String {
-    let mut output = String::new();
-    output.push_str("---\n");
-    output.push_str(&format!("name: {}\n", spec.id));
-    output.push_str(&format!("description: {:?}\n", spec.description));
-    output.push_str("---\n\n");
-    output.push_str(&format!("# {}\n\n", spec.title));
-    output.push_str("Follow the companion `skill.spec.yml` for structured routing, guards, state progression, command templates, and scenario tests.\n\n");
-    output.push_str("## Policy Summary\n\n");
-    output.push_str(&format!("- routes: {}\n", spec.routes.len()));
-    output.push_str(&format!("- rules: {}\n", spec.rules.len()));
-    output.push_str(&format!("- states: {}\n", spec.states.len()));
-    output.push_str(&format!("- commands: {}\n", spec.commands.len()));
-    output.push_str(&format!("- tests: {}\n", spec.tests.len()));
-    output
-}
-
 pub fn json<T: serde::Serialize>(value: &T) -> Result<()> {
     let mut stdout = io::stdout().lock();
     serde_json::to_writer_pretty(&mut stdout, value)?;
