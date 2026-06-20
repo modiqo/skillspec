@@ -24,19 +24,31 @@ pub struct MatchedRule {
     pub reason: Option<String>,
 }
 
+/// Final route-selection explanation for a decision.
+///
+/// The route id alone is not enough for trace alignment; the basis explains
+/// whether selection came from a rule or from default route order.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct RouteSelection {
+    /// Selected route id.
     pub route: RouteId,
+    /// Mechanism that selected the route.
     pub basis: RouteSelectionBasis,
+    /// Rule that caused selection, when a matched rule was involved.
     pub rule_id: Option<RuleId>,
+    /// Human-readable reason from the matching rule or default behavior.
     pub reason: Option<String>,
 }
 
+/// Mechanism used to select a route.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteSelectionBasis {
+    /// A matched rule selected its `prefer` route.
     RulePrefer,
+    /// A matched rule changed route order and the first route in that order won.
     RouteOrderDefault,
+    /// No rule selected or reordered routes; the first ranked/default route won.
     DefaultRouteOrder,
 }
 

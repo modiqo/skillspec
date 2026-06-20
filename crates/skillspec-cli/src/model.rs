@@ -347,17 +347,12 @@ pub enum ImportRole {
     Skill,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ImportLoad {
     Always,
+    #[default]
     OnDemand,
-}
-
-impl Default for ImportLoad {
-    fn default() -> Self {
-        Self::OnDemand
-    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

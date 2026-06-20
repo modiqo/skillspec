@@ -436,7 +436,17 @@ fn validate_recipes(spec: &SkillSpec) -> Result<()> {
     let artifact_ids = spec.artifacts.keys().cloned().collect::<BTreeSet<_>>();
     let command_ids = spec.commands.keys().cloned().collect::<BTreeSet<_>>();
     let code_ids = spec.code.keys().cloned().collect::<BTreeSet<_>>();
+    let recipe_ids = spec.recipes.keys().cloned().collect::<BTreeSet<_>>();
     let elicitation_ids = elicitation_ids(spec);
+    let refs = RecipeValidationRefs {
+        import_ids: &import_ids,
+        resource_ids: &resource_ids,
+        command_ids: &command_ids,
+        code_ids: &code_ids,
+        recipe_ids: &recipe_ids,
+        artifact_ids: &artifact_ids,
+        elicitation_ids: &elicitation_ids,
+    };
 
     for (id, recipe) in &spec.recipes {
         validate_identifier("recipes key", id)?;
@@ -457,58 +467,54 @@ fn validate_recipes(spec: &SkillSpec) -> Result<()> {
             validate_known_artifact("recipes.requires.artifacts", &artifact_ids, artifact)?;
         }
         for step in &recipe.steps {
-            validate_recipe_step(
-                step,
-                &import_ids,
-                &resource_ids,
-                &command_ids,
-                &code_ids,
-                &spec.recipes.keys().cloned().collect(),
-                &artifact_ids,
-                &elicitation_ids,
-            )?;
+            validate_recipe_step(step, &refs)?;
         }
     }
     Ok(())
 }
 
-fn validate_recipe_step(
-    step: &RecipeStep,
-    import_ids: &BTreeSet<String>,
-    resource_ids: &BTreeSet<String>,
-    command_ids: &BTreeSet<String>,
-    code_ids: &BTreeSet<String>,
-    recipe_ids: &BTreeSet<String>,
-    artifact_ids: &BTreeSet<String>,
-    elicitation_ids: &BTreeSet<String>,
-) -> Result<()> {
+struct RecipeValidationRefs<'a> {
+    import_ids: &'a BTreeSet<String>,
+    resource_ids: &'a BTreeSet<String>,
+    command_ids: &'a BTreeSet<String>,
+    code_ids: &'a BTreeSet<String>,
+    recipe_ids: &'a BTreeSet<String>,
+    artifact_ids: &'a BTreeSet<String>,
+    elicitation_ids: &'a BTreeSet<String>,
+}
+
+fn validate_recipe_step(step: &RecipeStep, refs: &RecipeValidationRefs<'_>) -> Result<()> {
     match step {
-        RecipeStep::LoadImport(step) => {
-            validate_known_import("recipes.steps.load_import", import_ids, &step.load_import)
-        }
+        RecipeStep::LoadImport(step) => validate_known_import(
+            "recipes.steps.load_import",
+            refs.import_ids,
+            &step.load_import,
+        ),
         RecipeStep::LoadResource(step) => validate_known_resource(
             "recipes.steps.load_resource",
-            resource_ids,
+            refs.resource_ids,
             &step.load_resource,
         ),
-        RecipeStep::RunCommand(step) => {
-            validate_known_action("recipes.steps.run_command", command_ids, &step.run_command)
-        }
+        RecipeStep::RunCommand(step) => validate_known_action(
+            "recipes.steps.run_command",
+            refs.command_ids,
+            &step.run_command,
+        ),
         RecipeStep::RunCode(step) => {
-            validate_known_code("recipes.steps.run_code", code_ids, &step.run_code)
+            validate_known_code("recipes.steps.run_code", refs.code_ids, &step.run_code)
         }
         RecipeStep::ProduceArtifact(step) => validate_known_artifact(
             "recipes.steps.produce_artifact",
-            artifact_ids,
+            refs.artifact_ids,
             &step.produce_artifact,
         ),
         RecipeStep::ConsumeArtifact(step) => validate_known_artifact(
             "recipes.steps.consume_artifact",
-            artifact_ids,
+            refs.artifact_ids,
             &step.consume_artifact,
         ),
         RecipeStep::Ask(step) => {
-            validate_known_elicitation("recipes.steps.ask", elicitation_ids, &step.ask)
+            validate_known_elicitation("recipes.steps.ask", refs.elicitation_ids, &step.ask)
         }
         RecipeStep::Branch(step) => {
             let branch = &step.branch;
@@ -519,17 +525,17 @@ fn validate_recipe_step(
             }
             validate_branch_target(
                 "recipes.steps.branch.then",
-                command_ids,
-                code_ids,
-                recipe_ids,
+                refs.command_ids,
+                refs.code_ids,
+                refs.recipe_ids,
                 &branch.then,
             )?;
             if let Some(otherwise) = &branch.otherwise {
                 validate_branch_target(
                     "recipes.steps.branch.otherwise",
-                    command_ids,
-                    code_ids,
-                    recipe_ids,
+                    refs.command_ids,
+                    refs.code_ids,
+                    refs.recipe_ids,
                     otherwise,
                 )?;
             }

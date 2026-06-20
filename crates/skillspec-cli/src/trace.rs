@@ -11,45 +11,76 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const TRACE_SCHEMA: &str = "skillspec.trace/v0";
 
+/// One persisted decision-trace event with portable metadata.
+///
+/// The envelope deliberately stores decision facts and stable references, not
+/// command output or browser/API payloads. Execution systems should provide
+/// separate evidence documents for payload-heavy proof.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TraceEnvelope {
+    /// Trace envelope schema identifier.
     pub schema: String,
+    /// Unique run directory id.
     pub run_id: String,
+    /// Monotonic event sequence within the run.
     pub seq: u64,
+    /// Wall-clock event timestamp in Unix milliseconds.
     pub timestamp_unix_ms: u128,
+    /// SkillSpec `id` loaded by the evaluator.
     pub skill_id: String,
+    /// SkillSpec schema loaded by the evaluator.
     pub spec_schema: String,
+    /// SHA-256 fingerprint of the resolved spec graph, including imports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spec_fingerprint: Option<String>,
+    /// SHA-256 hash of the task input recorded by `input_received`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_sha256: Option<String>,
+    /// Machine-readable event kind.
     pub event: TraceEventKind,
+    /// Stable snake-case event name.
     pub event_name: String,
+    /// Event-specific payload.
     pub data: serde_json::Value,
 }
 
+/// File locations and counts produced when writing or compacting a trace.
 #[derive(Clone, Debug, Serialize)]
 pub struct TraceWriteResult {
+    /// Unique run directory id.
     pub run_id: String,
+    /// Directory containing event files, `trace.jsonl`, and `summary.json`.
     pub run_dir: PathBuf,
+    /// Number of events included in the compacted trace.
     pub event_count: usize,
+    /// Path to the compacted JSONL event stream.
     pub trace_jsonl: PathBuf,
+    /// Path to the compacted summary JSON.
     pub summary_json: PathBuf,
 }
 
+/// Compact summary of a decision trace run.
 #[derive(Clone, Debug, Serialize)]
 pub struct TraceSummary {
+    /// Trace envelope schema identifier.
     pub schema: String,
+    /// Unique run directory id.
     pub run_id: String,
+    /// SkillSpec `id` loaded by the evaluator.
     pub skill_id: String,
+    /// SHA-256 fingerprint of the resolved spec graph, including imports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spec_fingerprint: Option<String>,
+    /// SHA-256 hash of the task input recorded by `input_received`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_sha256: Option<String>,
+    /// Number of events included in the compacted trace.
     pub event_count: usize,
+    /// Count by event kind.
     pub events: BTreeMap<TraceEventKind, usize>,
 }
 
+/// Write selected decision events to a new trace run directory.
 pub fn write_decision_trace(
     root: &Path,
     spec_path: &Path,
@@ -82,6 +113,7 @@ pub fn write_decision_trace(
     compact(&run_dir)
 }
 
+/// Compact event files in a run directory into `trace.jsonl` and `summary.json`.
 pub fn compact(run_dir: &Path) -> Result<TraceWriteResult> {
     let envelopes = read_envelopes(run_dir)?;
 
@@ -112,6 +144,7 @@ pub fn compact(run_dir: &Path) -> Result<TraceWriteResult> {
     })
 }
 
+/// Read sorted event envelopes from a trace run directory.
 pub fn read_envelopes(run_dir: &Path) -> Result<Vec<TraceEnvelope>> {
     let events_dir = run_dir.join("events");
     let mut event_files = fs::read_dir(&events_dir)
@@ -228,6 +261,7 @@ fn summary_for(envelopes: &[TraceEnvelope]) -> TraceSummary {
     }
 }
 
+/// Compute a stable fingerprint for a spec and the local files it imports.
 pub fn spec_fingerprint(spec: &SkillSpec, spec_path: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
     hasher.update(b"skillspec.resolved_spec/v0\n");
@@ -258,6 +292,7 @@ pub fn spec_fingerprint(spec: &SkillSpec, spec_path: &Path) -> Result<String> {
     ))
 }
 
+/// Compute the stable input hash stored in new trace envelopes.
 pub fn input_sha256(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
