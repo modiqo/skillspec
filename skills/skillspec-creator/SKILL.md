@@ -280,7 +280,8 @@ source skill folder
       skill.spec.yml
     ```
 
-    Then copy that folder into the selected harness root.
+    Then install it through `skillspec install` so harness roots are detected
+    and the spec is validated before files are written.
 
 ## Harness Install Targets
 
@@ -289,14 +290,17 @@ Do not install by default. Ask or wait for explicit instruction.
 Supported destinations:
 
 - Codex/Codex-style personal skill:
-  `~/.agents/skills/<skill-name>/` or `~/.codex/skills/<skill-name>/`
+  `skillspec install skill <skill-folder> --target agents` or
+  `skillspec install skill <skill-folder> --target codex`
 - Claude repo skill:
-  `.claude/skills/<skill-name>/`
+  `skillspec install skill <skill-folder> --target claude-local`
 - Hermes or another harness:
   ask for the target skill root
 
 Install the compiled `SKILL.md` and the reviewed `skill.spec.yml` together.
 The generated skill should point agents to the local `skill.spec.yml`.
+Use `skillspec install targets` to show detected harness roots, and use
+`--dry-run` before writing when the user is still reviewing the install plan.
 
 ## Remote Source Staging
 

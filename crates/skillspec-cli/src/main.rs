@@ -3,6 +3,7 @@ mod decision;
 mod deps;
 mod error;
 mod importer;
+mod install;
 mod model;
 mod parser;
 mod report;
@@ -10,6 +11,7 @@ mod trace;
 
 use clap::{Parser, Subcommand};
 use error::Result;
+use install::HarnessTarget;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -80,6 +82,11 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    #[command(about = "Detect harness roots and install SkillSpec-backed skills")]
+    Install {
+        #[command(subcommand)]
+        command: InstallCommand,
+    },
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]
@@ -108,6 +115,36 @@ enum DepsCommand {
         #[arg(long)]
         command: Option<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum InstallCommand {
+    #[command(about = "List detected harness skill roots")]
+    Targets,
+    #[command(about = "Install a folder containing SKILL.md and skill.spec.yml")]
+    Skill {
+        /// Generated skill folder containing SKILL.md and skill.spec.yml.
+        folder: PathBuf,
+        /// Harness target to install into. Repeat for multiple targets.
+        #[arg(long, value_enum)]
+        target: Vec<InstallTargetArg>,
+        /// Install into every harness root detected on this machine.
+        #[arg(long)]
+        all_detected: bool,
+        /// Show the install plan without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Override the installed skill folder name.
+        #[arg(long)]
+        name: Option<String>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum InstallTargetArg {
+    Agents,
+    Codex,
+    ClaudeLocal,
 }
 
 fn main() {
@@ -185,9 +222,45 @@ fn run() -> Result<()> {
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
         }
+        Command::Install { command } => match command {
+            InstallCommand::Targets => {
+                let targets = install::detect_targets()?;
+                report::json(&targets)?;
+            }
+            InstallCommand::Skill {
+                folder,
+                target,
+                all_detected,
+                dry_run,
+                name,
+            } => {
+                let targets = target
+                    .into_iter()
+                    .map(HarnessTarget::from)
+                    .collect::<Vec<_>>();
+                let report = install::install_skill(
+                    &folder,
+                    &targets,
+                    all_detected,
+                    dry_run,
+                    name.as_deref(),
+                )?;
+                report::json(&report)?;
+            }
+        },
     }
 
     Ok(())
+}
+
+impl From<InstallTargetArg> for HarnessTarget {
+    fn from(value: InstallTargetArg) -> Self {
+        match value {
+            InstallTargetArg::Agents => Self::Agents,
+            InstallTargetArg::Codex => Self::Codex,
+            InstallTargetArg::ClaudeLocal => Self::ClaudeLocal,
+        }
+    }
 }
 
 impl From<CompileTarget> for compiler::Target {

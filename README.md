@@ -2,68 +2,201 @@
 
 Keep the prose. Structure the decisions.
 
-SkillSpec is a structured companion to agent skills. A prose `SKILL.md` is good
-for human orientation, tone, and teaching. A `skill.spec.yml` is for the parts
-that should be compact, testable, portable, and hard to misread:
+SkillSpec turns long prose skills into compact, testable behavior contracts.
+The prose still teaches tone and context. The `skill.spec.yml` carries the
+parts agents should not guess: routes, rules, dependencies, code snippets,
+resources, recipes, elicitations, tests, and traces.
+
+Use it when you want a skill to be portable across Codex, Claude, Hermes, or
+another harness without relying on paragraphs of instructions alone.
+
+## Install The CLI
+
+From this repository:
+
+```sh
+cargo install --path crates/skillspec-cli --force
+```
+
+During development you can also run the local binary directly:
+
+```sh
+cargo build
+./target/debug/skillspec --help
+```
+
+Check the installed CLI has the expected surface:
+
+```sh
+skillspec --help
+skillspec import-skill --help
+skillspec deps check --help
+```
+
+## Create A SkillSpec From An Existing Skill
+
+For serious ports, use the creator skill:
+
+```text
+/skillspec-creator port <local-skill-folder-or-github-url>
+```
+
+Examples:
+
+```text
+/skillspec-creator port /Users/me/.agents/skills/rote-shell
+/skillspec-creator port https://github.com/anthropics/skills/tree/main/skills/pdf
+```
+
+The creator skill does the careful path:
+
+1. Stages remote sources locally.
+2. Reads the skill folder, not just `SKILL.md`.
+3. Runs the deterministic importer.
+4. Promotes resources, code snippets, artifacts, recipes, dependencies, rules,
+   and tests into a reviewed `skill.spec.yml`.
+5. Validates and tests the spec.
+6. Optionally compiles and installs a generated harness skill.
+
+The mechanical importer is available directly when you only want a draft:
+
+```sh
+skillspec import-skill path/to/skill-folder --out skill.spec.yml
+skillspec validate skill.spec.yml
+skillspec test skill.spec.yml
+skillspec deps check skill.spec.yml
+```
+
+`import-skill` preserves source material; it does not pretend to understand the
+whole skill. It extracts Markdown resources, fenced code blocks, shell-like
+commands, obvious dependencies, headings, and strong directive language, then
+marks uncertainty as `review_required`.
+
+## Install A SkillSpec-Backed Skill
+
+A generated skill folder should look like this:
+
+```text
+my-skill/
+  SKILL.md          # short harness-facing guidance
+  skill.spec.yml    # structured behavior contract
+```
+
+Detect available harness skill roots:
+
+```sh
+skillspec install targets
+```
+
+Preview an install:
+
+```sh
+skillspec install skill my-skill --target agents --target codex --dry-run
+```
+
+Install into one or more harnesses:
+
+```sh
+skillspec install skill my-skill --target agents
+skillspec install skill my-skill --target agents --target codex
+skillspec install skill my-skill --all-detected
+```
+
+The creator skill can prepare this folder after validation. Do not install a
+generated skill until:
+
+```sh
+skillspec validate my-skill/skill.spec.yml
+skillspec test my-skill/skill.spec.yml
+skillspec deps check my-skill/skill.spec.yml
+```
+
+If `deps check` reports missing tools or packages, leave the skill draft-only
+or add explicit provision choices. SkillSpec should not silently install global
+dependencies.
+
+Current install targets:
+
+- `agents`: `~/.agents/skills/<skill-name>`
+- `codex`: `~/.codex/skills/<skill-name>`
+- `claude-local`: nearest `.claude/skills/<skill-name>` in the current repo
+
+## Use A SkillSpec-Backed Skill
+
+In a harness session, invoke the generated skill normally:
+
+```text
+/my-skill do the task
+```
+
+The generated `SKILL.md` should tell the agent to use the sibling
+`skill.spec.yml`. The runtime flow is:
+
+```sh
+skillspec validate path/to/skill.spec.yml
+skillspec deps check path/to/skill.spec.yml
+skillspec decide path/to/skill.spec.yml \
+  --input='the user task text' \
+  --trace-dir .skillspec/traces
+```
+
+For debugging:
+
+```sh
+skillspec explain path/to/skill.spec.yml \
+  --input='the user task text' \
+  --trace-dir .skillspec/traces
+
+skillspec trace compact .skillspec/traces/<run-id>
+```
+
+The runtime skill [skills/skillspec-runtime/SKILL.md](skills/skillspec-runtime/SKILL.md)
+teaches agents how to use an existing `skill.spec.yml`: validate first, check
+dependencies, decide with a trace, obey forbids and elicitations, execute with
+the right harness tools, then report trace and evidence.
+
+## Compile A SkillSpec Into Harness Guidance
+
+Render a `skill.spec.yml` into a harness-facing `SKILL.md`:
+
+```sh
+skillspec compile skill.spec.yml --target codex-skill > SKILL.md
+skillspec compile skill.spec.yml --target claude-skill > SKILL.md
+skillspec compile skill.spec.yml --target markdown > skill.spec.md
+```
+
+Compilation is a renderer, not a lossy summary. It includes the runtime
+contract, routes, rules, dependencies, resources, code, artifacts, recipes,
+commands, snippets, closures, scenario tests, proof metrics, review notes, and
+CLI commands for validation and explanation.
+
+## What Goes In A Spec
+
+A `skill.spec.yml` can describe:
 
 - intent routing
 - route order
 - forbidden substitutions
 - bounded user questions and choices
 - state transitions
-- command templates
+- declared dependencies and provision choices
 - source resources from imported multi-file skills
 - code snippets with provenance, dependencies, inputs, outputs, and safety
 - named artifacts consumed or produced by code and commands
 - ordered recipes for procedural skills
-- declared dependencies and provision choices
-- user questions
+- command templates
 - completion closures
 - scenario tests
 - decision traces
 - proof metrics
 
-SkillSpec is not a workflow engine and not a replacement for skills. It is a
-small behavior contract that lets skills get shorter while decisions become
-provable.
-
-## Why
-
-Agent skills increasingly become routers and state machines written as prose.
-That works until a harness interprets "browse my calendar" as "search the web"
-or treats a browser extraction request as a generic lookup. The fix should not
-be another paragraph in a thousand-line skill. The fix should be a failing
-scenario test and a structured rule.
-
-SkillSpec exists to make that possible.
-
-## Shape
-
-A skill folder can look like this:
-
-```text
-my-skill/
-  SKILL.md          # short prose orientation
-  skill.spec.yml    # structured behavior contract
-```
-
-The prose stays useful:
-
-```markdown
-# rote-computer
-
-Use this when the user wants to get work done across tools.
-
-Follow `skill.spec.yml` for routing, state progression, guardrails, and
-completion behavior.
-```
-
-The spec carries the decisions:
+Example shape:
 
 ```yaml
 schema: skillspec/v0
 id: rote.computer
 title: rote computer
+description: Route task-first work across remembered routes, services, CLIs, and browsers.
 
 rules:
   - id: browse_means_browser
@@ -80,80 +213,36 @@ tests:
       forbid: ["native_search_as_answer", "adapter_setup_first"]
 ```
 
-## V0 Scope
-
-V0 is intentionally focused:
-
-- one file, no imports
-- one complete use case can be represented end to end
-- command templates, code snippets, resources, artifacts, and recipes are allowed
-- scenario tests are first-class
-- inheritance and sharing are documented future work, not v0 behavior
-
-## CLI Goals
-
-The CLI should make policies inspectable and testable:
-
-```sh
-skillspec validate skill.spec.yml
-skillspec test skill.spec.yml
-skillspec decide skill.spec.yml --input='browse my calendar'
-skillspec decide skill.spec.yml --input='browse my calendar' --trace-dir .skillspec/traces
-skillspec explain skill.spec.yml --input='browse my calendar'
-skillspec deps check skill.spec.yml
-skillspec deps check skill.spec.yml --command deno_replay
-skillspec trace compact .skillspec/traces/<run-id>
-skillspec compile skill.spec.yml --target codex-skill
-skillspec import-skill SKILL.md --out skill.spec.yml
-```
-
-Pass only the task text to `--input`. Do not include the skill invocation
-prefix, and prefer single quotes when the task text contains `$skill-name`
-syntax so the shell does not expand it.
-
-`import-skill` is not magic. It uses deterministic extraction first:
-frontmatter, headings, Markdown resources, fenced code blocks, shell-like
-command blocks, tables, "always/never/forbid" language, examples, and
-references. Multi-file skill folders are imported as resources; fenced code is
-preserved as `code` with provenance. Shell-like snippets can also become
-command templates. An optional agent-assisted pass can propose rules, recipes,
-states, artifacts, and safety classification, but uncertainty must be marked as
-`review_required`.
-
-`deps check` validates the declared dependency surface. Use `--command` to
-check only the dependencies required by a specific command template before use.
-It can directly check CLI tools on `PATH`, files, and environment variables.
-Services, adapters, browsers, and package managers are reported as
-harness-specific checks. Provision options are advisory until the harness
-elicits approval; SkillSpec does not silently install global tools.
-
-`compile` is a complete renderer, not a summary generator. Codex/Claude skill
-targets include the runtime contract, activation hints, ranked routes, ordered
-rules, bounded elicitations, lifecycle states, dependencies, command templates,
-snippets, closures, scenario tests, proof metrics, review notes, and CLI
-commands for validation and explanation.
-
 ## Repository Layout
 
 ```text
 spec/       specification, schema, semantics, security notes
 examples/   complete SkillSpec examples
-skills/     companion skills for authoring, importing, and dogfooding specs
+skills/     creator/runtime skills for authoring and using specs
 generators/ compiler target notes for Codex, Claude, Markdown
 crates/     reference Rust CLI
 fixtures/   sample skills and expected outputs
 ```
+
+Useful examples:
+
+- [examples/rote-computer.skill.spec.yml](examples/rote-computer.skill.spec.yml)
+- [examples/rote-shell.skill.spec.yml](examples/rote-shell.skill.spec.yml)
+- [examples/local-csv-report.skill.spec.yml](examples/local-csv-report.skill.spec.yml)
+- [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
 
 ## Formal Model
 
 SkillSpec v0 has a formal grammar and relationship model:
 
 - [spec/grammar.md](spec/grammar.md) defines the v0 tree.
-- [spec/relationships.md](spec/relationships.md) explains how routes, rules,
-  states, commands, snippets, tests, and proof associate.
+- [spec/relationships.md](spec/relationships.md) explains how concepts
+  associate.
 - [spec/rules.md](spec/rules.md) defines rule evaluation and negative
   steering.
 - [spec/trace.md](spec/trace.md) defines append-only decision traces.
+- [spec/skill.spec.schema.json](spec/skill.spec.schema.json) is the permissive
+  JSON schema.
 
 The core association is:
 
@@ -162,8 +251,11 @@ rules steer routes, elicitations, and closures
 states organize lifecycle
 elicitations ask bounded questions
 dependencies declare required tools and provision choices
+resources preserve source provenance
+code preserves executable knowledge
+artifacts name consumed and produced data
+recipes bind ordered procedures
 commands perform named actions
-snippets preserve product language
 tests prove steering behavior
 trace records runtime causality
 proof summarizes accuracy and savings
@@ -171,30 +263,7 @@ proof summarizes accuracy and savings
 
 ## Status
 
-Pre-alpha. This repository starts with a focused v0 spec, a typed Rust CLI, and
-examples for `rote-computer`, `rote-shell`, repo readiness, and local CSV
-reporting. The first flagship example is `rote-computer`, a task-first
-supertool policy for routing work across remembered routes, services, CLIs,
-browsers, and completion memory.
-
-`examples/rote-shell.skill.spec.yml` is the first serious port target: it
-turns the current rote-shell prose skill into routes, rules, states, commands,
-closures, and scenario tests.
-
-`examples/local-csv-report.skill.spec.yml` is the first non-repo rote-shell
-example: it keeps local data local, declares CLI dependencies, captures file
-provenance, saves report artifacts, and routes recurring reports toward
-crystallization.
-
-Two companion skills dogfood the format:
-
-- `skills/skillspec-creator/SKILL.md` creates a reviewed `skill.spec.yml` from
-  an existing prose `SKILL.md`, whether the source is a local file, local skill
-  folder, public GitHub repo, or public GitHub repo path. It stages remote
-  sources locally, uses deterministic extraction only as a first pass, proves
-  the spec with validation/tests/explanations, and only then prepares optional
-  harness installation.
-- `skills/skillspec-runtime/SKILL.md` teaches an agent how to use an existing
-  `skill.spec.yml` at runtime: validate, decide with a trace directory, obey
-  rules/forbids/elicitations, execute through the right harness tools, and
-  report the decision trace plus evidence.
+Pre-alpha. The CLI and spec are useful for dogfooding now, but the format is
+still moving. The current focus is proving that existing prose skills can be
+ported into structured, testable, cross-harness behavior without losing their
+source material.

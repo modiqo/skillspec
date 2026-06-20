@@ -48,4 +48,6 @@ pub enum Error {
     DuplicateId { field: &'static str, value: String },
     #[error("unknown reference {value:?} in {field}")]
     UnknownReference { field: &'static str, value: String },
+    #[error("{message}")]
+    InvalidInput { message: String },
 }
