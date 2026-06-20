@@ -14,6 +14,7 @@ mod trace;
 use clap::{Parser, Subcommand};
 use error::Result;
 use install::HarnessTarget;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -271,7 +272,7 @@ fn run() -> Result<()> {
         Command::Compile { path, target } => {
             let spec = parser::load_spec(&path)?;
             let markdown = compiler::compile(&spec, target.into());
-            report::text(&markdown)?;
+            std::io::stdout().lock().write_all(markdown.as_bytes())?;
         }
         Command::ImportSkill { path, out } => {
             let imported = importer::import_skill_for_output(&path, &out)?;

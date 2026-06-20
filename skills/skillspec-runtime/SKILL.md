@@ -68,7 +68,17 @@ surprising, or when debugging the spec:
 skillspec explain path/to/skill.spec.yml --input '<task text>' --trace-dir "${PWD}/.skillspec/traces"
 ```
 
-Preserve the emitted trace `run_dir`. Report it at completion.
+Preserve the emitted trace `run_dir`. When the CLI is available after a trace
+exists, run:
+
+```bash
+skillspec trace align path/to/skill.spec.yml --decision-trace <run_dir>
+```
+
+Report the alignment status at completion. If alignment reports failed checks,
+surface them before claiming the skill followed the spec. If it reports
+`unproven` execution obligations, say which proof is missing rather than
+claiming execution compliance.
 
 ## Interpret The Decision
 
@@ -142,6 +152,7 @@ End with a compact evidence report:
 ```text
 SkillSpec route: <route>
 SkillSpec decision trace: <run_dir>
+SkillSpec alignment: <pass|fail|unproven, with key failed/unproven checks>
 Evidence: <response ids, files, browser snapshots, logs, or workspace>
 Completion obligations: <closures completed or still pending>
 ```
@@ -166,6 +177,7 @@ The runtime use is complete when:
 - the spec was validated
 - dependencies were checked before command use
 - a traced decision was recorded
+- trace alignment was run when the CLI was available
 - the chosen route or allowed fallback was followed
 - required elicitations were honored
 - forbidden substitutions were avoided

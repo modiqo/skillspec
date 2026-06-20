@@ -19,9 +19,10 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
    ```
 
 3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.
-4. Preserve the emitted trace `run_dir`; mention it in the completion report so the decision path can be inspected.
-5. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.
-6. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.
+4. Preserve the emitted trace `run_dir`.
+5. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status with the trace path.
+6. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.
+7. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.
 
 ## Quick Commands
 
@@ -31,7 +32,12 @@ skillspec imports check ./skill.spec.yml
 skillspec test ./skill.spec.yml
 skillspec deps check ./skill.spec.yml
 skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>"
 ```
+
+## Completion Report
+
+When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), key failed or unproven alignment checks, and the concrete execution evidence ids or files.
 
 ## Route Hints
 
@@ -44,4 +50,3 @@ skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.sk
 - `dependency_preflight`: Check dependencies before replay or release
 - `crystallized_flow`: Crystallize or replay a shell flow
 - `raw_shell`: Use raw shell for disposable inspection only
-

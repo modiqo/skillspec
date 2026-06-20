@@ -18,6 +18,7 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.
 - Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.
 - After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.
+- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status or any failed/unproven checks in the completion report.
 
 ## Routes
 
@@ -271,5 +272,5 @@ skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>
 skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec trace compact "${PWD}/.skillspec/traces/<run-id>"
+skillspec trace align <skill-folder>/skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>"
 ```
-
