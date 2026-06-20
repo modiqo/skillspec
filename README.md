@@ -9,6 +9,9 @@ The prose still teaches tone and context. The `skill.spec.yml` carries the
 parts agents should not guess: routes, rules, dependencies, code snippets,
 resources, recipes, elicitations, tests, and traces.
 
+The claim is simple: keep `SKILL.md` tiny, move decisions into a spec, and make
+agent steering something you can validate, trace, port, and improve.
+
 Use it when you want a skill to be portable across Codex, Claude, Hermes, or
 another harness without relying on paragraphs of instructions alone.
 
@@ -21,6 +24,10 @@ another harness without relying on paragraphs of instructions alone.
 SkillSpec is not a replacement for prose, MCP, or harness policy. It is the
 machine-checkable contract for the behavioral parts of a skill that should be
 tested, traced, compiled, and reviewed.
+
+The result should be a smaller, more durable skill: a tiny loader for the
+harness, a structured contract for decisions, and the original prose and
+resources preserved as source material.
 
 ## Install The CLI
 
@@ -358,3 +365,6 @@ Pre-alpha. The CLI and spec are useful for dogfooding now, but the format is
 still moving. The current focus is proving that existing prose skills can be
 ported into structured, testable, cross-harness behavior without losing their
 source material.
+
+See [roadmap.md](roadmap.md) for what is distinctive today and where the project
+is not yet outstanding.
