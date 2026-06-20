@@ -23,6 +23,22 @@ pub fn import_ok(path: &Path, out: &Path, spec: &SkillSpec) -> Result<()> {
         out.display(),
         spec.review_required.len()
     )?;
+    if spec.imports.is_empty() {
+        writeln!(stdout, "imports: none inferred")?;
+    } else {
+        let imports = spec
+            .imports
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(stdout, "imports: inferred {imports}")?;
+        writeln!(
+            stdout,
+            "next: run `skillspec imports check {}` and review import load paths before install",
+            out.display()
+        )?;
+    }
     if spec.dependencies.is_empty() {
         writeln!(stdout, "deps: none inferred")?;
     } else {

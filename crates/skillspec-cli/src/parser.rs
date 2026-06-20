@@ -1,13 +1,20 @@
 use crate::error::{Error, Result};
+use crate::imports;
 use crate::model::{
-    CodeSource, ConsumerRef, ExecutableRefKind, ProducerRef, RecipeStep, ResourceUse,
-    ResourceUseKind, RouteId, RuleId, SkillSpec,
+    CodeSource, ConsumerRef, ExecutableRefKind, ImportLoad, ImportUse, ImportUseKind, ProducerRef,
+    RecipeStep, ResourceUse, ResourceUseKind, RouteId, RuleId, SkillSpec,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn load_spec(path: &Path) -> Result<SkillSpec> {
+    let spec = load_spec_unresolved(path)?;
+    imports::validate(&spec, path)?;
+    Ok(spec)
+}
+
+pub fn load_spec_unresolved(path: &Path) -> Result<SkillSpec> {
     let content = fs::read_to_string(path).map_err(|source| Error::Read {
         path: path.to_path_buf(),
         source,
@@ -60,6 +67,7 @@ pub fn validate_spec(spec: &SkillSpec) -> Result<()> {
     validate_elicitations(spec)?;
     validate_trace(spec)?;
     validate_dependencies(spec)?;
+    validate_imports(spec)?;
     validate_resources(spec)?;
     validate_code(spec)?;
     validate_artifacts(spec)?;
@@ -289,7 +297,45 @@ fn validate_resources(spec: &SkillSpec) -> Result<()> {
     Ok(())
 }
 
+fn validate_imports(spec: &SkillSpec) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    let import_ids = spec.imports.keys().cloned().collect::<BTreeSet<_>>();
+    let references = import_references(spec);
+
+    for (id, import) in &spec.imports {
+        validate_identifier("imports key", id)?;
+        insert_unique("imports key", &mut seen, id)?;
+        if import.path.trim().is_empty() {
+            return Err(Error::MissingField {
+                field: "imports.path",
+            });
+        }
+        if import.section.as_deref().is_some_and(str::is_empty) {
+            return Err(Error::MissingField {
+                field: "imports.section",
+            });
+        }
+        for required_import in &import.requires.imports {
+            validate_known_import("imports.requires.imports", &import_ids, required_import)?;
+        }
+        for use_ref in &import.used_by {
+            validate_import_use(spec, use_ref)?;
+        }
+        if !references.contains_key(id)
+            && import.used_by.is_empty()
+            && import.load != ImportLoad::Always
+        {
+            return Err(Error::UnknownReference {
+                field: "imports.orphan",
+                value: id.clone(),
+            });
+        }
+    }
+    validate_import_cycles(spec)
+}
+
 fn validate_code(spec: &SkillSpec) -> Result<()> {
+    let import_ids = spec.imports.keys().cloned().collect::<BTreeSet<_>>();
     let resource_ids = spec.resources.keys().cloned().collect::<BTreeSet<_>>();
     let dependency_ids = spec.dependencies.keys().cloned().collect::<BTreeSet<_>>();
     let artifact_ids = spec.artifacts.keys().cloned().collect::<BTreeSet<_>>();
@@ -303,14 +349,31 @@ fn validate_code(spec: &SkillSpec) -> Result<()> {
         }
         validate_code_source(&resource_ids, &code.source)?;
         if let Some(provenance) = &code.provenance {
-            validate_known_resource(
-                "code.provenance.resource",
-                &resource_ids,
-                &provenance.resource,
-            )?;
+            match (&provenance.resource, &provenance.import) {
+                (Some(resource), None) => {
+                    validate_known_resource("code.provenance.resource", &resource_ids, resource)?;
+                }
+                (None, Some(import)) => {
+                    validate_known_import("code.provenance.import", &import_ids, import)?;
+                }
+                (None, None) => {
+                    return Err(Error::MissingField {
+                        field: "code.provenance.resource_or_import",
+                    });
+                }
+                (Some(_), Some(_)) => {
+                    return Err(Error::UnknownReference {
+                        field: "code.provenance.resource_or_import",
+                        value: "resource and import both set".to_owned(),
+                    });
+                }
+            }
         }
         for dependency in &code.requires.dependencies {
             validate_known_dependency("code.requires.dependencies", &dependency_ids, dependency)?;
+        }
+        for import in &code.requires.imports {
+            validate_known_import("code.requires.imports", &import_ids, import)?;
         }
         for resource in &code.requires.resources {
             validate_known_resource("code.requires.resources", &resource_ids, resource)?;
@@ -367,6 +430,7 @@ fn validate_artifacts(spec: &SkillSpec) -> Result<()> {
 }
 
 fn validate_recipes(spec: &SkillSpec) -> Result<()> {
+    let import_ids = spec.imports.keys().cloned().collect::<BTreeSet<_>>();
     let resource_ids = spec.resources.keys().cloned().collect::<BTreeSet<_>>();
     let dependency_ids = spec.dependencies.keys().cloned().collect::<BTreeSet<_>>();
     let artifact_ids = spec.artifacts.keys().cloned().collect::<BTreeSet<_>>();
@@ -378,6 +442,9 @@ fn validate_recipes(spec: &SkillSpec) -> Result<()> {
         validate_identifier("recipes key", id)?;
         for resource in &recipe.requires.resources {
             validate_known_resource("recipes.requires.resources", &resource_ids, resource)?;
+        }
+        for import in &recipe.requires.imports {
+            validate_known_import("recipes.requires.imports", &import_ids, import)?;
         }
         for dependency in &recipe.requires.dependencies {
             validate_known_dependency(
@@ -392,6 +459,7 @@ fn validate_recipes(spec: &SkillSpec) -> Result<()> {
         for step in &recipe.steps {
             validate_recipe_step(
                 step,
+                &import_ids,
                 &resource_ids,
                 &command_ids,
                 &code_ids,
@@ -406,6 +474,7 @@ fn validate_recipes(spec: &SkillSpec) -> Result<()> {
 
 fn validate_recipe_step(
     step: &RecipeStep,
+    import_ids: &BTreeSet<String>,
     resource_ids: &BTreeSet<String>,
     command_ids: &BTreeSet<String>,
     code_ids: &BTreeSet<String>,
@@ -414,6 +483,9 @@ fn validate_recipe_step(
     elicitation_ids: &BTreeSet<String>,
 ) -> Result<()> {
     match step {
+        RecipeStep::LoadImport(step) => {
+            validate_known_import("recipes.steps.load_import", import_ids, &step.load_import)
+        }
         RecipeStep::LoadResource(step) => validate_known_resource(
             "recipes.steps.load_resource",
             resource_ids,
@@ -683,6 +755,21 @@ fn validate_known_dependency(
     }
 }
 
+fn validate_known_import(
+    field: &'static str,
+    import_ids: &BTreeSet<String>,
+    import: &str,
+) -> Result<()> {
+    if import_ids.contains(import) {
+        Ok(())
+    } else {
+        Err(Error::UnknownReference {
+            field,
+            value: import.to_owned(),
+        })
+    }
+}
+
 fn validate_known_resource(
     field: &'static str,
     resource_ids: &BTreeSet<String>,
@@ -769,6 +856,51 @@ impl ExecutableReference for ConsumerRef {
     }
 }
 
+fn validate_import_use(spec: &SkillSpec, use_ref: &ImportUse) -> Result<()> {
+    match use_ref.kind {
+        ImportUseKind::Route => {
+            let ids = route_ids(spec);
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Rule => {
+            let ids = spec.rules.iter().map(|rule| rule.id.0.clone()).collect();
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::State => {
+            let ids = spec.states.keys().cloned().collect();
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Elicitation => {
+            let ids = elicitation_ids(spec);
+            validate_known_elicitation("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Dependency => {
+            let ids = spec.dependencies.keys().cloned().collect();
+            validate_known_dependency("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Command => {
+            let ids = spec.commands.keys().cloned().collect();
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Code => {
+            let ids = spec.code.keys().cloned().collect();
+            validate_known_code("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Artifact => {
+            let ids = spec.artifacts.keys().cloned().collect();
+            validate_known_artifact("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Recipe => {
+            let ids = spec.recipes.keys().cloned().collect();
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+        ImportUseKind::Snippet => {
+            let ids = spec.snippets.keys().cloned().collect();
+            validate_known_action("imports.used_by", &ids, &use_ref.id)
+        }
+    }
+}
+
 fn validate_resource_use(spec: &SkillSpec, use_ref: &ResourceUse) -> Result<()> {
     match use_ref.kind {
         ResourceUseKind::Route => {
@@ -812,6 +944,65 @@ fn validate_resource_use(spec: &SkillSpec, use_ref: &ResourceUse) -> Result<()> 
             validate_known_action("resources.used_by", &ids, &use_ref.id)
         }
     }
+}
+
+fn import_references(spec: &SkillSpec) -> BTreeMap<String, usize> {
+    let mut references = BTreeMap::new();
+    for import in spec.imports.values() {
+        for required_import in &import.requires.imports {
+            increment(&mut references, required_import);
+        }
+    }
+    for code in spec.code.values() {
+        for import in &code.requires.imports {
+            increment(&mut references, import);
+        }
+    }
+    for recipe in spec.recipes.values() {
+        for import in &recipe.requires.imports {
+            increment(&mut references, import);
+        }
+        for step in &recipe.steps {
+            if let RecipeStep::LoadImport(step) = step {
+                increment(&mut references, &step.load_import);
+            }
+        }
+    }
+    references
+}
+
+fn validate_import_cycles(spec: &SkillSpec) -> Result<()> {
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    for id in spec.imports.keys() {
+        validate_import_cycle_from(id, spec, &mut visiting, &mut visited)?;
+    }
+    Ok(())
+}
+
+fn validate_import_cycle_from(
+    id: &str,
+    spec: &SkillSpec,
+    visiting: &mut BTreeSet<String>,
+    visited: &mut BTreeSet<String>,
+) -> Result<()> {
+    if visited.contains(id) {
+        return Ok(());
+    }
+    if !visiting.insert(id.to_owned()) {
+        return Err(Error::UnknownReference {
+            field: "imports.requires.imports.cycle",
+            value: id.to_owned(),
+        });
+    }
+    if let Some(import) = spec.imports.get(id) {
+        for child in &import.requires.imports {
+            validate_import_cycle_from(child, spec, visiting, visited)?;
+        }
+    }
+    visiting.remove(id);
+    visited.insert(id.to_owned());
+    Ok(())
 }
 
 fn resource_references(spec: &SkillSpec) -> BTreeMap<String, usize> {
@@ -972,6 +1163,18 @@ tests:
                 "dependencies:\n  git:\n    kind: cli\n    provision:\n      options:\n        - id: install\n          label: Install\n          unexpected: true",
             ),
             (
+                "import",
+                "imports:\n  shared_rules:\n    path: ../INDEX.md\n    role: policy\n    load: always\n    unexpected: true",
+            ),
+            (
+                "import_requires",
+                "imports:\n  task_reference:\n    path: references/task.md\n    role: reference\n    requires:\n      imports: []\n      unexpected: true\n    used_by:\n      - kind: route\n        id: local",
+            ),
+            (
+                "import_use",
+                "imports:\n  task_reference:\n    path: references/task.md\n    role: reference\n    used_by:\n      - kind: route\n        id: local\n        unexpected: true",
+            ),
+            (
                 "resource",
                 "resources:\n  source:\n    path: SKILL.md\n    role: source_material\n    unexpected: true",
             ),
@@ -1034,6 +1237,10 @@ tests:
             (
                 "recipe_step_load_resource",
                 "recipes:\n  main:\n    steps:\n      - load_resource: source\n        unexpected: true",
+            ),
+            (
+                "recipe_step_load_import",
+                "recipes:\n  main:\n    steps:\n      - load_import: task_reference\n        unexpected: true",
             ),
             (
                 "recipe_step_run_command",
@@ -1168,6 +1375,49 @@ tests:
         let error = validate_spec(&spec).unwrap_err();
 
         assert!(error.to_string().contains("tests.expect assertion"));
+    }
+
+    #[test]
+    fn imports_must_be_referenced_unless_loaded_always() {
+        let yaml = r#"
+schema: skillspec/v0
+id: imports.orphan
+title: Import Orphan
+description: Demonstrates orphan import rejection.
+imports:
+  task_reference:
+    path: references/task.md
+    role: reference
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        let error = validate_spec(&spec).unwrap_err();
+
+        assert!(error.to_string().contains("imports.orphan"));
+    }
+
+    #[test]
+    fn imports_detect_cycles() {
+        let yaml = r#"
+schema: skillspec/v0
+id: imports.cycle
+title: Import Cycle
+description: Demonstrates import cycle rejection.
+imports:
+  one:
+    path: one.md
+    role: reference
+    requires:
+      imports: [two]
+  two:
+    path: two.md
+    role: reference
+    requires:
+      imports: [one]
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        let error = validate_spec(&spec).unwrap_err();
+
+        assert!(error.to_string().contains("imports.requires.imports.cycle"));
     }
 
     fn spec_with(body: &str) -> String {

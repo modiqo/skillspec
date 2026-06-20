@@ -6,7 +6,7 @@ testable file.
 
 V0 is intentionally small:
 
-- no imports
+- explicit local imports only
 - no inheritance
 - no execution engine
 - no arbitrary expression language
@@ -31,12 +31,15 @@ small CLI.
 - `trace`: append-only decision event contract
 - `dependencies`: declared tools, files, env vars, services, adapters, browsers,
   packages, checks, permissions, and provision choices
-- `resources`: source files preserved from imported multi-file skills
+- `imports`: runtime-loadable local guidance such as shared policy,
+  branch-specific references, procedures, examples, and skill docs
+- `resources`: provenance, supporting material, and non-runtime files preserved
+  from imported multi-file skills
 - `code`: fenced snippets or scripts with provenance, requirements, safety, and
   artifact links
 - `artifacts`: named files or data products consumed and produced by behavior
-- `recipes`: ordered procedures that bind resources, code, commands, artifacts,
-  and elicitations
+- `recipes`: ordered procedures that bind imports, resources, code, commands,
+  artifacts, and elicitations
 - `commands`: command templates or command invocation instructions
 - `snippets`: reusable prose
 - `closures`: post-task behavior
@@ -45,7 +48,8 @@ small CLI.
 - `review_required`: uncertainties that require human review
 
 See [semantics.md](semantics.md) for behavior and
-[grammar.md](grammar.md) for the formal v0 grammar. See
+[grammar.md](grammar.md) for the formal v0 grammar. See [imports.md](imports.md)
+for import resolution, section loading, and nesting rules. See
 [relationships.md](relationships.md) for how the concepts associate,
 [trace.md](trace.md) for event logs, and [skill.spec.schema.json](skill.spec.schema.json)
 for the strict v0 schema.

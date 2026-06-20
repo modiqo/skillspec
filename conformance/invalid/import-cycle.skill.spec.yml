@@ -1,0 +1,15 @@
+schema: skillspec/v0
+id: conformance.import_cycle
+title: Import Cycle Fixture
+description: Invalid fixture proving nested imports cannot cycle.
+imports:
+  one:
+    path: one.md
+    role: reference
+    requires:
+      imports: [two]
+  two:
+    path: two.md
+    role: reference
+    requires:
+      imports: [one]

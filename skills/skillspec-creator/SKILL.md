@@ -70,18 +70,22 @@ source skill folder
    skillspec --help
    skillspec import-skill --help
    skillspec validate --help
+   skillspec imports check --help
    skillspec test --help
    skillspec compile --help
    skillspec deps --help
    skillspec deps check --help
    ```
 
-   Required capabilities are `import-skill`, `validate`, `test`, `compile`,
-   and `deps check`.
+   Required capabilities are `import-skill`, `validate`, `imports check`,
+   `test`, `compile`, and `deps check`.
 
-   If `deps check` is unavailable, continue only in degraded draft mode:
+   If `imports check` or `deps check` is unavailable, continue only in degraded
+   draft mode:
 
+   - infer and write imports into the spec
    - infer and write dependencies into the spec
+   - mark import validation as `review_required`
    - mark dependency verification as `review_required`
    - report the inferred dependency surface explicitly
    - do not claim dependency presence/absence
@@ -99,8 +103,8 @@ source skill folder
    has no sibling resources.
 4. Inventory the staged folder before importing:
 
-   - Markdown resources: `SKILL.md`, `reference.md`, `forms.md`, examples, and
-     other linked docs
+   - Markdown imports/resources: `SKILL.md`, `reference.md`, `forms.md`,
+     examples, and other linked docs
    - scripts and assets
    - fenced code blocks and their languages
    - shell command blocks
@@ -118,15 +122,17 @@ source skill folder
    skillspec import-skill path/to/skill-folder --out skill.spec.yml
    ```
 
-7. Immediately tell the user which dependencies were inferred before asking
-   for approval to validate, install, or run anything:
+7. Immediately validate imports and tell the user which dependencies were
+   inferred before asking for approval to install or run anything:
 
    ```bash
+   skillspec imports check skill.spec.yml
    skillspec deps check skill.spec.yml
    ```
 
-   Summarize dependency ids, status, permission requirements, and provision
-   options in plain language. Do not hide this in the final report.
+   Summarize import status plus dependency ids, status, permission requirements,
+   and provision options in plain language. Do not hide this in the final
+   report.
 
 8. Treat the draft as scaffolding, not truth.
 9. Extract routes from strategy choices. Examples:
@@ -144,10 +150,15 @@ source skill folder
    "unless", "when", "before", "after", "ask", "do not", and "must".
 11. Extract elicitations from places where the old skill would ask the user to
    choose, approve, connect, install, authenticate, attach, or continue.
-12. Extract resources into `resources`. A resource is source provenance or
-   supporting material, not hidden runtime behavior. Every resource must be
-   used by a route, rule, command, code block, artifact, recipe, snippet, or
-   explicit review note. Do not leave orphaned resources.
+12. Extract runtime-loadable Markdown into `imports`, and source provenance or
+   supporting material into `resources`. Use imports for shared policy,
+   branch-specific references, required procedures, examples, or other files
+   the harness should deliberately load during a run. Use resources for
+   evidence, scripts, assets, fixtures, and source material that should be
+   preserved but not loaded as active guidance. Every on-demand import and every
+   resource must be connected to a route, rule, command, code block, artifact,
+   recipe, snippet, or explicit review note. Do not leave orphaned imports or
+   resources.
 
 13. Extract fenced snippets into `code` with:
 
@@ -155,9 +166,10 @@ source skill folder
    - `kind`: `example`, `runnable_script`, `probe`, `transform`, `validator`,
      `troubleshooting`, or `reference`
    - `source`: inline or extracted file
-   - `provenance`: resource id, fence index, heading, and line span when known
+   - `provenance`: resource or import id, fence index, heading, and line span
+     when known
    - `purpose`
-   - `requires.dependencies`, `requires.resources`, and
+   - `requires.dependencies`, `requires.imports`, `requires.resources`, and
      `requires.artifacts`
    - `inputs`, `outputs`, and `safety`
 
@@ -181,9 +193,11 @@ source skill folder
 
    A good recipe binds:
 
+   - required imports
    - required resources
    - dependencies
    - artifacts
+   - `load_import`
    - `load_resource`
    - `run_code`
    - `run_command`
@@ -250,6 +264,7 @@ source skill folder
 
     ```bash
     skillspec validate skill.spec.yml
+    skillspec imports check skill.spec.yml
     skillspec test skill.spec.yml
     skillspec deps check skill.spec.yml
     skillspec deps check skill.spec.yml --command '<command-id>'
@@ -328,16 +343,19 @@ surface before doing meaningful work:
 skillspec --help
 skillspec import-skill --help
 skillspec validate --help
+skillspec imports check --help
 skillspec test --help
 skillspec compile --help
 skillspec deps --help
 skillspec deps check --help
 ```
 
-If `deps check` is missing but import/validate/test/compile exist, continue
-only as a draft port. In draft mode:
+If `imports check` or `deps check` is missing but import/validate/test/compile
+exist, continue only as a draft port. In draft mode:
 
+- keep runtime-loadable Markdown extraction first-class in `imports`
 - keep dependency extraction first-class in `dependencies`
+- mark import validation as `review_required` when `imports check` is missing
 - mark dependency verification as `review_required`
 - report inferred dependencies without local present/missing claims
 - do not install package managers, CLIs, services, adapters, or generated
@@ -352,6 +370,7 @@ binary if the installed binary is stale:
 
 ```bash
 cargo build
+./target/debug/skillspec imports check skill.spec.yml
 ./target/debug/skillspec deps check skill.spec.yml
 ```
 
@@ -537,12 +556,12 @@ For skills with referenced Markdown files and code snippets, such as PDF,
 spreadsheet, browser, data-processing, or build-system skills, do this extra
 pass after mechanical import:
 
-1. Build a resource map:
+1. Build an import/resource map:
 
    ```text
    SKILL.md -> entry/source material
-   reference.md -> reference or advanced examples
-   forms.md / guide.md / workflow.md -> required procedure when the source says so
+   reference.md -> import when loaded as active guidance, resource when only provenance
+   forms.md / guide.md / workflow.md -> procedure import when the source says to load/follow it
    scripts/* -> script resources or file dependencies
    assets/* -> asset resources
    ```
@@ -550,7 +569,7 @@ pass after mechanical import:
 2. Build a code map:
 
    ```text
-   code id -> language -> source resource -> heading -> purpose -> deps -> inputs -> outputs -> safety
+   code id -> language -> source import/resource -> heading -> purpose -> deps -> inputs -> outputs -> safety
    ```
 
 3. Classify snippets:
@@ -570,7 +589,8 @@ pass after mechanical import:
 7. Add review notes for every snippet whose role is uncertain.
 
 Do not flatten referenced files into a giant prose snippet. The whole point is
-to preserve source resources while moving control logic into recipes and rules.
+to preserve provenance as resources, load active guidance as imports, and move
+control logic into recipes and rules.
 
 ## Example: Porting A GitHub Skill Folder
 
@@ -585,24 +605,27 @@ skillspec import-skill /tmp/skillspec-port/anthropics-skills/skills/pdf \
   --out /tmp/anthropic-pdf.skill.spec.yml
 
 skillspec validate /tmp/anthropic-pdf.skill.spec.yml
+skillspec imports check /tmp/anthropic-pdf.skill.spec.yml
 skillspec deps check /tmp/anthropic-pdf.skill.spec.yml
 ```
 
 Then inspect the draft:
 
 ```bash
-rg -n "^resources:|^code:|^commands:|^dependencies:|provenance:|fence_index:" /tmp/anthropic-pdf.skill.spec.yml
+rg -n "^imports:|^resources:|^code:|^commands:|^dependencies:|provenance:|fence_index:" /tmp/anthropic-pdf.skill.spec.yml
 ```
 
 If the source contains a procedural file such as `forms.md`, revise the draft
 into a reviewed spec with:
 
-- `resources.forms.role: required_procedure`
+- `imports.forms.role: procedure` when the harness must load and follow it
+- `resources.forms.role: required_procedure` only when it is preserved as
+  provenance rather than loaded as runtime guidance
 - code blocks classified as probes/transforms/validators/examples
 - artifacts for field reports, rendered pages, generated PDFs, and validation
   output
-- a recipe that loads the procedure, runs the probe, branches, and validates
-  the final artifact
+- a recipe that `load_import`s the procedure, runs the probe, branches, and
+  validates the final artifact
 - dependency/provision elicitations for missing CLIs or packages
 
 ## Test Extraction
@@ -626,6 +649,7 @@ A created SkillSpec is ready for serious testing when:
 - the source `SKILL.md` was fully read
 - the source was staged locally if remote
 - `skillspec validate skill.spec.yml` passes
+- `skillspec imports check skill.spec.yml` passes
 - `skillspec test skill.spec.yml` passes
 - `skillspec deps check skill.spec.yml` has been run, and any missing
   dependency is represented by provision choices or review notes

@@ -22,6 +22,7 @@ dependencies:
       env: null
     permission: null
     provision: null
+imports: {}
 resources:
   skill:
     path: SKILL.md
@@ -48,6 +49,7 @@ code:
     purpose: Imported fenced code block; review before execution.
     requires:
       dependencies: []
+      imports: []
       resources:
       - skill
       artifacts: []

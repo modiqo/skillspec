@@ -6,8 +6,8 @@ tree independent of YAML spelling.
 
 V0 is deliberately not a programming language. It is a structured skill
 contract: enough grammar to express routes, rules, elicitations, states,
-commands, resources, code, artifacts, recipes, snippets, closures, tests, and
-proof hooks without becoming an execution engine.
+commands, imports, resources, code, artifacts, recipes, snippets, closures,
+tests, and proof hooks without becoming an execution engine.
 
 ## Lexical Conventions
 
@@ -18,6 +18,7 @@ rule-id         = identifier ;
 state-id        = identifier ;
 elicitation-id = identifier ;
 command-id      = identifier ;
+import-id       = identifier ;
 resource-id     = identifier ;
 code-id         = identifier ;
 artifact-id     = identifier ;
@@ -58,18 +59,26 @@ References are symbolic. A v0 document is well-formed when:
 - every `Trace.record` item is one of the v0 trace event kinds
 - every `Command.requires.dependencies` item references an existing dependency
 - every `Dependency.provision.elicit` references an existing elicitation
+- every `Import.requires.imports` item references an existing import
+- every `Import.used_by` item references the target it names
+- every on-demand import is referenced by code or recipe, required by another
+  import, or declares `used_by`
+- the import dependency graph is acyclic
 - every `Resource.used_by` item references the target it names
 - every resource is referenced by code or recipe, or declares `used_by`
 - every `Code.requires.dependencies` item references an existing dependency
+- every `Code.requires.imports` item references an existing import
 - every `Code.requires.resources` item references an existing resource
 - every `Code.requires.artifacts`, `Code.inputs`, and `Code.outputs` item
   references an existing artifact
-- every `Code.provenance.resource` and `Code.source.from_resource` references
-  an existing resource
+- every `Code.provenance.resource` references an existing resource
+- every `Code.provenance.import` references an existing import
+- every `Code.provenance` declares exactly one of `resource` or `import`
+- every `Code.source.from_resource` references an existing resource
 - every artifact producer/consumer references an existing command, code block,
   or recipe
-- every recipe dependency/resource/artifact/code/command/elicitation reference
-  points at an existing id
+- every recipe import/dependency/resource/artifact/code/command/elicitation
+  reference points at an existing id
 - every scenario test declares at least one concrete expectation
 - every expectation reference to a route, elicitation, action, or rule points at
   an existing id
@@ -91,6 +100,7 @@ skillspec       = header ,
                   [ elicitations ] ,
                   [ trace ] ,
                   [ dependencies ] ,
+                  [ imports ] ,
                   [ resources ] ,
                   [ code ] ,
                   [ artifacts ] ,
@@ -325,6 +335,88 @@ The reference CLI can directly check `cli`, `file`, and `env` dependencies.
 `package`, `service`, `adapter`, and `browser` dependencies are
 harness-specific and should be reported as requiring harness checks.
 
+## Imports
+
+```text
+imports         = "imports" ":" mapping-of import-id to import ;
+import          = "path" ":" string ,
+                  "role" ":" import-role ,
+                  [ "description" ":" string ] ,
+                  [ "section" ":" string ] ,
+                  [ "load" ":" import-load ] ,
+                  [ "requires" ":" import-requires ] ,
+                  [ "used_by" ":" sequence-of import-use ] ,
+                  [ "load_when" ":" sequence-of string ] ;
+
+import-role     = "policy"
+                | "reference"
+                | "procedure"
+                | "example"
+                | "skill" ;
+
+import-load     = "always"
+                | "on_demand" ;
+
+import-requires = [ "imports" ":" sequence-of import-id ] ;
+
+import-use      = "kind" ":" import-use-kind ,
+                  "id" ":" identifier ;
+
+import-use-kind = "route"
+                | "rule"
+                | "state"
+                | "elicitation"
+                | "dependency"
+                | "command"
+                | "code"
+                | "artifact"
+                | "recipe"
+                | "snippet" ;
+```
+
+Imports are runtime-loadable instruction material. Use them for shared policy,
+branch-specific references, procedures, examples, and other Markdown that a
+harness should load deliberately during a run.
+
+An import is not inheritance and does not merge another SkillSpec into the
+current document. Importing Markdown never creates routes, rules, commands, or
+tests implicitly. The current `skill.spec.yml` remains the only grammar tree.
+
+`path` resolves relative to the directory containing the current
+`skill.spec.yml`. Resolution is lexical: do not expand `~`, environment
+variables, command substitutions, or Markdown links. Relative paths such as
+`../INDEX.md` are allowed so a skill can import plugin-level shared guidance;
+harnesses may still apply package-root or sandbox policy before reading the
+file. Absolute paths and URLs are harness-specific and should be treated as
+local policy decisions, not portable v0 assumptions.
+
+`skillspec imports check <skill.spec.yml>` validates declared import paths,
+Markdown sections, explicit nesting, and dependency-first load order. The
+command checks static resolution only; it does not load import bodies into an
+agent context.
+
+`section` narrows a Markdown import to the named heading and its child content
+until the next heading at the same or higher level. If `section` is absent, the
+whole file is the import body. If a harness cannot find the section, it should
+report a missing import target rather than silently loading unrelated material.
+
+`load` defaults to `on_demand`. `always` imports are loaded after the spec is
+loaded and before task actions; they can stand alone without a `used_by`
+reference. `on_demand` imports must be connected to the runtime graph by
+`used_by`, `requires.imports`, `Code.requires.imports`, `Recipe.requires.imports`,
+or a `load_import` recipe step.
+
+Nested imports are explicit. `requires.imports` forms a directed acyclic graph
+of import ids; it is not discovered by scanning Markdown links. When loading an
+import, load its required imports first in topological order, then the import
+itself. Sibling ordering follows the sequence order in `requires.imports`.
+Cycles are invalid.
+
+Markdown links inside an imported file remain ordinary prose links. A harness
+may let a human or agent follow them, resolving those links relative to the
+imported file's path, but following them is outside SkillSpec import semantics
+unless the target is declared as its own import.
+
 ## Resources
 
 ```text
@@ -359,10 +451,12 @@ resource-use-kind
 ```
 
 Resources are provenance and supporting source material. They exist so an
-imported multi-file skill can preserve its original files without turning
-Markdown into the runtime model. Runtime behavior belongs in routes, rules,
-states, commands, code, artifacts, and recipes. A resource with no incoming
-reference and no `used_by` declaration is invalid because it has no stated role.
+imported multi-file skill can preserve original evidence and non-runtime assets
+without turning every file into runtime guidance. Runtime-loadable Markdown
+belongs in `imports`; provenance, examples, scripts, assets, and source evidence
+belong in `resources`. Runtime behavior belongs in routes, rules, states,
+commands, code, artifacts, and recipes. A resource with no incoming reference
+and no `used_by` declaration is invalid because it has no stated role.
 
 ## Code
 
@@ -394,13 +488,15 @@ code-source     = "inline" ":" string
                   [ "heading" ":" string ] ,
                   [ "sha256" ":" string ] ;
 
-code-provenance = "resource" ":" resource-id ,
+code-provenance = ( "resource" ":" resource-id
+                  | "import" ":" import-id ) ,
                   [ "fence_index" ":" number ] ,
                   [ "heading" ":" string ] ,
                   [ "line_start" ":" number ] ,
                   [ "line_end" ":" number ] ;
 
 code-requires   = [ "dependencies" ":" sequence-of dependency-id ] ,
+                  [ "imports" ":" sequence-of import-id ] ,
                   [ "resources" ":" sequence-of resource-id ] ,
                   [ "artifacts" ":" sequence-of artifact-id ] ;
 
@@ -457,11 +553,13 @@ recipe          = [ "description" ":" string ] ,
                   [ "requires" ":" recipe-requires ] ,
                   [ "steps" ":" sequence-of recipe-step ] ;
 
-recipe-requires = [ "resources" ":" sequence-of resource-id ] ,
+recipe-requires = [ "imports" ":" sequence-of import-id ] ,
+                  [ "resources" ":" sequence-of resource-id ] ,
                   [ "dependencies" ":" sequence-of dependency-id ] ,
                   [ "artifacts" ":" sequence-of artifact-id ] ;
 
-recipe-step     = "load_resource" ":" resource-id
+recipe-step     = "load_import" ":" import-id
+                | "load_resource" ":" resource-id
                 | "run_command" ":" command-id
                 | "run_code" ":" code-id
                 | "produce_artifact" ":" artifact-id

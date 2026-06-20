@@ -53,7 +53,8 @@ Ask for:
 - Pin the RFC from `docs/rfc-v0.md`.
 - File the starter issues from `docs/good-first-issues.md`.
 - Share the before/after example from `examples/before-after/`.
-- Link the minimum compliance gate: `validate`, `test`, and `deps check`.
+- Link the minimum compliance gate: `validate`, `imports check`, `test`, and
+  `deps check`.
 - Ask for ports, not opinions in the abstract.
 
 ## Response Pattern

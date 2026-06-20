@@ -33,6 +33,8 @@ pub struct SkillSpec {
     #[serde(default)]
     pub dependencies: BTreeMap<String, Dependency>,
     #[serde(default)]
+    pub imports: BTreeMap<String, Import>,
+    #[serde(default)]
     pub resources: BTreeMap<String, Resource>,
     #[serde(default)]
     pub code: BTreeMap<String, CodeBlock>,
@@ -318,6 +320,77 @@ pub struct DependencyProvisionOption {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct Import {
+    pub path: String,
+    pub role: ImportRole,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub section: Option<String>,
+    #[serde(default)]
+    pub load: ImportLoad,
+    #[serde(default)]
+    pub requires: ImportRequires,
+    #[serde(default)]
+    pub used_by: Vec<ImportUse>,
+    #[serde(default)]
+    pub load_when: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportRole {
+    Policy,
+    Reference,
+    Procedure,
+    Example,
+    Skill,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportLoad {
+    Always,
+    OnDemand,
+}
+
+impl Default for ImportLoad {
+    fn default() -> Self {
+        Self::OnDemand
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportRequires {
+    #[serde(default)]
+    pub imports: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportUse {
+    pub kind: ImportUseKind,
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportUseKind {
+    Route,
+    Rule,
+    State,
+    Elicitation,
+    Dependency,
+    Command,
+    Code,
+    Artifact,
+    Recipe,
+    Snippet,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Resource {
     pub path: String,
     pub role: ResourceRole,
@@ -426,7 +499,10 @@ pub struct CodeFileSource {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CodeProvenance {
-    pub resource: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import: Option<String>,
     #[serde(default)]
     pub fence_index: Option<u32>,
     #[serde(default)]
@@ -442,6 +518,8 @@ pub struct CodeProvenance {
 pub struct CodeRequires {
     #[serde(default)]
     pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub imports: Vec<String>,
     #[serde(default)]
     pub resources: Vec<String>,
     #[serde(default)]
@@ -529,6 +607,8 @@ pub struct Recipe {
 #[serde(deny_unknown_fields)]
 pub struct RecipeRequires {
     #[serde(default)]
+    pub imports: Vec<String>,
+    #[serde(default)]
     pub resources: Vec<String>,
     #[serde(default)]
     pub dependencies: Vec<String>,
@@ -539,6 +619,7 @@ pub struct RecipeRequires {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RecipeStep {
+    LoadImport(RecipeStepLoadImport),
     LoadResource(RecipeStepLoadResource),
     RunCommand(RecipeStepRunCommand),
     RunCode(RecipeStepRunCode),
@@ -547,6 +628,12 @@ pub enum RecipeStep {
     Ask(RecipeStepAsk),
     Branch(RecipeStepBranch),
     Note(RecipeStepNote),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecipeStepLoadImport {
+    pub load_import: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -8,7 +8,7 @@ Draft for community review.
 
 ## Summary
 
-SkillSpec turns long prose skills into compact, testable behavior contracts. The prose still teaches tone and context. The `skill.spec.yml` carries the parts agents should not guess: routes, rules, dependencies, code snippets, resources, recipes, elicitations, tests, and traces.
+SkillSpec turns long prose skills into compact, testable behavior contracts. The prose still teaches tone and context. The `skill.spec.yml` carries the parts agents should not guess: routes, rules, dependencies, imports, code snippets, resources, recipes, elicitations, tests, and traces.
 
 ## Motivation
 
@@ -57,6 +57,7 @@ A SkillSpec-backed skill should pass:
 
 ```sh
 skillspec validate skill.spec.yml
+skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml
 skillspec deps check skill.spec.yml
 ```

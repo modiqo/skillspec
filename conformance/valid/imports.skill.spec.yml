@@ -1,0 +1,27 @@
+schema: skillspec/v0
+id: conformance.imports
+title: Imports Fixture
+description: Valid import graph fixture.
+routes:
+  - id: local
+    label: Local
+imports:
+  shared_policy:
+    path: ../../README.md
+    role: policy
+    load: always
+  task_reference:
+    path: ../../spec/imports.md
+    role: reference
+    used_by:
+      - kind: route
+        id: local
+recipes:
+  task:
+    steps:
+      - load_import: task_reference
+tests:
+  - name: route assertion
+    input: local task
+    expect:
+      route: local

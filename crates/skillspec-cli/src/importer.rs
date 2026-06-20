@@ -1,19 +1,20 @@
 use crate::error::{Error, Result};
 use crate::model::{
     CodeBlock, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires, CodeSafety, CodeSource,
-    CommandRequires, CommandTemplate, Dependency, DependencyCheck, DependencyKind, Resource,
-    ResourceRole, ResourceUse, ResourceUseKind, SkillSpec, Snippet,
+    CommandRequires, CommandTemplate, Dependency, DependencyCheck, DependencyKind, Import,
+    ImportLoad, ImportRequires, ImportRole, ImportUse, ImportUseKind, Resource, ResourceRole,
+    ResourceUse, ResourceUseKind, SkillSpec, Snippet,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub fn import_skill(path: &Path) -> Result<SkillSpec> {
     let source = SkillSource::read(path)?;
     let analysis = SkillAnalysis::from_source(&source);
     let dependencies = dependencies_from_analysis(&analysis);
     let commands = commands_from_blocks(&analysis.command_blocks);
-    let (resources, code) = resources_and_code(&analysis);
+    let (imports, resources, code) = imports_resources_and_code(&analysis);
 
     let mut snippets = BTreeMap::new();
     snippets.insert(
@@ -68,6 +69,7 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
         elicitations: BTreeMap::new(),
         trace: None,
         dependencies,
+        imports,
         resources,
         code,
         artifacts: BTreeMap::new(),
@@ -88,6 +90,58 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
         ],
         metadata,
     })
+}
+
+pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
+    let mut spec = import_skill(path)?;
+    let source_root = source_root(path);
+    let out_dir = out.parent().unwrap_or_else(|| Path::new("."));
+    for import in spec.imports.values_mut() {
+        let source_path = source_root.join(&import.path);
+        if let Some(relative) = relative_path(&source_path, out_dir) {
+            import.path = relative.display().to_string();
+        }
+    }
+    Ok(spec)
+}
+
+fn source_root(path: &Path) -> PathBuf {
+    if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+}
+
+fn relative_path(target: &Path, base: &Path) -> Option<PathBuf> {
+    let target = target.canonicalize().ok()?;
+    let base = base.canonicalize().ok()?;
+    let target_components = target.components().collect::<Vec<_>>();
+    let base_components = base.components().collect::<Vec<_>>();
+    if target_components.first() != base_components.first() {
+        return None;
+    }
+
+    let mut common = 0;
+    while common < target_components.len()
+        && common < base_components.len()
+        && target_components[common] == base_components[common]
+    {
+        common += 1;
+    }
+
+    let mut relative = PathBuf::new();
+    for component in &base_components[common..] {
+        if matches!(component, Component::Normal(_)) {
+            relative.push("..");
+        }
+    }
+    for component in &target_components[common..] {
+        relative.push(component.as_os_str());
+    }
+    Some(relative)
 }
 
 fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTemplate> {
@@ -116,14 +170,57 @@ fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTe
         .collect()
 }
 
-fn resources_and_code(
+fn imports_resources_and_code(
     analysis: &SkillAnalysis,
-) -> (BTreeMap<String, Resource>, BTreeMap<String, CodeBlock>) {
+) -> (
+    BTreeMap<String, Import>,
+    BTreeMap<String, Resource>,
+    BTreeMap<String, CodeBlock>,
+) {
+    let mut imports = BTreeMap::new();
     let mut resources = BTreeMap::new();
     let mut code = BTreeMap::new();
     let code_ids_by_resource = code_ids_by_resource(&analysis.code_blocks);
+    let import_document_ids = analysis
+        .documents
+        .iter()
+        .filter(|document| document.is_import_candidate())
+        .map(|document| document.resource_id.clone())
+        .collect::<BTreeSet<_>>();
 
     for document in &analysis.documents {
+        if document.is_import_candidate() {
+            let used_by = code_ids_by_resource
+                .get(&document.resource_id)
+                .into_iter()
+                .flatten()
+                .map(|id| ImportUse {
+                    kind: ImportUseKind::Code,
+                    id: id.clone(),
+                })
+                .collect::<Vec<_>>();
+            imports.insert(
+                document.resource_id.clone(),
+                Import {
+                    path: document.relative_path.display().to_string(),
+                    role: import_role(&document.relative_path),
+                    description: Some(format!(
+                        "Imported runtime guidance from {}.",
+                        document.relative_path.display()
+                    )),
+                    section: None,
+                    load: ImportLoad::OnDemand,
+                    requires: ImportRequires::default(),
+                    used_by,
+                    load_when: vec![
+                        "Load when the active route, rule, recipe, or code path needs this guidance."
+                            .to_owned(),
+                    ],
+                },
+            );
+            continue;
+        }
+
         let used_by = code_ids_by_resource
             .get(&document.resource_id)
             .into_iter()
@@ -162,7 +259,11 @@ fn resources_and_code(
                     inline: block.text.clone(),
                 }),
                 provenance: Some(CodeProvenance {
-                    resource: block.resource_id.clone(),
+                    resource: (!import_document_ids.contains(&block.resource_id))
+                        .then(|| block.resource_id.clone()),
+                    import: import_document_ids
+                        .contains(&block.resource_id)
+                        .then(|| block.resource_id.clone()),
                     fence_index: Some(block.fence_index),
                     heading: block.heading.clone(),
                     line_start: Some(block.line_start),
@@ -171,7 +272,16 @@ fn resources_and_code(
                 purpose: Some("Imported fenced code block; review before execution.".to_owned()),
                 requires: CodeRequires {
                     dependencies: runtime_dependencies(&block.language),
-                    resources: vec![block.resource_id.clone()],
+                    imports: if import_document_ids.contains(&block.resource_id) {
+                        vec![block.resource_id.clone()]
+                    } else {
+                        Vec::new()
+                    },
+                    resources: if import_document_ids.contains(&block.resource_id) {
+                        Vec::new()
+                    } else {
+                        vec![block.resource_id.clone()]
+                    },
                     artifacts: Vec::new(),
                 },
                 inputs: Vec::new(),
@@ -182,7 +292,7 @@ fn resources_and_code(
         );
     }
 
-    (resources, code)
+    (imports, resources, code)
 }
 
 fn code_ids_by_resource(code_blocks: &[ImportedCodeBlock]) -> BTreeMap<String, Vec<String>> {
@@ -462,6 +572,13 @@ impl SourceDocument {
             content,
         }
     }
+
+    fn is_import_candidate(&self) -> bool {
+        self.relative_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| !name.eq_ignore_ascii_case("SKILL.md"))
+    }
 }
 
 #[derive(Debug)]
@@ -616,6 +733,20 @@ fn resource_role(path: &Path) -> ResourceRole {
         "forms.md" | "procedure.md" | "procedures.md" => ResourceRole::RequiredProcedure,
         "example.md" | "examples.md" => ResourceRole::Example,
         _ => ResourceRole::SourceMaterial,
+    }
+}
+
+fn import_role(path: &Path) -> ImportRole {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match file_name.as_str() {
+        "skill.md" => ImportRole::Skill,
+        "procedure.md" | "procedures.md" | "forms.md" => ImportRole::Procedure,
+        "example.md" | "examples.md" => ImportRole::Example,
+        _ => ImportRole::Reference,
     }
 }
 

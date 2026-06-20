@@ -7,7 +7,7 @@ Keep the prose. Structure the decisions.
 SkillSpec turns long prose skills into compact, testable behavior contracts.
 The prose still teaches tone and context. The `skill.spec.yml` carries the
 parts agents should not guess: routes, rules, dependencies, code snippets,
-resources, recipes, elicitations, tests, and traces.
+imports, resources, recipes, elicitations, tests, and traces.
 
 The claim is simple: keep `SKILL.md` tiny, move decisions into a spec, and make
 agent steering something you can validate, trace, port, and improve.
@@ -26,8 +26,8 @@ machine-checkable contract for the behavioral parts of a skill that should be
 tested, traced, compiled, and reviewed.
 
 The result should be a smaller, more durable skill: a tiny loader for the
-harness, a structured contract for decisions, and the original prose and
-resources preserved as source material.
+harness, a structured contract for decisions, runtime imports for active
+guidance, and original prose/resources preserved as source material.
 
 ## Install The CLI
 
@@ -49,6 +49,7 @@ Check the installed CLI has the expected surface:
 ```sh
 skillspec --help
 skillspec import-skill --help
+skillspec imports check --help
 skillspec deps check --help
 ```
 
@@ -72,8 +73,8 @@ The creator skill does the careful path:
 1. Stages remote sources locally.
 2. Reads the skill folder, not just `SKILL.md`.
 3. Runs the deterministic importer.
-4. Promotes resources, code snippets, artifacts, recipes, dependencies, rules,
-   and tests into a reviewed `skill.spec.yml`.
+4. Promotes imports, resources, code snippets, artifacts, recipes,
+   dependencies, rules, and tests into a reviewed `skill.spec.yml`.
 5. Validates and tests the spec.
 6. Optionally compiles and installs a generated harness skill.
 
@@ -82,14 +83,15 @@ The mechanical importer is available directly when you only want a draft:
 ```sh
 skillspec import-skill path/to/skill-folder --out skill.spec.yml
 skillspec validate skill.spec.yml
+skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml
 skillspec deps check skill.spec.yml
 ```
 
 `import-skill` preserves source material; it does not pretend to understand the
-whole skill. It extracts Markdown resources, fenced code blocks, shell-like
-commands, obvious dependencies, headings, and strong directive language, then
-marks uncertainty as `review_required`.
+whole skill. It extracts runtime-loadable Markdown imports, source resources,
+fenced code blocks, shell-like commands, obvious dependencies, headings, and
+strong directive language, then marks uncertainty as `review_required`.
 
 ## Install A SkillSpec-Backed Skill
 
@@ -127,6 +129,7 @@ generated skill until:
 
 ```sh
 skillspec validate my-skill/skill.spec.yml
+skillspec imports check my-skill/skill.spec.yml
 skillspec test my-skill/skill.spec.yml
 skillspec deps check my-skill/skill.spec.yml
 ```
@@ -156,6 +159,7 @@ The generated `SKILL.md` should tell the agent to use the sibling
 
 ```sh
 skillspec validate path/to/skill.spec.yml
+skillspec imports check path/to/skill.spec.yml
 skillspec deps check path/to/skill.spec.yml
 skillspec decide path/to/skill.spec.yml \
   --input='the user task text' \
@@ -194,9 +198,10 @@ the spec. This keeps `SKILL.md` small and prevents it from becoming a second
 source of truth.
 
 Use the Markdown target when you want a full human-readable rendering of the
-contract. `--target markdown` includes routes, rules, dependencies, resources,
-code, artifacts, recipes, commands, snippets, closures, scenario tests, proof
-metrics, review notes, and CLI commands for validation and explanation.
+contract. `--target markdown` includes routes, rules, dependencies, imports,
+resources, code, artifacts, recipes, commands, snippets, closures, scenario
+tests, proof metrics, review notes, and CLI commands for validation and
+explanation.
 
 ## What Goes In A Spec
 
@@ -208,6 +213,8 @@ A `skill.spec.yml` can describe:
 - bounded user questions and choices
 - state transitions
 - declared dependencies and provision choices
+- runtime-loadable imports for shared policy, references, procedures, examples,
+  and skill docs
 - source resources from imported multi-file skills
 - code snippets with provenance, dependencies, inputs, outputs, and safety
 - named artifacts consumed or produced by code and commands
@@ -276,6 +283,7 @@ Run the repository-level conformance sweep:
 ```sh
 cargo build
 find examples -name '*.yml' -exec target/debug/skillspec validate {} \;
+find examples -name '*.yml' -exec target/debug/skillspec imports check {} \;
 find examples -name '*.yml' -exec target/debug/skillspec test {} \;
 find examples -name '*.yml' -exec target/debug/skillspec deps check {} \;
 ```
@@ -297,6 +305,7 @@ The minimum compliance gate for a SkillSpec-backed skill is:
 
 ```sh
 skillspec validate skill.spec.yml
+skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml
 skillspec deps check skill.spec.yml
 ```
@@ -341,6 +350,8 @@ SkillSpec v0 has a formal grammar and relationship model:
 - [spec/rules.md](spec/rules.md) defines rule evaluation and negative
   steering.
 - [spec/trace.md](spec/trace.md) defines append-only decision traces.
+- [spec/imports.md](spec/imports.md) defines import resolution, sections, and
+  nesting.
 - [spec/skill.spec.schema.json](spec/skill.spec.schema.json) is the strict JSON
   schema for typed v0 fields.
 
@@ -351,6 +362,7 @@ rules steer routes, elicitations, and closures
 states organize lifecycle
 elicitations ask bounded questions
 dependencies declare required tools and provision choices
+imports load active guidance deliberately
 resources preserve source provenance
 code preserves executable knowledge
 artifacts name consumed and produced data

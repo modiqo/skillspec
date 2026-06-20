@@ -35,6 +35,10 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/dependency" }
     },
+    "imports": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/import" }
+    },
     "resources": {
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/resource" }
@@ -313,6 +317,66 @@
       },
       "additionalProperties": false
     },
+    "import": {
+      "type": "object",
+      "required": ["path", "role"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": "string",
+          "enum": ["policy", "reference", "procedure", "example", "skill"]
+        },
+        "description": { "type": "string" },
+        "section": { "type": "string", "minLength": 1 },
+        "load": {
+          "type": "string",
+          "enum": ["always", "on_demand"]
+        },
+        "requires": { "$ref": "#/$defs/import_requires" },
+        "used_by": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/import_use" }
+        },
+        "load_when": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "import_requires": {
+      "type": "object",
+      "properties": {
+        "imports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "import_use": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "route",
+            "rule",
+            "state",
+            "elicitation",
+            "dependency",
+            "command",
+            "code",
+            "artifact",
+            "recipe",
+            "snippet"
+          ]
+        },
+        "id": { "$ref": "#/$defs/identifier" }
+      },
+      "additionalProperties": false
+    },
     "resource": {
       "type": "object",
       "required": ["path", "role"],
@@ -427,20 +491,28 @@
     },
     "code_provenance": {
       "type": "object",
-      "required": ["resource"],
       "properties": {
         "resource": { "$ref": "#/$defs/identifier" },
+        "import": { "$ref": "#/$defs/identifier" },
         "fence_index": { "type": "integer", "minimum": 1 },
         "heading": { "type": "string" },
         "line_start": { "type": "integer", "minimum": 1 },
         "line_end": { "type": "integer", "minimum": 1 }
       },
+      "oneOf": [
+        { "required": ["resource"], "not": { "required": ["import"] } },
+        { "required": ["import"], "not": { "required": ["resource"] } }
+      ],
       "additionalProperties": false
     },
     "code_requires": {
       "type": "object",
       "properties": {
         "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "imports": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
         },
@@ -518,6 +590,10 @@
     "recipe_requires": {
       "type": "object",
       "properties": {
+        "imports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
         "resources": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
@@ -535,6 +611,12 @@
     },
     "recipe_step": {
       "oneOf": [
+        {
+          "type": "object",
+          "required": ["load_import"],
+          "properties": { "load_import": { "$ref": "#/$defs/identifier" } },
+          "additionalProperties": false
+        },
         {
           "type": "object",
           "required": ["load_resource"],

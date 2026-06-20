@@ -50,6 +50,7 @@ Validate before using a spec:
 
 ```bash
 skillspec validate path/to/skill.spec.yml
+skillspec imports check path/to/skill.spec.yml
 skillspec deps check path/to/skill.spec.yml
 skillspec deps check path/to/skill.spec.yml --command '<command-id>'
 ```
@@ -82,6 +83,9 @@ Read the decision as a contract:
 - `commands` are named templates or command families the harness may use.
 - `dependencies` are the tools, files, env vars, services, adapters, browsers,
   and packages that commands may require.
+- `imports` are runtime-loadable guidance. Load `always` imports before task
+  actions. Load `on_demand` imports only when their route, rule, recipe, code
+  path, or parent import is active.
 - `closures` and `after_success` are completion obligations.
 
 If a decision forbids a tempting shortcut, do not take the shortcut. Example:

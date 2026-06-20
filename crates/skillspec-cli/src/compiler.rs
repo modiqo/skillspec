@@ -1,8 +1,8 @@
 use crate::model::{
     Artifact, ArtifactKind, CodeBlock, CodeKind, CodeSource, CommandRequires, CommandTemplate,
-    Dependency, DependencyKind, Elicitation, ElicitationChoice, Predicate, Recipe, RecipeStep,
-    Resource, ResourceRole, ResourceUse, ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest,
-    SkillSpec, State, TraceEventKind,
+    Dependency, DependencyKind, Elicitation, ElicitationChoice, Import, ImportLoad, ImportRole,
+    ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep, Resource, ResourceRole, ResourceUse,
+    ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest, SkillSpec, State, TraceEventKind,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -31,6 +31,7 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_elicitations(&mut output, spec);
     write_trace(&mut output, spec);
     write_dependencies(&mut output, spec);
+    write_imports(&mut output, spec);
     write_resources(&mut output, spec);
     write_code(&mut output, spec);
     write_artifacts(&mut output, spec);
@@ -51,7 +52,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push('\n');
     let _ = writeln!(output, "{}", spec.description);
     output.push('\n');
-    output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, resources, recipes, tests, and trace requirements.\n\n");
+    output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements.\n\n");
     output.push_str("## Runtime Contract\n\n");
     output.push_str(
         "1. Load `./skill.spec.yml` from this skill folder before taking task actions.\n",
@@ -62,11 +63,12 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("   ```\n\n");
     output.push_str("3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.\n");
     output.push_str("4. Preserve the emitted trace `run_dir`; mention it in the completion report so the decision path can be inspected.\n");
-    output.push_str("5. Follow the selected route, matched rules, forbids, elicitations, dependencies, recipes, and closures from `skill.spec.yml`.\n");
+    output.push_str("5. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.\n");
     output.push_str("6. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.\n\n");
     output.push_str("## Quick Commands\n\n");
     output.push_str("```bash\n");
     output.push_str("skillspec validate ./skill.spec.yml\n");
+    output.push_str("skillspec imports check ./skill.spec.yml\n");
     output.push_str("skillspec test ./skill.spec.yml\n");
     output.push_str("skillspec deps check ./skill.spec.yml\n");
     output.push_str("skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
@@ -79,6 +81,52 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
             let _ = writeln!(output, "- `{}`: {}", route.id.0, route.label);
         }
     }
+}
+
+fn write_imports(output: &mut String, spec: &SkillSpec) {
+    if spec.imports.is_empty() {
+        return;
+    }
+    output.push_str("## Imports\n\n");
+    output.push_str("Imports are runtime-loadable instruction material. Resolve import paths relative to the `skill.spec.yml` file; load `always` imports before task actions and load `on_demand` imports only when their route, rule, recipe, code, or nested import reference is active.\n\n");
+    for (id, import) in &spec.imports {
+        write_import(output, id, import);
+    }
+}
+
+fn write_import(output: &mut String, id: &str, import: &Import) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- path: `{}`", import.path);
+    let _ = writeln!(output, "- role: `{}`", import_role_name(import));
+    let _ = writeln!(output, "- load: `{}`", import_load_name(&import.load));
+    if let Some(section) = &import.section {
+        let _ = writeln!(output, "- section: {section}");
+    }
+    if let Some(description) = &import.description {
+        let _ = writeln!(output, "- description: {description}");
+    }
+    if !import.requires.imports.is_empty() {
+        let _ = writeln!(
+            output,
+            "- requires.imports: {}",
+            code_list(&import.requires.imports)
+        );
+    }
+    if !import.used_by.is_empty() {
+        output.push_str("- used_by:\n");
+        for use_ref in &import.used_by {
+            let _ = writeln!(
+                output,
+                "  - {}: `{}`",
+                import_use_kind_name(use_ref),
+                use_ref.id
+            );
+        }
+    }
+    if !import.load_when.is_empty() {
+        let _ = writeln!(output, "- load_when: {}", code_list(&import.load_when));
+    }
+    output.push('\n');
 }
 
 fn write_resources(output: &mut String, spec: &SkillSpec) {
@@ -135,7 +183,12 @@ fn write_code_block(output: &mut String, id: &str, code: &CodeBlock) {
         let _ = writeln!(output, "- purpose: {purpose}");
     }
     if let Some(provenance) = &code.provenance {
-        let _ = writeln!(output, "- provenance: `{}`", provenance.resource);
+        if let Some(resource) = &provenance.resource {
+            let _ = writeln!(output, "- provenance resource: `{resource}`");
+        }
+        if let Some(import) = &provenance.import {
+            let _ = writeln!(output, "- provenance import: `{import}`");
+        }
         if let Some(fence_index) = provenance.fence_index {
             let _ = writeln!(output, "  - fence_index: {fence_index}");
         }
@@ -144,6 +197,7 @@ fn write_code_block(output: &mut String, id: &str, code: &CodeBlock) {
         }
     }
     if !code.requires.dependencies.is_empty()
+        || !code.requires.imports.is_empty()
         || !code.requires.resources.is_empty()
         || !code.requires.artifacts.is_empty()
     {
@@ -154,6 +208,9 @@ fn write_code_block(output: &mut String, id: &str, code: &CodeBlock) {
                 "  - dependencies: {}",
                 code_list(&code.requires.dependencies)
             );
+        }
+        if !code.requires.imports.is_empty() {
+            let _ = writeln!(output, "  - imports: {}", code_list(&code.requires.imports));
         }
         if !code.requires.resources.is_empty() {
             let _ = writeln!(
@@ -218,7 +275,7 @@ fn write_recipes(output: &mut String, spec: &SkillSpec) {
         return;
     }
     output.push_str("## Recipes\n\n");
-    output.push_str("Recipes are ordered procedures with explicit resource, dependency, code, command, elicitation, and artifact references.\n\n");
+    output.push_str("Recipes are ordered procedures with explicit import, resource, dependency, code, command, elicitation, and artifact references.\n\n");
     for (id, recipe) in &spec.recipes {
         write_recipe(output, id, recipe);
     }
@@ -241,6 +298,9 @@ fn write_recipe(output: &mut String, id: &str, recipe: &Recipe) {
 
 fn write_recipe_step(output: &mut String, step: &RecipeStep) {
     match step {
+        RecipeStep::LoadImport(step) => {
+            let _ = writeln!(output, "  - load_import: `{}`", step.load_import);
+        }
         RecipeStep::LoadResource(step) => {
             let _ = writeln!(output, "  - load_resource: `{}`", step.load_resource);
         }
@@ -805,6 +865,7 @@ fn write_runtime_commands(output: &mut String) {
     output.push_str("Use these commands when the `skillspec` CLI is available. Replace `<skill-folder>` with the folder containing this generated `SKILL.md`. The default trace location is `${PWD}/.skillspec/traces`, where `PWD` is the task working directory.\n\n");
     output.push_str("```bash\n");
     output.push_str("skillspec validate <skill-folder>/skill.spec.yml\n");
+    output.push_str("skillspec imports check <skill-folder>/skill.spec.yml\n");
     output.push_str("skillspec test <skill-folder>/skill.spec.yml\n");
     output.push_str("skillspec deps check <skill-folder>/skill.spec.yml\n");
     output.push_str("skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>\n");
@@ -914,6 +975,38 @@ fn resource_role_name(resource: &Resource) -> &'static str {
     }
 }
 
+fn import_role_name(import: &Import) -> &'static str {
+    match &import.role {
+        ImportRole::Policy => "policy",
+        ImportRole::Reference => "reference",
+        ImportRole::Procedure => "procedure",
+        ImportRole::Example => "example",
+        ImportRole::Skill => "skill",
+    }
+}
+
+fn import_load_name(load: &ImportLoad) -> &'static str {
+    match load {
+        ImportLoad::Always => "always",
+        ImportLoad::OnDemand => "on_demand",
+    }
+}
+
+fn import_use_kind_name(use_ref: &ImportUse) -> &'static str {
+    match &use_ref.kind {
+        ImportUseKind::Route => "route",
+        ImportUseKind::Rule => "rule",
+        ImportUseKind::State => "state",
+        ImportUseKind::Elicitation => "elicitation",
+        ImportUseKind::Dependency => "dependency",
+        ImportUseKind::Command => "command",
+        ImportUseKind::Code => "code",
+        ImportUseKind::Artifact => "artifact",
+        ImportUseKind::Recipe => "recipe",
+        ImportUseKind::Snippet => "snippet",
+    }
+}
+
 fn resource_use_kind_name(use_ref: &ResourceUse) -> &'static str {
     match &use_ref.kind {
         ResourceUseKind::Route => "route",
@@ -1015,6 +1108,7 @@ mod tests {
             elicitations: BTreeMap::new(),
             trace: None,
             dependencies: BTreeMap::new(),
+            imports: BTreeMap::new(),
             resources: BTreeMap::new(),
             code: BTreeMap::new(),
             artifacts: BTreeMap::new(),

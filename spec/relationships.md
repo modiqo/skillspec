@@ -403,9 +403,13 @@ skill prose reduced by 82%
 estimated 18,400 tokens avoided per remembered run
 ```
 
-## Future Inheritance Relationship
+## Imports And Future Inheritance
 
-V0 has no imports or inheritance. The future model should be:
+V0 imports are local, explicit, runtime-loadable guidance. They do not merge
+another spec, weaken forbids, or inherit routes and rules. Nested imports are a
+DAG of instruction files, not an inheritance chain.
+
+The future inheritance model should be:
 
 ```text
 base skill

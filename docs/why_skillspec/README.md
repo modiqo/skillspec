@@ -48,6 +48,7 @@ The demo is powerful because it is not a claim. It is runnable.
 
 ```sh
 skillspec validate docs/why_skillspec/skillspec_backed/skill.spec.yml
+skillspec imports check docs/why_skillspec/skillspec_backed/skill.spec.yml
 skillspec test docs/why_skillspec/skillspec_backed/skill.spec.yml
 skillspec deps check docs/why_skillspec/skillspec_backed/skill.spec.yml
 skillspec decide docs/why_skillspec/skillspec_backed/skill.spec.yml \
@@ -80,6 +81,7 @@ The SkillSpec-backed skill proves the rule.
 | Final report depends on memory | `after_success` names reporting obligations |
 | Reviewers read the whole skill manually | reviewers inspect schema, tests, and focused diffs |
 | Porting means reinterpreting prose | compiler targets emit thin harness loaders |
+| Reference files are either over-loaded or ignored | `imports` load active guidance only when needed |
 | Original source can be lost during rewrites | `resources` preserve the original prose as provenance |
 | Security claims are broad | safety-sensitive choices are explicit and reviewable |
 | Regression risk is mostly vibes | golden snapshots and scenario tests catch behavior drift |
@@ -140,4 +142,3 @@ and CI.
 
 The goal is not a bigger prompt. The goal is a smaller loader and a stronger
 contract.
-

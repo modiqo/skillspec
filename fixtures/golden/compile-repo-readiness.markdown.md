@@ -264,6 +264,7 @@ Use these commands when the `skillspec` CLI is available. Replace `<skill-folder
 
 ```bash
 skillspec validate <skill-folder>/skill.spec.yml
+skillspec imports check <skill-folder>/skill.spec.yml
 skillspec test <skill-folder>/skill.spec.yml
 skillspec deps check <skill-folder>/skill.spec.yml
 skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>

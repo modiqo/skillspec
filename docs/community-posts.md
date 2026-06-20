@@ -27,6 +27,7 @@ SkillSpec adds the missing testable layer:
 ```sh
 skillspec import-skill path/to/SKILL.md --out skill.spec.yml
 skillspec validate skill.spec.yml
+skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml
 skillspec deps check skill.spec.yml
 ```

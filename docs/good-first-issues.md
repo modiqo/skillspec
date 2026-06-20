@@ -41,6 +41,7 @@ Expected verification:
 
 ```sh
 skillspec validate examples/<name>.skill.spec.yml
+skillspec imports check examples/<name>.skill.spec.yml
 skillspec test examples/<name>.skill.spec.yml
 skillspec deps check examples/<name>.skill.spec.yml
 ```

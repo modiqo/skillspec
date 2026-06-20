@@ -3,6 +3,7 @@ mod decision;
 mod deps;
 mod error;
 mod importer;
+mod imports;
 mod install;
 mod model;
 mod parser;
@@ -66,6 +67,11 @@ enum Command {
         #[command(subcommand)]
         command: DepsCommand,
     },
+    #[command(about = "Validate and report SkillSpec imports")]
+    Imports {
+        #[command(subcommand)]
+        command: ImportsCommand,
+    },
     #[command(about = "Compile a SkillSpec into harness guidance")]
     Compile {
         /// Path to a skill.spec.yml file.
@@ -114,6 +120,15 @@ enum DepsCommand {
         /// Check only dependencies required by this command id.
         #[arg(long)]
         command: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ImportsCommand {
+    #[command(about = "Check import paths, sections, nesting, and load order")]
+    Check {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
     },
 }
 
@@ -215,13 +230,23 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Command::Imports { command } => match command {
+            ImportsCommand::Check { path } => {
+                let spec = parser::load_spec_unresolved(&path)?;
+                let report = imports::check(&spec, &path);
+                report::json(&report)?;
+                if !report.ok {
+                    std::process::exit(1);
+                }
+            }
+        },
         Command::Compile { path, target } => {
             let spec = parser::load_spec(&path)?;
             let markdown = compiler::compile(&spec, target.into());
             report::text(&markdown)?;
         }
         Command::ImportSkill { path, out } => {
-            let imported = importer::import_skill(&path)?;
+            let imported = importer::import_skill_for_output(&path, &out)?;
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
         }

@@ -56,6 +56,35 @@ parse hints, safety class, and expected output. V0 does not mandate a template
 engine; implementations should treat command strings as examples unless they
 explicitly support rendering.
 
+## Imports And Resources
+
+Imports are runtime-loadable instruction material. They are the right place for
+shared operating policy, branch-specific reference files, procedure documents,
+examples, or another skill document that a harness should deliberately load
+during a run.
+
+Resources are provenance and supporting material. They preserve source evidence,
+assets, scripts, examples, and other files without making them active guidance.
+A file can influence behavior only through structured routes, rules, recipes,
+commands, code, states, or an explicit import reference.
+
+Import paths resolve relative to the directory containing `skill.spec.yml`.
+Relative paths may point at sibling or parent package files such as
+`../INDEX.md`; harnesses still apply their own filesystem and package-root
+policy before reading. SkillSpec does not expand shell syntax, environment
+variables, or Markdown links in an import path.
+
+`load: always` imports are part of task startup. `load: on_demand` imports are
+loaded only when their connected route, rule, recipe, code path, or parent
+import is active. Nested imports are explicit through `requires.imports`; the
+graph must be acyclic and is loaded in topological order. Markdown links inside
+an imported document remain prose links unless their targets are declared as
+imports.
+
+If `section` is present, a Markdown loader should read the named heading and its
+children, stopping at the next heading at the same or higher level. Missing
+sections should fail closed with a clear missing-import error.
+
 ## Tests
 
 Tests are scenario contracts:

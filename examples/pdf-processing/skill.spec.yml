@@ -39,6 +39,28 @@ dependencies:
     kind: package
     description: Python package used for overlay-based PDF generation when forms are not fillable.
 
+imports:
+  reference:
+    path: reference.md
+    role: reference
+    description: Advanced PDF library and tool reference loaded only when extraction details or library selection are needed.
+    used_by:
+      - kind: code
+        id: extract_pdf_text
+  forms:
+    path: forms.md
+    role: procedure
+    description: Required ordered process for deciding whether to use fillable fields or overlay text.
+    used_by:
+      - kind: recipe
+        id: fill_pdf_form_recipe
+      - kind: recipe
+        id: overlay_text_recipe
+      - kind: code
+        id: inspect_fillable_fields
+      - kind: code
+        id: fill_existing_fields
+
 resources:
   skill:
     path: SKILL.md
@@ -49,22 +71,6 @@ resources:
         id: inspect_pdf
       - kind: route
         id: fill_pdf_form
-  reference:
-    path: reference.md
-    role: reference
-    description: Advanced PDF library and tool reference.
-    used_by:
-      - kind: code
-        id: extract_pdf_text
-  forms:
-    path: forms.md
-    role: required_procedure
-    description: Required ordered process for deciding whether to use fillable fields or overlay text.
-    used_by:
-      - kind: recipe
-        id: fill_pdf_form_recipe
-      - kind: code
-        id: inspect_fillable_fields
 
 artifacts:
   input_pdf:
@@ -109,7 +115,7 @@ code:
             "fields": sorted(fields.keys()),
         }, indent=2))
     provenance:
-      resource: forms
+      import: forms
       fence_index: 1
       heading: Detect fillable fields
       line_start: 10
@@ -119,7 +125,7 @@ code:
       dependencies:
         - python3
         - pypdf
-      resources:
+      imports:
         - forms
       artifacts:
         - input_pdf
@@ -152,7 +158,7 @@ code:
         with open(output_pdf, "wb") as handle:
             writer.write(handle)
     provenance:
-      resource: forms
+      import: forms
       fence_index: 2
       heading: Fill existing fields
       line_start: 45
@@ -162,7 +168,7 @@ code:
       dependencies:
         - python3
         - pypdf
-      resources:
+      imports:
         - forms
       artifacts:
         - input_pdf
@@ -188,7 +194,7 @@ code:
         for page in reader.pages:
             print(page.extract_text() or "")
     provenance:
-      resource: reference
+      import: reference
       fence_index: 1
       heading: Basic text extraction
       line_start: 12
@@ -198,7 +204,7 @@ code:
       dependencies:
         - python3
         - pypdf
-      resources:
+      imports:
         - reference
       artifacts:
         - input_pdf
@@ -213,7 +219,7 @@ recipes:
     description: Inspect a PDF, branch by fillability, and produce a filled PDF through an explicit artifact path.
     ordered: true
     requires:
-      resources:
+      imports:
         - forms
       dependencies:
         - python3
@@ -221,7 +227,7 @@ recipes:
       artifacts:
         - input_pdf
     steps:
-      - load_resource: forms
+      - load_import: forms
       - run_code: inspect_fillable_fields
       - produce_artifact: field_report_json
       - branch:
@@ -234,7 +240,7 @@ recipes:
     description: Fallback recipe for non-fillable forms; details should be promoted from forms.md after human review.
     ordered: true
     requires:
-      resources:
+      imports:
         - forms
       dependencies:
         - python3
@@ -242,7 +248,7 @@ recipes:
       artifacts:
         - input_pdf
     steps:
-      - load_resource: forms
+      - load_import: forms
       - note: Review coordinate extraction and overlay placement snippets before generating a filled PDF.
 
 tests:

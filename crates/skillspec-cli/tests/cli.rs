@@ -287,6 +287,195 @@ tests:
 }
 
 #[test]
+fn validate_resolves_import_paths_and_sections_from_spec_directory() {
+    let dir = TempDir::new("validate-imports");
+    let skill_dir = dir.path().join("skill");
+    let spec = skill_dir.join("skill.spec.yml");
+    write_file(
+        &skill_dir.join("references/guide.md"),
+        r#"# Guide
+
+## Required Procedure
+
+Follow this section.
+"#,
+    );
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.imports
+title: CLI Imports
+description: Exercises import resolution.
+imports:
+  guide:
+    path: references/guide.md
+    role: procedure
+    section: Required Procedure
+    load: always
+"#,
+    );
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&validate);
+
+    let imports = Command::new(bin())
+        .arg("imports")
+        .arg("check")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&imports);
+    let report = json_stdout(&imports);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["imports"][0]["id"], "guide");
+    assert_eq!(report["imports"][0]["section_found"], true);
+}
+
+#[test]
+fn validate_rejects_missing_import_files_and_sections() {
+    let dir = TempDir::new("validate-imports-negative");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&dir.path().join("guide.md"), "# Guide\n");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.imports_missing
+title: CLI Imports Missing
+description: Exercises missing import resolution.
+imports:
+  guide:
+    path: guide.md
+    role: reference
+    section: Missing Section
+    load: always
+"#,
+    );
+
+    let missing_section = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&missing_section);
+    assert!(stderr(&missing_section).contains("section"));
+
+    let missing_section_report = Command::new(bin())
+        .arg("imports")
+        .arg("check")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&missing_section_report);
+    let report = json_stdout(&missing_section_report);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["imports"][0]["status"], "missing_section");
+
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.imports_missing
+title: CLI Imports Missing
+description: Exercises missing import resolution.
+imports:
+  guide:
+    path: missing.md
+    role: reference
+    load: always
+"#,
+    );
+
+    let missing_file = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&missing_file);
+    assert!(stderr(&missing_file).contains("missing_file"));
+
+    let missing_file_report = Command::new(bin())
+        .arg("imports")
+        .arg("check")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&missing_file_report);
+    let report = json_stdout(&missing_file_report);
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["imports"][0]["status"], "missing_file");
+    assert!(report["imports"][0]["resolved_path"]
+        .as_str()
+        .unwrap()
+        .ends_with("missing.md"));
+}
+
+#[test]
+fn imports_check_reports_nested_load_order_across_path_depths() {
+    let dir = TempDir::new("imports-nested");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&dir.path().join("procedures/a.md"), "# A\n");
+    write_file(&dir.path().join("references/deep/b.md"), "# B\n");
+    write_file(&dir.path().join("shared/c.md"), "# C\n");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.imports_nested
+title: CLI Nested Imports
+description: Exercises nested import load order.
+routes:
+  - id: local
+    label: Local
+imports:
+  a:
+    path: procedures/a.md
+    role: procedure
+    requires:
+      imports: [b]
+    used_by:
+      - kind: route
+        id: local
+  b:
+    path: references/deep/b.md
+    role: reference
+    requires:
+      imports: [c]
+    used_by:
+      - kind: route
+        id: local
+  c:
+    path: shared/c.md
+    role: policy
+    used_by:
+      - kind: route
+        id: local
+tests:
+  - name: route assertion
+    input: local task
+    expect:
+      route: local
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("imports")
+        .arg("check")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["load_order"], serde_json::json!(["c", "b", "a"]));
+}
+
+#[test]
 fn test_command_reports_failed_expectations() {
     let dir = TempDir::new("test-negative");
     let spec = dir.path().join("skill.spec.yml");
@@ -495,6 +684,9 @@ print("hello")
 
     let content = fs::read_to_string(&out).unwrap();
     assert!(content.contains("review_required"));
+    assert!(content.contains("imports:"));
+    assert!(content.contains("reference:"));
+    assert!(content.contains("import: reference"));
     assert!(content.contains("command_block_1"));
     assert!(content.contains("python3"));
 }
@@ -577,6 +769,9 @@ fn schema_records_strict_typed_sections_and_extension_surfaces() {
         "predicate",
         "state",
         "dependency",
+        "import",
+        "import_requires",
+        "import_use",
         "resource",
         "code_block",
         "artifact",

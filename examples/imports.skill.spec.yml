@@ -1,0 +1,94 @@
+schema: skillspec/v0
+id: examples.imports
+title: imports example
+description: Demonstrates always-loaded policy, on-demand procedure imports, section narrowing, and nested import requirements.
+
+routes:
+  - id: explain_imports
+    label: Explain SkillSpec imports
+    rank: 10
+  - id: fill_pdf_form
+    label: Follow a PDF form procedure
+    rank: 20
+
+rules:
+  - id: explain_imports_rule
+    when:
+      user_says_any:
+        - explain imports
+        - import resolution
+    prefer: explain_imports
+    after_success:
+      - explain_import_model
+    reason: Import questions should load the import model reference.
+
+  - id: pdf_forms_rule
+    when:
+      user_says_any:
+        - fill this pdf
+        - complete this form
+    prefer: fill_pdf_form
+    after_success:
+      - fill_pdf_with_imports
+    reason: PDF form work needs the form procedure and its supporting reference.
+
+imports:
+  import_model:
+    path: ../spec/imports.md
+    role: policy
+    section: Imports
+    load: always
+    description: Repository-level import semantics used by this example.
+
+  pdf_reference:
+    path: pdf-processing/reference.md
+    role: reference
+    used_by:
+      - kind: recipe
+        id: fill_pdf_with_imports
+
+  pdf_forms:
+    path: pdf-processing/forms.md
+    role: procedure
+    requires:
+      imports:
+        - pdf_reference
+    used_by:
+      - kind: recipe
+        id: fill_pdf_with_imports
+
+recipes:
+  explain_import_model:
+    description: Load the import model reference before answering import semantics questions.
+    ordered: true
+    requires:
+      imports:
+        - import_model
+    steps:
+      - load_import: import_model
+      - note: Explain import path resolution, section narrowing, and explicit nesting.
+
+  fill_pdf_with_imports:
+    description: Load the PDF form procedure after its nested reference import.
+    ordered: true
+    requires:
+      imports:
+        - pdf_forms
+    steps:
+      - load_import: pdf_forms
+      - note: Inspect fillable fields before choosing a PDF fill strategy.
+
+tests:
+  - name: import questions use import reference
+    input: explain import resolution
+    expect:
+      route: explain_imports
+      after_success: [explain_import_model]
+      matched_rules: [explain_imports_rule]
+
+  - name: pdf form requests use imported procedure
+    input: fill this pdf form
+    expect:
+      route: fill_pdf_form
+      after_success: [fill_pdf_with_imports]
+      matched_rules: [pdf_forms_rule]
