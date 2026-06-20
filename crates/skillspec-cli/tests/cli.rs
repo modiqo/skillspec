@@ -276,7 +276,8 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&align);
     let align_help = stdout(&align);
-    assert!(align_help.contains("Usage: skillspec trace align"));
+    assert!(align_help.contains("trace align"));
+    assert!(align_help.contains("[OPTIONS]"));
     assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--json"));
