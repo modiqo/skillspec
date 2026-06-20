@@ -1,0 +1,57 @@
+name: Port your skill
+description: Try SkillSpec on a real skill and report what does not fit yet.
+title: "Port: <skill name>"
+labels:
+  - skill-port
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing SkillSpec on a real skill. The most valuable feedback is specific: what could not be expressed, what felt ambiguous, and which tests would prove the port works.
+  - type: input
+    id: source
+    attributes:
+      label: Original skill
+      description: Link to the skill repository, local path description, or package page.
+      placeholder: https://github.com/org/repo/tree/main/skills/example
+    validations:
+      required: true
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Harness
+      description: Which agent environment should load the skill?
+      options:
+        - Codex
+        - Claude Code
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: hard-decisions
+    attributes:
+      label: Decisions that were hard to encode
+      description: Which routing, guardrail, elicitation, or workflow decisions did not map cleanly?
+      placeholder: "Example: the prose says to prefer browser evidence unless..."
+    validations:
+      required: true
+  - type: textarea
+    id: ambiguous-dependencies
+    attributes:
+      label: Ambiguous dependencies
+      description: Which CLIs, services, packages, files, credentials, or adapters were unclear?
+      placeholder: "Example: the skill mentions Google Drive but does not say whether MCP, browser, or CLI is required."
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests that would prove it works
+      description: Describe scenario tests, dependency checks, or trace assertions that should pass.
+      placeholder: "Input -> expected route, forbids, elicitations, after_success actions."
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes or generated draft
+      description: Paste a short excerpt, attach a branch, or link to a draft PR.

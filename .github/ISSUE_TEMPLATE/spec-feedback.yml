@@ -1,0 +1,39 @@
+name: Spec feedback
+description: Give feedback on grammar, traces, tests, dependencies, or compiler targets.
+title: "Spec feedback: <topic>"
+labels:
+  - spec
+  - feedback
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Grammar
+        - Trace format
+        - Scenario tests
+        - Dependencies
+        - Compiler target
+        - Importer
+        - Security model
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is the issue?
+      description: Name the exact field, CLI behavior, or missing concept when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: Include a minimal SkillSpec snippet, command, trace event, or imported prose excerpt.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Optional. How should SkillSpec express this?

@@ -13,6 +13,9 @@ serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 thiserror = "2.0.12"
 
+[dev-dependencies]
+jsonschema = { version = "0.46.5", default-features = false }
+
 [[bin]]
 name = "skillspec"
 path = "src/main.rs"

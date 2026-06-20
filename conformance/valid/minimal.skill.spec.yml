@@ -1,0 +1,23 @@
+schema: skillspec/v0
+id: conformance.minimal
+title: minimal conformance spec
+description: Small valid SkillSpec fixture for CLI conformance checks.
+
+routes:
+  - id: local
+    label: Local
+
+rules:
+  - id: local_request
+    when:
+      user_says_any:
+        - local
+    prefer: local
+
+tests:
+  - name: local request selects local
+    input: run this local task
+    expect:
+      route: local
+      matched_rules_exact:
+        - local_request

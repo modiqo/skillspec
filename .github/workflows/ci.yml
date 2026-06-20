@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Rust and SkillSpec checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Provide example-only dependency stubs
+        shell: bash
+        run: |
+          mkdir -p .ci-bin
+          for tool in rote deno jq gh; do
+            printf '#!/usr/bin/env sh\nexit 0\n' > ".ci-bin/${tool}"
+            chmod +x ".ci-bin/${tool}"
+          done
+          echo "${PWD}/.ci-bin" >> "${GITHUB_PATH}"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace --all-targets
+
+      - name: Build CLI
+        run: cargo build --workspace
+
+      - name: Validate all examples
+        shell: bash
+        run: |
+          while IFS= read -r spec; do
+            cargo run -p skillspec -- validate "${spec}"
+          done < <(find examples -name '*.yml' | sort)
+
+      - name: Run all example scenario tests
+        shell: bash
+        run: |
+          while IFS= read -r spec; do
+            cargo run -p skillspec -- test "${spec}"
+          done < <(find examples -name '*.yml' | sort)
+
+      - name: Check all example dependencies
+        shell: bash
+        run: |
+          while IFS= read -r spec; do
+            cargo run -p skillspec -- deps check "${spec}"
+          done < <(find examples -name '*.yml' | sort)
+
+      - name: Check conformance fixtures
+        shell: bash
+        run: |
+          while IFS= read -r spec; do
+            cargo run -p skillspec -- validate "${spec}"
+          done < <(find conformance/valid -name '*.yml' | sort)
+
+          while IFS= read -r spec; do
+            if cargo run -p skillspec -- validate "${spec}"; then
+              echo "invalid conformance fixture unexpectedly passed: ${spec}" >&2
+              exit 1
+            fi
+          done < <(find conformance/invalid -name '*.yml' | sort)

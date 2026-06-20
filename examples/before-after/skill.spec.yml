@@ -1,0 +1,86 @@
+schema: skillspec/v0
+id: example.browser_research
+title: browser research
+description: Route browser inspection tasks to browser automation and keep URL discovery separate from page evidence.
+
+routes:
+  - id: browser
+    label: Browser automation
+    rank: 10
+  - id: native_search
+    label: Native search for URL discovery
+    rank: 20
+
+rules:
+  - id: browser_tasks_use_browser
+    when:
+      user_says_any:
+        - browse
+        - open
+        - click
+        - snapshot
+        - inspect
+        - extract from page
+    prefer: browser
+    forbid:
+      - native_search_as_answer
+    allow:
+      native_search: url_discovery_only
+    elicit:
+      - target_url
+    reason: Page evidence must come from observing the page, not from search-result summaries.
+
+elicitations:
+  target_url:
+    question: Which URL should be inspected?
+    choices:
+      - id: user_provided_url
+        label: Use the URL in the request
+      - id: ask_for_url
+        label: Ask for the URL
+      - id: discover_url
+        label: Search only to discover the URL
+    default: ask_for_url
+    max_choices: 1
+
+resources:
+  original_skill:
+    path: SKILL.before.md
+    role: source_material
+    description: Original prose-only browser research skill.
+    used_by:
+      - kind: route
+        id: browser
+    load_when:
+      - reviewing migration from prose
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - rule_matched
+    - route_selected
+    - elicitation_requested
+    - outcome_recorded
+
+tests:
+  - name: browse task uses browser
+    input: browse https://example.com and take a snapshot
+    expect:
+      route: browser
+      forbid_exact:
+        - native_search_as_answer
+      elicit_exact:
+        - target_url
+      matched_rules_exact:
+        - browser_tasks_use_browser
+
+  - name: native search is not the answer
+    input: inspect the latest docs page
+    expect:
+      route: browser
+      not_forbid:
+        - browser
+      forbid:
+        - native_search_as_answer

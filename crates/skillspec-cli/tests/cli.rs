@@ -77,6 +77,45 @@ fn json_stdout(output: &Output) -> Value {
     })
 }
 
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf()
+}
+
+fn collect_yml_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            collect_yml_files(&path, files);
+        } else if path.extension().and_then(|extension| extension.to_str()) == Some("yml") {
+            files.push(path);
+        }
+    }
+}
+
+fn normalize_newlines(text: &str) -> String {
+    text.replace("\r\n", "\n")
+}
+
+fn assert_snapshot_eq(snapshot_path: &Path, actual: &str) {
+    let expected = fs::read_to_string(snapshot_path).unwrap_or_else(|error| {
+        panic!(
+            "failed to read golden snapshot {}: {error}",
+            snapshot_path.display()
+        )
+    });
+    assert_eq!(
+        normalize_newlines(&expected),
+        normalize_newlines(actual),
+        "golden snapshot changed: {}",
+        snapshot_path.display()
+    );
+}
+
 fn rich_spec() -> &'static str {
     r#"
 schema: skillspec/v0
@@ -523,13 +562,7 @@ routes:
 
 #[test]
 fn schema_records_strict_typed_sections_and_extension_surfaces() {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let schema_path = manifest_dir
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("spec/skill.spec.schema.json");
+    let schema_path = repo_root().join("spec/skill.spec.schema.json");
     let schema: Value = serde_json::from_str(&fs::read_to_string(schema_path).unwrap()).unwrap();
 
     assert_eq!(schema["additionalProperties"], false);
@@ -568,4 +601,121 @@ fn schema_records_strict_typed_sections_and_extension_surfaces() {
         schema["$defs"]["elicitation_choice"]["properties"]["sets"]["additionalProperties"],
         true
     );
+}
+
+#[test]
+fn published_json_schema_validates_every_example() {
+    let root = repo_root();
+    let schema_path = root.join("spec/skill.spec.schema.json");
+    let schema: Value = serde_json::from_str(&fs::read_to_string(&schema_path).unwrap()).unwrap();
+    jsonschema::meta::validate(&schema).unwrap_or_else(|error| {
+        panic!(
+            "published JSON Schema is not valid at {}: {error}",
+            schema_path.display()
+        )
+    });
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    let mut examples = Vec::new();
+    collect_yml_files(&root.join("examples"), &mut examples);
+    examples.sort();
+    assert!(!examples.is_empty(), "expected at least one example spec");
+
+    let mut failures = Vec::new();
+    for path in examples {
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&fs::read_to_string(&path).unwrap())
+            .unwrap_or_else(|error| panic!("failed to parse {}: {error}", path.display()));
+        let instance = serde_json::to_value(yaml).unwrap();
+        let errors = validator
+            .iter_errors(&instance)
+            .map(|error| format!("{error} at {}", error.instance_path()))
+            .collect::<Vec<_>>();
+        if !errors.is_empty() {
+            failures.push(format!(
+                "{}\n{}",
+                path.strip_prefix(&root).unwrap().display(),
+                errors.join("\n")
+            ));
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "example specs failed JSON Schema validation:\n{}",
+        failures.join("\n\n")
+    );
+}
+
+#[test]
+fn compiler_markdown_output_matches_golden_snapshot() {
+    let root = repo_root();
+    let output = Command::new(bin())
+        .current_dir(&root)
+        .arg("compile")
+        .arg("examples/repo-readiness.skill.spec.yml")
+        .arg("--target")
+        .arg("markdown")
+        .output()
+        .unwrap();
+    assert_success(&output);
+
+    assert_snapshot_eq(
+        &root.join("fixtures/golden/compile-repo-readiness.markdown.md"),
+        &stdout(&output),
+    );
+}
+
+#[test]
+fn importer_output_matches_golden_snapshot() {
+    let root = repo_root();
+    let dir = TempDir::new("import-golden");
+    let out = dir.path().join("skill.spec.yml");
+    let output = Command::new(bin())
+        .current_dir(&root)
+        .arg("import-skill")
+        .arg("fixtures/skills")
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&output);
+
+    assert_snapshot_eq(
+        &root.join("fixtures/golden/import-fixtures-skill.spec.yml"),
+        &fs::read_to_string(out).unwrap(),
+    );
+}
+
+#[test]
+fn conformance_fixtures_have_expected_validation_outcomes() {
+    let root = repo_root();
+    let mut valid = Vec::new();
+    collect_yml_files(&root.join("conformance/valid"), &mut valid);
+    valid.sort();
+    assert!(!valid.is_empty(), "expected valid conformance fixtures");
+
+    for path in valid {
+        let output = Command::new(bin())
+            .current_dir(&root)
+            .arg("validate")
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert_success(&output);
+    }
+
+    let mut invalid = Vec::new();
+    collect_yml_files(&root.join("conformance/invalid"), &mut invalid);
+    invalid.sort();
+    assert!(!invalid.is_empty(), "expected invalid conformance fixtures");
+
+    for path in invalid {
+        let output = Command::new(bin())
+            .current_dir(&root)
+            .arg("validate")
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert_failure(&output);
+    }
 }

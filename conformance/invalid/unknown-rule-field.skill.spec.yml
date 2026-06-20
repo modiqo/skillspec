@@ -1,0 +1,21 @@
+schema: skillspec/v0
+id: conformance.unknown_rule_field
+title: invalid unknown rule field
+description: Invalid fixture that proves typoed typed grammar fields are rejected.
+
+routes:
+  - id: local
+    label: Local
+
+rules:
+  - id: typo_rule
+    when:
+      user_says_any:
+        - local
+    preferr: local
+
+tests:
+  - name: invalid fixture still has an assertion
+    input: run this local task
+    expect:
+      route: local

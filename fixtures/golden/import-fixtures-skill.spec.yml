@@ -1,0 +1,96 @@
+schema: skillspec/v0
+id: imported.skill
+title: Example Browser Skill
+description: Imported SkillSpec scaffold from SKILL.md
+applies_when: []
+entry: null
+routes: []
+rules: []
+states: {}
+elicitations: {}
+trace: null
+dependencies:
+  rote:
+    kind: cli
+    description: 'Inferred CLI dependency from imported skill material: rote'
+    command: rote
+    path: null
+    env: null
+    check:
+      command: rote
+      path: null
+      env: null
+    permission: null
+    provision: null
+resources:
+  skill:
+    path: SKILL.md
+    role: source_material
+    description: Imported source material from SKILL.md.
+    used_by:
+    - kind: code
+      id: skill_code_1
+    - kind: snippet
+      id: source_summary
+    load_when: []
+code:
+  skill_code_1:
+    language: bash
+    kind: runnable_script
+    source:
+      inline: rote browse https://example.com --headed
+    provenance:
+      resource: skill
+      fence_index: 1
+      heading: Example Browser Skill
+      line_start: 13
+      line_end: 14
+    purpose: Imported fenced code block; review before execution.
+    requires:
+      dependencies: []
+      resources:
+      - skill
+      artifacts: []
+    inputs: []
+    outputs: []
+    safety:
+      mutates_input: false
+      writes_files: false
+      network: false
+      notes: []
+    use_when: []
+artifacts: {}
+recipes: {}
+commands:
+  command_block_1:
+    description: Imported command block; review before use.
+    template: rote browse https://example.com --headed
+    safety: null
+    requires:
+      dependencies:
+      - rote
+      files: []
+      env: []
+      auth: []
+    parse: {}
+    success_when: {}
+snippets:
+  source_summary:
+    text: Imported 1 headings, 1 command blocks, and 1 strong directives.
+closures: {}
+proof: null
+tests: []
+review_required:
+- Review extracted headings and convert decision-heavy prose into rules.
+- Review command blocks and decide which should become command templates.
+- Review extracted resources and code snippets; promote only intentional snippets into runnable recipes.
+- Review inferred command dependencies and add permission/provision choices where needed.
+- Add scenario tests before trusting this structured skill.
+metadata:
+  code_block_count: 1
+  command_block_count: 1
+  heading_count: 1
+  resource_count: 1
+  source: fixtures/skills
+  source_kind: folder
+  strong_directive_count: 1

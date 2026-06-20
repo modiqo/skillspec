@@ -1,5 +1,7 @@
 # SkillSpec
 
+[![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
+
 Keep the prose. Structure the decisions.
 
 SkillSpec turns long prose skills into compact, testable behavior contracts.
@@ -9,6 +11,16 @@ resources, recipes, elicitations, tests, and traces.
 
 Use it when you want a skill to be portable across Codex, Claude, Hermes, or
 another harness without relying on paragraphs of instructions alone.
+
+## Where SkillSpec Fits
+
+- Agent Skills define what to load.
+- MCP defines what tools and data are available.
+- SkillSpec defines how the agent should decide, verify, and report behavior.
+
+SkillSpec is not a replacement for prose, MCP, or harness policy. It is the
+machine-checkable contract for the behavioral parts of a skill that should be
+tested, traced, compiled, and reviewed.
 
 ## Install The CLI
 
@@ -227,6 +239,7 @@ tests:
 ```text
 spec/       specification, schema, semantics, security notes
 examples/   complete SkillSpec examples
+conformance/ valid and invalid fixtures for CLI conformance behavior
 skills/     creator/runtime skills for authoring and using specs
 .claude/    repo-local SkillSpec-backed skills for this repository
 generators/ compiler target notes for Codex, Claude, Markdown
@@ -240,20 +253,21 @@ Useful examples:
 - [examples/rote-shell.skill.spec.yml](examples/rote-shell.skill.spec.yml)
 - [examples/local-csv-report.skill.spec.yml](examples/local-csv-report.skill.spec.yml)
 - [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
+- [examples/before-after/](examples/before-after/) shows a prose skill before
+  and after a SkillSpec-backed port.
 
 ## Verification Suite
 
 Run the Rust unit and CLI integration suite:
 
 ```sh
-cargo test
+cargo test --workspace --all-targets
 ```
 
 Run the repository-level conformance sweep:
 
 ```sh
 cargo build
-jq empty spec/skill.spec.schema.json
 find examples -name '*.yml' -exec target/debug/skillspec validate {} \;
 find examples -name '*.yml' -exec target/debug/skillspec test {} \;
 find examples -name '*.yml' -exec target/debug/skillspec deps check {} \;
@@ -262,7 +276,35 @@ find examples -name '*.yml' -exec target/debug/skillspec deps check {} \;
 The test suite covers strict typo rejection across typed grammar nodes,
 scenario-test pass/fail behavior, required trace enforcement and compaction,
 dependency status semantics and command scoping, compiler targets, importer
-draft generation, install target behavior, and schema strictness smoke checks.
+draft generation, install target behavior, full JSON Schema validation against
+examples, conformance fixtures, and golden snapshots for compiler/importer
+output.
+
+The minimum compliance gate for a SkillSpec-backed skill is:
+
+```sh
+skillspec validate skill.spec.yml
+skillspec test skill.spec.yml
+skillspec deps check skill.spec.yml
+```
+
+## Community And RFC
+
+- [docs/rfc-v0.md](docs/rfc-v0.md) is the RFC-style announcement draft.
+- [docs/why-skillspec.md](docs/why-skillspec.md) explains why structured
+  behavior contracts help.
+- [docs/prose-vs-skillspec.md](docs/prose-vs-skillspec.md) compares prose-only
+  skills with SkillSpec-backed skills.
+- [docs/community-outreach.md](docs/community-outreach.md) names the launch
+  audiences and the specific ask.
+- [DISCUSSIONS.md](DISCUSSIONS.md) defines recommended GitHub Discussions
+  categories.
+- [CONTRIBUTING.md](CONTRIBUTING.md) describes local development, spec changes,
+  and golden snapshot updates.
+- [docs/good-first-issues.md](docs/good-first-issues.md) lists starter issues
+  for contributors.
+- [docs/community-posts.md](docs/community-posts.md) contains short launch post
+  drafts.
 
 Repo-local skills live in `.claude/skills/<name>/` and are checked in despite
 common global ignores for `.claude*`. Each one keeps:
