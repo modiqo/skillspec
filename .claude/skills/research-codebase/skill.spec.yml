@@ -1,0 +1,204 @@
+schema: skillspec/v0
+id: generic.research_codebase
+title: Research Codebase
+description: Read a repository, map what exists, and produce neutral architecture documentation without changing code.
+
+applies_when:
+  - user_intent:
+      - understand a codebase
+      - map repository architecture
+      - explain where something is implemented
+      - document current behavior
+      - research modules without editing
+
+entry:
+  prompt: Clarify the research question, then perform read-only repository exploration and synthesize what exists.
+
+routes:
+  - id: focused_symbol_research
+    label: Focused symbol or feature research
+    rank: 10
+    description: Use for questions about one function, type, module, or narrow behavior.
+  - id: cross_component_research
+    label: Cross-component research
+    rank: 20
+    description: Use when the answer requires multiple files, crates, services, or data paths.
+  - id: architecture_map
+    label: Architecture map
+    rank: 30
+    description: Use when the user asks for a broad map of the repository.
+
+rules:
+  - id: simple_where_questions_are_focused
+    when:
+      user_says_any:
+        - where is
+        - find implementation
+        - where does
+        - what file
+    prefer: focused_symbol_research
+    forbid:
+      - speculative_improvement
+      - ungrounded_summary
+    after_success:
+      - produce_research_document
+    reason: Narrow location questions need grounded file references and no recommendations unless asked.
+
+  - id: cross_file_questions_use_cross_component_route
+    when:
+      user_says_any:
+        - how does
+        - how do these interact
+        - data flow
+        - architecture
+        - across modules
+    prefer: cross_component_research
+    forbid:
+      - single_file_answer_when_cross_component
+      - refactor_recommendation_without_request
+    after_success:
+      - produce_research_document
+    reason: Multi-file questions require a map of relationships, not a single snippet.
+
+  - id: explicit_research_never_edits
+    when:
+      user_says_any:
+        - research
+        - document
+        - explain
+        - understand
+        - map
+    route_order:
+      - focused_symbol_research
+      - cross_component_research
+      - architecture_map
+    forbid:
+      - code_edit
+      - root_cause_analysis_without_request
+      - enhancement_proposal_without_request
+    reason: Research mode documents the current system; it does not fix or critique by default.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - after_success_scheduled
+    - outcome_recorded
+
+dependencies:
+  rg:
+    kind: cli
+    description: ripgrep is the preferred repository search tool for codebase research.
+    command: rg
+    check:
+      command: rg
+  git:
+    kind: cli
+    description: Git is used to identify branch and commit context for research reports.
+    command: git
+    check:
+      command: git
+
+resources:
+  source_skill:
+    path: source/SKILL.md
+    role: source_material
+    description: Original prose skill describing neutral, read-only codebase research behavior.
+    used_by:
+      - kind: route
+        id: focused_symbol_research
+      - kind: route
+        id: cross_component_research
+      - kind: route
+        id: architecture_map
+      - kind: recipe
+        id: produce_research_document
+
+commands:
+  search_code:
+    description: Search repository text for symbols, files, and concepts.
+    template: rg <query> <paths>
+    safety: read_only
+    requires:
+      dependencies:
+        - rg
+
+  current_commit:
+    description: Capture the current commit for report provenance.
+    template: git rev-parse HEAD
+    safety: read_only
+    requires:
+      dependencies:
+        - git
+
+recipes:
+  produce_research_document:
+    description: Produce a neutral research document grounded in repository files.
+    ordered: true
+    requires:
+      resources:
+        - source_skill
+      dependencies:
+        - rg
+        - git
+    steps:
+      - load_resource: source_skill
+      - run_command: current_commit
+      - run_command: search_code
+      - note: Read relevant files completely enough to explain relationships.
+      - note: Synthesize what exists with file references; avoid recommendations unless explicitly asked.
+
+closures:
+  produce_research_document:
+    description: Return a structured report with question, summary, findings, code references, and open questions.
+
+snippets:
+  research_posture:
+    text: "Describe what exists, where it exists, how it works, and how components interact. Do not propose changes unless asked."
+  report_shape:
+    text: "Research question, summary, detailed findings, code references, architecture notes, open questions."
+
+tests:
+  - name: where question chooses focused research
+    input: where is request routing implemented?
+    expect:
+      route: focused_symbol_research
+      forbid:
+        - speculative_improvement
+      after_success:
+        - produce_research_document
+
+  - name: cross component question chooses cross component route
+    input: how does authentication flow across modules?
+    expect:
+      route: cross_component_research
+      forbid:
+        - single_file_answer_when_cross_component
+      after_success:
+        - produce_research_document
+
+  - name: research request forbids edits
+    input: research this codebase and explain the architecture
+    expect:
+      route_order:
+        - focused_symbol_research
+        - cross_component_research
+        - architecture_map
+      forbid:
+        - code_edit
+        - enhancement_proposal_without_request
+
+proof:
+  metrics:
+    - file_reference_coverage
+    - neutrality_adherence
+    - no_edit_compliance
+
+metadata:
+  source: .claude/skills/research-codebase/source
+  source_kind: staged_folder

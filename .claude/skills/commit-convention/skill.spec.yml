@@ -1,0 +1,196 @@
+schema: skillspec/v0
+id: generic.commit_convention
+title: Commit Convention
+description: Write conventional commit messages and run the repository's pre-push checks before commit, push, or PR title work.
+
+applies_when:
+  - user_intent:
+      - write a commit message
+      - create a conventional commit
+      - prepare to push a branch
+      - create or update a pull request title
+
+entry:
+  prompt: Decide whether the user needs a message only, a pre-push gate, or a complete commit/push preparation loop.
+
+routes:
+  - id: message_only
+    label: Draft commit message only
+    rank: 10
+    description: Use when the user only asks for a commit message or PR title.
+  - id: pre_push_gate
+    label: Run pre-push checks
+    rank: 20
+    description: Use when the user is about to commit, push, or create a PR.
+  - id: commit_ready
+    label: Prepare commit-ready output
+    rank: 30
+    description: Use after checks pass to provide the final conventional commit subject.
+
+rules:
+  - id: commit_message_uses_conventional_format
+    when:
+      user_says_any:
+        - commit message
+        - conventional commit
+        - pr title
+        - pull request title
+    prefer: message_only
+    forbid:
+      - uppercase_subject_start
+      - co_authored_by_footer
+    after_success:
+      - validate_commit_subject
+    reason: Commit and PR subjects must use Conventional Commits and avoid generated co-author footers.
+
+  - id: push_or_pr_requires_pre_push_gate
+    when:
+      user_says_any:
+        - push
+        - before pushing
+        - create pr
+        - open pr
+        - ready to commit
+    prefer: pre_push_gate
+    after_success:
+      - run_pre_push_checks
+      - validate_commit_subject
+    forbid:
+      - push_without_checks
+      - skip_check_claim_without_evidence
+    reason: Push and PR work should not proceed until the configured formatting and lint checks pass.
+
+  - id: failing_checks_block_commit_ready_claim
+    when:
+      user_says_any:
+        - check failed
+        - clippy failed
+        - fmt failed
+    route_order:
+      - pre_push_gate
+      - message_only
+    forbid:
+      - commit_ready_claim
+    reason: Failed checks must be fixed or explicitly reported before declaring the branch ready.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - after_success_scheduled
+    - outcome_recorded
+
+dependencies:
+  cargo:
+    kind: cli
+    description: Cargo is used by the source skill's Rust pre-push gate.
+    command: cargo
+    check:
+      command: cargo
+    permission:
+      required: true
+      reason: Cargo checks may execute project build scripts and compiler plugins.
+      safety: local_read
+
+resources:
+  source_skill:
+    path: source/SKILL.md
+    role: source_material
+    description: Original prose skill with allowed commit types, format rules, and pre-push gate.
+    used_by:
+      - kind: route
+        id: message_only
+      - kind: route
+        id: pre_push_gate
+      - kind: command
+        id: cargo_fmt_check
+      - kind: command
+        id: cargo_clippy_check
+
+commands:
+  cargo_fmt_check:
+    description: Check Rust formatting without mutating files.
+    template: cargo fmt --all -- --check
+    safety: read_only
+    requires:
+      dependencies:
+        - cargo
+
+  cargo_clippy_check:
+    description: Run Rust lint checks with warnings denied.
+    template: cargo clippy --workspace --all-targets --all-features -- -D warnings
+    safety: local_read
+    requires:
+      dependencies:
+        - cargo
+
+recipes:
+  run_pre_push_checks:
+    description: Execute the source skill's pre-push gate before push or PR operations.
+    ordered: true
+    requires:
+      resources:
+        - source_skill
+      dependencies:
+        - cargo
+    steps:
+      - load_resource: source_skill
+      - run_command: cargo_fmt_check
+      - run_command: cargo_clippy_check
+      - note: Report any failure and do not claim the branch is ready until the checks pass.
+
+closures:
+  run_pre_push_checks:
+    description: Run the pre-push gate and report pass/fail evidence.
+  validate_commit_subject:
+    description: "Ensure the final subject is `<type>[optional scope]: <description>`, lowercase after the prefix, and has no co-author footer."
+
+snippets:
+  allowed_types:
+    text: "Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert."
+  commit_format:
+    text: "<type>[optional scope]: <description>"
+
+tests:
+  - name: commit message request drafts message route
+    input: write a commit message for this diff
+    expect:
+      route: message_only
+      forbid:
+        - co_authored_by_footer
+      after_success:
+        - validate_commit_subject
+
+  - name: pushing requires checks
+    input: push this branch and open a PR
+    expect:
+      route: pre_push_gate
+      forbid:
+        - push_without_checks
+      after_success:
+        - run_pre_push_checks
+        - validate_commit_subject
+
+  - name: failed checks block ready claim
+    input: clippy failed, can I still commit?
+    expect:
+      route_order:
+        - pre_push_gate
+        - message_only
+      forbid:
+        - commit_ready_claim
+
+proof:
+  metrics:
+    - conventional_subject_accuracy
+    - pre_push_gate_evidence
+    - forbidden_footer_avoidance
+
+metadata:
+  source: .claude/skills/commit-convention/source
+  source_kind: staged_folder

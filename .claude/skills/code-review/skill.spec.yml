@@ -1,0 +1,262 @@
+schema: skillspec/v0
+id: generic.code_review
+title: Code Review
+description: Review code changes by collecting the review target, researching context, checking risks, and reporting findings before summary.
+
+applies_when:
+  - user_intent:
+      - review code
+      - review a pull request
+      - sanity check changes
+      - audit a diff
+      - inspect changed files for bugs
+
+entry:
+  prompt: Determine the review target first, then collect evidence and report findings ordered by severity.
+
+routes:
+  - id: current_pr
+    label: Review current pull request
+    rank: 10
+    description: Use GitHub CLI to inspect the current PR metadata and diff.
+  - id: diff_to_main
+    label: Review diff to main
+    rank: 20
+    description: Use local git diff when the work is not necessarily attached to a PR.
+  - id: specific_paths
+    label: Review specific paths
+    rank: 30
+    description: Use when the user names files, crates, directories, or a narrow ownership surface.
+  - id: second_opinion
+    label: Provide review synthesis from supplied evidence
+    rank: 40
+    description: Use when the diff or findings are already provided and the task is synthesis.
+
+rules:
+  - id: explicit_pr_review_uses_current_pr
+    when:
+      user_says_any:
+        - review this pr
+        - current pr
+        - pull request
+        - pr review
+    prefer: current_pr
+    after_success:
+      - collect_pr_diff
+      - produce_findings_first_report
+    forbid:
+      - summary_before_findings
+      - ungrounded_review
+    reason: PR review needs PR metadata, base branch, and diff evidence before findings.
+
+  - id: diff_review_uses_local_diff
+    when:
+      user_says_any:
+        - review my changes
+        - diff to main
+        - uncommitted changes
+        - committed changes
+    prefer: diff_to_main
+    after_success:
+      - collect_local_diff
+      - produce_findings_first_report
+    forbid:
+      - github_required_for_local_diff
+      - summary_before_findings
+    reason: Local diff review should not require GitHub when the local repository has the needed evidence.
+
+  - id: path_review_stays_scoped
+    when:
+      user_says_any:
+        - specific files
+        - these files
+        - this crate
+        - this directory
+    prefer: specific_paths
+    after_success:
+      - produce_findings_first_report
+    forbid:
+      - unrelated_refactor
+      - broad_review_when_paths_named
+    reason: Named paths define the review boundary unless the user asks to broaden it.
+
+  - id: findings_lead_the_response
+    when:
+      user_says_any:
+        - review
+        - audit
+        - sanity check
+        - anything wrong
+    route_order:
+      - current_pr
+      - diff_to_main
+      - specific_paths
+      - second_opinion
+    after_success:
+      - produce_findings_first_report
+    forbid:
+      - praise_before_risks
+      - change_summary_as_primary_answer
+    reason: Code review output should prioritize bugs, risks, regressions, and missing tests before summary.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - after_success_scheduled
+    - outcome_recorded
+
+dependencies:
+  git:
+    kind: cli
+    description: Git is required to inspect local branch and diffs.
+    command: git
+    check:
+      command: git
+  gh:
+    kind: cli
+    description: GitHub CLI is required only for current-PR review.
+    command: gh
+    check:
+      command: gh
+    permission:
+      required: true
+      reason: GitHub CLI may use authenticated account state and network access.
+      safety: network_read
+
+resources:
+  source_skill:
+    path: source/SKILL.md
+    role: source_material
+    description: Original prose skill with review target collection, phased review flow, and report format.
+    used_by:
+      - kind: route
+        id: current_pr
+      - kind: route
+        id: diff_to_main
+      - kind: route
+        id: specific_paths
+      - kind: recipe
+        id: produce_findings_first_report
+
+commands:
+  pr_metadata:
+    description: Collect pull request title, body, number, and base branch.
+    template: gh pr view --json title,body,number,baseRefName
+    safety: network_read
+    requires:
+      dependencies:
+        - gh
+
+  pr_diff:
+    description: Collect the current pull request diff.
+    template: gh pr diff
+    safety: network_read
+    requires:
+      dependencies:
+        - gh
+
+  local_diff_to_main:
+    description: Collect the local diff against main.
+    template: git diff main...HEAD
+    safety: read_only
+    requires:
+      dependencies:
+        - git
+
+recipes:
+  collect_pr_diff:
+    description: Gather PR metadata and diff evidence.
+    ordered: true
+    requires:
+      resources:
+        - source_skill
+      dependencies:
+        - gh
+    steps:
+      - run_command: pr_metadata
+      - run_command: pr_diff
+
+  collect_local_diff:
+    description: Gather local diff evidence.
+    ordered: true
+    requires:
+      resources:
+        - source_skill
+      dependencies:
+        - git
+    steps:
+      - run_command: local_diff_to_main
+
+  produce_findings_first_report:
+    description: Write findings first, ordered by severity, then questions, then secondary summary.
+    ordered: true
+    requires:
+      resources:
+        - source_skill
+    steps:
+      - load_resource: source_skill
+      - note: Prioritize bugs, behavioral regressions, security issues, and missing tests.
+      - note: Include file and line references when available.
+      - note: Put change summary after findings, not before.
+
+closures:
+  collect_pr_diff:
+    description: Collect PR metadata and diff before reviewing.
+  collect_local_diff:
+    description: Collect local diff before reviewing.
+  produce_findings_first_report:
+    description: Return findings first by severity, then open questions, then brief summary.
+
+snippets:
+  review_output_order:
+    text: "Findings first, ordered by severity; then open questions; then a short change summary only as secondary context."
+
+tests:
+  - name: current pr review uses gh
+    input: review this PR
+    expect:
+      route: current_pr
+      forbid:
+        - summary_before_findings
+      after_success:
+        - collect_pr_diff
+        - produce_findings_first_report
+
+  - name: local changes use git diff
+    input: review my changes against main
+    expect:
+      route: diff_to_main
+      forbid:
+        - github_required_for_local_diff
+      after_success:
+        - collect_local_diff
+        - produce_findings_first_report
+
+  - name: review response leads with findings
+    input: sanity check this change, anything wrong?
+    expect:
+      route_order:
+        - current_pr
+        - diff_to_main
+        - specific_paths
+        - second_opinion
+      forbid:
+        - praise_before_risks
+        - change_summary_as_primary_answer
+
+proof:
+  metrics:
+    - evidence_collection_before_review
+    - severity_ordering
+    - line_reference_coverage
+    - missing_test_detection
+
+metadata:
+  source: .claude/skills/code-review/source
+  source_kind: staged_folder
