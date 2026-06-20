@@ -1,0 +1,173 @@
+schema: skillspec/v0
+id: demo.browser_research
+title: browser research
+description: Demonstrates how a prose browser skill becomes a tested SkillSpec behavior contract.
+
+routes:
+  - id: browser
+    label: Browser automation
+    rank: 10
+    description: Observe rendered page state directly.
+  - id: url_discovery
+    label: URL discovery only
+    rank: 20
+    description: Use search only to identify the page URL before browser verification.
+  - id: not_browser_task
+    label: Not a browser-inspection task
+    rank: 30
+    description: Use when the user asks for general search or summary work rather than page inspection.
+
+rules:
+  - id: browser_request_requires_browser
+    when:
+      user_says_any:
+        - browse
+        - open
+        - click
+        - snapshot
+        - inspect
+        - extract from page
+    prefer: browser
+    forbid:
+      - native_search_as_answer
+      - unverified_page_claims
+      - curl_as_browser
+    after_success:
+      - report_trace_and_evidence
+    reason: Browser inspection must be based on observed rendered page evidence.
+
+  - id: missing_url_needs_discovery
+    when:
+      user_says_any:
+        - no url
+        - do not have the url
+        - latest docs page
+        - find the page
+    prefer: url_discovery
+    route_order:
+      - url_discovery
+      - browser
+    allow:
+      native_search: url_discovery_only
+    elicit:
+      - target_url
+    after_success:
+      - verify_in_browser
+    reason: Search may discover a URL, but browser observation must provide the evidence.
+
+  - id: general_search_is_not_browser_inspection
+    when:
+      user_says_any:
+        - summarize search results
+        - general web summary
+    prefer: not_browser_task
+    reason: General web summary requests do not require browser inspection unless the user asks to observe a page.
+
+elicitations:
+  target_url:
+    question: Which URL should be inspected?
+    choices:
+      - id: use_provided_url
+        label: Use the URL in the request
+      - id: ask_for_url
+        label: Ask for the URL
+      - id: discover_url
+        label: Search only to discover the URL
+    default: ask_for_url
+    max_choices: 1
+
+dependencies:
+  browser_session:
+    kind: browser
+    description: Browser automation must be available for page observation, snapshots, and UI inspection.
+    permission:
+      required: true
+      reason: Browser attachment observes live page state and may expose logged-in context.
+      safety: browser_attach
+  network_access:
+    kind: service
+    description: Network access is required to open pages or discover a URL.
+    permission:
+      required: true
+      reason: Browser and URL discovery steps read remote web content.
+      safety: network_read
+
+resources:
+  prose_skill:
+    path: ../prose_only/SKILL.md
+    role: source_material
+    description: Prose-only version of the same browser research skill.
+    used_by:
+      - kind: rule
+        id: browser_request_requires_browser
+      - kind: rule
+        id: missing_url_needs_discovery
+    load_when:
+      - comparing prose-only and SkillSpec-backed behavior
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - allow_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+
+closures:
+  report_trace_and_evidence:
+    description: Report selected route, evidence observed, limitations, and trace directory.
+  verify_in_browser:
+    description: After URL discovery, open the selected URL in browser automation and use browser evidence as the answer source.
+
+tests:
+  - name: direct browser task uses browser
+    input: browse https://example.com and take a snapshot
+    expect:
+      route: browser
+      forbid_exact:
+        - native_search_as_answer
+        - unverified_page_claims
+        - curl_as_browser
+      not_elicit:
+        - target_url
+      after_success_exact:
+        - report_trace_and_evidence
+      matched_rules_exact:
+        - browser_request_requires_browser
+
+  - name: missing URL allows discovery before browser
+    input: inspect the latest docs page but I do not have the URL
+    expect:
+      route: url_discovery
+      route_order:
+        - url_discovery
+        - browser
+      forbid:
+        - native_search_as_answer
+      elicit:
+        - target_url
+      after_success:
+        - report_trace_and_evidence
+        - verify_in_browser
+      matched_rules_exact:
+        - browser_request_requires_browser
+        - missing_url_needs_discovery
+
+  - name: general search summary is not browser inspection
+    input: summarize search results about this company
+    expect:
+      route: not_browser_task
+      not_forbid:
+        - native_search_as_answer
+      not_after_success:
+        - verify_in_browser
+      matched_rules_exact:
+        - general_search_is_not_browser_inspection

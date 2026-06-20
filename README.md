@@ -306,6 +306,8 @@ skillspec deps check skill.spec.yml
 - [docs/rfc-v0.md](docs/rfc-v0.md) is the RFC-style announcement draft.
 - [docs/why-skillspec.md](docs/why-skillspec.md) explains why structured
   behavior contracts help.
+- [docs/why_skillspec/](docs/why_skillspec/) contains a demo-ready prose versus
+  SkillSpec comparison.
 - [docs/prose-vs-skillspec.md](docs/prose-vs-skillspec.md) compares prose-only
   skills with SkillSpec-backed skills.
 - [docs/community-outreach.md](docs/community-outreach.md) names the launch
