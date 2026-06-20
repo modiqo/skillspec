@@ -9,6 +9,7 @@ that should be compact, testable, portable, and hard to misread:
 - intent routing
 - route order
 - forbidden substitutions
+- bounded user questions and choices
 - state transitions
 - command templates
 - user questions
@@ -103,8 +104,9 @@ states, but uncertainty must be marked as `review_required`.
 
 `compile` is a complete renderer, not a summary generator. Codex/Claude skill
 targets include the runtime contract, activation hints, ranked routes, ordered
-rules, lifecycle states, command templates, snippets, closures, scenario tests,
-proof metrics, review notes, and CLI commands for validation and explanation.
+rules, bounded elicitations, lifecycle states, command templates, snippets,
+closures, scenario tests, proof metrics, review notes, and CLI commands for
+validation and explanation.
 
 ## Repository Layout
 
@@ -130,8 +132,9 @@ SkillSpec v0 has a formal grammar and relationship model:
 The core association is:
 
 ```text
-rules steer routes and closures
+rules steer routes, elicitations, and closures
 states organize lifecycle
+elicitations ask bounded questions
 commands perform named actions
 snippets preserve product language
 tests prove steering behavior

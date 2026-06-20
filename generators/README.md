@@ -25,7 +25,9 @@ Generated harness guidance must include:
 - activation hints
 - ranked routes
 - ordered rules with predicates, prefer, route_order, forbid, allow,
-  after_success, and reason
+  elicit, after_success, and reason
+- bounded elicitations with questions, choices, facts set by choices, route
+  steering, next states, defaults, and safety
 - lifecycle states
 - command templates with safety, requirements, parse hints, and success checks
 - snippets

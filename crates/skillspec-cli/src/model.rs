@@ -26,6 +26,8 @@ pub struct SkillSpec {
     #[serde(default)]
     pub states: BTreeMap<String, State>,
     #[serde(default)]
+    pub elicitations: BTreeMap<String, Elicitation>,
+    #[serde(default)]
     pub commands: BTreeMap<String, CommandTemplate>,
     #[serde(default)]
     pub snippets: BTreeMap<String, Snippet>,
@@ -72,6 +74,8 @@ pub struct Rule {
     #[serde(default)]
     pub allow: BTreeMap<String, serde_yaml::Value>,
     #[serde(default)]
+    pub elicit: Vec<String>,
+    #[serde(default)]
     pub after_success: Vec<String>,
     #[serde(default)]
     pub reason: Option<String>,
@@ -98,11 +102,51 @@ pub struct State {
     #[serde(default)]
     pub say: Option<String>,
     #[serde(default)]
+    pub ask: Option<String>,
+    #[serde(default)]
     pub next: Option<String>,
     #[serde(default)]
     pub yes: Option<String>,
     #[serde(default)]
     pub no: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Elicitation {
+    pub question: String,
+    #[serde(default)]
+    pub required_when: Vec<ElicitationCondition>,
+    pub choices: Vec<ElicitationChoice>,
+    #[serde(default)]
+    pub default: Option<String>,
+    #[serde(default)]
+    pub max_choices: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ElicitationCondition {
+    #[serde(default)]
+    pub route: Option<RouteId>,
+    #[serde(default)]
+    pub missing: Option<String>,
+    #[serde(default)]
+    pub predicate: Option<Predicate>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ElicitationChoice {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub sets: BTreeMap<String, serde_yaml::Value>,
+    #[serde(default)]
+    pub route: Option<RouteId>,
+    #[serde(default)]
+    pub next: Option<String>,
+    #[serde(default)]
+    pub safety: Option<SafetyClass>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,6 +203,8 @@ pub struct Expectation {
     pub route_order: Vec<RouteId>,
     #[serde(default)]
     pub forbid: Vec<String>,
+    #[serde(default)]
+    pub elicit: Vec<String>,
     #[serde(default)]
     pub after_success: Vec<String>,
 }

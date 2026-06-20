@@ -11,10 +11,12 @@ V0 evaluates rules in file order. For each matching rule:
 - `route_order` replaces the current route order
 - `forbid` entries are appended
 - `allow` entries are merged
+- `elicit` entries are appended
 - `after_success` entries are appended
 - `reason` is attached to the decision explanation
 
-After all matches, duplicate `forbid` and `after_success` entries are removed.
+After all matches, duplicate `forbid`, `elicit`, and `after_success` entries
+are removed.
 
 ## Scope
 
@@ -27,6 +29,8 @@ Rules should be used for:
 - route order: what to try first, second, third
 - risk steering: avoid hidden prompts, avoid native search as answer, avoid raw
   shell when provenance matters
+- bounded questions: ask for missing choices such as browser mode, install
+  scope, auth profile, or release approval
 - lifecycle obligations: collect trace cost, ask to remember, ask to share
 - approval hints: route destructive work through visible confirmation
 
@@ -133,10 +137,30 @@ allow:
 This says native search may help find a URL, but may not become the answer
 substrate. This distinction is exactly the kind of thing prose skills lose.
 
+## Bounded Elicitation
+
+`elicit` requests a specific question from the `elicitations` map.
+
+```yaml
+rules:
+  - id: browse_words_handoff_to_browse
+    when:
+      user_says_any: [browse]
+    prefer: browser_handoff
+    elicit: [browser_mode]
+```
+
+This says the agent should not ask "How do you want to proceed?" Instead it
+should ask the named bounded question and present the declared choices.
+
+Use `elicit` when the alternatives are already known and the missing user
+choice materially affects safety, auth, substrate, or side effects. Do not use
+it as a substitute for safe inspection.
+
 ## Test Obligation
 
-Every route-changing or forbid-heavy rule should have at least one scenario
-test. A rule without a test is only structured prose.
+Every route-changing, forbid-heavy, or elicitation-producing rule should have
+at least one scenario test. A rule without a test is only structured prose.
 
 ## Extension Discipline
 

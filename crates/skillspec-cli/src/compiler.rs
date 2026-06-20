@@ -1,5 +1,6 @@
 use crate::model::{
-    CommandTemplate, Predicate, Route, Rule, SafetyClass, ScenarioTest, SkillSpec, State,
+    CommandTemplate, Elicitation, ElicitationChoice, Predicate, Route, Rule, SafetyClass,
+    ScenarioTest, SkillSpec, State,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -20,6 +21,7 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
     write_activation(&mut output, spec);
     write_routes(&mut output, spec);
     write_rules(&mut output, spec);
+    write_elicitations(&mut output, spec);
     write_states(&mut output, spec);
     write_commands(&mut output, spec);
     write_snippets(&mut output, spec);
@@ -69,6 +71,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- Treat routes, rules, states, commands, tests, and review notes below as authoritative.\n");
     output.push_str("- Rules beat prose when there is tension.\n");
     output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
+    output.push_str("- `elicit` entries require bounded user questions before guessing.\n");
     output.push_str("- Use the scenario tests as examples of expected behavior.\n");
     output.push_str("- When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.\n\n");
 }
@@ -129,7 +132,7 @@ fn write_rules(output: &mut String, spec: &SkillSpec) {
         return;
     }
     output.push_str("## Rules\n\n");
-    output.push_str("Evaluate rules in order. A matching rule may choose a route, replace route order, forbid substitutions, allow narrow fallbacks, and schedule post-success actions.\n\n");
+    output.push_str("Evaluate rules in order. A matching rule may choose a route, replace route order, forbid substitutions, allow narrow fallbacks, request bounded elicitation, and schedule post-success actions.\n\n");
     for rule in &spec.rules {
         write_rule(output, rule);
     }
@@ -159,6 +162,9 @@ fn write_rule(output: &mut String, rule: &Rule) {
         output.push_str("- allow:\n");
         write_yaml_map(output, &rule.allow, 2);
     }
+    if !rule.elicit.is_empty() {
+        let _ = writeln!(output, "- elicit: {}", code_list(&rule.elicit));
+    }
     if !rule.after_success.is_empty() {
         let _ = writeln!(
             output,
@@ -170,6 +176,68 @@ fn write_rule(output: &mut String, rule: &Rule) {
         let _ = writeln!(output, "- reason: {reason}");
     }
     output.push('\n');
+}
+
+fn write_elicitations(output: &mut String, spec: &SkillSpec) {
+    if spec.elicitations.is_empty() {
+        return;
+    }
+    output.push_str("## Elicitations\n\n");
+    output.push_str("Use elicitations for bounded, high-signal questions. Do not replace them with open-ended questioning or silent guessing.\n\n");
+    for (id, elicitation) in &spec.elicitations {
+        write_elicitation(output, id, elicitation);
+    }
+}
+
+fn write_elicitation(output: &mut String, id: &str, elicitation: &Elicitation) {
+    let _ = writeln!(output, "### `{id}`");
+    let _ = writeln!(output, "- question: {}", elicitation.question);
+    if let Some(default) = &elicitation.default {
+        let _ = writeln!(output, "- default: `{default}`");
+    }
+    if let Some(max_choices) = elicitation.max_choices {
+        let _ = writeln!(output, "- max_choices: {max_choices}");
+    }
+    if !elicitation.required_when.is_empty() {
+        output.push_str("- required_when:\n");
+        for condition in &elicitation.required_when {
+            if let Some(route) = &condition.route {
+                let _ = writeln!(output, "  - route: `{}`", route.0);
+            }
+            if let Some(missing) = &condition.missing {
+                let _ = writeln!(output, "  - missing: `{missing}`");
+            }
+            if let Some(predicate) = &condition.predicate {
+                output.push_str("  - predicate:\n");
+                write_predicate(output, predicate);
+            }
+        }
+    }
+    output.push_str("- choices:\n");
+    for choice in &elicitation.choices {
+        write_elicitation_choice(output, choice);
+    }
+    output.push('\n');
+}
+
+fn write_elicitation_choice(output: &mut String, choice: &ElicitationChoice) {
+    let _ = writeln!(output, "  - `{}`: {}", choice.id, choice.label);
+    if let Some(description) = &choice.description {
+        let _ = writeln!(output, "    description: {description}");
+    }
+    if !choice.sets.is_empty() {
+        output.push_str("    sets:\n");
+        write_yaml_map(output, &choice.sets, 6);
+    }
+    if let Some(route) = &choice.route {
+        let _ = writeln!(output, "    route: `{}`", route.0);
+    }
+    if let Some(next) = &choice.next {
+        let _ = writeln!(output, "    next: `{next}`");
+    }
+    if let Some(safety) = &choice.safety {
+        let _ = writeln!(output, "    safety: `{}`", safety_name(safety));
+    }
 }
 
 fn write_predicate(output: &mut String, predicate: &Predicate) {
@@ -213,6 +281,9 @@ fn write_state(output: &mut String, id: &str, state: &State) {
     }
     if let Some(say) = &state.say {
         let _ = writeln!(output, "- say: `{say}`");
+    }
+    if let Some(ask) = &state.ask {
+        let _ = writeln!(output, "- ask: `{ask}`");
     }
     if let Some(next) = &state.next {
         let _ = writeln!(output, "- next: `{next}`");
@@ -325,6 +396,13 @@ fn write_test(output: &mut String, test: &ScenarioTest) {
             output,
             "- expect forbid: {}",
             code_list(&test.expect.forbid)
+        );
+    }
+    if !test.expect.elicit.is_empty() {
+        let _ = writeln!(
+            output,
+            "- expect elicit: {}",
+            code_list(&test.expect.elicit)
         );
     }
     if !test.expect.after_success.is_empty() {

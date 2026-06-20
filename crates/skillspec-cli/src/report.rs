@@ -60,6 +60,9 @@ pub fn explain(decision: &Decision) -> Result<()> {
     if !decision.forbid.is_empty() {
         writeln!(stdout, "forbid: {}", decision.forbid.join(", "))?;
     }
+    if !decision.elicit.is_empty() {
+        writeln!(stdout, "elicit: {}", decision.elicit.join(", "))?;
+    }
     if !decision.after_success.is_empty() {
         writeln!(
             stdout,

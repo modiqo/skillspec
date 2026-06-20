@@ -54,6 +54,7 @@ pub fn validate_spec(spec: &SkillSpec) -> Result<()> {
     }
     validate_identifier("id", &spec.id)?;
     validate_routes(spec)?;
+    validate_elicitations(spec)?;
     validate_rules(spec)?;
     validate_states(spec)?;
     validate_tests(spec)?;
@@ -72,6 +73,7 @@ fn validate_routes(spec: &SkillSpec) -> Result<()> {
 fn validate_rules(spec: &SkillSpec) -> Result<()> {
     let route_ids = route_ids(spec);
     let action_ids = action_ids(spec);
+    let elicitation_ids = elicitation_ids(spec);
     let mut seen = BTreeSet::new();
 
     for rule in &spec.rules {
@@ -83,6 +85,9 @@ fn validate_rules(spec: &SkillSpec) -> Result<()> {
         for route in &rule.route_order {
             validate_known_route("rules.route_order", &route_ids, route)?;
         }
+        for elicitation in &rule.elicit {
+            validate_known_elicitation("rules.elicit", &elicitation_ids, elicitation)?;
+        }
         for action in &rule.after_success {
             validate_known_action("rules.after_success", &action_ids, action)?;
         }
@@ -93,6 +98,7 @@ fn validate_rules(spec: &SkillSpec) -> Result<()> {
 fn validate_states(spec: &SkillSpec) -> Result<()> {
     let state_ids = spec.states.keys().cloned().collect::<BTreeSet<_>>();
     let action_ids = action_ids(spec);
+    let elicitation_ids = elicitation_ids(spec);
 
     for (state_id, state) in &spec.states {
         validate_identifier("states key", state_id)?;
@@ -116,6 +122,9 @@ fn validate_states(spec: &SkillSpec) -> Result<()> {
                 });
             }
         }
+        if let Some(elicitation) = &state.ask {
+            validate_known_elicitation("states.ask", &elicitation_ids, elicitation)?;
+        }
     }
     Ok(())
 }
@@ -123,6 +132,7 @@ fn validate_states(spec: &SkillSpec) -> Result<()> {
 fn validate_tests(spec: &SkillSpec) -> Result<()> {
     let route_ids = route_ids(spec);
     let action_ids = action_ids(spec);
+    let elicitation_ids = elicitation_ids(spec);
 
     for test in &spec.tests {
         if let Some(route) = &test.expect.route {
@@ -133,6 +143,61 @@ fn validate_tests(spec: &SkillSpec) -> Result<()> {
         }
         for action in &test.expect.after_success {
             validate_known_action("tests.expect.after_success", &action_ids, action)?;
+        }
+        for elicitation in &test.expect.elicit {
+            validate_known_elicitation("tests.expect.elicit", &elicitation_ids, elicitation)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_elicitations(spec: &SkillSpec) -> Result<()> {
+    let route_ids = route_ids(spec);
+    let state_ids = spec.states.keys().cloned().collect::<BTreeSet<_>>();
+
+    for (id, elicitation) in &spec.elicitations {
+        validate_identifier("elicitations key", id)?;
+        if elicitation.question.trim().is_empty() {
+            return Err(Error::MissingField {
+                field: "elicitations.question",
+            });
+        }
+        if elicitation.choices.is_empty() {
+            return Err(Error::MissingField {
+                field: "elicitations.choices",
+            });
+        }
+        let mut choice_ids = BTreeSet::new();
+        for choice in &elicitation.choices {
+            validate_identifier("elicitations.choices.id", &choice.id)?;
+            insert_unique("elicitations.choices.id", &mut choice_ids, &choice.id)?;
+            if choice.label.trim().is_empty() {
+                return Err(Error::MissingField {
+                    field: "elicitations.choices.label",
+                });
+            }
+            if let Some(route) = &choice.route {
+                validate_known_route("elicitations.choices.route", &route_ids, route)?;
+            }
+            if let Some(next) = &choice.next {
+                validate_known_state("elicitations.choices.next", &state_ids, next)?;
+            }
+        }
+        if let Some(default) = &elicitation.default {
+            if !choice_ids.contains(default) {
+                return Err(Error::UnknownReference {
+                    field: "elicitations.default",
+                    value: default.clone(),
+                });
+            }
+        }
+        for condition in &elicitation.required_when {
+            if let Some(route) = &condition.route {
+                validate_known_route("elicitations.required_when.route", &route_ids, route)?;
+            }
+            if let Some(missing) = &condition.missing {
+                validate_identifier("elicitations.required_when.missing", missing)?;
+            }
         }
     }
     Ok(())
@@ -148,6 +213,10 @@ fn action_ids(spec: &SkillSpec) -> BTreeSet<String> {
         .chain(spec.closures.keys())
         .cloned()
         .collect()
+}
+
+fn elicitation_ids(spec: &SkillSpec) -> BTreeSet<String> {
+    spec.elicitations.keys().cloned().collect()
 }
 
 fn validate_known_route(
@@ -191,6 +260,21 @@ fn validate_known_action(
         Err(Error::UnknownReference {
             field,
             value: action.to_owned(),
+        })
+    }
+}
+
+fn validate_known_elicitation(
+    field: &'static str,
+    elicitation_ids: &BTreeSet<String>,
+    elicitation: &str,
+) -> Result<()> {
+    if elicitation_ids.contains(elicitation) {
+        Ok(())
+    } else {
+        Err(Error::UnknownReference {
+            field,
+            value: elicitation.to_owned(),
         })
     }
 }

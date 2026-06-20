@@ -9,6 +9,7 @@ pub struct Decision {
     pub route_order: Vec<RouteId>,
     pub forbid: Vec<String>,
     pub allow: BTreeMap<String, serde_yaml::Value>,
+    pub elicit: Vec<String>,
     pub after_success: Vec<String>,
     pub matched_rules: Vec<MatchedRule>,
     pub reason: Option<String>,
@@ -41,6 +42,7 @@ pub fn decide(spec: &SkillSpec, input: &str) -> Decision {
         route_order: default_route_order(spec),
         forbid: Vec::new(),
         allow: BTreeMap::new(),
+        elicit: Vec::new(),
         after_success: Vec::new(),
         matched_rules: Vec::new(),
         reason: None,
@@ -55,6 +57,7 @@ pub fn decide(spec: &SkillSpec, input: &str) -> Decision {
     }
 
     dedupe_strings(&mut decision.forbid);
+    dedupe_strings(&mut decision.elicit);
     dedupe_strings(&mut decision.after_success);
     decision
 }
@@ -127,6 +130,12 @@ fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<St
         }
     }
 
+    for expected in &expectation.elicit {
+        if !decision.elicit.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected elicit {expected:?}"));
+        }
+    }
+
     failures
 }
 
@@ -188,6 +197,7 @@ fn apply_rule(decision: &mut Decision, rule: &Rule) {
         decision.route_order = rule.route_order.clone();
     }
     decision.forbid.extend(rule.forbid.clone());
+    decision.elicit.extend(rule.elicit.clone());
     decision.after_success.extend(rule.after_success.clone());
     decision.allow.extend(rule.allow.clone());
     decision.reason = rule.reason.clone().or_else(|| decision.reason.clone());

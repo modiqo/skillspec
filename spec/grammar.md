@@ -5,8 +5,9 @@ canonical interchange format is YAML, but the grammar describes the conceptual
 tree independent of YAML spelling.
 
 V0 is deliberately not a programming language. It is a structured skill
-contract: enough grammar to express routes, rules, states, commands, snippets,
-closures, tests, and proof hooks without becoming an execution engine.
+contract: enough grammar to express routes, rules, elicitations, states,
+commands, snippets, closures, tests, and proof hooks without becoming an
+execution engine.
 
 ## Lexical Conventions
 
@@ -15,7 +16,9 @@ identifier      = lowercase-letter , { lowercase-letter | digit | "_" | "-" | ".
 route-id        = identifier ;
 rule-id         = identifier ;
 state-id        = identifier ;
+elicitation-id = identifier ;
 command-id      = identifier ;
+choice-id       = identifier ;
 snippet-id      = identifier ;
 metric-id       = identifier ;
 string          = YAML string scalar ;
@@ -35,15 +38,20 @@ References are symbolic. A v0 document is well-formed when:
 
 - every `Rule.prefer` references an existing `Route.id`
 - every `Rule.route_order` item references an existing `Route.id`
+- every `Rule.elicit` item references an existing elicitation
+- every `State.ask` references an existing elicitation
 - every `State.next`, `State.yes`, and `State.no` references an existing state
 - every command id referenced from `State.do` or `Rule.after_success` exists in
   `commands` or `closures`
+- every `Elicitation.required_when.route` references an existing route
+- every `Elicitation.default` references one of its choices
+- every `ElicitationChoice.route` references an existing route
+- every `ElicitationChoice.next` references an existing state
 - every `Test.expect.route` references an existing `Route.id`
 - every `Test.expect.route_order` item references an existing `Route.id`
+- every `Test.expect.elicit` item references an existing elicitation
 
-V0 CLI validation performs a minimal structural pass. Schema-backed and
-cross-reference validation should become part of the contract before a v1
-release.
+V0 CLI validation performs these structural and cross-reference checks.
 
 ## Document
 
@@ -53,6 +61,7 @@ skillspec       = header ,
                   [ entry ] ,
                   [ routes ] ,
                   [ rules ] ,
+                  [ elicitations ] ,
                   [ states ] ,
                   [ commands ] ,
                   [ snippets ] ,
@@ -121,6 +130,7 @@ rule            = "id" ":" rule-id ,
                   [ "route_order" ":" sequence-of route-id ] ,
                   [ "forbid" ":" sequence-of identifier ] ,
                   [ "allow" ":" mapping ] ,
+                  [ "elicit" ":" sequence-of elicitation-id ] ,
                   [ "after_success" ":" sequence-of command-id-or-closure-id ] ,
                   [ "reason" ":" string ] ;
 
@@ -146,6 +156,7 @@ decision        = input ,
                   route-order ,
                   forbid-set ,
                   allow-map ,
+                  elicitation-list ,
                   after-success-list ,
                   matched-rule-list ,
                   reason ;
@@ -154,6 +165,7 @@ apply(rule)     = if rule.prefer then route := rule.prefer ,
                   if rule.route_order then route-order := rule.route_order ,
                   forbid-set := forbid-set union rule.forbid ,
                   allow-map := allow-map merge rule.allow ,
+                  elicitation-list := append elicitation-list rule.elicit ,
                   after-success-list := append after-success-list rule.after_success ,
                   matched-rule-list := append matched-rule-list rule.id ,
                   reason := rule.reason or reason ;
@@ -162,12 +174,45 @@ apply(rule)     = if rule.prefer then route := rule.prefer ,
 This algebra is intentionally boring. The goal is inspectable steering, not a
 hidden policy language.
 
+## Elicitations
+
+```text
+elicitations    = "elicitations" ":" mapping-of elicitation-id to elicitation ;
+elicitation     = "question" ":" string ,
+                  [ "required_when" ":" sequence-of elicitation-condition ] ,
+                  "choices" ":" sequence-of elicitation-choice ,
+                  [ "default" ":" choice-id ] ,
+                  [ "max_choices" ":" number ] ;
+
+elicitation-condition
+                = [ "route" ":" route-id ] ,
+                  [ "missing" ":" identifier ] ,
+                  [ "predicate" ":" predicate ] ;
+
+elicitation-choice
+                = "id" ":" choice-id ,
+                  "label" ":" string ,
+                  [ "description" ":" string ] ,
+                  [ "sets" ":" mapping ] ,
+                  [ "route" ":" route-id ] ,
+                  [ "next" ":" state-id ] ,
+                  [ "safety" ":" safety-class ] ;
+```
+
+Elicitations are bounded questions. They are used when the skill should ask
+for a specific missing decision instead of guessing or asking an open-ended
+question.
+
+Choices may set facts, steer a route, or advance to a state. They do not
+execute commands by themselves.
+
 ## States
 
 ```text
 states          = "states" ":" mapping-of state-id to state ;
 state           = [ "do" ":" sequence-of command-id-or-action-id ] ,
                   [ "say" ":" snippet-id ] ,
+                  [ "ask" ":" elicitation-id ] ,
                   [ "next" ":" state-id ] ,
                   [ "yes" ":" state-id ] ,
                   [ "no" ":" state-id ] ;
@@ -231,6 +276,7 @@ scenario-test   = "name" ":" string ,
 expectation     = [ "route" ":" route-id ] ,
                   [ "route_order" ":" sequence-of route-id ] ,
                   [ "forbid" ":" sequence-of identifier ] ,
+                  [ "elicit" ":" sequence-of elicitation-id ] ,
                   [ "after_success" ":" sequence-of command-id-or-closure-id ] ;
 ```
 

@@ -75,6 +75,8 @@ rules:
       - adapter_setup_before_browser_fallback
     allow:
       native_search: url_discovery_only
+    elicit:
+      - browser_mode
     reason: Browser intent must be satisfied by browser evidence, not search summaries or raw browser automation.
 
   - id: durable_result_uses_rote_exec
@@ -167,11 +169,28 @@ rules:
       - dependency_preflight
       - one_shot_process
       - background_process
+    elicit:
+      - release_approval
     forbid:
       - irreversible_background_without_approval
       - release_without_dry_run
       - release_without_dependency_preflight
     reason: Mutating release work needs dependency checks, dry-run when available, and explicit approval.
+
+  - id: missing_dependencies_elicit_install_scope
+    when:
+      user_says_any:
+        - install missing tool
+        - provision dependency
+        - missing dependency
+        - deps check failed
+    prefer: dependency_preflight
+    elicit:
+      - install_scope
+    forbid:
+      - silent_global_install
+      - released_with_missing_dependencies
+    reason: Missing dependencies require a bounded install/provisioning choice before machine mutation.
 
   - id: crystallization_requires_deps_and_qa
     when:
@@ -207,11 +226,117 @@ rules:
       - browser_payload_in_large_argv
     reason: Browser state should be materialized as a response, snapshot, slice, or file before local CLI processing.
 
+elicitations:
+  browser_mode:
+    question: How should I access the browser state for this task?
+    required_when:
+      - route: browser_handoff
+      - missing: browser_mode
+    default: attach_existing
+    max_choices: 1
+    choices:
+      - id: attach_existing
+        label: Attach to active browser
+        description: Use the user's current logged-in browser profile when session state matters.
+        sets:
+          browser_mode: attach_existing
+        route: browser_handoff
+        next: prepare_workspace
+        safety: browser_attach
+      - id: new_headed
+        label: Start visible browser
+        description: Open a new visible rote-managed browser window.
+        sets:
+          browser_mode: new_headed
+        route: browser_handoff
+        next: prepare_workspace
+        safety: browser_attach
+      - id: new_headless
+        label: Start headless browser
+        description: Use for public pages or replay-like work that does not need an existing login.
+        sets:
+          browser_mode: new_headless
+        route: browser_handoff
+        next: prepare_workspace
+        safety: network_read
+
+  install_scope:
+    question: How should missing local tools be provisioned?
+    required_when:
+      - route: dependency_preflight
+      - missing: dependency_install_scope
+    max_choices: 1
+    choices:
+      - id: rote_managed
+        label: Rote-managed or project-local
+        description: Prefer isolated provisioning that does not mutate the whole machine.
+        sets:
+          dependency_install_scope: rote_managed
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: user_global
+        label: User/global package manager
+        description: Allow broader machine mutation only after explicit approval.
+        sets:
+          dependency_install_scope: user_global
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: leave_draft
+        label: Leave flow in draft
+        description: Do not install anything; keep the flow unreleased until dependencies are installed.
+        sets:
+          dependency_install_scope: none
+          flow_status: draft
+        route: dependency_preflight
+        next: done
+        safety: read_only
+
+  release_approval:
+    question: Do you approve running the real mutating release/publish step?
+    required_when:
+      - missing: release_approval
+    max_choices: 1
+    choices:
+      - id: approve_foreground
+        label: Approve foreground run
+        description: Run the final irreversible command visibly after preflight and dry-run evidence.
+        sets:
+          release_approval: foreground
+        route: one_shot_process
+        next: execute
+        safety: destructive
+      - id: approve_tracked_background
+        label: Approve tracked background run
+        description: Run as a tracked lease with stdout/stderr capture and no interruption unless requested.
+        sets:
+          release_approval: tracked_background
+        route: background_process
+        next: execute
+        safety: destructive
+      - id: do_not_run
+        label: Do not run
+        description: Stop after preflight and dry-run evidence.
+        sets:
+          release_approval: denied
+        next: done
+        safety: read_only
+
 states:
   start:
     do:
       - choose_shell_route
     next: prepare_workspace
+  choose_browser_mode:
+    ask: browser_mode
+    next: prepare_workspace
+  choose_install_scope:
+    ask: install_scope
+    next: prepare_workspace
+  approve_release:
+    ask: release_approval
+    next: execute
   prepare_workspace:
     do:
       - initialize_rote_workspace
@@ -353,6 +478,8 @@ tests:
     input: browse the active dashboard and summarize it
     expect:
       route: browser_handoff
+      elicit:
+        - browser_mode
       forbid:
         - native_search_as_answer
         - raw_playwright
@@ -394,6 +521,8 @@ tests:
   - name: release work is guarded
     input: publish a release
     expect:
+      elicit:
+        - release_approval
       route_order:
         - dependency_preflight
         - one_shot_process
@@ -401,6 +530,15 @@ tests:
       forbid:
         - release_without_dry_run
         - release_without_dependency_preflight
+
+  - name: missing dependency asks install scope
+    input: deps check failed because gh is missing, install missing tool
+    expect:
+      route: dependency_preflight
+      elicit:
+        - install_scope
+      forbid:
+        - silent_global_install
 
   - name: crystallization requires deps and qa
     input: crystallize this shell workflow as a reusable flow

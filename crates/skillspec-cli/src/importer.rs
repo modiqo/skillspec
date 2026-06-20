@@ -49,6 +49,7 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
         routes: Vec::new(),
         rules: Vec::new(),
         states: BTreeMap::new(),
+        elicitations: BTreeMap::new(),
         commands: BTreeMap::new(),
         snippets,
         closures: BTreeMap::new(),

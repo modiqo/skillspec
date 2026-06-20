@@ -13,6 +13,7 @@ SkillSpec
   has many Routes
   has many Rules
   has many States
+  has many Elicitations
   has many Commands
   has many Snippets
   has many Tests
@@ -24,10 +25,20 @@ Rule
   may replace RouteOrder
   may forbid Substitution
   may allow NarrowFallback
+  may request Elicitation
   may schedule AfterSuccess closure/action
+
+Elicitation
+  asks bounded Question
+  has many Choices
+  may be required by Route or MissingFact
+  may set Fact
+  may steer Route
+  may transition to State
 
 State
   may say Snippet
+  may ask Elicitation
   may do Command or Action
   may transition to State
   may branch to State by user answer
@@ -40,7 +51,7 @@ Command
 
 Test
   provides Input
-  expects Route, RouteOrder, Forbid, AfterSuccess
+  expects Route, RouteOrder, Forbid, Elicit, AfterSuccess
   proves Rule behavior
 
 Proof
@@ -49,7 +60,7 @@ Proof
 
 ## Where Rules Can Be Used
 
-Rules are not only route selectors. A rule can influence four parts of behavior:
+Rules are not only route selectors. A rule can influence five parts of behavior:
 
 1. **Route choice**
    `prefer: browser`
@@ -62,6 +73,9 @@ Rules are not only route selectors. A rule can influence four parts of behavior:
 
 4. **Post-task closure**
    `after_success: [collect_trace_cost, ask_to_remember]`
+
+5. **Bounded elicitation**
+   `elicit: [browser_mode]`
 
 The important design decision: rules can shape both **what happens next** and
 **what must not happen instead**. That is how a SkillSpec prevents prose drift.
@@ -78,6 +92,7 @@ Use a document-level rule when it answers one of these questions:
 - Which route order should be tried before asking the user?
 - Which plausible substitutes are forbidden?
 - Which narrow fallbacks are allowed?
+- Which bounded question must be asked before guessing?
 - Which post-success actions are mandatory?
 
 Do not hide routing rules inside command descriptions or snippets. Commands
@@ -94,9 +109,10 @@ associations define the useful behavior.
 | Primitive | Owns | Points To | Is Proven By |
 | --- | --- | --- | --- |
 | `Route` | A strategy for satisfying intent | `Command.checks`, `State` lifecycle, `Rule.prefer` | scenario tests and runtime outcomes |
-| `Rule` | A steering decision | `Predicate`, `Route`, forbids, allows, closures | scenario tests |
+| `Rule` | A steering decision | `Predicate`, `Route`, forbids, allows, elicitations, closures | scenario tests |
 | `Predicate` | A match condition | user wording or inferred task properties | decision traces |
-| `State` | Lifecycle position | commands, snippets, next/yes/no states | state graph review and flow replay |
+| `Elicitation` | A bounded question | choices, facts, route, next state | scenario tests and user answers |
+| `State` | Lifecycle position | commands, snippets, elicitations, next/yes/no states | state graph review and flow replay |
 | `Command` | A named action template | required tools/files/env, parse rules, safety class | captured command output |
 | `Snippet` | Stable human-facing prose | states or generated skill docs | generated skill output |
 | `Closure` | Post-task behavior | commands, digest, memory, hub share | trace/cost evidence |
@@ -111,7 +127,8 @@ The intended mental model is:
 user input
   -> matched predicates
   -> matched rules
-  -> route choice and route order
+  -> route choice, route order, and required elicitations
+  -> bounded user choice when needed
   -> state lifecycle
   -> command/snippet execution plan
   -> captured evidence
@@ -128,6 +145,7 @@ It should make the steering chain inspectable:
   -> browse_profiles_uses_browser
   -> route = browser
   -> forbid native_search_as_answer
+  -> elicit browser_mode
   -> collect browser evidence
 ```
 
@@ -159,6 +177,63 @@ state = execute
 The route says use browser observation. The state says we are currently running
 the chosen route. Keeping these separate avoids turning the state machine into
 a giant set of route-specific branches.
+
+## Elicitation Relationship
+
+Elicitations answer:
+
+```text
+What bounded choice must the user make before the agent can continue safely?
+```
+
+Rules can request an elicitation:
+
+```yaml
+rules:
+  - id: browse_words_handoff_to_browse
+    when:
+      user_says_any: [browse]
+    prefer: browser
+    elicit: [browser_mode]
+```
+
+States can ask an elicitation:
+
+```yaml
+states:
+  choose_browser_mode:
+    ask: browser_mode
+    next: execute
+```
+
+The elicitation owns the actual question and choices:
+
+```yaml
+elicitations:
+  browser_mode:
+    question: How should I access the browser state?
+    choices:
+      - id: attach_existing
+        label: Attach to active browser
+        sets:
+          browser_mode: attach_existing
+```
+
+This keeps "ask the user" from becoming an open-ended prompt. A good
+elicitation is small, mutually understandable, and tied to facts the skill
+needs before it can route or execute safely.
+
+Use elicitations for:
+
+- browser attach/headed/headless choices
+- install/provisioning scope
+- destructive release approval
+- auth/session selection
+- ambiguous target selection when the alternatives are known
+
+Do not use elicitations for broad discovery questions. If the agent does not
+yet know the alternatives, it should inspect safely first, then ask a bounded
+elicitation.
 
 ## Command And State Relationship
 
