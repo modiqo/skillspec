@@ -2,6 +2,7 @@ use crate::decision::{DecisionEvent, DecisionWithEvents};
 use crate::error::{Error, Result};
 use crate::model::{SkillSpec, TraceConfig, TraceEventKind};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
@@ -18,6 +19,10 @@ pub struct TraceEnvelope {
     pub timestamp_unix_ms: u128,
     pub skill_id: String,
     pub spec_schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spec_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_sha256: Option<String>,
     pub event: TraceEventKind,
     pub event_name: String,
     pub data: serde_json::Value,
@@ -37,12 +42,17 @@ pub struct TraceSummary {
     pub schema: String,
     pub run_id: String,
     pub skill_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spec_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_sha256: Option<String>,
     pub event_count: usize,
     pub events: BTreeMap<TraceEventKind, usize>,
 }
 
 pub fn write_decision_trace(
     root: &Path,
+    spec_path: &Path,
     spec: &SkillSpec,
     decision: &DecisionWithEvents,
 ) -> Result<TraceWriteResult> {
@@ -55,8 +65,17 @@ pub fn write_decision_trace(
     })?;
 
     let selected = selected_events(spec.trace.as_ref(), &decision.events);
+    let spec_fingerprint = spec_fingerprint(spec, spec_path)?;
+    let input_sha256 = input_sha256(&decision.decision.input);
     for (index, event) in selected.iter().enumerate() {
-        let envelope = envelope_for(spec, &run_id, index as u64 + 1, event)?;
+        let envelope = envelope_for(
+            spec,
+            &run_id,
+            index as u64 + 1,
+            event,
+            &spec_fingerprint,
+            &input_sha256,
+        )?;
         write_event(&events_dir, &envelope)?;
     }
 
@@ -64,34 +83,7 @@ pub fn write_decision_trace(
 }
 
 pub fn compact(run_dir: &Path) -> Result<TraceWriteResult> {
-    let events_dir = run_dir.join("events");
-    let mut event_files = fs::read_dir(&events_dir)
-        .map_err(|source| Error::Read {
-            path: events_dir.clone(),
-            source,
-        })?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension()
-                .is_some_and(|extension| extension == "json")
-        })
-        .collect::<Vec<_>>();
-    event_files.sort();
-
-    let mut envelopes = Vec::with_capacity(event_files.len());
-    for path in event_files {
-        let content = fs::read_to_string(&path).map_err(|source| Error::Read {
-            path: path.clone(),
-            source,
-        })?;
-        let envelope =
-            serde_json::from_str::<TraceEnvelope>(&content).map_err(|source| Error::ParseJson {
-                path: path.clone(),
-                source,
-            })?;
-        envelopes.push(envelope);
-    }
+    let envelopes = read_envelopes(run_dir)?;
 
     let trace_jsonl = run_dir.join("trace.jsonl");
     let mut trace_file = fs::File::create(&trace_jsonl).map_err(|source| Error::Write {
@@ -120,6 +112,38 @@ pub fn compact(run_dir: &Path) -> Result<TraceWriteResult> {
     })
 }
 
+pub fn read_envelopes(run_dir: &Path) -> Result<Vec<TraceEnvelope>> {
+    let events_dir = run_dir.join("events");
+    let mut event_files = fs::read_dir(&events_dir)
+        .map_err(|source| Error::Read {
+            path: events_dir.clone(),
+            source,
+        })?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "json")
+        })
+        .collect::<Vec<_>>();
+    event_files.sort();
+
+    let mut envelopes = Vec::with_capacity(event_files.len());
+    for path in event_files {
+        let content = fs::read_to_string(&path).map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        let envelope =
+            serde_json::from_str::<TraceEnvelope>(&content).map_err(|source| Error::ParseJson {
+                path: path.clone(),
+                source,
+            })?;
+        envelopes.push(envelope);
+    }
+    Ok(envelopes)
+}
+
 fn selected_events<'a>(
     config: Option<&TraceConfig>,
     events: &'a [DecisionEvent],
@@ -142,6 +166,8 @@ fn envelope_for(
     run_id: &str,
     seq: u64,
     event: &DecisionEvent,
+    spec_fingerprint: &str,
+    input_sha256: &str,
 ) -> Result<TraceEnvelope> {
     Ok(TraceEnvelope {
         schema: TRACE_SCHEMA.to_owned(),
@@ -150,6 +176,8 @@ fn envelope_for(
         timestamp_unix_ms: unix_ms(),
         skill_id: spec.id.clone(),
         spec_schema: spec.schema.clone(),
+        spec_fingerprint: Some(spec_fingerprint.to_owned()),
+        input_sha256: Some(input_sha256.to_owned()),
         event: event.kind(),
         event_name: event.name().to_owned(),
         data: serde_json::to_value(event)?,
@@ -177,6 +205,12 @@ fn summary_for(envelopes: &[TraceEnvelope]) -> TraceSummary {
     for envelope in envelopes {
         *events.entry(envelope.event.clone()).or_insert(0) += 1;
     }
+    let spec_fingerprint = envelopes
+        .iter()
+        .find_map(|envelope| envelope.spec_fingerprint.clone());
+    let input_sha256 = envelopes
+        .iter()
+        .find_map(|envelope| envelope.input_sha256.clone());
     TraceSummary {
         schema: TRACE_SCHEMA.to_owned(),
         run_id: envelopes
@@ -187,9 +221,57 @@ fn summary_for(envelopes: &[TraceEnvelope]) -> TraceSummary {
             .first()
             .map(|envelope| envelope.skill_id.clone())
             .unwrap_or_else(|| "unknown".to_owned()),
+        spec_fingerprint,
+        input_sha256,
         event_count: envelopes.len(),
         events,
     }
+}
+
+pub fn spec_fingerprint(spec: &SkillSpec, spec_path: &Path) -> Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"skillspec.resolved_spec/v0\n");
+    hasher.update(serde_json::to_vec(spec)?);
+
+    let spec_dir = spec_path.parent().unwrap_or_else(|| Path::new("."));
+    for (id, import) in &spec.imports {
+        hasher.update(b"\nimport\n");
+        hasher.update(id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(import.path.as_bytes());
+        hasher.update(b"\n");
+        if let Some(section) = &import.section {
+            hasher.update(section.as_bytes());
+        }
+        hasher.update(b"\ncontent\n");
+        let path = spec_dir.join(&import.path);
+        let content = fs::read(&path).map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        hasher.update(content);
+    }
+
+    Ok(format!(
+        "sha256:{}",
+        hex_digest(hasher.finalize().as_slice())
+    ))
+}
+
+pub fn input_sha256(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    format!("sha256:{}", hex_digest(hasher.finalize().as_slice()))
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 fn new_run_id() -> String {

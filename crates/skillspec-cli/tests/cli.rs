@@ -564,6 +564,61 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     )
     .unwrap();
     assert_eq!(summary["skill_id"], "cli.rich");
+    assert!(summary["spec_fingerprint"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
+    assert!(summary["input_sha256"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
+
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let report = json_stdout(&align);
+    assert_eq!(report["status"], "unproven");
+    assert_eq!(report["ok"], true);
+    let checks = report["checks"].as_array().unwrap();
+    assert!(checks
+        .iter()
+        .any(|check| { check["id"] == "route_selected" && check["status"] == "pass" }));
+    assert!(checks
+        .iter()
+        .any(|check| { check["id"] == "route_selection_basis" && check["status"] == "pass" }));
+    assert!(checks
+        .iter()
+        .any(|check| { check["id"] == "forbids" && check["status"] == "unproven" }));
+
+    let changed = fs::read_to_string(&spec).unwrap().replace(
+        "description: Exercises core CLI behavior.",
+        "description: Exercises core CLI behavior after drift.",
+    );
+    write_file(&spec, &changed);
+    let drift = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&drift);
+    let drift_report = json_stdout(&drift);
+    assert_eq!(drift_report["status"], "fail");
+    assert!(drift_report["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|check| { check["id"] == "spec_fingerprint" && check["status"] == "fail" }));
 }
 
 #[test]

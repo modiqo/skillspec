@@ -1,3 +1,4 @@
+use crate::align::{AlignCheckStatus, AlignReport, AlignStatus};
 use crate::decision::{Decision, TestRun};
 use crate::error::Result;
 use crate::model::SkillSpec;
@@ -142,6 +143,52 @@ pub fn trace_written(trace: &TraceWriteResult) -> Result<()> {
     writeln!(stderr, "trace: jsonl {}", trace.trace_jsonl.display())?;
     writeln!(stderr, "trace: summary {}", trace.summary_json.display())?;
     Ok(())
+}
+
+pub fn align(report: &AlignReport) -> Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    writeln!(stdout, "status: {}", align_status_name(report.status))?;
+    writeln!(stdout, "spec: {}", report.spec)?;
+    writeln!(stdout, "decision_trace: {}", report.decision_trace)?;
+    writeln!(stdout, "checks:")?;
+    for check in &report.checks {
+        writeln!(
+            stdout,
+            "  - {}: {} ({})",
+            check.id,
+            check_status_name(check.status),
+            check.message
+        )?;
+    }
+    if !report.obligations.is_empty() {
+        writeln!(stdout, "obligations:")?;
+        for obligation in &report.obligations {
+            writeln!(
+                stdout,
+                "  - {}: {} ({})",
+                obligation.id,
+                check_status_name(obligation.status),
+                obligation.message
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn check_status_name(status: AlignCheckStatus) -> &'static str {
+    match status {
+        AlignCheckStatus::Pass => "pass",
+        AlignCheckStatus::Fail => "fail",
+        AlignCheckStatus::Unproven => "unproven",
+    }
+}
+
+fn align_status_name(status: AlignStatus) -> &'static str {
+    match status {
+        AlignStatus::Pass => "pass",
+        AlignStatus::Fail => "fail",
+        AlignStatus::Unproven => "unproven",
+    }
 }
 
 pub fn error(error: crate::error::Error) {

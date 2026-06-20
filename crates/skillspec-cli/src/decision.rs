@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Decision {
     pub input: String,
     pub route: Option<RouteId>,
+    pub route_selection: Option<RouteSelection>,
     pub route_order: Vec<RouteId>,
     pub forbid: Vec<String>,
     pub allow: BTreeMap<String, serde_yaml::Value>,
@@ -21,6 +22,22 @@ pub struct Decision {
 pub struct MatchedRule {
     pub id: RuleId,
     pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct RouteSelection {
+    pub route: RouteId,
+    pub basis: RouteSelectionBasis,
+    pub rule_id: Option<RuleId>,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteSelectionBasis {
+    RulePrefer,
+    RouteOrderDefault,
+    DefaultRouteOrder,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -43,6 +60,9 @@ pub enum DecisionEvent {
     },
     RouteSelected {
         route: RouteId,
+        basis: RouteSelectionBasis,
+        rule_id: Option<RuleId>,
+        reason: Option<String>,
     },
     RouteOrderSet {
         route_order: Vec<RouteId>,
@@ -61,6 +81,7 @@ pub enum DecisionEvent {
     },
     OutcomeRecorded {
         route: Option<RouteId>,
+        route_selection: Option<RouteSelection>,
         matched_rules: Vec<RuleId>,
     },
 }
@@ -87,6 +108,7 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
     let mut decision = Decision {
         input: input.to_owned(),
         route: None,
+        route_selection: None,
         route_order: default_route_order(spec),
         forbid: Vec::new(),
         allow: BTreeMap::new(),
@@ -104,6 +126,7 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
             schema: spec.schema.clone(),
         },
     ];
+    let mut route_order_selection_source: Option<(RuleId, Option<String>)> = None;
 
     for rule in &spec.rules {
         let matched = matches_rule(rule, input);
@@ -112,15 +135,43 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
             matched,
         });
         if matched {
-            apply_rule(&mut decision, &mut events, rule);
+            apply_rule(
+                &mut decision,
+                &mut events,
+                rule,
+                &mut route_order_selection_source,
+            );
         }
     }
 
     if decision.route.is_none() {
-        decision.route = decision.route_order.first().cloned();
-        if let Some(route) = &decision.route {
-            events.push(DecisionEvent::RouteSelected {
+        if let Some(route) = decision.route_order.first().cloned() {
+            let (basis, rule_id, reason) =
+                if let Some((rule_id, reason)) = route_order_selection_source {
+                    (
+                        RouteSelectionBasis::RouteOrderDefault,
+                        Some(rule_id),
+                        reason,
+                    )
+                } else {
+                    (
+                        RouteSelectionBasis::DefaultRouteOrder,
+                        None,
+                        Some("selected first route by rank/default order".to_owned()),
+                    )
+                };
+            decision.route = Some(route.clone());
+            decision.route_selection = Some(RouteSelection {
                 route: route.clone(),
+                basis: basis.clone(),
+                rule_id: rule_id.clone(),
+                reason: reason.clone(),
+            });
+            events.push(DecisionEvent::RouteSelected {
+                route,
+                basis,
+                rule_id,
+                reason,
             });
         }
     }
@@ -130,6 +181,7 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
     dedupe_strings(&mut decision.after_success);
     events.push(DecisionEvent::OutcomeRecorded {
         route: decision.route.clone(),
+        route_selection: decision.route_selection.clone(),
         matched_rules: decision
             .matched_rules
             .iter()
@@ -367,19 +419,34 @@ fn matches_predicate(predicate: &Predicate, input: &str) -> bool {
     has_condition
 }
 
-fn apply_rule(decision: &mut Decision, events: &mut Vec<DecisionEvent>, rule: &Rule) {
+fn apply_rule(
+    decision: &mut Decision,
+    events: &mut Vec<DecisionEvent>,
+    rule: &Rule,
+    route_order_selection_source: &mut Option<(RuleId, Option<String>)>,
+) {
     events.push(DecisionEvent::RuleMatched {
         rule_id: rule.id.clone(),
         reason: rule.reason.clone(),
     });
     if let Some(route) = &rule.prefer {
         decision.route = Some(route.clone());
+        decision.route_selection = Some(RouteSelection {
+            route: route.clone(),
+            basis: RouteSelectionBasis::RulePrefer,
+            rule_id: Some(rule.id.clone()),
+            reason: rule.reason.clone(),
+        });
         events.push(DecisionEvent::RouteSelected {
             route: route.clone(),
+            basis: RouteSelectionBasis::RulePrefer,
+            rule_id: Some(rule.id.clone()),
+            reason: rule.reason.clone(),
         });
     }
     if !rule.route_order.is_empty() {
         decision.route_order = rule.route_order.clone();
+        *route_order_selection_source = Some((rule.id.clone(), rule.reason.clone()));
         events.push(DecisionEvent::RouteOrderSet {
             route_order: rule.route_order.clone(),
         });

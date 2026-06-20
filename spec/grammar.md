@@ -278,6 +278,9 @@ harness. A rule causes a decision; the evaluator writes the event. The spec
 does not contain per-rule file writing instructions.
 
 If `record` is empty or absent, an evaluator may record every v0 event kind.
+Event payload fields such as `route_selected.basis`, `spec_fingerprint`, and
+`input_sha256` are defined by the trace envelope and event schema, not by the
+`skill.spec.yml` grammar.
 If `required` is true, a conforming harness should either write the trace or
 state that tracing is unavailable before relying on the decision.
 

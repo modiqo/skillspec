@@ -92,6 +92,8 @@ Every event uses the same envelope:
   "timestamp_unix_ms": 1781900000123,
   "skill_id": "rote.shell",
   "spec_schema": "skillspec/v0",
+  "spec_fingerprint": "sha256:...",
+  "input_sha256": "sha256:...",
   "event": "rule_matched",
   "event_name": "rule_matched",
   "data": {
@@ -105,6 +107,11 @@ Every event uses the same envelope:
 `seq` is monotonic inside a run. Future harnesses may add span ids for parallel
 branches, but v0 does not require them.
 
+`spec_fingerprint` hashes the resolved spec graph used for the decision,
+including imported file contents. `input_sha256` hashes the task text from the
+`input_received` event. Older traces may omit these fields; alignment tools
+must report those checks as unproven instead of guessing.
+
 ## Event Kinds
 
 V0 defines these decision events:
@@ -115,13 +122,21 @@ V0 defines these decision events:
 | `spec_loaded` | The evaluator loaded a specific SkillSpec. |
 | `rule_evaluated` | A rule was checked and either matched or did not match. |
 | `rule_matched` | A rule matched and its effects are about to apply. |
-| `route_selected` | A route was selected or replaced by a rule/default. |
+| `route_selected` | A route was selected or replaced by a rule/default. Payload includes `route`, `basis`, optional `rule_id`, and optional `reason`. |
 | `route_order_set` | A rule replaced the route order. |
 | `forbid_added` | A rule added forbidden substitutions. |
 | `allow_added` | A rule added narrow allowed fallbacks. |
 | `elicitation_requested` | A rule required a bounded user choice. |
 | `after_success_scheduled` | A rule scheduled post-success action. |
 | `outcome_recorded` | The evaluator recorded the final decision outcome. |
+
+`route_selected.basis` is one of:
+
+- `rule_prefer`: a matched rule selected `prefer`.
+- `route_order_default`: no rule selected `prefer`, but a matched rule replaced
+  route order and the first route in that order was selected.
+- `default_route_order`: no rule selected `prefer`; the evaluator selected the
+  first route by rank/default order.
 
 ## CLI
 
@@ -143,6 +158,20 @@ Compact a run after a harness appends event files:
 ```sh
 skillspec trace compact .skillspec/traces/run-1781900000000-12345
 ```
+
+Align a spec with a decision trace:
+
+```sh
+skillspec trace align examples/rote-shell.skill.spec.yml \
+  --decision-trace .skillspec/traces/run-1781900000000-12345
+```
+
+Alignment re-runs the current spec against the captured input and compares the
+trace to deterministic decision facts: skill id, schema, resolved-spec
+fingerprint, input hash, selected route, route-selection basis, matched rules,
+forbids, elicitations, and after-success closures. It marks execution
+obligations as `unproven` unless structured execution evidence is supplied by a
+future harness/export path.
 
 ## Independence From Tool Systems
 

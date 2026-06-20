@@ -1,3 +1,4 @@
+mod align;
 mod compiler;
 mod decision;
 mod deps;
@@ -109,6 +110,17 @@ enum TraceCommand {
         /// Trace run directory produced by decide/explain --trace-dir.
         run_dir: PathBuf,
     },
+    #[command(about = "Compare a SkillSpec to a decision trace")]
+    Align {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Trace run directory produced by decide/explain --trace-dir.
+        #[arg(long)]
+        decision_trace: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -194,7 +206,7 @@ fn run() -> Result<()> {
             ensure_trace_available(&spec, trace_dir.as_ref())?;
             let decision = decision::decide_with_events(&spec, &input);
             if let Some(trace_dir) = trace_dir {
-                let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
+                let trace = trace::write_decision_trace(&trace_dir, &path, &spec, &decision)?;
                 report::trace_written(&trace)?;
             }
             report::json(&decision.decision)?;
@@ -208,7 +220,7 @@ fn run() -> Result<()> {
             ensure_trace_available(&spec, trace_dir.as_ref())?;
             let decision = decision::decide_with_events(&spec, &input);
             if let Some(trace_dir) = trace_dir {
-                let trace = trace::write_decision_trace(&trace_dir, &spec, &decision)?;
+                let trace = trace::write_decision_trace(&trace_dir, &path, &spec, &decision)?;
                 report::trace_written(&trace)?;
             }
             report::explain(&decision.decision)?;
@@ -217,6 +229,22 @@ fn run() -> Result<()> {
             TraceCommand::Compact { run_dir } => {
                 let trace = trace::compact(&run_dir)?;
                 report::json(&trace)?;
+            }
+            TraceCommand::Align {
+                path,
+                decision_trace,
+                json,
+            } => {
+                let spec = parser::load_spec(&path)?;
+                let report = align::align_decision_trace(&spec, &path, &decision_trace)?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::align(&report)?;
+                }
+                if report.has_failures() {
+                    std::process::exit(1);
+                }
             }
         },
         Command::Deps { command } => match command {

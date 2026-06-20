@@ -174,7 +174,14 @@ skillspec explain path/to/skill.spec.yml \
   --trace-dir .skillspec/traces
 
 skillspec trace compact .skillspec/traces/<run-id>
+
+skillspec trace align path/to/skill.spec.yml \
+  --decision-trace .skillspec/traces/<run-id>
 ```
+
+`trace align` replays the captured input against the current spec and compares
+the decision facts deterministically. Without structured execution evidence it
+reports execution obligations as `unproven`, not as guessed pass/fail results.
 
 The runtime skill [skills/skillspec-runtime/SKILL.md](skills/skillspec-runtime/SKILL.md)
 teaches agents how to use an existing `skill.spec.yml`: validate first, check
