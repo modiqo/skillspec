@@ -1,0 +1,800 @@
+schema: skillspec/v0
+id: rote.shell
+title: rote shell
+description: Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work.
+
+applies_when:
+  - user_intent:
+      - run a local command and remember the result
+      - inspect CLI output with provenance
+      - follow a log or process stream
+      - start or observe a background job
+      - capture terminal-sensitive output
+      - crystallize shell work into a TypeScript flow
+      - combine local CLI facts with adapters or browser observations
+
+entry:
+  prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
+
+routes:
+  - id: browser_handoff
+    label: Hand off to rote-browse for browser state
+    rank: 5
+    description: Use when the user asks to browse, click, snapshot, attach to a browser, or extract from live page state.
+  - id: one_shot_process
+    label: Capture a one-shot process
+    rank: 10
+    description: Use `rote exec --` for finite commands whose stdout, stderr, exit, or file outputs should be remembered.
+  - id: declared_file_io
+    label: Capture declared file inputs or outputs
+    rank: 20
+    description: Use stdin, stdout, stderr, and capture-file declarations when files are part of the evidence.
+  - id: stream_follow
+    label: Follow a moving file or process stream
+    rank: 30
+    description: Use stream capture when the source of truth is a log or evolving process stream.
+  - id: background_process
+    label: Start and track a background process lease
+    rank: 40
+    description: Use for long finite non-interactive jobs and services that need status, wait, follow, or cleanup.
+  - id: pty_transcript
+    label: Capture a one-shot PTY transcript
+    rank: 50
+    description: Use only when terminal behavior is the point or a bounded interactive prompt can be scripted safely.
+  - id: dependency_preflight
+    label: Check dependencies before replay or release
+    rank: 60
+    description: Use `rote deps check` before marking shell-derived flows released.
+  - id: crystallized_flow
+    label: Crystallize or replay a shell flow
+    rank: 70
+    description: Use TypeScript SDK shell wrappers or declarative process steps when the work should become reusable.
+  - id: raw_shell
+    label: Use raw shell for disposable inspection only
+    rank: 100
+    description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
+
+rules:
+  - id: browser_words_handoff_to_browse
+    when:
+      user_says_any:
+        - browse
+        - open this site
+        - attach to my browser
+        - click
+        - type
+        - snapshot
+        - extract from page
+        - social profile
+        - gmail in browser
+    prefer: browser_handoff
+    forbid:
+      - native_search_as_answer
+      - raw_playwright
+      - curl_as_browser_substitute
+      - adapter_setup_before_browser_fallback
+    allow:
+      native_search: url_discovery_only
+    elicit:
+      - browser_mode
+    reason: Browser intent must be satisfied by browser evidence, not search summaries or raw browser automation.
+
+  - id: durable_work_requires_named_workspace
+    when:
+      user_says_any:
+        - rote exec
+        - gh
+        - git
+        - repo
+        - remote
+        - browse
+        - evidence
+        - remember
+        - query later
+    forbid:
+      - rote_exec_outside_workspace
+      - anonymous_workspace
+      - final_summary_without_workspace
+      - final_summary_without_trace_math
+    after_success:
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Durable shell work must start in a named rote workspace and finish with workspace evidence, dependency trace, and token math.
+
+  - id: durable_result_uses_rote_exec
+    when:
+      user_says_any:
+        - remember
+        - query later
+        - compare
+        - replay
+        - evidence
+        - audit
+    prefer: one_shot_process
+    forbid:
+      - untracked_stdout_scrollback
+      - ad_hoc_redirect_for_evidence
+    reason: Durable CLI facts should be captured as typed process responses.
+
+  - id: file_inputs_outputs_are_declared
+    when:
+      user_says_any:
+        - file
+        - stdin
+        - stdout
+        - stderr
+        - artifact
+        - write report
+        - save output
+    prefer: declared_file_io
+    forbid:
+      - implicit_file_side_effects
+    reason: File inputs and outputs need explicit provenance, hashes, and artifact pointers.
+
+  - id: long_noninteractive_jobs_use_background
+    when:
+      command_likely_long_running: true
+      interactive_prompt_likely: false
+    prefer: background_process
+    after_success:
+      - query_lease_status
+      - follow_process_stream
+      - wait_for_process
+    reason: Long finite non-interactive jobs should be leased, observable, and joined.
+
+  - id: moving_logs_use_stream_follow
+    when:
+      user_says_any:
+        - tail
+        - follow log
+        - watch log
+        - until ready
+        - readiness log
+    prefer: stream_follow
+    reason: Moving logs should be followed with offsets, chunks, and stop conditions.
+
+  - id: interactive_prompts_do_not_background
+    when:
+      interactive_prompt_likely: true
+    route_order:
+      - pty_transcript
+      - browser_handoff
+      - one_shot_process
+    forbid:
+      - background_without_human_confirm
+      - hidden_credential_prompt
+      - secret_in_pty_input
+    reason: Interactive prompts require visible bounded handling, never hidden background execution.
+
+  - id: terminal_sensitive_commands_use_pty
+    when:
+      user_says_any:
+        - tty
+        - terminal
+        - isatty
+        - interactive
+        - prompt
+        - auth status
+    prefer: pty_transcript
+    forbid:
+      - persistent_repl_pty
+      - secret_in_pty_input
+    reason: PTY is for one-shot terminal behavior, not persistent sessions or secret entry.
+
+  - id: release_publish_is_guarded
+    when:
+      user_says_any:
+        - release
+        - publish
+        - deploy
+    route_order:
+      - dependency_preflight
+      - one_shot_process
+      - background_process
+    elicit:
+      - release_approval
+    forbid:
+      - irreversible_background_without_approval
+      - release_without_dry_run
+      - release_without_dependency_preflight
+    reason: Mutating release work needs dependency checks, dry-run when available, and explicit approval.
+
+  - id: missing_dependencies_elicit_install_scope
+    when:
+      user_says_any:
+        - install missing tool
+        - provision dependency
+        - missing dependency
+        - deps check failed
+    prefer: dependency_preflight
+    elicit:
+      - install_scope
+    forbid:
+      - silent_global_install
+      - released_with_missing_dependencies
+    reason: Missing dependencies require a bounded install/provisioning choice before machine mutation.
+
+  - id: crystallization_requires_deps_and_qa
+    when:
+      user_says_any:
+        - crystallize
+        - reusable flow
+        - save as flow
+        - release flow
+        - rote deno run
+    prefer: crystallized_flow
+    after_success:
+      - run_dependency_preflight
+      - run_flow_qa
+      - mark_released_after_evidence
+    forbid:
+      - released_without_deps_toml
+      - released_without_replay_qa
+    reason: Shell-derived flows need deps.toml and replay evidence before release.
+
+  - id: mixed_browser_shell_bridges_files
+    when:
+      user_says_any:
+        - browser plus shell
+        - snapshot then process
+        - page then cli
+        - browse and save
+    route_order:
+      - browser_handoff
+      - declared_file_io
+      - one_shot_process
+    forbid:
+      - raw_playwright
+      - browser_payload_in_large_argv
+    reason: Browser state should be materialized as a response, snapshot, slice, or file before local CLI processing.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - allow_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+
+elicitations:
+  browser_mode:
+    question: How should I access the browser state for this task?
+    required_when:
+      - route: browser_handoff
+      - missing: browser_mode
+    default: attach_existing
+    max_choices: 1
+    choices:
+      - id: attach_existing
+        label: Attach to active browser
+        description: Use the user's current logged-in browser profile when session state matters.
+        sets:
+          browser_mode: attach_existing
+        route: browser_handoff
+        next: prepare_workspace
+        safety: browser_attach
+      - id: new_headed
+        label: Start visible browser
+        description: Open a new visible rote-managed browser window.
+        sets:
+          browser_mode: new_headed
+        route: browser_handoff
+        next: prepare_workspace
+        safety: browser_attach
+      - id: new_headless
+        label: Start headless browser
+        description: Use for public pages or replay-like work that does not need an existing login.
+        sets:
+          browser_mode: new_headless
+        route: browser_handoff
+        next: prepare_workspace
+        safety: network_read
+
+  install_scope:
+    question: How should missing local tools be provisioned?
+    required_when:
+      - route: dependency_preflight
+      - missing: dependency_install_scope
+    max_choices: 1
+    choices:
+      - id: rote_managed
+        label: Rote-managed or project-local
+        description: Prefer isolated provisioning that does not mutate the whole machine.
+        sets:
+          dependency_install_scope: rote_managed
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: user_global
+        label: User/global package manager
+        description: Allow broader machine mutation only after explicit approval.
+        sets:
+          dependency_install_scope: user_global
+        route: dependency_preflight
+        next: prepare_workspace
+        safety: local_write
+      - id: leave_draft
+        label: Leave flow in draft
+        description: Do not install anything; keep the flow unreleased until dependencies are installed.
+        sets:
+          dependency_install_scope: none
+          flow_status: draft
+        route: dependency_preflight
+        next: done
+        safety: read_only
+
+  release_approval:
+    question: Do you approve running the real mutating release/publish step?
+    required_when:
+      - missing: release_approval
+    max_choices: 1
+    choices:
+      - id: approve_foreground
+        label: Approve foreground run
+        description: Run the final irreversible command visibly after preflight and dry-run evidence.
+        sets:
+          release_approval: foreground
+        route: one_shot_process
+        next: execute
+        safety: destructive
+      - id: approve_tracked_background
+        label: Approve tracked background run
+        description: Run as a tracked lease with stdout/stderr capture and no interruption unless requested.
+        sets:
+          release_approval: tracked_background
+        route: background_process
+        next: execute
+        safety: destructive
+      - id: do_not_run
+        label: Do not run
+        description: Stop after preflight and dry-run evidence.
+        sets:
+          release_approval: denied
+        next: done
+        safety: read_only
+
+dependencies:
+  rote:
+    kind: cli
+    description: Rote CLI is required for workspace setup, process capture, stream capture, PTY capture, dependency preflight, traces, and replay.
+    command: rote
+    check:
+      command: rote
+    provision:
+      elicit: install_scope
+      options:
+        - id: rote_managed
+          label: Install or upgrade through the project-approved rote path
+          description: Use the local project's install/update path rather than silently mutating the machine.
+          safety: local_write
+        - id: leave_draft
+          label: Leave the flow in draft
+          description: Do not install rote; keep the work unreleased until the tool is available.
+          safety: read_only
+  gh:
+    kind: cli
+    description: GitHub CLI may be used by shell workflows that inspect repositories, pull requests, users, or auth state.
+    command: gh
+    check:
+      command: gh
+    permission:
+      required: true
+      reason: GitHub CLI commands can use authenticated account state and network access.
+      safety: network_read
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install GitHub CLI with a user package manager
+          command: brew install gh
+          safety: local_write
+        - id: leave_draft
+          label: Leave flow in draft
+          safety: read_only
+  git:
+    kind: cli
+    description: Git may be used for repository status, remotes, branches, and local history.
+    command: git
+    check:
+      command: git
+  cargo:
+    kind: cli
+    description: Cargo may be used for Rust project checks, tests, metadata, and release dry-runs.
+    command: cargo
+    check:
+      command: cargo
+    permission:
+      required: true
+      reason: Cargo commands may execute project build scripts and tests.
+      safety: local_read
+  deno:
+    kind: cli
+    description: Deno is required for TypeScript flow replay through `rote deno run`.
+    command: deno
+    check:
+      command: deno
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install Deno with a user package manager
+          command: brew install deno
+          safety: local_write
+        - id: leave_draft
+          label: Leave flow in draft
+          safety: read_only
+  curl:
+    kind: cli
+    description: Curl may be used only for URL discovery or API checks when the selected route permits it.
+    command: curl
+    check:
+      command: curl
+    permission:
+      required: true
+      reason: Curl may perform network reads and must not substitute for browser evidence.
+      safety: network_read
+  deps_toml:
+    kind: file
+    description: Shell-crystallized flows should carry a dependency manifest before release.
+    path: deps.toml
+    check:
+      path: deps.toml
+
+states:
+  start:
+    do:
+      - choose_shell_route
+      - derive_workspace_name
+    next: prepare_workspace
+  choose_browser_mode:
+    ask: browser_mode
+    next: prepare_workspace
+  choose_install_scope:
+    ask: install_scope
+    next: prepare_workspace
+  approve_release:
+    ask: release_approval
+    next: execute
+  prepare_workspace:
+    do:
+      - initialize_rote_workspace
+      - confirm_workspace_context
+    next: execute
+  execute:
+    do:
+      - run_selected_rote_primitive
+      - query_typed_response
+    next: assess_reuse
+  assess_reuse:
+    do:
+      - decide_whether_to_crystallize
+    next: complete
+  complete:
+    do:
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - summarize_evidence
+      - report_workspace_evidence_and_token_math
+    next: done
+  done:
+    say: done_summary
+
+commands:
+  rote_guidance_shell:
+    description: Load the complete shell command model.
+    template: "rote guidance shell essential"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  initialize_rote_workspace:
+    description: Create or enter a rote workspace before durable CLI work.
+    template: |
+      rote init <task-derived-workspace-slug> --seq --force
+      eval "$(rote cd <task-derived-workspace-slug>)"
+      rote workspace sandbox <task-derived-workspace-slug> off
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  confirm_workspace_context:
+    description: Confirm the active workspace before running any durable rote shell command.
+    template: "rote whoami"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  exec:
+    description: Capture a finite command as a typed process response.
+    template: "rote exec -- <program> [args...]"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+
+  exec_with_stdin_file:
+    description: Capture stdin provenance from a declared input file.
+    template: "rote exec --stdin-file <input> -- <program> [args...]"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+
+  exec_with_file_capture:
+    description: Capture an output file as a named artifact.
+    template: "rote exec --capture-file <label>:<path> -- <program> [args...]"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  exec_with_stream_files:
+    description: Save stdout and stderr streams to durable files.
+    template: "rote exec --stdout-file <stdout-path> --stderr-file <stderr-path> -- <program> [args...]"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  follow_file:
+    description: Follow a moving log or file with an optional readiness pattern.
+    template: "rote stream follow --file <path> --until <pattern>"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  exec_background:
+    description: Start a tracked background process lease.
+    template: "rote exec --background --stdout-file <stdout-log> --stderr-file <stderr-log> -- <program> [args...]"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  exec_background_ready_log:
+    description: Start a tracked background process and wait for log readiness.
+    template: "rote exec --background --ready-log <pattern> --ready-timeout-ms <ms> -- <program> [args...]"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  exec_status:
+    description: Query a background process lease before making claims.
+    template: "rote exec status <lease>"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  exec_wait:
+    description: Join a tracked finite background job.
+    template: "rote exec wait <lease> --timeout-ms <ms> --poll-ms <ms>"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  follow_process:
+    description: Follow stdout or stderr from a tracked process lease.
+    template: "rote stream follow-process <lease> --stream <stdout-or-stderr> --from-start --max-bytes <bytes>"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  exec_stop:
+    description: Stop a tracked background process lease and record cleanup evidence.
+    template: "rote exec stop <lease>"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  pty_run:
+    description: Capture one-shot terminal-sensitive output.
+    template: "rote pty run --cols <cols> --rows <rows> -- <program> [args...]"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+
+  deps_check:
+    description: Verify required local tools and files before replay or release.
+    template: "rote deps check deps.toml"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+        - deps_toml
+
+  deno_replay:
+    description: Replay a crystallized TypeScript flow.
+    template: "rote deno run --allow-all ~/.rote/flows/<name>/main.ts"
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+        - deno
+
+  trace_deps:
+    description: Show the dependency trace for the current rote workspace.
+    template: "rote trace --deps"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  workspace_stats_json:
+    description: Collect workspace token and cost statistics as JSON when available.
+    template: "rote workspace stats <workspace> --json"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+closures:
+  choose_shell_route:
+    description: Choose the narrowest shipped rote shell primitive that preserves necessary evidence.
+  derive_workspace_name:
+    description: Derive a short, stable, task-specific workspace slug before any durable rote command, such as `tulving-rote-remote-check`.
+  run_selected_rote_primitive:
+    description: Execute the selected shipped rote shell primitive, not an invented roadmap command.
+  query_typed_response:
+    description: Query the saved typed response with the exact query in @@result or @proc addresses.
+  decide_whether_to_crystallize:
+    description: Ask whether to crystallize after the workflow has worked and recurrence or reuse is likely.
+  summarize_evidence:
+    description: Summarize from typed output, artifacts, streams, and leases rather than terminal scrollback.
+  compute_workspace_trace:
+    description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
+  compute_workspace_stats:
+    description: Run JSON workspace stats when available and extract token/cost totals for recurrence math.
+  report_workspace_evidence_and_token_math:
+    description: End with the workspace name, important response ids, SkillSpec trace run directory, and token math including estimated savings from future filesystem recall.
+  query_lease_status:
+    description: Query the lease status before acting on background process assumptions.
+  follow_process_stream:
+    description: Inspect process stdout or stderr with `rote stream follow-process`.
+  wait_for_process:
+    description: Establish completion with `rote exec wait`.
+  run_dependency_preflight:
+    description: Run `rote deps check deps.toml` before release.
+  run_flow_qa:
+    description: Run help, dependency, replay, and lint/validate checks appropriate to the flow shape.
+  mark_released_after_evidence:
+    description: Mark a flow released only after dependency and replay evidence pass.
+
+snippets:
+  done_summary:
+    text: |
+      Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
+      SkillSpec route trace: {{ skillspec_trace_dir }}.
+      Rote dependency trace: captured with `rote trace --deps`.
+      Token math: exploration used {{ tokens_used }} tokens; future replay/recall is estimated to save {{ tokens_saved }} tokens per run by reusing the rote filesystem and typed response handles.
+
+proof:
+  metrics:
+    - route_decision_accuracy
+    - forbidden_substitution_coverage
+    - captured_artifact_completeness
+    - crystallization_readiness
+
+tests:
+  - name: browser intent hands off to browser
+    input: browse the active dashboard and summarize it
+    expect:
+      route: browser_handoff
+      elicit:
+        - browser_mode
+      forbid:
+        - native_search_as_answer
+        - raw_playwright
+
+  - name: browsing profiles does not trigger file io
+    input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
+    expect:
+      route: browser_handoff
+      elicit:
+        - browser_mode
+      after_success:
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - native_search_as_answer
+        - rote_exec_outside_workspace
+
+  - name: durable evidence uses rote exec
+    input: run git status and remember the result so I can query it later
+    expect:
+      route: one_shot_process
+      after_success:
+        - compute_workspace_trace
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - untracked_stdout_scrollback
+        - final_summary_without_trace_math
+
+  - name: rote exec requires named workspace and token math
+    input: rote exec ls the repo and remember the evidence
+    expect:
+      route: one_shot_process
+      after_success:
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - rote_exec_outside_workspace
+        - anonymous_workspace
+        - final_summary_without_workspace
+
+  - name: file output uses declared file io
+    input: save the command output to a report file
+    expect:
+      route: declared_file_io
+      forbid:
+        - implicit_file_side_effects
+
+  - name: tailing logs uses stream follow
+    input: tail the server log until ready
+    expect:
+      route: stream_follow
+
+  - name: long cargo test uses background process
+    input: run cargo test and check gh status while it runs
+    expect:
+      route: background_process
+      after_success:
+        - wait_for_process
+        - follow_process_stream
+
+  - name: terminal auth status uses pty
+    input: run gh auth status in a terminal
+    expect:
+      route: pty_transcript
+      forbid:
+        - secret_in_pty_input
+
+  - name: release work is guarded
+    input: publish a release
+    expect:
+      elicit:
+        - release_approval
+      route_order:
+        - dependency_preflight
+        - one_shot_process
+        - background_process
+      forbid:
+        - release_without_dry_run
+        - release_without_dependency_preflight
+
+  - name: missing dependency asks install scope
+    input: deps check failed because gh is missing, install missing tool
+    expect:
+      route: dependency_preflight
+      elicit:
+        - install_scope
+      forbid:
+        - silent_global_install
+
+  - name: crystallization requires deps and qa
+    input: crystallize this shell workflow as a reusable flow
+    expect:
+      route: crystallized_flow
+      after_success:
+        - run_dependency_preflight
+        - run_flow_qa
