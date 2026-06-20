@@ -4,7 +4,7 @@
 
 # SkillSpec
 
-[![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
+[![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
 
 Keep the prose. Structure the decisions.
 
