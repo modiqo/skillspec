@@ -143,7 +143,7 @@ V0 defines these decision events:
 Write a trace while making a decision:
 
 ```sh
-skillspec decide examples/rote-shell.skill.spec.yml \
+skillspec decide examples/rote-shell/skill.spec.yml \
   --input='browse the active dashboard' \
   --trace-dir .skillspec/traces
 ```
@@ -162,16 +162,20 @@ skillspec trace compact .skillspec/traces/run-1781900000000-12345
 Align a spec with a decision trace:
 
 ```sh
-skillspec trace align examples/rote-shell.skill.spec.yml \
+skillspec trace align examples/rote-shell/skill.spec.yml \
   --decision-trace .skillspec/traces/run-1781900000000-12345
 ```
 
 Alignment re-runs the current spec against the captured input and compares the
 trace to deterministic decision facts: skill id, schema, resolved-spec
 fingerprint, input hash, selected route, route-selection basis, matched rules,
-forbids, elicitations, and after-success closures. It marks execution
-obligations as `unproven` unless structured execution evidence is supplied by a
-future harness/export path.
+forbids, elicitations, and after-success closures. The human report begins with
+a summary that names the selected route, route-selection basis, matched rules,
+deterministic check counts, execution-obligation counts, and the grouped
+unproven obligation kinds. It marks execution obligations as `unproven` unless
+structured execution evidence is supplied by a future harness/export path; that
+means the decision can be reproducible while route fulfillment, forbid
+compliance, elicitations, and after-success closures still need execution proof.
 
 ## Independence From Tool Systems
 

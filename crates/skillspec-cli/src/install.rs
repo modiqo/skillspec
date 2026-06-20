@@ -1,9 +1,10 @@
 use crate::error::{Error, Result};
+use crate::model::{DependencyKind, SkillSpec};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -86,7 +87,8 @@ pub fn install_skill(
         None => infer_skill_name(skill_folder)?,
     };
     validate_skill_folder(skill_folder)?;
-    crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
+    let spec = crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
+    let support_files = declared_relative_file_dependencies(skill_folder, &spec)?;
 
     let target_roots = selected_roots(targets, all_detected)?;
     if target_roots.is_empty() {
@@ -105,6 +107,9 @@ pub fn install_skill(
             })?;
             copy_file(skill_folder, &install_dir, "SKILL.md")?;
             copy_file(skill_folder, &install_dir, "skill.spec.yml")?;
+            for relative_path in &support_files {
+                copy_relative_file(skill_folder, &install_dir, relative_path)?;
+            }
         }
         installs.push(InstallTargetReport {
             target: root.target,
@@ -187,6 +192,73 @@ fn validate_skill_name(name: &str) -> Result<String> {
 fn copy_file(skill_folder: &Path, install_dir: &Path, file_name: &str) -> Result<()> {
     let source = skill_folder.join(file_name);
     let destination = install_dir.join(file_name);
+    fs::copy(&source, &destination).map_err(|source| Error::Write {
+        path: destination,
+        source,
+    })?;
+    Ok(())
+}
+
+fn declared_relative_file_dependencies(
+    skill_folder: &Path,
+    spec: &SkillSpec,
+) -> Result<BTreeSet<PathBuf>> {
+    let mut paths = BTreeSet::new();
+    for dependency in spec.dependencies.values() {
+        if dependency.kind != DependencyKind::File {
+            continue;
+        }
+
+        let Some(path) = dependency
+            .check
+            .as_ref()
+            .and_then(|check| check.path.as_deref())
+            .or(dependency.path.as_deref())
+        else {
+            continue;
+        };
+
+        let relative_path = Path::new(path);
+        if relative_path.is_absolute() {
+            continue;
+        }
+        if relative_path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::Prefix(_) | Component::RootDir
+            )
+        }) {
+            return Err(Error::InvalidInput {
+                message: format!(
+                    "file dependency path {} must stay within the skill folder",
+                    relative_path.display()
+                ),
+            });
+        }
+
+        if !skill_folder.join(relative_path).is_file() {
+            return Err(Error::InvalidInput {
+                message: format!(
+                    "declared file dependency is missing: {}",
+                    skill_folder.join(relative_path).display()
+                ),
+            });
+        }
+
+        paths.insert(relative_path.to_path_buf());
+    }
+    Ok(paths)
+}
+
+fn copy_relative_file(skill_folder: &Path, install_dir: &Path, relative_path: &Path) -> Result<()> {
+    let source = skill_folder.join(relative_path);
+    let destination = install_dir.join(relative_path);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|source| Error::Write {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
     fs::copy(&source, &destination).map_err(|source| Error::Write {
         path: destination,
         source,

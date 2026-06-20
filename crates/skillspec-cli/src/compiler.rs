@@ -71,7 +71,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("   ```\n\n");
     output.push_str("3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.\n");
     output.push_str("4. Preserve the emitted trace `run_dir`.\n");
-    output.push_str("5. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status with the trace path.\n");
+    output.push_str("5. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, summary, and trace path.\n");
     output.push_str("6. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.\n");
     output.push_str("7. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.\n\n");
     output.push_str("## Quick Commands\n\n");
@@ -84,7 +84,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\"\n");
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
-    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), key failed or unproven alignment checks, and the concrete execution evidence ids or files.\n\n");
+    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), the align summary/conclusion, key failed or unproven alignment checks, and the concrete execution evidence ids or files.\n\n");
     if !spec.routes.is_empty() {
         output.push_str("## Route Hints\n\n");
         let mut routes = spec.routes.iter().collect::<Vec<_>>();
@@ -465,7 +465,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
     output.push_str("- After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
-    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status or any failed/unproven checks in the completion report.\n\n");
+    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, summary, and any failed/unproven checks in the completion report.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {

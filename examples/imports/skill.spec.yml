@@ -34,21 +34,21 @@ rules:
 
 imports:
   import_model:
-    path: ../spec/imports.md
+    path: ../../spec/imports.md
     role: policy
     section: Imports
     load: always
     description: Repository-level import semantics used by this example.
 
   pdf_reference:
-    path: pdf-processing/reference.md
+    path: ../pdf-processing/reference.md
     role: reference
     used_by:
       - kind: recipe
         id: fill_pdf_with_imports
 
   pdf_forms:
-    path: pdf-processing/forms.md
+    path: ../pdf-processing/forms.md
     role: procedure
     requires:
       imports:

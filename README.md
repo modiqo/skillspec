@@ -274,12 +274,19 @@ fixtures/   sample skills and expected outputs
 
 Useful examples:
 
-- [examples/rote-computer.skill.spec.yml](examples/rote-computer.skill.spec.yml)
-- [examples/rote-shell.skill.spec.yml](examples/rote-shell.skill.spec.yml)
-- [examples/local-csv-report.skill.spec.yml](examples/local-csv-report.skill.spec.yml)
+- [examples/rote-computer/skill.spec.yml](examples/rote-computer/skill.spec.yml)
+- [examples/rote-shell/skill.spec.yml](examples/rote-shell/skill.spec.yml)
+- [examples/local-csv-report/skill.spec.yml](examples/local-csv-report/skill.spec.yml)
 - [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
 - [examples/before-after/](examples/before-after/) shows a prose skill before
   and after a SkillSpec-backed port.
+
+Installable examples are folder-shaped and include a generated `SKILL.md`
+trampoline plus `skill.spec.yml`:
+
+```sh
+skillspec install skill examples/rote-shell --target agents --target codex --dry-run
+```
 
 ## Verification Suite
 

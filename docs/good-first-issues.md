@@ -14,7 +14,7 @@ cargo test --workspace --all-targets published_json_schema_validates_every_examp
 
 ## Add Golden Snapshots For `compile --target markdown`
 
-Status: initial snapshot added for `examples/repo-readiness.skill.spec.yml`.
+Status: initial snapshot added for `examples/repo-readiness/skill.spec.yml`.
 
 Next starter task:
 
@@ -40,10 +40,10 @@ Pick a real, small skill with a clear route decision. Good examples:
 Expected verification:
 
 ```sh
-skillspec validate examples/<name>.skill.spec.yml
-skillspec imports check examples/<name>.skill.spec.yml
-skillspec test examples/<name>.skill.spec.yml
-skillspec deps check examples/<name>.skill.spec.yml
+skillspec validate examples/<name>/skill.spec.yml
+skillspec imports check examples/<name>/skill.spec.yml
+skillspec test examples/<name>/skill.spec.yml
+skillspec deps check examples/<name>/skill.spec.yml
 ```
 
 ## Add A Compiler Target
@@ -60,7 +60,7 @@ Expected verification:
 
 ```sh
 cargo test --workspace --all-targets
-skillspec compile examples/rote-computer.skill.spec.yml --target <target>
+skillspec compile examples/rote-computer/skill.spec.yml --target <target>
 ```
 
 ## Improve Importer Extraction

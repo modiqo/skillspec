@@ -150,6 +150,57 @@ pub fn align(report: &AlignReport) -> Result<()> {
     writeln!(stdout, "status: {}", align_status_name(report.status))?;
     writeln!(stdout, "spec: {}", report.spec)?;
     writeln!(stdout, "decision_trace: {}", report.decision_trace)?;
+    writeln!(stdout, "summary: {}", report.summary.conclusion)?;
+    if let Some(route) = &report.summary.selected_route {
+        write!(stdout, "decision: route {route}")?;
+        if let Some(basis) = &report.summary.route_selection_basis {
+            write!(stdout, " via {basis}")?;
+        }
+        if let Some(rule) = &report.summary.route_selection_rule {
+            write!(stdout, " ({rule})")?;
+        }
+        writeln!(stdout)?;
+    }
+    if !report.summary.matched_rules.is_empty() {
+        writeln!(
+            stdout,
+            "matched_rules: {}",
+            report.summary.matched_rules.join(", ")
+        )?;
+    }
+    writeln!(
+        stdout,
+        "proof: decision checks {} pass, {} fail, {} unproven ({} total)",
+        report.summary.decision_checks.pass,
+        report.summary.decision_checks.fail,
+        report.summary.decision_checks.unproven,
+        report.summary.decision_checks.total
+    )?;
+    writeln!(
+        stdout,
+        "proof: execution obligations {} pass, {} fail, {} unproven ({} total)",
+        report.summary.execution_obligations.pass,
+        report.summary.execution_obligations.fail,
+        report.summary.execution_obligations.unproven,
+        report.summary.execution_obligations.total
+    )?;
+    if !report.summary.unproven_obligation_kinds.is_empty() {
+        let groups = report
+            .summary
+            .unproven_obligation_kinds
+            .iter()
+            .map(|count| {
+                format!(
+                    "{}={}/{}",
+                    obligation_kind_name(count.kind),
+                    count.unproven,
+                    count.total
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(stdout, "unproven_by_kind: {groups}")?;
+    }
     writeln!(stdout, "checks:")?;
     for check in &report.checks {
         writeln!(
@@ -188,6 +239,16 @@ fn align_status_name(status: AlignStatus) -> &'static str {
         AlignStatus::Pass => "pass",
         AlignStatus::Fail => "fail",
         AlignStatus::Unproven => "unproven",
+    }
+}
+
+fn obligation_kind_name(kind: crate::align::AlignObligationKind) -> &'static str {
+    match kind {
+        crate::align::AlignObligationKind::Route => "route",
+        crate::align::AlignObligationKind::RouteCheck => "route_check",
+        crate::align::AlignObligationKind::Forbid => "forbid",
+        crate::align::AlignObligationKind::Elicitation => "elicitation",
+        crate::align::AlignObligationKind::AfterSuccess => "after_success",
     }
 }
 

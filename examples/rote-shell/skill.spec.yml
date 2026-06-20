@@ -17,10 +17,18 @@ entry:
   prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
 
 routes:
+  - id: adapter_first_cli_fallback
+    label: Use rote adapters, then rote exec CLI fallback
+    rank: 4
+    description: Use when the task names external services, repos, issue trackers, profile enrichment, or Parallel search. Discover installed rote adapters first; only when no healthy adapter is available, prove CLI availability and auth through `rote exec --`.
   - id: browser_handoff
     label: Hand off to rote-browse for browser state
     rank: 5
-    description: Use when the user asks to browse, click, snapshot, attach to a browser, or extract from live page state.
+    description: >
+      Use when the user asks to browse, click, snapshot, attach to a browser, or extract from live page state.
+      Defer the browser portion to the `rote-browse` skill. This shell skill should preserve the
+      user's intent, workspace/evidence context, and any shell-side prerequisites, but it must not
+      prescribe browser command sequences itself.
   - id: one_shot_process
     label: Capture a one-shot process
     rank: 10
@@ -55,29 +63,105 @@ routes:
     description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
 
 rules:
+  - id: external_service_tasks_are_adapter_first
+    when:
+      user_says_any:
+        - adapter
+        - github
+        - gh
+        - git
+        - repo
+        - remote
+        - issue
+        - issues
+        - assignee
+        - assigned to me
+        - contributor
+        - committers
+        - profile
+        - enrich
+    route_order:
+      - adapter_first_cli_fallback
+      - one_shot_process
+      - browser_handoff
+    forbid:
+      - skipping_adapter_discovery
+      - skipping_cli_readiness_check
+      - direct_cli_without_rote_exec
+      - direct_mcp_tool_call
+      - native_search_as_answer
+      - native_codex_web_search
+      - untracked_stdout_scrollback
+    after_success:
+      - identify_required_services_and_tools
+      - discover_relevant_rote_adapters
+      - verify_adapter_or_cli_readiness
+      - preflight_cli_fallback
+      - run_cli_only_through_rote_exec
+    reason: External-service work should prefer rote adapters; if no healthy adapter exists, prove installed/authenticated CLI fallback through rote exec before use.
+
+  - id: explicit_parallel_search_uses_parallel_adapter_or_cli
+    when:
+      user_says_any:
+        - parallel
+        - parallelweb
+        - parallel web
+        - search using parallel
+        - use parallel
+        - enrich their profile
+        - enrich profiles
+    route_order:
+      - adapter_first_cli_fallback
+      - one_shot_process
+    forbid:
+      - native_search_as_answer
+      - native_codex_web_search
+      - web_search_tool_without_parallel_preflight
+      - direct_parallelweb_tool_call
+      - direct_cli_without_rote_exec
+      - skipping_parallel_adapter_check
+      - skipping_cli_readiness_check
+    after_success:
+      - identify_required_services_and_tools
+      - discover_relevant_rote_adapters
+      - check_parallel_adapter_before_search
+      - preflight_cli_fallback
+      - use_parallel_search_via_adapter_or_cli
+      - capture_parallel_search_results
+    reason: When the user names Parallel, first check the Parallel/parallelweb rote adapter, then a CLI fallback through rote exec; never substitute native Codex web search.
+
   - id: browser_words_handoff_to_browse
     when:
       user_says_any:
         - browse
         - open this site
         - attach to my browser
+        - active browser
+        - existing browser
+        - logged-in browser
         - click
         - type
         - snapshot
         - extract from page
         - social profile
+        - gmail
         - gmail in browser
     prefer: browser_handoff
     forbid:
       - native_search_as_answer
       - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
       - curl_as_browser_substitute
-      - adapter_setup_before_browser_fallback
+      - adapter_setup_before_browser_handoff
+      - browser_cli_commands_in_rote_shell
     allow:
       native_search: url_discovery_only
-    elicit:
-      - browser_mode
-    reason: Browser intent must be satisfied by browser evidence, not search summaries or raw browser automation.
+    after_success:
+      - handoff_browser_work_to_rote_browse_skill
+      - pass_browser_context_to_rote_browse
+      - resume_shell_work_after_browser_evidence
+    reason: Browser intent must be satisfied by browser evidence owned by the rote-browse skill, not search summaries, raw browser automation, or shell-level browser command recipes.
 
   - id: durable_work_requires_named_workspace
     when:
@@ -247,7 +331,13 @@ rules:
     forbid:
       - raw_playwright
       - browser_payload_in_large_argv
-    reason: Browser state should be materialized as a response, snapshot, slice, or file before local CLI processing.
+      - native_browser_tool_without_rote_browse
+      - browser_cli_commands_in_rote_shell
+    after_success:
+      - handoff_browser_work_to_rote_browse_skill
+      - pass_browser_context_to_rote_browse
+      - resume_shell_work_after_browser_evidence
+    reason: Browser state should be collected by the rote-browse skill, then materialized as evidence before local CLI processing resumes.
 
 trace:
   mode: event_log
@@ -266,39 +356,6 @@ trace:
     - outcome_recorded
 
 elicitations:
-  browser_mode:
-    question: How should I access the browser state for this task?
-    required_when:
-      - route: browser_handoff
-      - missing: browser_mode
-    default: attach_existing
-    max_choices: 1
-    choices:
-      - id: attach_existing
-        label: Attach to active browser
-        description: Use the user's current logged-in browser profile when session state matters.
-        sets:
-          browser_mode: attach_existing
-        route: browser_handoff
-        next: prepare_workspace
-        safety: browser_attach
-      - id: new_headed
-        label: Start visible browser
-        description: Open a new visible rote-managed browser window.
-        sets:
-          browser_mode: new_headed
-        route: browser_handoff
-        next: prepare_workspace
-        safety: browser_attach
-      - id: new_headless
-        label: Start headless browser
-        description: Use for public pages or replay-like work that does not need an existing login.
-        sets:
-          browser_mode: new_headless
-        route: browser_handoff
-        next: prepare_workspace
-        safety: network_read
-
   install_scope:
     question: How should missing local tools be provisioned?
     required_when:
@@ -363,6 +420,12 @@ elicitations:
         safety: read_only
 
 dependencies:
+  github_adapter:
+    kind: adapter
+    description: Preferred GitHub access path for issues, assignees, contributors, and repo metadata. Check with `rote adapter list github --json --health --probe` or the installed GitHub adapter id before CLI fallback.
+  parallelweb_adapter:
+    kind: adapter
+    description: Preferred Parallel web search/enrichment access path. Check likely ids such as `parallelweb`, `parallel`, or installed registry aliases before CLI fallback.
   rote:
     kind: cli
     description: Rote CLI is required for workspace setup, process capture, stream capture, PTY capture, dependency preflight, traces, and replay.
@@ -454,9 +517,7 @@ states:
     do:
       - choose_shell_route
       - derive_workspace_name
-    next: prepare_workspace
-  choose_browser_mode:
-    ask: browser_mode
+      - identify_required_services_and_tools
     next: prepare_workspace
   choose_install_scope:
     ask: install_scope
@@ -468,10 +529,23 @@ states:
     do:
       - initialize_rote_workspace
       - confirm_workspace_context
+    next: discover_adapters
+  discover_adapters:
+    do:
+      - discover_relevant_rote_adapters
+      - check_parallel_adapter_before_search
+    next: preflight_fallbacks
+  preflight_fallbacks:
+    do:
+      - verify_adapter_or_cli_readiness
+      - preflight_cli_fallback
+      - prepare_browser_skill_handoff_if_selected
     next: execute
   execute:
     do:
       - run_selected_rote_primitive
+      - run_cli_only_through_rote_exec
+      - handoff_browser_work_to_rote_browse_skill
       - query_typed_response
     next: assess_reuse
   assess_reuse:
@@ -512,6 +586,59 @@ commands:
     description: Confirm the active workspace before running any durable rote shell command.
     template: "rote whoami"
     safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  adapter_discovery:
+    description: Discover installed and healthy rote adapters for the services named by the task before using any CLI fallback.
+    template: |
+      rote adapter list --json --health --probe
+      rote adapter list <service-or-adapter-id> --json --health --probe
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+        - github_adapter
+        - parallelweb_adapter
+
+  adapter_sessions:
+    description: Inspect active workspace sessions for an adapter before assuming auth/session readiness.
+    template: "rote adapter sessions <adapter-id>"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  cli_readiness_via_rote_exec:
+    description: If no healthy adapter exists, prove CLI fallback availability and auth/readiness through typed rote exec evidence before using that CLI.
+    template: |
+      rote exec -- <cli> --version
+      rote exec -- <cli-auth-or-status-command>
+    safety: local_read
+    requires:
+      dependencies:
+        - rote
+
+  github_cli_readiness:
+    description: GitHub CLI fallback readiness check; only valid after adapter discovery found no healthy GitHub adapter.
+    template: |
+      rote exec -- gh --version
+      rote exec -- gh auth status
+    safety: network_read
+    requires:
+      dependencies:
+        - rote
+        - gh
+
+  parallel_search_preflight:
+    description: For explicit Parallel search/enrichment, check the Parallel/parallelweb adapter first, then prove CLI fallback readiness through rote exec; never use native web search as the substitute.
+    template: |
+      rote adapter list parallelweb --json --health --probe
+      rote adapter list parallel --json --health --probe
+      rote exec -- <parallel-cli> --version
+      rote exec -- <parallel-cli> auth status
+    safety: network_read
     requires:
       dependencies:
         - rote
@@ -639,9 +766,11 @@ commands:
         - rote
 
   workspace_stats_json:
-    description: Collect workspace token and cost statistics as JSON when available.
-    template: "rote workspace stats <workspace> --json"
-    safety: read_only
+    description: Persist the workspace metrics snapshot, then collect JSON stats. Use .metrics.context_tokens for agent-consumed exploration tokens and .metrics.total_tokens for API request+response tokens; if .metrics is null, report token math as unavailable.
+    template: |
+      rote stats --save
+      rote workspace stats <workspace> --json
+    safety: local_write
     requires:
       dependencies:
         - rote
@@ -651,6 +780,30 @@ closures:
     description: Choose the narrowest shipped rote shell primitive that preserves necessary evidence.
   derive_workspace_name:
     description: Derive a short, stable, task-specific workspace slug before any durable rote command, such as `tulving-rote-remote-check`.
+  prepare_browser_skill_handoff_if_selected:
+    description: If the selected route is `browser_handoff`, stop shell-owned browser planning and prepare a concise handoff note for the `rote-browse` skill.
+  handoff_browser_work_to_rote_browse_skill:
+    description: Defer all browser navigation, interaction, capture, auth/session, and cleanup decisions to the `rote-browse` skill instead of prescribing them in rote-shell.
+  pass_browser_context_to_rote_browse:
+    description: Pass the user's browser goal, URLs or sites, workspace/evidence context, and any shell-derived inputs to `rote-browse` so it can own browser execution.
+  resume_shell_work_after_browser_evidence:
+    description: Resume rote-shell only after `rote-browse` has produced materialized browser evidence such as response handles, files, or a concise result.
+  identify_required_services_and_tools:
+    description: Extract named services and tools from the request (for example GitHub/gh/git and Parallel/parallelweb) before selecting adapters or CLI fallbacks.
+  discover_relevant_rote_adapters:
+    description: Run adapter discovery and health/probe checks for every named external service before using any CLI or native tool substitute.
+  check_parallel_adapter_before_search:
+    description: For "search using Parallel" or profile enrichment via Parallel, check installed `parallelweb`/`parallel` rote adapters before CLI fallback and forbid native Codex web search.
+  verify_adapter_or_cli_readiness:
+    description: Record whether each service will use a healthy adapter or a CLI fallback, and capture the evidence that made that choice.
+  preflight_cli_fallback:
+    description: When adapter discovery fails, check CLI presence, auth/session status, and readiness through `rote exec --` before the CLI is used.
+  run_cli_only_through_rote_exec:
+    description: Execute non-rote CLIs such as `git`, `gh`, or a Parallel CLI only via `rote exec --`, preserving stdout, stderr, exit code, and typed response ids.
+  use_parallel_search_via_adapter_or_cli:
+    description: Perform Parallel search/enrichment through the healthy Parallel adapter when present; otherwise use the proven CLI fallback through `rote exec --`.
+  capture_parallel_search_results:
+    description: Store Parallel search/enrichment results as typed rote responses or declared files before summarizing them.
   run_selected_rote_primitive:
     description: Execute the selected shipped rote shell primitive, not an invented roadmap command.
   query_typed_response:
@@ -662,9 +815,9 @@ closures:
   compute_workspace_trace:
     description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
   compute_workspace_stats:
-    description: Run JSON workspace stats when available and extract token/cost totals for recurrence math.
+    description: Run `rote stats --save`, then `rote workspace stats <workspace> --json`; extract `.metrics.context_tokens` as exploration tokens consumed and `.metrics.total_tokens` as API request+response tokens. If metrics are missing, say token math is unavailable.
   report_workspace_evidence_and_token_math:
-    description: End with the workspace name, important response ids, SkillSpec trace run directory, and token math including estimated savings from future filesystem recall.
+    description: End with the workspace name, important response ids, SkillSpec trace run directory, and token math only when stats were actually queried. Do not invent replay savings.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -684,7 +837,7 @@ snippets:
       Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
       SkillSpec route trace: {{ skillspec_trace_dir }}.
       Rote dependency trace: captured with `rote trace --deps`.
-      Token math: exploration used {{ tokens_used }} tokens; future replay/recall is estimated to save {{ tokens_saved }} tokens per run by reusing the rote filesystem and typed response handles.
+      Token math: exploration consumed {{ context_tokens }} context tokens (API request+response tokens: {{ total_tokens }}). Replay savings: {{ replay_savings }} when measured; otherwise report unavailable.
 
 proof:
   metrics:
@@ -698,25 +851,120 @@ tests:
     input: browse the active dashboard and summarize it
     expect:
       route: browser_handoff
-      elicit:
-        - browser_mode
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
         - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
+
+  - name: active browser attach defers to rote-browse
+    input: attach to my active Chrome session for Gmail and snapshot the inbox
+    expect:
+      route: browser_handoff
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - raw_playwright
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
+
+  - name: browser setup belongs to rote-browse
+    input: attach to my browser, click through the dashboard, snapshot the result, and stop the daemon when done
+    expect:
+      route: browser_handoff
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - raw_playwright
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
 
   - name: browsing profiles does not trigger file io
     input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
     expect:
       route: browser_handoff
-      elicit:
-        - browser_mode
       after_success:
         - compute_workspace_trace
         - compute_workspace_stats
         - report_workspace_evidence_and_token_math
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
         - rote_exec_outside_workspace
+        - native_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
+
+  - name: repo issues and parallel enrichment are adapter first
+    input: can you check how many recent issues have been assigned to me in ~/tulving/rote repo and whether local is aligned with remote, then rank the top committers, get their emails and search using parallel to enrich their profile
+    expect:
+      route: adapter_first_cli_fallback
+      matched_rules:
+        - external_service_tasks_are_adapter_first
+        - explicit_parallel_search_uses_parallel_adapter_or_cli
+      after_success:
+        - identify_required_services_and_tools
+        - discover_relevant_rote_adapters
+        - verify_adapter_or_cli_readiness
+        - preflight_cli_fallback
+        - run_cli_only_through_rote_exec
+        - check_parallel_adapter_before_search
+        - use_parallel_search_via_adapter_or_cli
+        - capture_parallel_search_results
+      forbid:
+        - skipping_adapter_discovery
+        - skipping_cli_readiness_check
+        - direct_cli_without_rote_exec
+        - direct_mcp_tool_call
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool_without_parallel_preflight
+        - direct_parallelweb_tool_call
+        - skipping_parallel_adapter_check
+
+  - name: explicit parallel search forbids native web search
+    input: search using parallel to enrich contributor profiles
+    expect:
+      route: adapter_first_cli_fallback
+      matched_rules:
+        - explicit_parallel_search_uses_parallel_adapter_or_cli
+      after_success:
+        - check_parallel_adapter_before_search
+        - preflight_cli_fallback
+        - use_parallel_search_via_adapter_or_cli
+        - capture_parallel_search_results
+      forbid:
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool_without_parallel_preflight
+        - direct_parallelweb_tool_call
+        - direct_cli_without_rote_exec
+        - skipping_parallel_adapter_check
+
+  - name: github cli fallback must be proven through rote exec
+    input: if the github adapter is missing use gh to list recent assigned issues
+    expect:
+      route: adapter_first_cli_fallback
+      matched_rules:
+        - external_service_tasks_are_adapter_first
+      after_success:
+        - discover_relevant_rote_adapters
+        - verify_adapter_or_cli_readiness
+        - preflight_cli_fallback
+        - run_cli_only_through_rote_exec
+      forbid:
+        - skipping_adapter_discovery
+        - skipping_cli_readiness_check
+        - direct_cli_without_rote_exec
 
   - name: durable evidence uses rote exec
     input: run git status and remember the result so I can query it later

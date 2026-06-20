@@ -617,6 +617,16 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     let report = json_stdout(&align);
     assert_eq!(report["status"], "unproven");
     assert_eq!(report["ok"], true);
+    assert_eq!(
+        report["summary"]["conclusion"],
+        "3 deterministic trace check(s) lack recorded evidence; 4 execution obligation(s) need structured evidence; no deterministic drift was detected"
+    );
+    assert_eq!(report["summary"]["selected_route"], "browser");
+    assert_eq!(report["summary"]["route_selection_basis"], "rule_prefer");
+    assert_eq!(report["summary"]["route_selection_rule"], "browse_rule");
+    assert_eq!(report["summary"]["decision_checks"]["pass"], 7);
+    assert_eq!(report["summary"]["decision_checks"]["unproven"], 3);
+    assert_eq!(report["summary"]["execution_obligations"]["unproven"], 4);
     let checks = report["checks"].as_array().unwrap();
     assert!(checks
         .iter()
@@ -627,6 +637,26 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     assert!(checks
         .iter()
         .any(|check| { check["id"] == "forbids" && check["status"] == "unproven" }));
+
+    let align_text = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .output()
+        .unwrap();
+    assert_success(&align_text);
+    let align_text_stdout = stdout(&align_text);
+    assert!(align_text_stdout.contains("summary: 3 deterministic trace check(s) lack recorded evidence; 4 execution obligation(s) need structured evidence; no deterministic drift was detected"));
+    assert!(align_text_stdout.contains("decision: route browser via rule_prefer (browse_rule)"));
+    assert!(
+        align_text_stdout.contains("proof: decision checks 7 pass, 0 fail, 3 unproven (10 total)")
+    );
+    assert!(align_text_stdout.contains("route=1/1"));
+    assert!(align_text_stdout.contains("forbid=1/1"));
+    assert!(align_text_stdout.contains("elicitation=1/1"));
+    assert!(align_text_stdout.contains("after_success=1/1"));
 
     let changed = fs::read_to_string(&spec).unwrap().replace(
         "description: Exercises core CLI behavior.",
@@ -790,6 +820,7 @@ fn install_skill_supports_dry_run_and_claude_local_install() {
         &skill.join("SKILL.md"),
         "# Installable Skill\n\nThin loader for skill.spec.yml.\n",
     );
+    write_file(&skill.join("deps.toml"), "# dependency manifest\n");
     write_file(
         &skill.join("skill.spec.yml"),
         r#"
@@ -800,6 +831,10 @@ description: Install target fixture.
 routes:
   - id: local
     label: Local
+dependencies:
+  deps_toml:
+    kind: file
+    path: deps.toml
 "#,
     );
 
@@ -841,6 +876,41 @@ routes:
     assert!(repo
         .join(".claude/skills/installed-skill/skill.spec.yml")
         .is_file());
+    assert!(repo
+        .join(".claude/skills/installed-skill/deps.toml")
+        .is_file());
+}
+
+#[test]
+fn install_skill_supports_folder_shaped_examples() {
+    let dir = TempDir::new("install-example");
+    let home = dir.path().join("home");
+    fs::create_dir_all(home.join(".agents/skills")).unwrap();
+    fs::create_dir_all(home.join(".codex/skills")).unwrap();
+
+    let dry_run = Command::new(bin())
+        .current_dir(repo_root())
+        .env("HOME", &home)
+        .arg("install")
+        .arg("skill")
+        .arg("examples/rote-shell")
+        .arg("--target")
+        .arg("agents")
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let planned = json_stdout(&dry_run);
+    assert_eq!(planned["skill_name"], "rote-shell");
+    assert_eq!(planned["dry_run"], true);
+    assert_eq!(planned["installs"].as_array().unwrap().len(), 2);
+    assert!(planned["installs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|install| install["status"] == "planned"));
 }
 
 #[test]
@@ -938,7 +1008,7 @@ fn compiler_markdown_output_matches_golden_snapshot() {
     let output = Command::new(bin())
         .current_dir(&root)
         .arg("compile")
-        .arg("examples/repo-readiness.skill.spec.yml")
+        .arg("examples/repo-readiness/skill.spec.yml")
         .arg("--target")
         .arg("markdown")
         .output()

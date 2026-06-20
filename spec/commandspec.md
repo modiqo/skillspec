@@ -125,9 +125,13 @@ Options:
   `decide` or `explain` `--trace-dir`.
 - `--json`: emit JSON instead of a concise human report.
 
-Current alignment compares deterministic decision-trace facts and emits
-execution obligations as `unproven` until structured execution evidence is
-supplied.
+Current alignment compares deterministic decision-trace facts and emits a
+summary before the detailed check list. The summary includes the selected
+route, route-selection basis, matched rules, pass/fail/unproven counts for
+deterministic checks, and pass/fail/unproven counts for execution obligations.
+`unproven` means no deterministic drift was found but one or more required
+facts or execution obligations still lack structured proof. Execution
+obligations remain `unproven` until structured execution evidence is supplied.
 
 ## `deps`
 

@@ -3,7 +3,7 @@ use crate::error::{Error, Result};
 use crate::model::{RouteId, SkillSpec, TraceEventKind};
 use crate::trace::{self, TraceEnvelope};
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 const ALIGN_SCHEMA: &str = "skillspec.align/v0";
@@ -22,6 +22,8 @@ pub struct AlignReport {
     pub ok: bool,
     /// Overall report classification.
     pub status: AlignStatus,
+    /// Condensed explanation of why the report has this status.
+    pub summary: AlignSummary,
     /// SkillSpec path used for the comparison.
     pub spec: String,
     /// Decision trace run directory used for the comparison.
@@ -30,6 +32,47 @@ pub struct AlignReport {
     pub checks: Vec<AlignCheck>,
     /// Execution-side duties that require structured evidence to prove.
     pub obligations: Vec<AlignObligation>,
+}
+
+/// Condensed alignment explanation for humans and JSON consumers.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignSummary {
+    /// One-sentence interpretation of the report status.
+    pub conclusion: String,
+    /// Selected route from the fresh decision, when any route was selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_route: Option<String>,
+    /// Route-selection mechanism, such as rule_prefer or default_route_order.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_selection_basis: Option<String>,
+    /// Rule responsible for route selection, when route selection came from a rule.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_selection_rule: Option<String>,
+    /// Matched rule ids from the fresh decision.
+    pub matched_rules: Vec<String>,
+    /// Deterministic decision-trace check totals.
+    pub decision_checks: AlignStatusCounts,
+    /// Execution obligation proof totals.
+    pub execution_obligations: AlignStatusCounts,
+    /// Unproven obligations grouped by kind for fast triage.
+    pub unproven_obligation_kinds: Vec<AlignObligationKindCount>,
+}
+
+/// Counts for pass/fail/unproven status groups.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct AlignStatusCounts {
+    pub total: usize,
+    pub pass: usize,
+    pub fail: usize,
+    pub unproven: usize,
+}
+
+/// Count of obligations by source kind.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignObligationKindCount {
+    pub kind: AlignObligationKind,
+    pub total: usize,
+    pub unproven: usize,
 }
 
 /// Overall alignment state.
@@ -89,7 +132,7 @@ pub struct AlignObligation {
 }
 
 /// Source category for an execution obligation.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AlignObligationKind {
     /// The selected route must be fulfilled by execution.
@@ -234,16 +277,130 @@ pub fn align_decision_trace(
 
     let obligations = obligations_for(spec, &expected_decision);
     let status = report_status(&checks, &obligations);
+    let summary = summary_for(status, &checks, &obligations, &expected_decision);
 
     Ok(AlignReport {
         schema: ALIGN_SCHEMA.to_owned(),
         ok: status != AlignStatus::Fail,
         status,
+        summary,
         spec: spec_path.display().to_string(),
         decision_trace: decision_trace.display().to_string(),
         checks,
         obligations,
     })
+}
+
+fn summary_for(
+    status: AlignStatus,
+    checks: &[AlignCheck],
+    obligations: &[AlignObligation],
+    decision: &decision::Decision,
+) -> AlignSummary {
+    let decision_checks = status_counts(checks.iter().map(|check| check.status));
+    let execution_obligations =
+        status_counts(obligations.iter().map(|obligation| obligation.status));
+    let unproven_obligation_kinds = unproven_obligation_kinds(obligations);
+    let conclusion = align_conclusion(status, &decision_checks, &execution_obligations);
+
+    AlignSummary {
+        conclusion,
+        selected_route: decision.route.as_ref().map(|route| route.0.clone()),
+        route_selection_basis: decision
+            .route_selection
+            .as_ref()
+            .map(|selection| route_selection_basis_name(&selection.basis).to_owned()),
+        route_selection_rule: decision
+            .route_selection
+            .as_ref()
+            .and_then(|selection| selection.rule_id.as_ref())
+            .map(|rule| rule.0.clone()),
+        matched_rules: decision
+            .matched_rules
+            .iter()
+            .map(|matched| matched.id.0.clone())
+            .collect(),
+        decision_checks,
+        execution_obligations,
+        unproven_obligation_kinds,
+    }
+}
+
+fn route_selection_basis_name(basis: &decision::RouteSelectionBasis) -> &'static str {
+    match basis {
+        decision::RouteSelectionBasis::RulePrefer => "rule_prefer",
+        decision::RouteSelectionBasis::RouteOrderDefault => "route_order_default",
+        decision::RouteSelectionBasis::DefaultRouteOrder => "default_route_order",
+    }
+}
+
+fn status_counts(statuses: impl IntoIterator<Item = AlignCheckStatus>) -> AlignStatusCounts {
+    let mut counts = AlignStatusCounts::default();
+    for status in statuses {
+        counts.total += 1;
+        match status {
+            AlignCheckStatus::Pass => counts.pass += 1,
+            AlignCheckStatus::Fail => counts.fail += 1,
+            AlignCheckStatus::Unproven => counts.unproven += 1,
+        }
+    }
+    counts
+}
+
+fn unproven_obligation_kinds(obligations: &[AlignObligation]) -> Vec<AlignObligationKindCount> {
+    let mut counts: BTreeMap<AlignObligationKind, AlignObligationKindCount> = BTreeMap::new();
+    for obligation in obligations {
+        let entry = counts
+            .entry(obligation.kind)
+            .or_insert(AlignObligationKindCount {
+                kind: obligation.kind,
+                total: 0,
+                unproven: 0,
+            });
+        entry.total += 1;
+        if obligation.status == AlignCheckStatus::Unproven {
+            entry.unproven += 1;
+        }
+    }
+    counts
+        .into_values()
+        .filter(|count| count.unproven > 0)
+        .collect()
+}
+
+fn align_conclusion(
+    status: AlignStatus,
+    checks: &AlignStatusCounts,
+    obligations: &AlignStatusCounts,
+) -> String {
+    match status {
+        AlignStatus::Pass => {
+            "all deterministic decision checks and execution obligations are proven".to_owned()
+        }
+        AlignStatus::Fail => format!(
+            "{} deterministic check(s) failed; the current spec no longer aligns with the decision trace",
+            checks.fail
+        ),
+        AlignStatus::Unproven => {
+            let mut reasons = Vec::new();
+            if checks.unproven > 0 {
+                reasons.push(format!(
+                    "{} deterministic trace check(s) lack recorded evidence",
+                    checks.unproven
+                ));
+            }
+            if obligations.unproven > 0 {
+                reasons.push(format!(
+                    "{} execution obligation(s) need structured evidence",
+                    obligations.unproven
+                ));
+            }
+            if checks.fail == 0 {
+                reasons.push("no deterministic drift was detected".to_owned());
+            }
+            reasons.join("; ")
+        }
+    }
 }
 
 fn trace_input(envelopes: &[TraceEnvelope]) -> Result<String> {
