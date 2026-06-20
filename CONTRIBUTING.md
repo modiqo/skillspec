@@ -45,6 +45,9 @@ skillspec deps check path/to/skill.spec.yml
 
 The CI workflow runs the same categories of checks. It provides small command stubs for example-only external CLIs so example dependency declarations can be checked consistently in GitHub Actions.
 
+CI also runs locked native build and test jobs on Linux, macOS, and Windows so
+platform assumptions are caught before release.
+
 ## Changing The Spec
 
 Spec changes should update these surfaces together:

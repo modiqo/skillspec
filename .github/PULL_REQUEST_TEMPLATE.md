@@ -9,6 +9,7 @@
 - [ ] `cargo test --workspace --all-targets`
 - [ ] `cargo build --workspace`
 - [ ] `skillspec validate` / `skillspec test` / `skillspec deps check` for changed examples
+- [ ] CI platform matrix is green on Linux, macOS, and Windows
 
 ## Notes
 

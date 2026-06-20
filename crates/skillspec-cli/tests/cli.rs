@@ -202,11 +202,11 @@ routes:
   - id: local
     label: Local
 dependencies:
-  shell:
+  cargo:
     kind: cli
-    command: sh
+    command: cargo
     check:
-      command: sh
+      command: cargo
   missing_file:
     kind: file
     path: absent.txt
@@ -214,9 +214,9 @@ dependencies:
     kind: package
 commands:
   present:
-    template: echo ok
+    template: cargo --version
     requires:
-      dependencies: [shell]
+      dependencies: [cargo]
   missing:
     template: cat absent.txt
     requires:
@@ -408,7 +408,7 @@ fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     let scoped_report = json_stdout(&scoped);
     assert_eq!(scoped_report["ok"], true);
     assert_eq!(scoped_report["dependencies"].as_array().unwrap().len(), 1);
-    assert_eq!(scoped_report["dependencies"][0]["id"], "shell");
+    assert_eq!(scoped_report["dependencies"][0]["id"], "cargo");
 }
 
 #[test]

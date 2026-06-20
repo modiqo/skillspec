@@ -280,6 +280,9 @@ draft generation, install target behavior, full JSON Schema validation against
 examples, conformance fixtures, and golden snapshots for compiler/importer
 output.
 
+CI runs a full Ubuntu quality gate plus native locked build/test jobs on Linux,
+macOS, and Windows.
+
 The minimum compliance gate for a SkillSpec-backed skill is:
 
 ```sh
