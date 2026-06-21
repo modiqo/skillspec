@@ -107,6 +107,11 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
     output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.\n\n");
+    output.push_str("Minimum final response shape when workspace evidence exists:\n\n");
+    output.push_str("- `Result`: answer the user's task directly.\n");
+    output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
+    output.push_str("- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.\n");
+    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
     if !spec.routes.is_empty() {
         output.push_str("## Route Hints\n\n");
         let mut routes = spec.routes.iter().collect::<Vec<_>>();
@@ -446,12 +451,185 @@ fn write_frontmatter(output: &mut String, spec: &SkillSpec, target: Target) {
         Target::CodexSkill | Target::ClaudeSkill => {
             let _ = writeln!(output, "---");
             let _ = writeln!(output, "name: {}", skill_name(&spec.id));
-            let _ = writeln!(output, "description: {:?}", spec.description);
+            let _ = writeln!(output, "description: {:?}", selection_description(spec));
             let _ = writeln!(output, "---");
             output.push('\n');
         }
         Target::Markdown => {}
     }
+}
+
+fn selection_description(spec: &SkillSpec) -> String {
+    let mut intents = Vec::new();
+    for applies_when in &spec.applies_when {
+        collect_user_intents(applies_when, &mut intents);
+    }
+
+    let mut capabilities = Vec::new();
+    let cli_intent_surface = intents.iter().any(|intent| {
+        let intent = intent.to_ascii_lowercase();
+        intent.contains("cli")
+            || intent.contains("shell")
+            || intent.contains("command")
+            || intent.contains("process")
+            || intent.contains("terminal")
+    }) || spec.routes.iter().any(|route| {
+        let route = format!(
+            "{} {}",
+            route.label,
+            route.description.as_deref().unwrap_or_default()
+        )
+        .to_ascii_lowercase();
+        route.contains("cli")
+            || route.contains("shell")
+            || route.contains("command")
+            || route.contains("process")
+            || route.contains("terminal")
+    });
+    let cli_command_surface = spec
+        .commands
+        .keys()
+        .any(|id| id.contains("exec") || id.contains("process") || id.contains("pty"));
+    if cli_intent_surface && cli_command_surface {
+        push_unique(&mut capabilities, "CLI and shell commands");
+    }
+    if spec
+        .dependencies
+        .values()
+        .any(|dependency| dependency.kind == DependencyKind::Adapter)
+    {
+        push_unique(
+            &mut capabilities,
+            "APIs, MCP/rote adapters, and service connectors",
+        );
+    }
+    if spec
+        .dependencies
+        .values()
+        .any(|dependency| dependency.kind == DependencyKind::Browser)
+    {
+        push_unique(&mut capabilities, "browser handoff and page evidence");
+    }
+    if spec
+        .dependencies
+        .values()
+        .any(|dependency| dependency.kind == DependencyKind::Service)
+    {
+        push_unique(&mut capabilities, "external services");
+    }
+    if spec
+        .commands
+        .keys()
+        .any(|id| id.contains("exec") || id.contains("process"))
+    {
+        push_unique(&mut capabilities, "process capture");
+    }
+    if spec
+        .commands
+        .keys()
+        .any(|id| id.contains("stream") || id.contains("follow"))
+    {
+        push_unique(&mut capabilities, "logs and streams");
+    }
+    if spec.commands.keys().any(|id| id.contains("pty")) {
+        push_unique(&mut capabilities, "PTY and terminal-sensitive prompts");
+    }
+    if spec
+        .commands
+        .keys()
+        .any(|id| id.contains("deps") || id.contains("dependency"))
+    {
+        push_unique(&mut capabilities, "dependency checks");
+    }
+    if spec
+        .closures
+        .keys()
+        .any(|id| id.contains("crystallize") || id.contains("crystallization"))
+    {
+        push_unique(&mut capabilities, "flow crystallization and replay");
+    }
+
+    let mut parts = Vec::new();
+    if !intents.is_empty() {
+        parts.push(format!(
+            "Use when the task needs to {}",
+            sentence_list(&intents.into_iter().take(7).collect::<Vec<_>>())
+        ));
+    } else {
+        parts.push(format!(
+            "Use for {}",
+            lower_first(spec.description.trim_end_matches('.'))
+        ));
+    }
+    if !capabilities.is_empty() {
+        parts.push(format!(
+            "Handles {}",
+            sentence_list(&capabilities.into_iter().take(8).collect::<Vec<_>>())
+        ));
+    }
+    parts.push(
+        "Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+            .to_owned(),
+    );
+    shorten_description(&parts.join(". "))
+}
+
+fn collect_user_intents(value: &serde_yaml::Value, intents: &mut Vec<String>) {
+    let serde_yaml::Value::Mapping(mapping) = value else {
+        return;
+    };
+    let Some(user_intent) = mapping.get(serde_yaml::Value::String("user_intent".to_owned())) else {
+        return;
+    };
+    match user_intent {
+        serde_yaml::Value::Sequence(values) => {
+            for value in values {
+                if let Some(value) = value.as_str() {
+                    push_unique(intents, value);
+                }
+            }
+        }
+        serde_yaml::Value::String(value) => push_unique(intents, value),
+        _ => {}
+    }
+}
+
+fn push_unique(values: &mut Vec<String>, value: &str) {
+    let value = value.trim();
+    if value.is_empty() || values.iter().any(|existing| existing == value) {
+        return;
+    }
+    values.push(value.to_owned());
+}
+
+fn sentence_list(values: &[String]) -> String {
+    match values {
+        [] => String::new(),
+        [only] => only.clone(),
+        [head @ .., last] => format!("{} and {}", head.join(", "), last),
+    }
+}
+
+fn shorten_description(value: &str) -> String {
+    const LIMIT: usize = 700;
+    if value.len() <= LIMIT {
+        return value.to_owned();
+    }
+    let mut shortened = value[..LIMIT].trim_end().to_owned();
+    if let Some(index) = shortened.rfind(['.', ',', ';']) {
+        shortened.truncate(index);
+    }
+    shortened.trim_end().trim_end_matches('.').to_owned()
+}
+
+fn lower_first(value: &str) -> String {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    let mut lowered = first.to_lowercase().collect::<String>();
+    lowered.push_str(chars.as_str());
+    lowered
 }
 
 fn write_overview(output: &mut String, spec: &SkillSpec, target: Target) {
@@ -492,6 +670,11 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
     output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.\n");
     output.push_str("- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.\n\n");
+    output.push_str("Minimum final response shape when workspace evidence exists:\n\n");
+    output.push_str("- `Result`: answer the user's task directly.\n");
+    output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
+    output.push_str("- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.\n");
+    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {

@@ -1,6 +1,6 @@
 ---
 name: rote-shell
-description: "Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work."
+description: "Use when the task needs to run a local command and remember the result, inspect CLI output with provenance, follow a log or process stream, start or observe a background job, capture terminal-sensitive output, crystallize shell work into a TypeScript flow and combine local CLI facts with adapters or browser observations. Handles CLI and shell commands, APIs, MCP/rote adapters, and service connectors, browser handoff and page evidence, external services, process capture, logs and streams, PTY and terminal-sensitive prompts and dependency checks. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
 # rote shell
@@ -62,6 +62,13 @@ skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/trace
 ## Completion Report
 
 When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.
+
+Minimum final response shape when workspace evidence exists:
+
+- `Result`: answer the user's task directly.
+- `Evidence`: workspace name plus important response ids/files the user can query later.
+- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
+- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.
 
 ## Route Hints
 

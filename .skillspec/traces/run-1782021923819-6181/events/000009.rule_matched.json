@@ -1,0 +1,17 @@
+{
+  "schema": "skillspec.trace/v0",
+  "run_id": "run-1782021923819-6181",
+  "seq": 9,
+  "timestamp_unix_ms": 1782021923820,
+  "skill_id": "rote.shell",
+  "spec_schema": "skillspec/v0",
+  "spec_fingerprint": "sha256:b59a251b6dc9c0954af7c568129dc85870b107058948bc614c26140a39770a7c",
+  "input_sha256": "sha256:ea6df241bf3ddc5b10a012f1c3b6cbba1e9700e595176bfd1caae9d4ad80cdc4",
+  "event": "rule_matched",
+  "event_name": "rule_matched",
+  "data": {
+    "event": "rule_matched",
+    "reason": "External-service work should prefer rote adapters; if no healthy adapter exists, prove installed/authenticated CLI fallback through rote exec before use.",
+    "rule_id": "external_service_tasks_are_adapter_first"
+  }
+}

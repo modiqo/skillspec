@@ -24,6 +24,13 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.
 - When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.
 
+Minimum final response shape when workspace evidence exists:
+
+- `Result`: answer the user's task directly.
+- `Evidence`: workspace name plus important response ids/files the user can query later.
+- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
+- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.
+
 ## Routes
 
 Try lower-rank routes first unless matching rules override the route or route order.

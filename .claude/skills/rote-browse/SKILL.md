@@ -1,6 +1,6 @@
 ---
 name: rote-browse
-description: "Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup."
+description: "Use when the task needs to browse a website with rote, attach to an active browser, inspect logged-in web app state, snapshot or slice a page, click or type in a page, recover a stale browser ref or page lease and crystallize browser exploration into a reusable flow. Handles browser handoff and page evidence and dependency checks. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
 # rote browse
@@ -62,6 +62,13 @@ skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/trace
 ## Completion Report
 
 When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.
+
+Minimum final response shape when workspace evidence exists:
+
+- `Result`: answer the user's task directly.
+- `Evidence`: workspace name plus important response ids/files the user can query later.
+- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
+- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.
 
 ## Route Hints
 
