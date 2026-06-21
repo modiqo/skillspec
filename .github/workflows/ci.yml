@@ -44,7 +44,10 @@ jobs:
         run: cargo test --locked --workspace --all-targets
 
       - name: Build CLI
-        run: cargo build --locked --workspace
+        shell: bash
+        run: |
+          cargo build --locked --workspace
+          echo "${PWD}/target/debug" >> "${GITHUB_PATH}"
 
       - name: Validate all examples
         shell: bash
