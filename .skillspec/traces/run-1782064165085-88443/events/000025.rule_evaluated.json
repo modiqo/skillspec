@@ -1,0 +1,17 @@
+{
+  "schema": "skillspec.trace/v0",
+  "run_id": "run-1782064165085-88443",
+  "seq": 25,
+  "timestamp_unix_ms": 1782064165088,
+  "skill_id": "rote.shell",
+  "spec_schema": "skillspec/v0",
+  "spec_fingerprint": "sha256:8de175e2b09a7cd90562c11d5aad7cd808ad2ffa388fce14bf67e9f98d9ac2bf",
+  "input_sha256": "sha256:024ad92b8dce04f0ea2c5d1b311d4a798b223b6d565010a83e026b33eebac576",
+  "event": "rule_evaluated",
+  "event_name": "rule_evaluated",
+  "data": {
+    "event": "rule_evaluated",
+    "matched": false,
+    "rule_id": "interactive_prompts_do_not_background"
+  }
+}
