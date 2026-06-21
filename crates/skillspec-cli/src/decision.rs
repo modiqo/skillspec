@@ -571,7 +571,17 @@ fn domain_object_task(input: &str) -> bool {
 
 fn long_running(input: &str) -> bool {
     [
-        "test", "build", "release", "deploy", "server", "watch", "tail", "monitor",
+        "test",
+        "build",
+        "release",
+        "deploy",
+        "server",
+        "watch",
+        "tail",
+        "monitor",
+        "background process",
+        "tracked background",
+        "in the background",
     ]
     .iter()
     .any(|needle| contains_phrase(input, needle))

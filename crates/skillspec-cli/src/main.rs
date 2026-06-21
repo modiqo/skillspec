@@ -156,6 +156,9 @@ enum TraceCommand {
         /// Trace run directory produced by decide/explain --trace-dir.
         #[arg(long)]
         decision_trace: PathBuf,
+        /// JSONL execution ledger with sanitized action evidence. Repeat for multiple ledgers.
+        #[arg(long)]
+        execution_trace: Vec<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -319,10 +322,12 @@ fn run() -> Result<()> {
             TraceCommand::Align {
                 path,
                 decision_trace,
+                execution_trace,
                 json,
             } => {
                 let spec = parser::load_spec(&path)?;
-                let report = align::align_decision_trace(&spec, &path, &decision_trace)?;
+                let report =
+                    align::align_decision_trace(&spec, &path, &decision_trace, &execution_trace)?;
                 if json {
                     report::json(&report)?;
                 } else {

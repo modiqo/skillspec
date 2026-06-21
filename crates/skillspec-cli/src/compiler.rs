@@ -77,7 +77,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     );
     output.push_str("7. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.\n");
     output.push_str("8. Materialize the active contract described below, then execute only actions that satisfy it.\n");
-    output.push_str("9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, meaning, model layers, evidence gaps, summary, and trace path.\n");
+    output.push_str("9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
     output.push_str("10. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
@@ -103,15 +103,15 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec refs ./skill.spec.yml rule:<id> --view summary\n");
     output.push_str("skillspec query ./skill.spec.yml command:<id>.requires\n");
     output.push_str("skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
-    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\"\n");
+    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace <execution-ledger.jsonl>\n");
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
-    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.\n\n");
+    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the user-facing alignment proof rows. Command proof must name only the command basename, never raw args. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.\n\n");
     output.push_str("Minimum final response shape when workspace evidence exists:\n\n");
     output.push_str("- `Result`: answer the user's task directly.\n");
     output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
     output.push_str("- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.\n");
-    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
+    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
     if !spec.routes.is_empty() {
         output.push_str("## Route Hints\n\n");
         let mut routes = spec.routes.iter().collect::<Vec<_>>();
@@ -668,13 +668,14 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
     output.push_str("- After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
-    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.\n");
-    output.push_str("- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.\n\n");
+    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <jsonl>` when structured action evidence exists. Include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, summary, and any failed/unproven checks in the completion report.\n");
+    output.push_str("- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.\n");
+    output.push_str("- Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.\n\n");
     output.push_str("Minimum final response shape when workspace evidence exists:\n\n");
     output.push_str("- `Result`: answer the user's task directly.\n");
     output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
     output.push_str("- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.\n");
-    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
+    output.push_str("- `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {
@@ -1102,7 +1103,7 @@ fn write_runtime_commands(output: &mut String) {
     );
     output.push_str("skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec trace compact \"${PWD}/.skillspec/traces/<run-id>\"\n");
-    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\"\n");
+    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace <execution-ledger.jsonl>\n");
     output.push_str("```\n");
 }
 

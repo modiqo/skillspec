@@ -1,4 +1,4 @@
-use crate::align::{AlignCheckStatus, AlignReport, AlignStatus};
+use crate::align::{AlignCheckStatus, AlignProofStatus, AlignReport, AlignStatus};
 use crate::decision::{Decision, TestRun};
 use crate::error::Result;
 use crate::model::SkillSpec;
@@ -150,6 +150,13 @@ pub fn align(report: &AlignReport) -> Result<()> {
     writeln!(stdout, "status: {}", align_status_name(report.status))?;
     writeln!(stdout, "spec: {}", report.spec)?;
     writeln!(stdout, "decision_trace: {}", report.decision_trace)?;
+    if !report.execution_traces.is_empty() {
+        writeln!(
+            stdout,
+            "execution_traces: {}",
+            report.execution_traces.join(", ")
+        )?;
+    }
     writeln!(stdout, "summary: {}", report.summary.conclusion)?;
     writeln!(stdout, "meaning: {}", report.summary.status_meaning)?;
     if !report.summary.layers.is_empty() {
@@ -238,6 +245,17 @@ pub fn align(report: &AlignReport) -> Result<()> {
             }
         }
     }
+    if !report.proof_rows.is_empty() {
+        writeln!(stdout, "alignment_evidence:")?;
+        for row in &report.proof_rows {
+            writeln!(stdout, "  - requirement: {}", row.requirement)?;
+            writeln!(stdout, "    obligation: {}", row.obligation)?;
+            writeln!(stdout, "    expected: {}", row.expected_evidence)?;
+            writeln!(stdout, "    observed: {}", row.observed_evidence)?;
+            writeln!(stdout, "    status: {}", proof_status_name(row.status))?;
+            writeln!(stdout, "    explanation: {}", row.explanation)?;
+        }
+    }
     writeln!(stdout, "checks:")?;
     for check in &report.checks {
         writeln!(
@@ -279,6 +297,15 @@ fn align_status_name(status: AlignStatus) -> &'static str {
     }
 }
 
+fn proof_status_name(status: AlignProofStatus) -> &'static str {
+    match status {
+        AlignProofStatus::Satisfied => "satisfied",
+        AlignProofStatus::PartiallySatisfied => "partially_satisfied",
+        AlignProofStatus::Violated => "violated",
+        AlignProofStatus::Unproven => "unproven",
+    }
+}
+
 fn align_layer_name(kind: crate::align::AlignLayerKind) -> &'static str {
     match kind {
         crate::align::AlignLayerKind::DecisionReplay => "decision_replay",
@@ -300,6 +327,7 @@ fn obligation_kind_name(kind: crate::align::AlignObligationKind) -> &'static str
         crate::align::AlignObligationKind::Forbid => "forbid",
         crate::align::AlignObligationKind::Elicitation => "elicitation",
         crate::align::AlignObligationKind::AfterSuccess => "after_success",
+        crate::align::AlignObligationKind::UserRequirement => "user_requirement",
     }
 }
 

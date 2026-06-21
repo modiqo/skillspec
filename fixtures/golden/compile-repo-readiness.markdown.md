@@ -21,15 +21,16 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.
 - Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.
 - After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.
-- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.
+- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <jsonl>` when structured action evidence exists. Include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, summary, and any failed/unproven checks in the completion report.
 - When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.
+- Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.
 
 Minimum final response shape when workspace evidence exists:
 
 - `Result`: answer the user's task directly.
 - `Evidence`: workspace name plus important response ids/files the user can query later.
 - `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
-- `SkillSpec`: selected route, trace run directory, alignment status, and any evidence gaps. Never let this replace the Result, Evidence, or Token savings sections.
+- `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.
 
 ## Routes
 
@@ -287,5 +288,5 @@ skillspec query <skill-folder>/skill.spec.yml command:<command-id>.requires
 skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec trace compact "${PWD}/.skillspec/traces/<run-id>"
-skillspec trace align <skill-folder>/skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>"
+skillspec trace align <skill-folder>/skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>" --execution-trace <execution-ledger.jsonl>
 ```

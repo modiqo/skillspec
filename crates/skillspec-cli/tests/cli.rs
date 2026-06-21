@@ -233,6 +233,72 @@ tests:
 "#
 }
 
+fn alignment_spec() -> &'static str {
+    r#"
+schema: skillspec/v0
+id: cli.alignment
+title: CLI Alignment Spec
+description: Exercises execution alignment proof.
+routes:
+  - id: adapter_first_cli_fallback
+    label: Adapter first, CLI fallback
+rules:
+  - id: cli_invocations_use_rote_exec
+    when:
+      user_says_any: ["run", "gh"]
+    forbid:
+      - direct_cli_without_rote_exec
+      - untracked_stdout_scrollback
+    after_success:
+      - run_cli_only_through_rote_exec
+      - report_workspace_evidence_and_token_math
+  - id: external_service_tasks_are_adapter_first
+    when:
+      user_says_any: ["gh", "github"]
+    prefer: adapter_first_cli_fallback
+    forbid:
+      - skipping_adapter_discovery
+      - skipping_cli_readiness_check
+    after_success:
+      - discover_relevant_rote_adapters
+      - preflight_cli_fallback
+  - id: durable_work_requires_named_workspace
+    when:
+      user_says_any: ["gh"]
+    forbid:
+      - anonymous_workspace
+    after_success:
+      - compute_workspace_stats
+  - id: long_noninteractive_jobs_use_background
+    when:
+      command_likely_long_running: true
+closures:
+  run_cli_only_through_rote_exec:
+    description: Verify CLI invocations used rote exec.
+  report_workspace_evidence_and_token_math:
+    description: Report workspace evidence and token math.
+  discover_relevant_rote_adapters:
+    description: Discover relevant adapters before CLI fallback.
+  preflight_cli_fallback:
+    description: Verify CLI fallback readiness.
+  compute_workspace_stats:
+    description: Collect workspace stats.
+trace:
+  mode: event_log
+  required: true
+tests:
+  - name: background phrase matches background rule
+    input: run gh PR status as a tracked background process
+    expect:
+      route: adapter_first_cli_fallback
+      matched_rules:
+        - cli_invocations_use_rote_exec
+        - external_service_tasks_are_adapter_first
+        - durable_work_requires_named_workspace
+        - long_noninteractive_jobs_use_background
+"#
+}
+
 #[test]
 fn validate_and_test_rich_spec_through_cli() {
     let dir = TempDir::new("validate-test");
@@ -282,6 +348,7 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("trace align"));
     assert!(align_help.contains("[OPTIONS]"));
     assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
+    assert!(align_help.contains("--execution-trace <EXECUTION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--json"));
 }
@@ -813,6 +880,107 @@ fn decide_enforces_required_trace_and_trace_compaction() {
         .unwrap()
         .iter()
         .any(|check| { check["id"] == "spec_fingerprint" && check["status"] == "fail" }));
+}
+
+#[test]
+fn trace_align_uses_execution_ledger_without_leaking_command_args() {
+    let dir = TempDir::new("align-execution");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    let execution_trace = dir.path().join("execution.jsonl");
+    write_file(&spec, alignment_spec());
+
+    let test = Command::new(bin()).arg("test").arg(&spec).output().unwrap();
+    assert_success(&test);
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=run gh PR status as a tracked background process")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    write_file(
+        &execution_trace,
+        r#"{"event":"workspace_created","workspace":"gh-pr-checks-conikeec","anonymous":false}
+{"event":"adapter_discovery_finished","workspace":"gh-pr-checks-conikeec","service":"github","matches":[],"fallback_needed":true}
+{"event":"cli_readiness_check_finished","workspace":"gh-pr-checks-conikeec","command":"gh auth status private@example.com","executor":"rote_exec","operation_kind":"auth_status","exit_code":0,"ready":true,"stdout_captured":true,"stderr_captured":true}
+{"event":"background_process_started","workspace":"gh-pr-checks-conikeec","lease_id":"proc-10","command":"gh pr status --repo private/repo --author secret-user","executor":"rote_exec","operation_kind":"pr_status","stdout_captured":true,"stderr_captured":true}
+{"event":"process_wait_finished","workspace":"gh-pr-checks-conikeec","lease_id":"proc-10","exit_code":0,"timed_out":false}
+{"event":"workspace_trace_collected","workspace":"gh-pr-checks-conikeec"}
+{"event":"stats_collected","workspace":"gh-pr-checks-conikeec","response_tokens_cached":6799,"query_result_tokens":826,"reduction_percent":87.9}
+{"event":"final_response_sent","included_result":true,"included_alignment":true,"included_evidence":true,"included_token_savings":true}
+"#,
+    );
+
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let out = stdout(&align);
+    assert!(!out.contains("private/repo"));
+    assert!(!out.contains("private@example.com"));
+    assert!(!out.contains("secret-user"));
+    let report: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(report["status"], "pass");
+    assert_eq!(report["summary"]["decision_checks"]["fail"], 0);
+    assert_eq!(report["summary"]["execution_obligations"]["pass"], 12);
+    assert_eq!(report["summary"]["execution_obligations"]["unproven"], 0);
+    assert!(report["checks"].as_array().unwrap().iter().any(|check| {
+        check["id"] == "tracked_background_rule_triggered" && check["status"] == "pass"
+    }));
+    let proof_rows = report["proof_rows"].as_array().unwrap();
+    assert!(proof_rows.iter().any(|row| {
+        row["requirement"] == "User requested work as a tracked background process"
+            && row["status"] == "satisfied"
+            && row["observed_evidence"]
+                .as_str()
+                .unwrap()
+                .contains("proc-10")
+    }));
+    assert!(proof_rows.iter().any(|row| {
+        row["requirement"] == "CLI work must be captured through rote exec"
+            && row["status"] == "satisfied"
+            && row["observed_evidence"].as_str().unwrap().contains("gh")
+    }));
+
+    let align_text = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .output()
+        .unwrap();
+    assert_success(&align_text);
+    let text = stdout(&align_text);
+    assert!(text.contains("alignment_evidence:"));
+    assert!(text.contains("status: satisfied"));
+    assert!(text.contains("command(s) gh ran with arguments redacted"));
+    assert!(!text.contains("private/repo"));
+    assert!(!text.contains("private@example.com"));
+    assert!(!text.contains("secret-user"));
 }
 
 #[test]
