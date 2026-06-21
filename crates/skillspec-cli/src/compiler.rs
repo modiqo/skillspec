@@ -1,8 +1,9 @@
 use crate::model::{
     Artifact, ArtifactKind, CodeBlock, CodeKind, CodeSource, CommandRequires, CommandTemplate,
-    Dependency, DependencyKind, Elicitation, ElicitationChoice, Import, ImportLoad, ImportRole,
-    ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep, Resource, ResourceRole, ResourceUse,
-    ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest, SkillSpec, State, TraceEventKind,
+    Dependency, DependencyKind, Elicitation, ElicitationChoice, HandoffBoundary, Import,
+    ImportLoad, ImportRole, ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep, Resource,
+    ResourceRole, ResourceUse, ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest, SkillSpec,
+    State, TraceEventKind,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -82,6 +83,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
     output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
+    output.push_str("- route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.\n");
     output.push_str("- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.\n");
     output.push_str("- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.\n");
     output.push_str("- user constraints: carry explicit user instructions such as \"do not search the web\" into the same checklist. The spec adds structure; it does not erase the user's constraints.\n");
@@ -655,6 +657,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("## Runtime Contract\n\n");
     output.push_str("- Read this generated skill for orientation and immediate rules.\n");
     output.push_str("- Treat routes, rules, states, commands, tests, and review notes below as authoritative.\n");
+    output.push_str("- Route `handoff` entries are hard execution boundaries, not prose. If a selected route has `handoff.boundary: stop_current_skill`, stop current-skill execution except to pass the declared context to the target skill.\n");
     output.push_str("- Rules beat prose when there is tension.\n");
     output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
     output.push_str("- `elicit` entries require bounded user questions before guessing.\n");
@@ -726,7 +729,36 @@ fn write_route(output: &mut String, route: &Route) {
     if !route.checks.is_empty() {
         let _ = writeln!(output, "- checks: {}", route.checks.join(", "));
     }
+    if let Some(handoff) = &route.handoff {
+        let _ = writeln!(output, "- handoff:");
+        let _ = writeln!(output, "  - to_skill: `{}`", handoff.to_skill);
+        let _ = writeln!(
+            output,
+            "  - boundary: `{}`",
+            handoff_boundary_name(&handoff.boundary)
+        );
+        if !handoff.pass_context.is_empty() {
+            let _ = writeln!(
+                output,
+                "  - pass_context: {}",
+                handoff.pass_context.join(", ")
+            );
+        }
+        if !handoff.forbid.is_empty() {
+            let _ = writeln!(output, "  - forbid: {}", handoff.forbid.join(", "));
+        }
+        if let Some(reason) = &handoff.reason {
+            let _ = writeln!(output, "  - reason: {reason}");
+        }
+    }
     output.push('\n');
+}
+
+fn handoff_boundary_name(boundary: &HandoffBoundary) -> &'static str {
+    match boundary {
+        HandoffBoundary::StopCurrentSkill => "stop_current_skill",
+        HandoffBoundary::ResumeAfterHandoff => "resume_after_handoff",
+    }
 }
 
 fn write_rules(output: &mut String, spec: &SkillSpec) {
@@ -1332,6 +1364,7 @@ mod tests {
                 rank: Some(10),
                 description: None,
                 checks: Vec::new(),
+                handoff: None,
             }],
             rules: Vec::new(),
             states: BTreeMap::new(),

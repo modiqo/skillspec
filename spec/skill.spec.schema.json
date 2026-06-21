@@ -119,7 +119,29 @@
         "checks": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
-        }
+        },
+        "handoff": { "$ref": "#/$defs/route_handoff" }
+      },
+      "additionalProperties": false
+    },
+    "route_handoff": {
+      "type": "object",
+      "required": ["to_skill", "boundary"],
+      "properties": {
+        "to_skill": { "type": "string", "minLength": 1 },
+        "boundary": {
+          "type": "string",
+          "enum": ["stop_current_skill", "resume_after_handoff"]
+        },
+        "pass_context": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "forbid": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },

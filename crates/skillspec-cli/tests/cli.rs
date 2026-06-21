@@ -126,6 +126,12 @@ routes:
   - id: browser
     label: Browser
     rank: 10
+    handoff:
+      to_skill: rote-browse
+      boundary: stop_current_skill
+      pass_context: [user_intent, evidence_context]
+      forbid: [direct_browser_tool_without_rote_browse]
+      reason: Browser execution belongs to rote-browse.
   - id: local
     label: Local
     rank: 20
@@ -431,6 +437,21 @@ fn sensemake_and_query_teach_progressive_navigation() {
     let forbid_report = json_stdout(&forbid);
     assert_eq!(forbid_report["value"][0], "native_search_as_answer");
 
+    let route = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("route:browser")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&route);
+    let route_report = json_stdout(&route);
+    assert_eq!(route_report["value"]["handoff"]["to_skill"], "rote-browse");
+    assert_eq!(
+        route_report["value"]["handoff"]["boundary"],
+        "stop_current_skill"
+    );
+
     let refs = Command::new(bin())
         .arg("refs")
         .arg(&spec)
@@ -442,6 +463,16 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert!(refs_out.contains("prefer -> route: browser"));
     assert!(refs_out.contains("forbid -> forbid: native_search_as_answer"));
     assert!(refs_out.contains("after_success -> command_or_recipe_or_state: cleanup"));
+
+    let route_refs = Command::new(bin())
+        .arg("refs")
+        .arg(&spec)
+        .arg("route:browser")
+        .output()
+        .unwrap();
+    assert_success(&route_refs);
+    let route_refs_out = stdout(&route_refs);
+    assert!(route_refs_out.contains("handoff.to_skill -> skill: rote-browse"));
 
     let missing = Command::new(bin())
         .arg("query")

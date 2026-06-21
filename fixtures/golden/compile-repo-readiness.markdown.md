@@ -8,6 +8,7 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 
 - Read this generated skill for orientation and immediate rules.
 - Treat routes, rules, states, commands, tests, and review notes below as authoritative.
+- Route `handoff` entries are hard execution boundaries, not prose. If a selected route has `handoff.boundary: stop_current_skill`, stop current-skill execution except to pass the declared context to the target skill.
 - Rules beat prose when there is tension.
 - `forbid` entries are hard negative steering, not suggestions.
 - `elicit` entries require bounded user questions before guessing.

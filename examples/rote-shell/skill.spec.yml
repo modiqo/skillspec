@@ -29,6 +29,20 @@ routes:
       Defer the browser portion to the `rote-browse` skill. This shell skill should preserve the
       user's intent, workspace/evidence context, and any shell-side prerequisites, but it must not
       prescribe browser command sequences itself.
+    handoff:
+      to_skill: rote-browse
+      boundary: stop_current_skill
+      pass_context:
+        - user_intent
+        - workspace
+        - evidence_context
+        - shell_prerequisites
+      forbid:
+        - native_browser_tool_without_rote_browse
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
+        - raw_playwright
+      reason: Browser execution is owned by rote-browse; rote-shell must stop browser execution and only pass declared context.
   - id: one_shot_process
     label: Capture a one-shot process
     rank: 10
@@ -209,8 +223,8 @@ rules:
         - snapshot
         - extract from page
         - social profile
-        - gmail
-        - gmail in browser
+        - email web app
+        - inbox in browser
     prefer: browser_handoff
     forbid:
       - native_search_as_answer
@@ -1005,7 +1019,7 @@ tests:
         - browser_cli_commands_in_rote_shell
 
   - name: active browser attach defers to rote-browse
-    input: attach to my active Chrome session for Gmail and snapshot the inbox
+    input: attach to my active Chrome session for a logged-in inbox and snapshot the current page
     expect:
       route: browser_handoff
       after_success:

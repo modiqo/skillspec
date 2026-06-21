@@ -75,6 +75,28 @@ pub struct Route {
     pub description: Option<String>,
     #[serde(default)]
     pub checks: Vec<String>,
+    #[serde(default)]
+    pub handoff: Option<RouteHandoff>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RouteHandoff {
+    pub to_skill: String,
+    pub boundary: HandoffBoundary,
+    #[serde(default)]
+    pub pass_context: Vec<String>,
+    #[serde(default)]
+    pub forbid: Vec<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HandoffBoundary {
+    StopCurrentSkill,
+    ResumeAfterHandoff,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

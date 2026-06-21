@@ -635,6 +635,7 @@ fn route_summary(route: &crate::model::Route) -> Value {
         "rank": route.rank,
         "description": route.description,
         "checks": route.checks,
+        "handoff": route.handoff,
     })
 }
 
@@ -837,11 +838,18 @@ fn outgoing_refs(spec: &SkillSpec, parsed: &ParsedHandle) -> Result<Vec<Referenc
                 .ok_or_else(|| Error::InvalidInput {
                     message: format!("unknown route id {id:?}"),
                 })?;
-            if route.checks.is_empty() {
-                Ok(Vec::new())
-            } else {
-                Ok(vec![edge("checks", "check", route.checks.clone())])
+            let mut edges = Vec::new();
+            if !route.checks.is_empty() {
+                edges.push(edge("checks", "check", route.checks.clone()));
             }
+            if let Some(handoff) = &route.handoff {
+                edges.push(edge(
+                    "handoff.to_skill",
+                    "skill",
+                    vec![handoff.to_skill.clone()],
+                ));
+            }
+            Ok(edges)
         }
         _ => Err(Error::InvalidInput {
             message: format!(

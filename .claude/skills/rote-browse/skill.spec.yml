@@ -14,37 +14,65 @@ applies_when:
       - crystallize browser exploration into a reusable flow
 
 entry:
-  prompt: Choose the browser launch shape before navigating, then use rote browser ledger evidence instead of raw browser automation.
+  prompt: Choose the browser launch shape before navigating. Browser execution is owned by rote-browse and its declared rote browser primitives; do not substitute any direct browser runtime, browser API, or raw automation tool.
 
 routes:
   - id: attach_existing_session
     label: Attach to an active browser
     rank: 10
-    description: Use the user's existing Chrome or Edge session when login, SSO, MFA, extensions, Gmail, or active tab state matters.
+    description: Use the user's existing Chrome or Edge session when login, SSO, MFA, extensions, email/calendar, or active tab state matters.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_browser_ledger_evidence
   - id: new_headed_session
     label: Start a new visible browser
     rank: 20
     description: Use a rote-managed headed browser when visual debugging matters but personal browser state should not be reused.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_browser_ledger_evidence
   - id: new_headless_session
     label: Start a new headless browser
     rank: 30
     description: Use a deterministic headless session for public pages, scripts, CI, or replay-like browsing.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_browser_ledger_evidence
   - id: saved_auth_replay
     label: Use saved browser auth state
     rank: 40
     description: Use saved auth state for authenticated replay without attaching to the live personal browser.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_browser_ledger_evidence
   - id: page_recovery
     label: Recover browser page or ref state
     rank: 50
     description: Use when a page lease is missing, snapshot capture failed, or an element ref became stale.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - inspect_page_lease
   - id: stateful_page_flow
     label: Work through a stateful page
     rank: 60
     description: Use for forms, pickers, filters, calendars, schedulers, and other multi-step web UI state machines.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_transition_evidence
   - id: browser_flow_crystallization
     label: Crystallize browser exploration
     rank: 70
     description: Use after successful exploration when the user wants private recall or controlled replay.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - run_browser_flow_preflight
 
 rules:
   - id: logged_in_browser_state_attaches_existing
@@ -54,7 +82,8 @@ rules:
         - active browser
         - existing browser
         - logged-in browser
-        - gmail
+        - email web app
+        - inbox in browser
         - calendar
         - sso
         - mfa
@@ -64,6 +93,10 @@ rules:
       - saved_auth_without_existing_profile_approval
       - native_search_as_answer
       - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - direct_browser_api_without_rote_browse
+      - browser_runtime_without_rote_browse
     elicit:
       - browser_launch_shape
     after_success:
@@ -90,6 +123,10 @@ rules:
       - web_fetch_as_browser_substitute
       - curl_as_browser_substitute
       - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - direct_browser_api_without_rote_browse
+      - browser_runtime_without_rote_browse
     allow:
       native_search: url_discovery_only
     elicit:
@@ -110,6 +147,10 @@ rules:
     prefer: new_headless_session
     forbid:
       - attach_personal_browser_without_need
+      - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - direct_browser_api_without_rote_browse
     after_success:
       - capture_browser_ledger_evidence
       - cleanup_owned_browser_resources
@@ -130,6 +171,10 @@ rules:
       - chained_unobserved_form_actions
       - stale_ref_reuse
       - transactional_click_without_approval
+      - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - direct_browser_api_without_rote_browse
     elicit:
       - transactional_approval
     after_success:
@@ -173,6 +218,10 @@ rules:
       - acting_on_unknown_tab
       - repeated_empty_snapshots
       - stale_ref_reuse
+      - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - direct_browser_api_without_rote_browse
     after_success:
       - inspect_page_lease
       - regrant_or_rebase_before_action
@@ -359,6 +408,7 @@ states:
   start:
     do:
       - choose_browser_route
+      - enforce_rote_browse_tool_boundary
       - load_browser_guidance
     next: prepare_browser
   prepare_browser:
@@ -520,6 +570,8 @@ commands:
 closures:
   choose_browser_route:
     description: Choose attach-existing, headed, headless, saved-auth replay, recovery, stateful flow, or crystallization route from the user's task.
+  enforce_rote_browse_tool_boundary:
+    description: Treat browser execution as owned by rote-browse and declared rote browser commands only. Do not use direct browser runtimes, browser APIs, raw automation tools, or plugin/MCP browser calls as substitutes.
   inspect_browser_readiness:
     description: Check rote browser inventory, preferences, attach prerequisites, saved auth state, and workspace variables.
   prepare_launch_shape:
@@ -570,8 +622,8 @@ proof:
     - replay_readiness
 
 tests:
-  - name: logged in Gmail attaches existing browser
-    input: browse Gmail in my active browser and snapshot the inbox
+  - name: logged in web app attaches existing browser
+    input: browse a logged-in web app in my active browser and snapshot the current page
     expect:
       route: attach_existing_session
       elicit:
@@ -583,6 +635,10 @@ tests:
         - headless_for_personal_browser_state
         - native_search_as_answer
         - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - direct_browser_tool_without_rote_browse
+        - direct_browser_api_without_rote_browse
+        - browser_runtime_without_rote_browse
 
   - name: bare browse asks for launch shape
     input: browse the dashboard and extract the visible buttons
@@ -598,6 +654,10 @@ tests:
         - native_search_as_answer
         - web_fetch_as_browser_substitute
         - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - direct_browser_tool_without_rote_browse
+        - direct_browser_api_without_rote_browse
+        - browser_runtime_without_rote_browse
 
   - name: public headless page avoids personal browser
     input: browse this public page headless in CI and summarize headings
