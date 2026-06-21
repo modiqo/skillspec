@@ -257,6 +257,9 @@ fn help_lists_trace_align_arguments() {
     let top = Command::new(bin()).arg("--help").output().unwrap();
     assert_success(&top);
     assert!(stdout(&top).contains("trace"));
+    assert!(stdout(&top).contains("sensemake"));
+    assert!(stdout(&top).contains("query"));
+    assert!(stdout(&top).contains("refs"));
 
     let trace = Command::new(bin())
         .arg("trace")
@@ -281,6 +284,106 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--json"));
+}
+
+#[test]
+fn sensemake_and_query_teach_progressive_navigation() {
+    let dir = TempDir::new("sensemake");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+
+    let sensemake = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&sensemake);
+    let out = stdout(&sensemake);
+    assert!(out.contains("SkillSpec map: CLI Rich Spec (cli.rich)"));
+    assert!(out.contains("- routes: strategy choices (2)"));
+    assert!(out.contains("- rules: steering logic (2)"));
+    assert!(out.contains("- states: lifecycle phases (0)"));
+    assert!(out.contains("skillspec decide"));
+    assert!(out.contains("skillspec query"));
+    assert!(out.contains("skillspec refs"));
+    assert!(out.contains("escalate index -> summary -> full only when needed"));
+
+    let sensemake_json = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&sensemake_json);
+    let report = json_stdout(&sensemake_json);
+    assert_eq!(report["spec_id"], "cli.rich");
+    assert!(report["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|section| { section["name"] == "commands" && section["count"] == 1 }));
+
+    let rule = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("rule:browse_rule")
+        .arg("--view")
+        .arg("summary")
+        .output()
+        .unwrap();
+    assert_success(&rule);
+    let rule_out = stdout(&rule);
+    assert!(rule_out.contains("target: rule:browse_rule"));
+    assert!(rule_out.contains("forbids"));
+    assert!(rule_out.contains("native_search_as_answer"));
+    assert!(rule_out.contains("after_success"));
+    assert!(rule_out.contains("cleanup"));
+
+    let requires = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("command:cleanup.requires")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&requires);
+    let requires_report = json_stdout(&requires);
+    assert_eq!(requires_report["target"]["kind"], "command");
+    assert_eq!(requires_report["target"]["id"], "cleanup");
+    assert_eq!(requires_report["target"]["field_path"][0], "requires");
+    assert_eq!(requires_report["value"]["dependencies"][0], "shell");
+
+    let forbid = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("rule:browse_rule.forbid")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&forbid);
+    let forbid_report = json_stdout(&forbid);
+    assert_eq!(forbid_report["value"][0], "native_search_as_answer");
+
+    let refs = Command::new(bin())
+        .arg("refs")
+        .arg(&spec)
+        .arg("rule:browse_rule")
+        .output()
+        .unwrap();
+    assert_success(&refs);
+    let refs_out = stdout(&refs);
+    assert!(refs_out.contains("prefer -> route: browser"));
+    assert!(refs_out.contains("forbid -> forbid: native_search_as_answer"));
+    assert!(refs_out.contains("after_success -> command_or_recipe_or_state: cleanup"));
+
+    let missing = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("rule:nope")
+        .output()
+        .unwrap();
+    assert_failure(&missing);
+    assert!(stderr(&missing).contains("unknown rule id"));
 }
 
 #[test]

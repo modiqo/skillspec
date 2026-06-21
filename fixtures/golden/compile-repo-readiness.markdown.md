@@ -12,13 +12,17 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - `forbid` entries are hard negative steering, not suggestions.
 - `elicit` entries require bounded user questions before guessing.
 - Use the scenario tests as examples of expected behavior.
+- When unfamiliar with the spec shape, run `skillspec sensemake <skill-folder>/skill.spec.yml --view index` to get section roles, counts, ids, and query commands without consuming the whole spec.
 - When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.
+- After `skillspec decide`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.
+- Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.
 - When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/rote-shell-spec`, `$rote-shell-spec`, or `/my-skill` before setting `--input`.
 - Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.
 - Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.
 - Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.
 - After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.
 - When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.
+- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.
 
 ## Routes
 
@@ -264,11 +268,15 @@ Use these as behavioral examples. The agent should make the same routing and gua
 Use these commands when the `skillspec` CLI is available. Replace `<skill-folder>` with the folder containing this generated `SKILL.md`. The default trace location is `${PWD}/.skillspec/traces`, where `PWD` is the task working directory.
 
 ```bash
+skillspec sensemake <skill-folder>/skill.spec.yml --view index
 skillspec validate <skill-folder>/skill.spec.yml
 skillspec imports check <skill-folder>/skill.spec.yml
 skillspec test <skill-folder>/skill.spec.yml
 skillspec deps check <skill-folder>/skill.spec.yml
 skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>
+skillspec query <skill-folder>/skill.spec.yml rule:<rule-id> --view summary
+skillspec refs <skill-folder>/skill.spec.yml rule:<rule-id> --view summary
+skillspec query <skill-folder>/skill.spec.yml command:<command-id>.requires
 skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec trace compact "${PWD}/.skillspec/traces/<run-id>"

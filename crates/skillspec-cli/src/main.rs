@@ -9,9 +9,10 @@ mod install;
 mod model;
 mod parser;
 mod report;
+mod sensemake;
 mod trace;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use error::Result;
 use install::HarnessTarget;
 use std::io::Write;
@@ -58,6 +59,43 @@ enum Command {
         /// Directory where append-only decision trace events should be written.
         #[arg(long)]
         trace_dir: Option<PathBuf>,
+    },
+    #[command(about = "Teach the SkillSpec grammar map and progressive navigation handles")]
+    Sensemake {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Output detail level.
+        #[arg(long, value_enum, default_value_t = SenseViewArg::Index)]
+        view: SenseViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Query one SkillSpec collection, item, or field path")]
+    Query {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Query handle, such as routes, rule:<id>, or command:<id>.requires.
+        handle: String,
+        /// Output detail level.
+        #[arg(long, value_enum, default_value_t = SenseViewArg::Summary)]
+        view: SenseViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Show outgoing SkillSpec references for an item handle")]
+    Refs {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Item handle, such as rule:<id>, command:<id>, state:<id>, or recipe:<id>.
+        handle: String,
+        /// Output detail level.
+        #[arg(long, value_enum, default_value_t = SenseViewArg::Summary)]
+        view: SenseViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
     },
     #[command(about = "Inspect, compact, or align SkillSpec decision traces")]
     Trace {
@@ -178,6 +216,13 @@ enum InstallTargetArg {
     ClaudeLocal,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum SenseViewArg {
+    Index,
+    Summary,
+    Full,
+}
+
 fn main() {
     if let Err(error) = run() {
         report::error(error);
@@ -228,6 +273,43 @@ fn run() -> Result<()> {
                 report::trace_written(&trace)?;
             }
             report::explain(&decision.decision)?;
+        }
+        Command::Sensemake { path, view, json } => {
+            let spec = parser::load_spec(&path)?;
+            let report = sensemake::sensemake(&spec, &path, view.into());
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&sensemake::render_sensemake(&report))?;
+            }
+        }
+        Command::Query {
+            path,
+            handle,
+            view,
+            json,
+        } => {
+            let spec = parser::load_spec(&path)?;
+            let report = sensemake::query(&spec, &path, &handle, view.into())?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&sensemake::render_query(&report))?;
+            }
+        }
+        Command::Refs {
+            path,
+            handle,
+            view,
+            json,
+        } => {
+            let spec = parser::load_spec(&path)?;
+            let report = sensemake::refs(&spec, &path, &handle, view.into())?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&sensemake::render_refs(&report))?;
+            }
         }
         Command::Trace { command } => match command {
             TraceCommand::Compact { run_dir } => {
@@ -345,6 +427,16 @@ impl From<CompileTarget> for compiler::Target {
             CompileTarget::CodexSkill => compiler::Target::CodexSkill,
             CompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
             CompileTarget::Markdown => compiler::Target::Markdown,
+        }
+    }
+}
+
+impl From<SenseViewArg> for sensemake::View {
+    fn from(value: SenseViewArg) -> Self {
+        match value {
+            SenseViewArg::Index => Self::Index,
+            SenseViewArg::Summary => Self::Summary,
+            SenseViewArg::Full => Self::Full,
         }
     }
 }

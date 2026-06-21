@@ -55,6 +55,9 @@ skillspec --help
 skillspec import-skill --help
 skillspec imports check --help
 skillspec deps check --help
+skillspec sensemake --help
+skillspec query --help
+skillspec refs --help
 ```
 
 ## Create A SkillSpec From An Existing Skill
@@ -162,6 +165,7 @@ The generated `SKILL.md` should tell the agent to use the sibling
 `skill.spec.yml`. The runtime flow is:
 
 ```sh
+skillspec sensemake path/to/skill.spec.yml --view index
 skillspec validate path/to/skill.spec.yml
 skillspec imports check path/to/skill.spec.yml
 skillspec deps check path/to/skill.spec.yml
@@ -169,6 +173,25 @@ skillspec decide path/to/skill.spec.yml \
   --input='the user task text' \
   --trace-dir .skillspec/traces
 ```
+
+`sensemake` is the progressive orientation step. It returns the SkillSpec map,
+section roles, counts, ids, and query handles without dumping the whole YAML.
+Use it when the spec shape is unfamiliar, then let `decide` fit the actual task.
+After `decide`, pull only the active slices and relationships you need:
+
+```sh
+skillspec query path/to/skill.spec.yml rule:<matched-rule> --view summary
+skillspec refs path/to/skill.spec.yml rule:<matched-rule> --view summary
+skillspec query path/to/skill.spec.yml rule:<matched-rule>.forbid --json
+skillspec query path/to/skill.spec.yml command:<command-id>.requires
+skillspec query path/to/skill.spec.yml state:<state-id>.next --json
+```
+
+Query detail is progressive:
+
+- `--view index`: ids and handles only
+- `--view summary`: compact resolved relationships for decisions
+- `--view full`: the full typed YAML-derived object
 
 For debugging:
 

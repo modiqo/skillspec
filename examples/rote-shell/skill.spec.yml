@@ -63,6 +63,47 @@ routes:
     description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
 
 rules:
+  - id: cli_invocations_use_rote_exec
+    when:
+      user_says_any:
+        - cli
+        - command
+        - shell command
+        - run
+        - execute
+        - call
+        - invoke
+        - check status
+        - list
+        - ls
+        - cat
+        - grep
+        - rg
+        - git
+        - gh
+        - cargo
+        - npm
+        - pnpm
+        - node
+        - python
+        - curl
+    route_order:
+      - one_shot_process
+      - declared_file_io
+      - background_process
+      - pty_transcript
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_harness_cli_call_without_rote_exec
+      - untracked_stdout_scrollback
+    after_success:
+      - run_cli_only_through_rote_exec
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Any local CLI invocation must go through `rote exec --` so stdout, stderr, exit status, workspace context, and evidence ids are captured instead of disappearing into harness terminal scrollback.
+
   - id: external_service_tasks_are_adapter_first
     when:
       user_says_any:
@@ -74,6 +115,13 @@ rules:
         - remote
         - issue
         - issues
+        - supabase
+        - database
+        - auth users
+        - active users
+        - users table
+        - table
+        - export csv
         - assignee
         - assigned to me
         - contributor
@@ -98,6 +146,9 @@ rules:
       - verify_adapter_or_cli_readiness
       - preflight_cli_fallback
       - run_cli_only_through_rote_exec
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
     reason: External-service work should prefer rote adapters; if no healthy adapter exists, prove installed/authenticated CLI fallback through rote exec before use.
 
   - id: explicit_parallel_search_uses_parallel_adapter_or_cli
@@ -139,6 +190,9 @@ rules:
       - use_parallel_search_via_adapter_or_cli
       - record_parallel_selection_evidence
       - capture_parallel_search_results
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
     reason: When the user names Parallel, run paired discovery for the Parallel/parallelweb adapter and a harness-discovered Parallel CLI candidate such as `parallel-cli`. Choose the adapter if healthy, otherwise choose the CLI only when readiness is proven through rote exec; never assume the binary is named `parallel` and never substitute native Codex web search.
 
   - id: browser_words_handoff_to_browse
@@ -893,16 +947,17 @@ closures:
       Run `rote stats --save`, then `rote workspace stats <workspace> --json`;
       extract `.metrics.context_tokens` as one-time exploration context-window
       tokens and `.metrics.total_tokens` as API request+response tokens. If
-      metrics are missing, say context economy is unavailable.
+      metrics are missing, say measured token savings are unavailable.
   report_workspace_evidence_and_token_math:
     description: >
       End with the workspace name, important response ids, SkillSpec trace run
-      directory, and context economy only when stats were actually queried.
-      Explain that workspace evidence is a context file system: future steps
-      can retrieve exact slices by id instead of carrying full outputs in the
-      model window. If the workflow is crystallized or memoried, repeat use can
-      avoid both API request tokens and context-window tokens for cached
-      evidence. Do not invent measured replay savings.
+      directory, and a visible `Token savings` section. Explain that the
+      workspace is a context file system: future steps can retrieve exact
+      slices by id instead of carrying full outputs in the model window. If the
+      workflow is crystallized or memoried, repeat use can avoid both API
+      request tokens and context-window tokens for cached evidence. If stats or
+      replay measurements were not queried, say the savings are structurally
+      available but not measured yet. Do not invent numeric replay savings.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -922,7 +977,7 @@ snippets:
       Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
       SkillSpec route trace: {{ skillspec_trace_dir }}.
       Rote dependency trace: captured with `rote trace --deps`.
-      Context economy:
+      Token savings:
       - Exploration spent {{ context_tokens }} context-window tokens and {{ total_tokens }} API request+response tokens once.
       - The important data now lives outside the prompt in the rote workspace, addressable by response ids/files instead of pasted back into the model window.
       - If this is crystallized as a flow or remembered, repeat use can skip the API work and avoid reloading the full evidence into context; measured replay savings: {{ replay_savings }} when available, otherwise say not measured yet.
@@ -1118,6 +1173,18 @@ tests:
       forbid:
         - untracked_stdout_scrollback
         - final_summary_without_trace_math
+
+  - name: direct cli invocation must use rote exec
+    input: run ls and show me the output
+    expect:
+      route: one_shot_process
+      after_success:
+        - run_cli_only_through_rote_exec
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_shell_command_without_rote_exec
+        - direct_harness_cli_call_without_rote_exec
+        - untracked_stdout_scrollback
 
   - name: rote exec requires named workspace and token math
     input: rote exec ls the repo and remember the evidence
