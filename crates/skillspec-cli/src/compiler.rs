@@ -72,7 +72,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("   ```bash\n");
     output.push_str("   skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("   ```\n\n");
-    output.push_str("4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.\n");
+    output.push_str("4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/durable-executor-spec` before passing `--input`.\n");
     output.push_str("5. Preserve the emitted trace `run_dir`.\n");
     output.push_str(
         "6. Read the decision JSON before using tools. Do not act from route labels alone.\n",
@@ -81,6 +81,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("8. Materialize the active contract described below, then execute only actions that satisfy it.\n");
     output.push_str("9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
     output.push_str("10. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    write_durable_handoff_contract(output);
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
     output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
@@ -124,6 +125,18 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
             let _ = writeln!(output, "- `{}`: {}", route.id.0, route.label);
         }
     }
+}
+
+fn write_durable_handoff_contract(output: &mut String) {
+    output.push_str("## Durable Handoff Contract\n\n");
+    output.push_str("This skill participates in agent-mediated durable execution. There is no runtime handoff engine: the agent reads the active SkillSpec contracts, carries the handoff packet in context, and preserves the declared evidence.\n\n");
+    output.push_str("- If a durable handoff packet is present, preserve its `workspace`, `trace_dir`, `return_to`, `branch_id`, and `execution_policy` fields.\n");
+    output.push_str("- If no durable handoff packet is present and the task asks for remembered evidence, future recall, reuse, trace, alignment, or durable execution, route through `durable-executor` first unless the user explicitly requests direct/no-rote execution.\n");
+    output.push_str("- If `durable_context.active` is true, do not route the whole task back to `durable-executor`; use `durable-executor` only as the execution substrate and then return to `return_to`.\n");
+    output.push_str("- This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.\n");
+    output.push_str("- Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.\n");
+    output.push_str("- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.\n");
+    output.push_str("- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.\n\n");
 }
 
 fn write_imports(output: &mut String, spec: &SkillSpec) {
@@ -469,6 +482,12 @@ fn selection_description(spec: &SkillSpec) -> String {
         collect_user_intents(applies_when, &mut intents);
     }
 
+    let activation_summary = spec
+        .activation
+        .as_ref()
+        .map(|activation| activation.summary.trim().trim_end_matches('.'))
+        .filter(|summary| !summary.is_empty());
+
     let mut capabilities = Vec::new();
     let cli_intent_surface = intents.iter().any(|intent| {
         let intent = intent.to_ascii_lowercase();
@@ -554,6 +573,24 @@ fn selection_description(spec: &SkillSpec) -> String {
     }
 
     let mut parts = Vec::new();
+    if let Some(summary) = activation_summary {
+        parts.push(summary.to_owned());
+    }
+    if let Some(activation) = &spec.activation {
+        if !activation.keywords.is_empty() {
+            parts.push(format!(
+                "Use for {}",
+                sentence_list(
+                    &activation
+                        .keywords
+                        .iter()
+                        .take(12)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                )
+            ));
+        }
+    }
     if !intents.is_empty() {
         parts.push(format!(
             "Use when the task needs to {}",
@@ -679,7 +716,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.\n");
     output.push_str("- After `skillspec decide`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.\n");
     output.push_str("- Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.\n");
-    output.push_str("- When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/rote-shell-spec`, `$rote-shell-spec`, or `/my-skill` before setting `--input`.\n");
+    output.push_str("- When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/durable-executor-spec`, `$durable-executor-spec`, or `/my-skill` before setting `--input`.\n");
     output.push_str("- Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.\n");
     output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
@@ -703,10 +740,24 @@ fn write_entry(output: &mut String, spec: &SkillSpec) {
 }
 
 fn write_activation(output: &mut String, spec: &SkillSpec) {
+    if spec.activation.is_none() && spec.applies_when.is_empty() {
+        return;
+    }
+    output.push_str("## Activation\n\n");
+    if let Some(activation) = &spec.activation {
+        let _ = writeln!(output, "- summary: {}", activation.summary);
+        if !activation.keywords.is_empty() {
+            let _ = writeln!(output, "- keywords: {}", activation.keywords.join(", "));
+        }
+        if let Some(priority) = &activation.priority {
+            let _ = writeln!(output, "- priority: {priority}");
+        }
+        output.push('\n');
+    }
     if spec.applies_when.is_empty() {
         return;
     }
-    output.push_str("## Applies When\n\n");
+    output.push_str("### Applies When\n\n");
     for hint in &spec.applies_when {
         write_yaml_block(output, hint);
     }
@@ -1467,6 +1518,7 @@ mod tests {
             id: "generic.code_review".to_owned(),
             title: "Code Review".to_owned(),
             description: "Review code changes.".to_owned(),
+            activation: None,
             applies_when: Vec::new(),
             entry: None,
             routes: vec![Route {

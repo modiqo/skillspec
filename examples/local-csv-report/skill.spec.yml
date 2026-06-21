@@ -1,7 +1,7 @@
 schema: skillspec/v0
 id: local.csv_report
 title: local csv report
-description: Use rote shell to turn a local CSV into durable JSON and text reports with file provenance, dependency checks, privacy guardrails, and optional reuse.
+description: Use durable executor to turn a local CSV into durable JSON and text reports with file provenance, dependency checks, privacy guardrails, and optional reuse.
 
 applies_when:
   - user_intent:
@@ -22,7 +22,7 @@ routes:
   - id: local_file_report
     label: Build a report from local files
     rank: 20
-    description: Use rote shell file provenance and local CLI tools to parse, summarize, and save report artifacts.
+    description: Use durable executor file provenance and local CLI tools to parse, summarize, and save report artifacts.
   - id: dependency_preflight
     label: Check local tools before report generation
     rank: 30

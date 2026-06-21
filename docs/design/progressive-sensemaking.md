@@ -336,7 +336,7 @@ This doc is grounded in:
 - `crates/skillspec-cli/src/compiler.rs`, which emits loader guidance to run
   `sensemake`, `decide`, `query`, `refs`, dependency checks, and trace
   alignment;
-- `examples/rote-shell/SKILL.md`, which shows the generated runtime contract and
+- `examples/durable-executor/SKILL.md`, which shows the generated runtime contract and
   active checklist;
 - `crates/skillspec-cli/src/decision.rs`, which defines the decision output the
   agent must read before acting.

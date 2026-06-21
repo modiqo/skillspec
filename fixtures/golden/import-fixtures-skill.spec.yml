@@ -2,6 +2,7 @@ schema: skillspec/v0
 id: imported.skill
 title: Example Browser Skill
 description: Imported SkillSpec scaffold from SKILL.md
+activation: null
 applies_when: []
 entry: null
 routes: []

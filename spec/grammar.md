@@ -93,6 +93,7 @@ carry arbitrary structured values.
 
 ```text
 skillspec       = header ,
+                  [ activation ] ,
                   [ applies-when ] ,
                   [ entry ] ,
                   [ routes ] ,
@@ -124,13 +125,29 @@ description     = "description" ":" string ;
 ## Activation
 
 ```text
+activation      = "activation" ":" mapping ;
+activation.summary = "summary" ":" string ;
+activation.keywords = "keywords" ":" sequence-of string ;
+activation.priority = "priority" ":" string ;
 applies-when    = "applies_when" ":" sequence-of activation-hint ;
 activation-hint = mapping ;
 ```
 
-V0 does not standardize all activation predicates. The common shape is:
+`activation.summary` is a harness-selection hint. Compiler targets that emit a
+trampoline skill should place it at the start of the generated frontmatter
+description so the harness can choose the skill before loading the full spec.
+`activation.keywords` can widen that selection surface without changing route
+decision. `activation.priority` is advisory metadata for humans and harnesses;
+it does not execute routing by itself.
+
+V0 does not standardize all `applies_when` predicates. The common shape is:
 
 ```yaml
+activation:
+  summary: Universal durable-work router with trace and alignment benefits.
+  keywords:
+    - remember this workflow
+    - route through durable executor
 applies_when:
   - user_intent:
       - recurring task

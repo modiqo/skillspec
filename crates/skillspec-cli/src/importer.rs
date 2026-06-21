@@ -61,6 +61,7 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
             .title
             .unwrap_or_else(|| "imported skill".to_owned()),
         description: "Imported SkillSpec scaffold from SKILL.md".to_owned(),
+        activation: None,
         applies_when: Vec::new(),
         entry: None,
         routes: Vec::new(),

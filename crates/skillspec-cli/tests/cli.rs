@@ -122,6 +122,12 @@ schema: skillspec/v0
 id: cli.rich
 title: CLI Rich Spec
 description: Exercises core CLI behavior.
+activation:
+  summary: Universal CLI/API/shell router with trace and alignment benefits.
+  keywords:
+    - git status
+    - remote sync
+  priority: broad_router
 entry:
   prompt: Decide before tools.
   decision_required: true
@@ -141,7 +147,7 @@ routes:
       mode: ordered
       phases:
         - id: collect_cli_evidence
-          owner_skill: rote-shell
+          owner_skill: durable-executor
           route: local
           requires: [run_cli_only_through_rote_exec]
           forbid: [direct_cli_without_rote_exec]
@@ -505,7 +511,7 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert_success(&route_refs);
     let route_refs_out = stdout(&route_refs);
     assert!(route_refs_out.contains("handoff.to_skill -> skill: rote-browse"));
-    assert!(route_refs_out.contains("execution_plan.owner_skill -> skill: rote-shell"));
+    assert!(route_refs_out.contains("execution_plan.owner_skill -> skill: durable-executor"));
     assert!(route_refs_out.contains("execution_plan.route -> route: local"));
     assert!(route_refs_out.contains("execution_plan.jump.to_phase -> phase: browser_handoff"));
 
@@ -1103,8 +1109,12 @@ fn compile_targets_render_loader_and_full_markdown() {
         .unwrap();
     assert_success(&loader);
     let loader_out = stdout(&loader);
+    assert!(loader_out.contains(
+        "description: \"Universal CLI/API/shell router with trace and alignment benefits."
+    ));
     assert!(loader_out.contains("thin loader"));
     assert!(loader_out.contains("## Entry Gate"));
+    assert!(loader_out.contains("## Durable Handoff Contract"));
     assert!(loader_out.contains("Forbidden before the decision"));
     assert!(loader_out.contains("skill.spec.yml"));
     assert!(!loader_out.contains("## Rules"));
@@ -1348,7 +1358,7 @@ fn install_skill_supports_folder_shaped_examples() {
         .env("HOME", &home)
         .arg("install")
         .arg("skill")
-        .arg("examples/rote-shell")
+        .arg("examples/durable-executor")
         .arg("--target")
         .arg("agents")
         .arg("--target")
@@ -1358,7 +1368,7 @@ fn install_skill_supports_folder_shaped_examples() {
         .unwrap();
     assert_success(&dry_run);
     let planned = json_stdout(&dry_run);
-    assert_eq!(planned["skill_name"], "rote-shell");
+    assert_eq!(planned["skill_name"], "durable-executor");
     assert_eq!(planned["dry_run"], true);
     assert_eq!(planned["installs"].as_array().unwrap().len(), 2);
     assert!(planned["installs"]
@@ -1376,6 +1386,7 @@ fn schema_records_strict_typed_sections_and_extension_surfaces() {
     assert_eq!(schema["additionalProperties"], false);
     for typed_def in [
         "route",
+        "activation",
         "rule",
         "predicate",
         "state",

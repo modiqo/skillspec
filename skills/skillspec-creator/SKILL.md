@@ -256,11 +256,43 @@ source skill folder
         - outcome_recorded
     ```
 
-25. Add scenario tests for every important decision, especially old-skill
+25. Add durable-executor compatibility when the skill may run commands, call
+    APIs, invoke provider CLIs, write files, use adapters, preserve evidence,
+    or participate in future recall. This is an agent-mediated contract, not a
+    runtime engine.
+
+    - Add `activation.summary` so generated trampoline frontmatter states what
+      the skill is before the full spec is loaded.
+    - For durable meta-router skills, use a summary like:
+      `Universal durable-work meta-router and CLI/API/shell substrate with trace, alignment, evidence capture, and future recall.`
+    - For domain skills, use a domain summary like:
+      `Universal browser/web automation router with trace and alignment benefits.`
+    - Do not create or maintain a central domain registry. Domain skills
+      advertise their own activation metadata; the agent selects the matching
+      installed skill from harness metadata.
+    - If the skill receives a durable handoff packet, preserve `workspace`,
+      `trace_dir`, `return_to`, `branch_id`, `execution_policy`, and
+      `evidence_context`.
+    - If no durable handoff packet is present and the task asks for remembered
+      evidence, future recall, trace, alignment, reuse, or durable execution,
+      route through `durable-executor` before domain work unless the user
+      explicitly asks for direct/no-rote execution.
+    - Domain skills own domain interpretation and validation only. Any CLI,
+      shell, local process, package command, API fallback, or provider command
+      must use the durable execution substrate, normally a rote adapter or
+      `rote exec --`.
+    - When domain work completes, the skill should produce a return packet with
+      status, selected route, skill metadata, artifacts, evidence handles,
+      blockers, and trace paths, then hand back to `return_to` for final durable
+      closure.
+    - For parallel branches, keep one top-level workspace and use branch-scoped
+      `branch_id`, trace paths, evidence labels, and artifact directories.
+
+26. Add scenario tests for every important decision, especially old-skill
     failure modes.
-26. Add `review_required` for any uncertain judgment. Do not bury uncertainty
+27. Add `review_required` for any uncertain judgment. Do not bury uncertainty
     in comments.
-27. Validate, test, and check dependencies:
+28. Validate, test, and check dependencies:
 
     ```bash
     skillspec validate skill.spec.yml
@@ -271,7 +303,7 @@ source skill folder
     skillspec explain skill.spec.yml --input '<representative request>'
     ```
 
-28. Before asking to install the generated skill, show the dependency summary
+29. Before asking to install the generated skill, show the dependency summary
     again and ask the user to approve the dependency surface. Approval should
     cover:
 
@@ -280,14 +312,14 @@ source skill folder
     - provision/install options
     - any missing dependencies that leave the skill draft-only
 
-29. Compile only after the spec is valid:
+30. Compile only after the spec is valid:
 
     ```bash
     skillspec compile skill.spec.yml --target codex-skill
     skillspec compile skill.spec.yml --target claude-skill
     ```
 
-30. If the user asks to install, create a clean generated skill folder:
+31. If the user asks to install, create a clean generated skill folder:
 
     ```text
     <skill-name>/

@@ -18,7 +18,7 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - When the `skillspec` CLI is available, prefer `skillspec decide` or `skillspec explain` over manual interpretation.
 - After `skillspec decide`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.
 - Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.
-- When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/rote-shell-spec`, `$rote-shell-spec`, or `/my-skill` before setting `--input`.
+- When invoking `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/durable-executor-spec`, `$durable-executor-spec`, or `/my-skill` before setting `--input`.
 - Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.
 - Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.
 - Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.

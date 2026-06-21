@@ -1,6 +1,6 @@
 ---
 name: rote-browse
-description: "Use when the task needs to browse a website with rote, browse Gmail or an email web app with rote, attach to an active browser, inspect logged-in web app state, snapshot or slice a page, click or type in a page and recover a stale browser ref or page lease. Handles browser handoff and page evidence and dependency checks. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+description: "Browser domain skill for durable-executor handoffs and explicit rote-browse browser execution with trace, alignment, and page evidence. Use for browser handoff from durable executor, durable browser handoff, preserve durable handoff packet, return browser evidence to durable executor, explicit rote-browse browser execution, attach existing browser, logged-in web app state, snapshot or slice a page, click or type in a page and recover stale browser refs. Use when the task needs to browser handoff from durable executor, preserve browser evidence in a durable workspace, browse a website with rote, browse Gmail or an email web app with rote, attach to an active browser, inspect logged-in web app state and snapshot or slice a page. Handles browser handoff and page evidence and dependency checks. Requires `skillspec decide` before substrate tools or overlapping low-level skills"
 ---
 
 # rote browse
@@ -26,13 +26,25 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
    skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
    ```
 
-4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.
+4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/durable-executor-spec` before passing `--input`.
 5. Preserve the emitted trace `run_dir`.
 6. Read the decision JSON before using tools. Do not act from route labels alone.
 7. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.
 8. Materialize the active contract described below, then execute only actions that satisfy it.
 9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
 10. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+
+## Durable Handoff Contract
+
+This skill participates in agent-mediated durable execution. There is no runtime handoff engine: the agent reads the active SkillSpec contracts, carries the handoff packet in context, and preserves the declared evidence.
+
+- If a durable handoff packet is present, preserve its `workspace`, `trace_dir`, `return_to`, `branch_id`, and `execution_policy` fields.
+- If no durable handoff packet is present and the task asks for remembered evidence, future recall, reuse, trace, alignment, or durable execution, route through `durable-executor` first unless the user explicitly requests direct/no-rote execution.
+- If `durable_context.active` is true, do not route the whole task back to `durable-executor`; use `durable-executor` only as the execution substrate and then return to `return_to`.
+- This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.
+- Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.
+- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.
+- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.
 
 ## How To Execute The Structure
 

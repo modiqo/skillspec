@@ -9,6 +9,7 @@
     "id": { "$ref": "#/$defs/identifier" },
     "title": { "type": "string", "minLength": 1 },
     "description": { "type": "string", "minLength": 1 },
+    "activation": { "$ref": "#/$defs/activation" },
     "applies_when": {
       "type": "array",
       "items": { "type": "object", "additionalProperties": true }
@@ -99,6 +100,19 @@
         "credential_request",
         "destructive"
       ]
+    },
+    "activation": {
+      "type": "object",
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "priority": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
     },
     "entry": {
       "type": "object",

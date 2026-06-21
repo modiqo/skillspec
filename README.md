@@ -71,7 +71,7 @@ For serious ports, use the creator skill:
 Examples:
 
 ```text
-/skillspec-creator port /Users/me/.agents/skills/rote-shell
+/skillspec-creator port /Users/me/.agents/skills/durable-executor
 /skillspec-creator port https://github.com/anthropics/skills/tree/main/skills/pdf
 ```
 
@@ -298,7 +298,7 @@ fixtures/   sample skills and expected outputs
 Useful examples:
 
 - [examples/rote-computer/skill.spec.yml](examples/rote-computer/skill.spec.yml)
-- [examples/rote-shell/skill.spec.yml](examples/rote-shell/skill.spec.yml)
+- [examples/durable-executor/skill.spec.yml](examples/durable-executor/skill.spec.yml)
 - [examples/local-csv-report/skill.spec.yml](examples/local-csv-report/skill.spec.yml)
 - [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
 - [examples/before-after/](examples/before-after/) shows a prose skill before
@@ -308,7 +308,7 @@ Installable examples are folder-shaped and include a generated `SKILL.md`
 trampoline plus `skill.spec.yml`:
 
 ```sh
-skillspec install skill examples/rote-shell --target agents --target codex --dry-run
+skillspec install skill examples/durable-executor --target agents --target codex --dry-run
 ```
 
 ## Verification Suite

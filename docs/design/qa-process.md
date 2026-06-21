@@ -211,10 +211,10 @@ cargo test
 Run representative SkillSpec checks:
 
 ```sh
-target/debug/skillspec validate examples/rote-shell/skill.spec.yml
-target/debug/skillspec imports check examples/rote-shell/skill.spec.yml
-target/debug/skillspec test examples/rote-shell/skill.spec.yml
-target/debug/skillspec deps check examples/rote-shell/skill.spec.yml
+target/debug/skillspec validate examples/durable-executor/skill.spec.yml
+target/debug/skillspec imports check examples/durable-executor/skill.spec.yml
+target/debug/skillspec test examples/durable-executor/skill.spec.yml
+target/debug/skillspec deps check examples/durable-executor/skill.spec.yml
 ```
 
 If `target/debug/skillspec` does not exist before the representative checks, run

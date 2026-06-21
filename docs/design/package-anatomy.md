@@ -147,7 +147,7 @@ of the contract only when declared through `imports`, `resources`, `code`,
 ## `deps.toml`
 
 `deps.toml` is a companion dependency manifest used by surrounding tooling. In
-the `examples/rote-shell` package it looks like:
+the `examples/durable-executor` package it looks like:
 
 ```toml
 schema_version = 1
@@ -169,7 +169,7 @@ The important boundary is:
 - a SkillSpec can declare `deps.toml` as a file dependency when that manifest is
   required for the skill's release or replay workflow.
 
-In `examples/rote-shell/skill.spec.yml`, `deps_toml` is declared as a file
+In `examples/durable-executor/skill.spec.yml`, `deps_toml` is declared as a file
 dependency with `path: deps.toml`, and the `deps_check` command template runs
 `rote deps check deps.toml`. That makes the manifest visible to the SkillSpec
 contract without making the SkillSpec CLI parse `deps.toml` directly.
@@ -242,10 +242,10 @@ This doc is grounded in:
 
 - `crates/skillspec-cli/src/compiler.rs`, which generates thin loaders for
   Codex and Claude skill targets;
-- `examples/rote-shell/SKILL.md`, which shows the generated loader shape;
-- `examples/rote-shell/skill.spec.yml`, which shows entry policy, routes, rules,
+- `examples/durable-executor/SKILL.md`, which shows the generated loader shape;
+- `examples/durable-executor/skill.spec.yml`, which shows entry policy, routes, rules,
   dependencies, file dependency `deps_toml`, and command template `deps_check`;
-- `examples/rote-shell/deps.toml`, which shows the companion tool manifest;
+- `examples/durable-executor/deps.toml`, which shows the companion tool manifest;
 - `crates/skillspec-cli/src/deps.rs`, which checks dependencies declared in
   `skill.spec.yml`;
 - `spec/imports.md` and `crates/skillspec-cli/src/imports.rs`, which define and

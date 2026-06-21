@@ -1,10 +1,39 @@
 schema: skillspec/v0
-id: rote.shell
-title: rote shell
-description: Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work.
+id: durable.executor
+title: durable executor
+description: Universal durable-work meta-router and CLI/API/shell execution substrate for remembered, traced, aligned, and reusable work.
+
+activation:
+  summary: Universal durable-work meta-router for CLI, API, shell, browser, and domain-skill work with trace, alignment, evidence capture, and future recall.
+  keywords:
+    - remember this workflow
+    - future recall
+    - trace and alignment
+    - durable execution
+    - route through durable executor
+    - browse Gmail or email web app through durable executor
+    - browse a website with durable evidence
+    - browser automation with trace and alignment
+    - browser handoff to rote-browse
+    - inspect logged-in web app state
+    - run any CLI command
+    - run any shell command
+    - call or inspect an API
+    - check git or gh repo status
+    - check whether a repo is ahead behind or synced with remote
+    - use rote exec
+  priority: meta_router
 
 applies_when:
   - user_intent:
+      - remember this workflow for future recall
+      - preserve evidence with trace and alignment
+      - route durable work through a meta-router
+      - hand off to a domain skill and return for closure
+      - route browser work through durable executor before rote-browse
+      - browse Gmail or an email web app with trace and alignment
+      - extract browser page or email evidence for future recall
+      - execute all CLI API shell and provider commands through rote exec
       - run a local command and remember the result
       - inspect CLI output with provenance
       - follow a log or process stream
@@ -15,7 +44,7 @@ applies_when:
       - check a repository for roadmap or contribution markdown files
 
 entry:
-  prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
+  prompt: Choose the narrowest durable executor route that preserves the evidence the user will need later.
   decision_required: true
   supersedes_skills:
     - browser:browser
@@ -29,18 +58,77 @@ entry:
     - node_repl
 
 routes:
+  - id: durable_domain_handoff
+    label: Hand off domain work and return for durable closure
+    rank: 1
+    description: >
+      Use when the task is domain-owned, such as voice, PDF, spreadsheet, browser, or another independent SkillSpec,
+      but the user or activation context requires durable workspace evidence, trace, alignment, and future recall.
+      The agent selects the matching domain skill from harness skill metadata, carries a durable handoff packet, and
+      returns to durable-executor for closure. This is an agent-mediated contract, not a runtime engine.
+    execution_plan:
+      mode: ordered
+      reason: Durable work needs one workspace and trace lineage while independent domain skills keep ownership of domain decisions.
+      phases:
+        - id: establish_durable_context
+          owner_skill: durable-executor
+          description: Create or enter one named rote workspace, create a decision trace, and prepare branch or artifact scopes before domain work starts.
+          requires:
+            - initialize_rote_workspace
+            - derive_workspace_name
+            - prepare_durable_handoff_packet
+          forbid:
+            - anonymous_workspace
+            - untracked_stdout_scrollback
+        - id: domain_skill_handoff
+          owner_skill: matching-domain-skill
+          description: Let the matching domain SkillSpec own domain interpretation and validation while preserving the durable handoff packet.
+          requires:
+            - handoff_to_matching_domain_skill
+            - preserve_durable_context
+            - require_domain_execution_through_durable_executor
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+          handoff:
+            to_skill: matching-domain-skill
+            boundary: resume_after_handoff
+            pass_context:
+              - user_intent
+              - workspace
+              - trace_dir
+              - return_to
+              - execution_policy
+              - evidence_context
+            forbid:
+              - direct_cli_without_rote_exec
+              - direct_shell_command_without_rote_exec
+              - direct_api_call_without_rote_adapter_or_rote_exec
+            reason: Domain semantics belong to the selected domain skill; durable execution and final closure return to durable-executor.
+        - id: durable_closure
+          owner_skill: durable-executor
+          description: Review the domain return packet, align traces, summarize evidence, report token-savings context, and handle recall or crystallization closure.
+          requires:
+            - receive_domain_return_packet
+            - compute_workspace_trace
+            - compute_workspace_stats
+            - report_workspace_evidence_and_token_math
+          forbid:
+            - final_summary_without_workspace
+            - final_summary_without_trace_math
   - id: shell_then_browser_handoff
     label: Run shell evidence, then hand off browser work
     rank: 3
     description: >
       Use when one user request combines local CLI/repo/service status work with browser-owned page or email-draft work.
-      Execute the shell evidence phase through rote-shell first, then stop at the browser phase and hand off to rote-browse.
+      Execute the shell evidence phase through durable-executor first, then stop at the browser phase and hand off to rote-browse.
     execution_plan:
       mode: ordered
       reason: Compound shell-plus-browser requests must not let the browser handoff hide or skip the shell phase.
       phases:
         - id: shell_status_via_rote_exec
-          owner_skill: rote-shell
+          owner_skill: durable-executor
           route: adapter_first_cli_fallback
           description: Complete repo, GitHub, local CLI, and status checks through a named rote workspace and `rote exec --` before any browser work.
           requires:
@@ -59,7 +147,7 @@ routes:
         - id: browser_draft_handoff
           owner_skill: rote-browse
           route: browser_handoff
-          description: Pass the shell evidence summary and browser/email-draft intent to rote-browse; do not run browser tools inside rote-shell.
+          description: Pass the shell evidence summary and browser/email-draft intent to rote-browse; do not run browser tools inside durable-executor.
           requires:
             - handoff_browser_work_to_rote_browse_skill
             - pass_browser_context_to_rote_browse
@@ -69,7 +157,7 @@ routes:
             - raw_playwright
             - native_browser_tool_without_rote_browse
             - direct_browser_tool_without_rote_browse
-            - browser_cli_commands_in_rote_shell
+            - browser_cli_commands_in_durable_executor
           handoff:
             to_skill: rote-browse
             boundary: stop_current_skill
@@ -82,7 +170,7 @@ routes:
             forbid:
               - native_browser_tool_without_rote_browse
               - direct_browser_tool_without_rote_browse
-              - browser_cli_commands_in_rote_shell
+              - browser_cli_commands_in_durable_executor
               - raw_playwright
             reason: Browser drafting is owned by rote-browse after shell evidence is captured.
 
@@ -109,9 +197,9 @@ routes:
       forbid:
         - native_browser_tool_without_rote_browse
         - direct_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
         - raw_playwright
-      reason: Browser execution is owned by rote-browse; rote-shell must stop browser execution and only pass declared context.
+      reason: Browser execution is owned by rote-browse; durable-executor must stop browser execution and only pass declared context.
   - id: one_shot_process
     label: Capture a one-shot process
     rank: 10
@@ -146,6 +234,58 @@ routes:
     description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
 
 rules:
+  - id: durable_memory_tasks_start_at_meta_router
+    when:
+      user_says_any:
+        - remember this
+        - memorize this
+        - future recall
+        - reusable
+        - reuse later
+        - crystallize this workflow
+        - preserve evidence
+        - trace and alignment
+        - durable execution
+    prefer: durable_domain_handoff
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_api_call_without_rote_adapter_or_rote_exec
+      - final_summary_without_workspace
+      - final_summary_without_trace_math
+    after_success:
+      - derive_workspace_name
+      - prepare_durable_handoff_packet
+      - handoff_to_matching_domain_skill
+      - receive_domain_return_packet
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Requests that ask for memory, reuse, trace, or durable evidence should start at durable-executor, hand domain work to the matching SkillSpec, and return for closure.
+
+  - id: domain_objects_handoff_but_keep_durable_execution
+    when:
+      user_says_any:
+        - voice message
+        - text to speech
+        - elevenlabs
+        - audio generation
+        - pdf
+        - spreadsheet
+        - document conversion
+    prefer: durable_domain_handoff
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_api_call_without_rote_adapter_or_rote_exec
+    after_success:
+      - prepare_durable_handoff_packet
+      - preserve_durable_context
+      - require_domain_execution_through_durable_executor
+      - receive_domain_return_packet
+      - report_workspace_evidence_and_token_math
+    reason: Domain skills own domain decisions, but durable-executor owns the workspace, execution substrate, evidence, and final closure.
+
   - id: cli_invocations_use_rote_exec
     when:
       user_says_any:
@@ -191,6 +331,31 @@ rules:
       - compute_workspace_stats
       - report_workspace_evidence_and_token_math
     reason: Any local CLI invocation must go through `rote exec --` so stdout, stderr, exit status, workspace context, and evidence ids are captured instead of disappearing into harness terminal scrollback.
+
+  - id: explicit_process_command_uses_one_shot
+    when:
+      user_says_any:
+        - rote exec
+        - run git
+        - run gh
+        - run cargo
+        - run npm
+        - run pnpm
+        - run python
+        - run node
+        - run curl
+    prefer: one_shot_process
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_harness_cli_call_without_rote_exec
+      - untracked_stdout_scrollback
+    after_success:
+      - run_cli_only_through_rote_exec
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Explicit command-form prompts should capture a bounded process response through the durable execution substrate.
 
   - id: external_service_tasks_are_adapter_first
     when:
@@ -307,7 +472,7 @@ rules:
       - direct_browser_tool_without_rote_browse
       - curl_as_browser_substitute
       - adapter_setup_before_browser_handoff
-      - browser_cli_commands_in_rote_shell
+      - browser_cli_commands_in_durable_executor
     allow:
       native_search: url_discovery_only
     after_success:
@@ -331,7 +496,7 @@ rules:
       - raw_playwright
       - native_browser_tool_without_rote_browse
       - direct_browser_tool_without_rote_browse
-      - browser_cli_commands_in_rote_shell
+      - browser_cli_commands_in_durable_executor
     after_success:
       - run_cli_only_through_rote_exec
       - handoff_browser_work_to_rote_browse_skill
@@ -376,10 +541,14 @@ rules:
         - replay
         - evidence
         - audit
-    prefer: one_shot_process
     forbid:
       - untracked_stdout_scrollback
       - ad_hoc_redirect_for_evidence
+    after_success:
+      - run_cli_only_through_rote_exec
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
     reason: Durable CLI facts should be captured as typed process responses.
 
   - id: file_inputs_outputs_are_declared
@@ -419,7 +588,7 @@ rules:
       - compute_workspace_trace
       - compute_workspace_stats
       - report_workspace_evidence_and_token_math
-    reason: Repository markdown discovery must be captured as rote-shell evidence, not direct `rg`, file listing, or file reads.
+    reason: Repository markdown discovery must be captured as durable-executor evidence, not direct `rg`, file listing, or file reads.
 
   - id: long_noninteractive_jobs_use_background
     when:
@@ -537,7 +706,7 @@ rules:
       - raw_playwright
       - browser_payload_in_large_argv
       - native_browser_tool_without_rote_browse
-      - browser_cli_commands_in_rote_shell
+      - browser_cli_commands_in_durable_executor
     after_success:
       - handoff_browser_work_to_rote_browse_skill
       - pass_browser_context_to_rote_browse
@@ -649,7 +818,7 @@ dependencies:
           safety: read_only
   rote_browse:
     kind: browser
-    description: Browser execution capability owned by the rote-browse skill. Browser setup, daemon/session start, `rote browse` use, and cleanup must be handled by rote-browse rather than raw browser tooling in rote-shell.
+    description: Browser execution capability owned by the rote-browse skill. Browser setup, daemon/session start, `rote browse` use, and cleanup must be handled by rote-browse rather than raw browser tooling in durable-executor.
     permission:
       required: true
       reason: Browser work may attach to logged-in sessions or read live page state.
@@ -815,7 +984,7 @@ commands:
         - rote
 
   confirm_workspace_context:
-    description: Confirm the active workspace before running any durable rote shell command.
+    description: Confirm the active workspace before running any durable executor command.
     template: "rote whoami"
     safety: read_only
     requires:
@@ -1035,17 +1204,36 @@ commands:
 
 closures:
   choose_shell_route:
-    description: Choose the narrowest shipped rote shell primitive that preserves necessary evidence.
+    description: Choose the narrowest shipped durable executor primitive that preserves necessary evidence.
   derive_workspace_name:
     description: Derive a short, stable, task-specific workspace slug before any durable rote command, such as `tulving-rote-remote-check`.
+  prepare_durable_handoff_packet:
+    description: >
+      Prepare a structured handoff packet that carries user intent, one shared workspace,
+      trace directory, return_to target, execution policy, evidence requirements, and
+      optional branch_id for parallel work. This is carried by the agent in context; no
+      runtime handoff engine is implied.
+  handoff_to_matching_domain_skill:
+    description: >
+      Select the matching domain skill from harness skill metadata and load its generated
+      SkillSpec trampoline. Do not maintain a domain registry inside durable-executor.
+  preserve_durable_context:
+    description: Preserve workspace, trace_dir, return_to, branch_id, execution_policy, and evidence_context across the handoff.
+  require_domain_execution_through_durable_executor:
+    description: >
+      Require the domain skill to run any CLI, shell, process, package, provider, or API fallback
+      through durable-executor's rote adapter or `rote exec --` substrate unless the user explicitly
+      requested direct/no-rote execution.
+  receive_domain_return_packet:
+    description: Review the domain skill return packet for status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths before final closure.
   prepare_browser_skill_handoff_if_selected:
     description: If the selected route is `browser_handoff`, stop shell-owned browser planning and prepare a concise handoff note for the `rote-browse` skill.
   handoff_browser_work_to_rote_browse_skill:
-    description: Defer all browser navigation, interaction, capture, auth/session, and cleanup decisions to the `rote-browse` skill instead of prescribing them in rote-shell.
+    description: Defer all browser navigation, interaction, capture, auth/session, and cleanup decisions to the `rote-browse` skill instead of prescribing them in durable-executor.
   pass_browser_context_to_rote_browse:
     description: Pass the user's browser goal, URLs or sites, workspace/evidence context, and any shell-derived inputs to `rote-browse` so it can own browser execution.
   resume_shell_work_after_browser_evidence:
-    description: Resume rote-shell only after `rote-browse` has produced materialized browser evidence such as response handles, files, or a concise result.
+    description: Resume durable-executor only after `rote-browse` has produced materialized browser evidence such as response handles, files, or a concise result.
   identify_required_services_and_tools:
     description: Extract named services and tools from the request (for example GitHub/gh/git and Parallel/parallelweb) before selecting adapters or CLI fallbacks.
   discover_relevant_rote_adapters:
@@ -1073,7 +1261,7 @@ closures:
   capture_parallel_search_results:
     description: Store Parallel search/enrichment results as typed rote responses or declared files before summarizing them.
   run_selected_rote_primitive:
-    description: Execute the selected shipped rote shell primitive, not an invented roadmap command.
+    description: Execute the selected shipped durable executor primitive, not an invented roadmap command.
   query_typed_response:
     description: Query the saved typed response with the exact query in @@result or @proc addresses.
   decide_whether_to_crystallize:
@@ -1130,6 +1318,52 @@ proof:
     - crystallization_readiness
 
 tests:
+  - name: remembered voice work hands off to domain skill
+    input: create a voice message with ElevenLabs and remember this workflow for future reuse
+    expect:
+      route: durable_domain_handoff
+      plan_phases:
+        - establish_durable_context
+        - domain_skill_handoff
+        - durable_closure
+      matched_rules:
+        - durable_memory_tasks_start_at_meta_router
+        - domain_objects_handoff_but_keep_durable_execution
+      after_success:
+        - prepare_durable_handoff_packet
+        - handoff_to_matching_domain_skill
+        - preserve_durable_context
+        - require_domain_execution_through_durable_executor
+        - receive_domain_return_packet
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_shell_command_without_rote_exec
+        - direct_api_call_without_rote_adapter_or_rote_exec
+
+  - name: gh repo sync check remains adapter cli fallback
+    input: can you check the gh status for repo skillspec and let me know if its ahead or sync with remote
+    expect:
+      route: adapter_first_cli_fallback
+      matched_rules:
+        - cli_invocations_use_rote_exec
+        - external_service_tasks_are_adapter_first
+        - durable_work_requires_named_workspace
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_shell_command_without_rote_exec
+        - direct_harness_cli_call_without_rote_exec
+        - untracked_stdout_scrollback
+        - skipping_adapter_discovery
+        - skipping_cli_readiness_check
+      after_success:
+        - run_cli_only_through_rote_exec
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - report_workspace_evidence_and_token_math
+
   - name: browser intent hands off to browser
     input: browse the active dashboard and summarize it
     expect:
@@ -1142,7 +1376,21 @@ tests:
         - native_search_as_answer
         - raw_playwright
         - native_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
+
+  - name: gmail browse request starts at durable executor and hands off
+    input: browse from my gmail and extract last 10 emails
+    expect:
+      route: browser_handoff
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - native_search_as_answer
+        - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - browser_cli_commands_in_durable_executor
 
   - name: active browser attach defers to rote-browse
     input: attach to my active Chrome session for a logged-in inbox and snapshot the current page
@@ -1155,7 +1403,7 @@ tests:
       forbid:
         - raw_playwright
         - direct_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
 
   - name: repo status then email reminder uses ordered shell then browser plan
     input: check my gh status for repo ~/tulving/skillspec against the remote repo for pending checkins, then browse to create an email draft summary to act as a reminder
@@ -1174,7 +1422,7 @@ tests:
         - direct_harness_cli_call_without_rote_exec
         - raw_playwright
         - direct_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
       after_success:
         - run_cli_only_through_rote_exec
         - handoff_browser_work_to_rote_browse_skill
@@ -1192,7 +1440,7 @@ tests:
       forbid:
         - raw_playwright
         - direct_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
 
   - name: browsing profiles does not trigger file io
     input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
@@ -1212,7 +1460,7 @@ tests:
         - native_search_as_answer
         - rote_exec_outside_workspace
         - native_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
 
   - name: repo issues and parallel enrichment are adapter first
     input: can you check how many recent issues have been assigned to me in ~/tulving/rote repo and whether local is aligned with remote, then rank the top committers, get their emails and search using parallel to enrich their profile
@@ -1312,7 +1560,7 @@ tests:
         - parallel_cli_candidate_not_selected
         - parallel_cli_not_checked
         - direct_browser_tool_without_rote_browse
-        - browser_cli_commands_in_rote_shell
+        - browser_cli_commands_in_durable_executor
 
   - name: github cli fallback must be proven through rote exec
     input: if the github adapter is missing use gh to list recent assigned issues

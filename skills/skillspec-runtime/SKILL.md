@@ -42,7 +42,7 @@ Use this order:
    home directory.
 
 Pass only the user task text to `--input`. Strip activation prefixes such as
-`/rote-shell-spec`, `$rote-shell-spec`, `/my-skill`, or `$my-skill`.
+`/durable-executor-spec`, `$durable-executor-spec`, `/my-skill`, or `$my-skill`.
 
 ## Decide First
 

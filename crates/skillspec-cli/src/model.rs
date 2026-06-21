@@ -17,6 +17,8 @@ pub struct SkillSpec {
     pub title: String,
     pub description: String,
     #[serde(default)]
+    pub activation: Option<Activation>,
+    #[serde(default)]
     pub applies_when: Vec<serde_yaml::Value>,
     #[serde(default)]
     pub entry: Option<Entry>,
@@ -56,6 +58,16 @@ pub struct SkillSpec {
     pub review_required: Vec<String>,
     #[serde(default)]
     pub metadata: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Activation {
+    pub summary: String,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    #[serde(default)]
+    pub priority: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

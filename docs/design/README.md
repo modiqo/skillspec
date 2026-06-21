@@ -63,7 +63,7 @@ Every design claim should be grounded in one or more of these sources:
 | Progressive sensemaking | `crates/skillspec-cli/src/sensemake.rs`, `crates/skillspec-cli/src/compiler.rs` |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/imports.rs`, `crates/skillspec-cli/src/parser.rs` |
 | Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/prose-vs-skillspec.md` |
-| Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/rote-shell/SKILL.md` |
+| Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Traces and alignment | `spec/trace.md`, `crates/skillspec-cli/src/trace.rs`, `crates/skillspec-cli/src/align.rs` |
 | CLI surface | `crates/skillspec-cli/src/main.rs` |

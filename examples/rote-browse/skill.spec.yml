@@ -3,8 +3,25 @@ id: rote.browse
 title: rote browse
 description: Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup.
 
+activation:
+  summary: Browser domain skill for durable-executor handoffs and explicit rote-browse browser execution with trace, alignment, and page evidence.
+  keywords:
+    - browser handoff from durable executor
+    - durable browser handoff
+    - preserve durable handoff packet
+    - return browser evidence to durable executor
+    - explicit rote-browse browser execution
+    - attach existing browser
+    - logged-in web app state
+    - snapshot or slice a page
+    - click or type in a page
+    - recover stale browser refs
+  priority: domain_router
+
 applies_when:
   - user_intent:
+      - browser handoff from durable executor
+      - preserve browser evidence in a durable workspace
       - browse a website with rote
       - browse Gmail or an email web app with rote
       - attach to an active browser
@@ -15,7 +32,7 @@ applies_when:
       - crystallize browser exploration into a reusable flow
 
 entry:
-  prompt: Choose the browser launch shape before navigating. Browser execution is owned by rote-browse and its declared rote browser primitives; do not substitute any direct browser runtime, browser API, or raw automation tool.
+  prompt: Choose the browser launch shape before navigating. Browser execution is owned by rote-browse and its declared rote browser primitives; do not substitute any direct browser runtime, browser API, or raw automation tool. If invoked by durable-executor, preserve the durable handoff packet and return browser evidence for durable closure.
   decision_required: true
   supersedes_skills:
     - browser:browser
@@ -34,7 +51,7 @@ routes:
     rank: 4
     description: >
       Use when one request asks for browser-owned email/page evidence first and then local repo/file checks.
-      Complete browser evidence through rote-browse, then hand off the repo or file phase to rote-shell.
+      Complete browser evidence through rote-browse, then hand off the repo or file phase to durable-executor.
     checks:
       - rote_browse_owns_browser_execution
       - no_direct_browser_tooling
@@ -58,11 +75,11 @@ routes:
             - native_browser_tool_without_rote_browse
             - direct_browser_tool_without_rote_browse
             - browser_runtime_without_rote_browse
-        - id: repo_markdown_via_rote_shell
-          owner_skill: rote-shell
-          description: Hand repo markdown discovery to rote-shell so any `rg`, file listing, or file reads run through `rote exec --`.
+        - id: repo_markdown_via_durable_executor
+          owner_skill: durable-executor
+          description: Hand repo markdown discovery to durable-executor so any `rg`, file listing, or file reads run through `rote exec --`.
           requires:
-            - handoff_to_rote_shell_for_repo_files
+            - handoff_to_durable_executor_for_repo_files
             - record_browser_jump_decision
           forbid:
             - raw_repo_search
@@ -71,7 +88,7 @@ routes:
             - direct_shell_command_without_rote_exec
             - direct_harness_cli_call_without_rote_exec
           handoff:
-            to_skill: rote-shell
+            to_skill: durable-executor
             boundary: stop_current_skill
             pass_context:
               - user_intent
@@ -85,14 +102,14 @@ routes:
               - direct_cli_without_rote_exec
               - direct_shell_command_without_rote_exec
               - direct_harness_cli_call_without_rote_exec
-            reason: Repo markdown existence checks are shell-owned and must be captured through rote-shell.
+            reason: Repo markdown existence checks are shell-owned and must be captured through durable-executor.
 
   - id: browser_access_ladder
     label: Try browser access, then shell auth, then adapters
     rank: 5
     description: >
       Use when a browser task may require login, active session state, or alternate access paths.
-      Try browser-owned launch shapes first, then jump to rote-shell for CLI auth if browser auth is blocked,
+      Try browser-owned launch shapes first, then jump to durable-executor for CLI auth if browser auth is blocked,
       and finally jump to rote adapters only when browser and CLI access cannot satisfy the task.
     checks:
       - rote_browse_owns_browser_execution
@@ -120,8 +137,8 @@ routes:
               to_phase: new_headed_browser
               reason: If an existing browser cannot be attached, try a rote-managed visible browser next.
             - when: auth_required
-              to_phase: cli_auth_via_rote_shell
-              reason: If browser access is blocked by auth that has a CLI path, transfer auth work to rote-shell.
+              to_phase: cli_auth_via_durable_executor
+              reason: If browser access is blocked by auth that has a CLI path, transfer auth work to durable-executor.
         - id: new_headed_browser
           owner_skill: rote-browse
           route: new_headed_session
@@ -139,8 +156,8 @@ routes:
               to_phase: headless_browser
               reason: If a visible browser cannot be started, try the deterministic headless browser path.
             - when: auth_required
-              to_phase: cli_auth_via_rote_shell
-              reason: If the new browser hits an auth gate with a CLI path, transfer auth work to rote-shell.
+              to_phase: cli_auth_via_durable_executor
+              reason: If the new browser hits an auth gate with a CLI path, transfer auth work to durable-executor.
         - id: headless_browser
           owner_skill: rote-browse
           route: new_headless_session
@@ -156,23 +173,23 @@ routes:
             - browser_runtime_without_rote_browse
           jumps:
             - when: auth_required
-              to_phase: cli_auth_via_rote_shell
+              to_phase: cli_auth_via_durable_executor
               reason: Headless browser auth blockers must not trigger raw browser bypasses; try CLI auth next.
             - when: browser_blocked
-              to_phase: cli_auth_via_rote_shell
+              to_phase: cli_auth_via_durable_executor
               reason: If all browser launch paths are blocked, jump to shell-owned auth/readiness checks.
-        - id: cli_auth_via_rote_shell
-          owner_skill: rote-shell
-          description: Hand auth/readiness work to rote-shell so any CLI checks run through a named rote workspace and `rote exec --`.
+        - id: cli_auth_via_durable_executor
+          owner_skill: durable-executor
+          description: Hand auth/readiness work to durable-executor so any CLI checks run through a named rote workspace and `rote exec --`.
           requires:
-            - handoff_to_rote_shell_for_cli_auth
+            - handoff_to_durable_executor_for_cli_auth
             - record_browser_jump_decision
           forbid:
             - direct_cli_without_rote_exec
             - direct_shell_command_without_rote_exec
             - direct_harness_cli_call_without_rote_exec
           handoff:
-            to_skill: rote-shell
+            to_skill: durable-executor
             boundary: resume_after_handoff
             pass_context:
               - user_intent
@@ -184,7 +201,7 @@ routes:
               - direct_cli_without_rote_exec
               - direct_shell_command_without_rote_exec
               - direct_harness_cli_call_without_rote_exec
-            reason: CLI auth and local readiness checks are shell-owned and must be captured through rote-shell.
+            reason: CLI auth and local readiness checks are shell-owned and must be captured through durable-executor.
           jumps:
             - when: cli_auth_completed
               to_phase: attach_existing_browser
@@ -467,7 +484,7 @@ rules:
       - direct_harness_cli_call_without_rote_exec
     after_success:
       - capture_browser_ledger_evidence
-      - handoff_to_rote_shell_for_repo_files
+      - handoff_to_durable_executor_for_repo_files
       - record_browser_jump_decision
     reason: Email browsing plus repo markdown discovery is a browser-then-shell plan; neither phase may use raw browser runtimes or direct repo search.
 
@@ -823,10 +840,10 @@ closures:
     description: Record page snapshots, refs, slices, actions, tabs, dependencies, and evidence handles before summarizing.
   record_browser_jump_decision:
     description: Record the active execution phase, any matched jump condition, and the evidence that justified moving from browser to shell or adapters.
-  handoff_to_rote_shell_for_cli_auth:
-    description: Stop browser-owned auth work and pass the blocker, page evidence, workspace, and user intent to rote-shell for CLI auth or local readiness checks through `rote exec --`.
-  handoff_to_rote_shell_for_repo_files:
-    description: Stop browser-owned work after page evidence is captured and pass repo markdown discovery to rote-shell; do not run `rg`, file listing, or file reads directly in rote-browse.
+  handoff_to_durable_executor_for_cli_auth:
+    description: Stop browser-owned auth work and pass the blocker, page evidence, workspace, and user intent to durable-executor for CLI auth or local readiness checks through `rote exec --`.
+  handoff_to_durable_executor_for_repo_files:
+    description: Stop browser-owned work after page evidence is captured and pass repo markdown discovery to durable-executor; do not run `rg`, file listing, or file reads directly in rote-browse.
   discover_relevant_rote_adapters:
     description: Discover installed and catalogued rote adapters only after browser access and shell auth/readiness paths cannot satisfy the task.
   handoff_to_rote_adapter_or_setup:
@@ -863,7 +880,7 @@ tests:
       route: browser_then_shell_handoff
       plan_phases:
         - browser_email_via_rote_browse
-        - repo_markdown_via_rote_shell
+        - repo_markdown_via_durable_executor
       matched_rules:
         - email_browse_then_repo_files_uses_browser_then_shell
       forbid:
@@ -874,7 +891,7 @@ tests:
         - direct_cli_without_rote_exec
       after_success:
         - capture_browser_ledger_evidence
-        - handoff_to_rote_shell_for_repo_files
+        - handoff_to_durable_executor_for_repo_files
 
   - name: logged in web app attaches existing browser
     input: browse a logged-in web app in my active browser and snapshot the current page
@@ -884,12 +901,12 @@ tests:
         - attach_existing_browser
         - new_headed_browser
         - headless_browser
-        - cli_auth_via_rote_shell
+        - cli_auth_via_durable_executor
         - adapter_fallback
       plan_jumps:
-        - attach_existing_browser:auth_required->cli_auth_via_rote_shell
-        - headless_browser:browser_blocked->cli_auth_via_rote_shell
-        - cli_auth_via_rote_shell:cli_auth_unavailable->adapter_fallback
+        - attach_existing_browser:auth_required->cli_auth_via_durable_executor
+        - headless_browser:browser_blocked->cli_auth_via_durable_executor
+        - cli_auth_via_durable_executor:cli_auth_unavailable->adapter_fallback
       elicit:
         - browser_launch_shape
       after_success:
@@ -918,12 +935,12 @@ tests:
         - attach_existing_browser
         - new_headed_browser
         - headless_browser
-        - cli_auth_via_rote_shell
+        - cli_auth_via_durable_executor
         - adapter_fallback
       plan_jumps:
         - attach_existing_browser:active_browser_unavailable->new_headed_browser
         - new_headed_browser:headed_session_unavailable->headless_browser
-        - cli_auth_via_rote_shell:cli_auth_unavailable->adapter_fallback
+        - cli_auth_via_durable_executor:cli_auth_unavailable->adapter_fallback
       elicit:
         - browser_launch_shape
       forbid:
@@ -961,7 +978,7 @@ tests:
         - attach_existing_browser
         - new_headed_browser
         - headless_browser
-        - cli_auth_via_rote_shell
+        - cli_auth_via_durable_executor
         - adapter_fallback
       elicit:
         - human_gate_resolution

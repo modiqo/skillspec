@@ -90,7 +90,7 @@ Every event uses the same envelope:
   "run_id": "run-1781900000000-12345",
   "seq": 4,
   "timestamp_unix_ms": 1781900000123,
-  "skill_id": "rote.shell",
+  "skill_id": "durable.executor",
   "spec_schema": "skillspec/v0",
   "spec_fingerprint": "sha256:...",
   "input_sha256": "sha256:...",
@@ -143,13 +143,13 @@ V0 defines these decision events:
 Write a trace while making a decision:
 
 ```sh
-skillspec decide examples/rote-shell/skill.spec.yml \
+skillspec decide examples/durable-executor/skill.spec.yml \
   --input='browse the active dashboard' \
   --trace-dir .skillspec/traces
 ```
 
 Pass only the task text to `--input`. A harness should strip activation text
-such as `/rote-shell-spec` or `$rote-shell-spec` before calling `skillspec`.
+such as `/durable-executor-spec` or `$durable-executor-spec` before calling `skillspec`.
 When invoking from a shell, prefer single quotes so `$skill-name` text is not
 expanded by the shell.
 
@@ -162,7 +162,7 @@ skillspec trace compact .skillspec/traces/run-1781900000000-12345
 Align a spec with a decision trace:
 
 ```sh
-skillspec trace align examples/rote-shell/skill.spec.yml \
+skillspec trace align examples/durable-executor/skill.spec.yml \
   --decision-trace .skillspec/traces/run-1781900000000-12345
 ```
 
