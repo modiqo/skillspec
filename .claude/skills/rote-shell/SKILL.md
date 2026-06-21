@@ -1,11 +1,18 @@
 ---
 name: rote-shell
-description: "Use when the task needs to run a local command and remember the result, inspect CLI output with provenance, follow a log or process stream, start or observe a background job, capture terminal-sensitive output, crystallize shell work into a TypeScript flow and combine local CLI facts with adapters or browser observations. Handles CLI and shell commands, APIs, MCP/rote adapters, and service connectors, browser handoff and page evidence, external services, process capture, logs and streams, PTY and terminal-sensitive prompts and dependency checks. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+description: "Use when the task needs to run a local command and remember the result, inspect CLI output with provenance, follow a log or process stream, start or observe a background job, capture terminal-sensitive output, crystallize shell work into a TypeScript flow and combine local CLI facts with adapters or browser observations. Handles CLI and shell commands, APIs, MCP/rote adapters, and service connectors, browser handoff and page evidence, external services, process capture, logs and streams, PTY and terminal-sensitive prompts and dependency checks. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
 # rote shell
 
 Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work.
+
+## Entry Gate
+
+- Before any task action, run `skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the decision JSON.
+- Until that decision is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- This SkillSpec supersedes overlapping lower-level skill instructions: browser:browser.
+- Forbidden before the decision: raw_repo_search, direct_file_read, direct_cli_without_rote_exec, direct_shell_command_without_rote_exec, direct_harness_cli_call_without_rote_exec, browser_browser_skill, node_repl.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 

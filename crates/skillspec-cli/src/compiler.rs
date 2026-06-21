@@ -61,6 +61,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push('\n');
     let _ = writeln!(output, "{}", spec.description);
     output.push('\n');
+    write_entry_gate(output, spec);
     output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.\n\n");
     output.push_str("## Runtime Contract\n\n");
     output.push_str(
@@ -570,6 +571,16 @@ fn selection_description(spec: &SkillSpec) -> String {
             sentence_list(&capabilities.into_iter().take(8).collect::<Vec<_>>())
         ));
     }
+    if spec
+        .entry
+        .as_ref()
+        .is_some_and(|entry| entry.decision_required)
+    {
+        parts.push(
+            "Requires `skillspec decide` before substrate tools or overlapping low-level skills"
+                .to_owned(),
+        );
+    }
     parts.push(
         "Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
             .to_owned(),
@@ -614,7 +625,7 @@ fn sentence_list(values: &[String]) -> String {
 }
 
 fn shorten_description(value: &str) -> String {
-    const LIMIT: usize = 700;
+    const LIMIT: usize = 900;
     if value.len() <= LIMIT {
         return value.to_owned();
     }
@@ -698,6 +709,39 @@ fn write_activation(output: &mut String, spec: &SkillSpec) {
     output.push_str("## Applies When\n\n");
     for hint in &spec.applies_when {
         write_yaml_block(output, hint);
+    }
+    output.push('\n');
+}
+
+fn write_entry_gate(output: &mut String, spec: &SkillSpec) {
+    let Some(entry) = &spec.entry else {
+        return;
+    };
+    if !entry.decision_required
+        && entry.supersedes_skills.is_empty()
+        && entry.forbid_before_decision.is_empty()
+    {
+        return;
+    }
+
+    output.push_str("## Entry Gate\n\n");
+    if entry.decision_required {
+        output.push_str("- Before any task action, run `skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"` and read the decision JSON.\n");
+        output.push_str("- Until that decision is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.\n");
+    }
+    if !entry.supersedes_skills.is_empty() {
+        let _ = writeln!(
+            output,
+            "- This SkillSpec supersedes overlapping lower-level skill instructions: {}.",
+            entry.supersedes_skills.join(", ")
+        );
+    }
+    if !entry.forbid_before_decision.is_empty() {
+        let _ = writeln!(
+            output,
+            "- Forbidden before the decision: {}.",
+            entry.forbid_before_decision.join(", ")
+        );
     }
     output.push('\n');
 }

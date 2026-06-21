@@ -104,7 +104,16 @@
       "type": "object",
       "required": ["prompt"],
       "properties": {
-        "prompt": { "type": "string" }
+        "prompt": { "type": "string" },
+        "decision_required": { "type": "boolean" },
+        "supersedes_skills": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbid_before_decision": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        }
       },
       "additionalProperties": false
     },

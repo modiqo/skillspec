@@ -62,6 +62,12 @@ pub struct SkillSpec {
 #[serde(deny_unknown_fields)]
 pub struct Entry {
     pub prompt: String,
+    #[serde(default)]
+    pub decision_required: bool,
+    #[serde(default)]
+    pub supersedes_skills: Vec<String>,
+    #[serde(default)]
+    pub forbid_before_decision: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -122,6 +122,11 @@ schema: skillspec/v0
 id: cli.rich
 title: CLI Rich Spec
 description: Exercises core CLI behavior.
+entry:
+  prompt: Decide before tools.
+  decision_required: true
+  supersedes_skills: [browser:browser]
+  forbid_before_decision: [node_repl, direct_cli_without_rote_exec]
 routes:
   - id: browser
     label: Browser
@@ -1099,6 +1104,8 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert_success(&loader);
     let loader_out = stdout(&loader);
     assert!(loader_out.contains("thin loader"));
+    assert!(loader_out.contains("## Entry Gate"));
+    assert!(loader_out.contains("Forbidden before the decision"));
     assert!(loader_out.contains("skill.spec.yml"));
     assert!(!loader_out.contains("## Rules"));
 

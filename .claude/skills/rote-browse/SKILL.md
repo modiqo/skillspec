@@ -1,11 +1,18 @@
 ---
 name: rote-browse
-description: "Use when the task needs to browse a website with rote, attach to an active browser, inspect logged-in web app state, snapshot or slice a page, click or type in a page, recover a stale browser ref or page lease and crystallize browser exploration into a reusable flow. Handles browser handoff and page evidence and dependency checks. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+description: "Use when the task needs to browse a website with rote, browse Gmail or an email web app with rote, attach to an active browser, inspect logged-in web app state, snapshot or slice a page, click or type in a page and recover a stale browser ref or page lease. Handles browser handoff and page evidence and dependency checks. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
 # rote browse
 
 Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup.
+
+## Entry Gate
+
+- Before any task action, run `skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the decision JSON.
+- Until that decision is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- This SkillSpec supersedes overlapping lower-level skill instructions: browser:browser.
+- Forbidden before the decision: browser_browser_skill, node_repl, direct_browser_runtime, direct_browser_tool_without_rote_browse, raw_repo_search, direct_file_read, direct_cli_without_rote_exec.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -74,6 +81,7 @@ Minimum final response shape when workspace evidence exists:
 
 ## Route Hints
 
+- `browser_then_shell_handoff`: Browse first, then hand off shell evidence
 - `browser_access_ladder`: Try browser access, then shell auth, then adapters
 - `attach_existing_session`: Attach to an active browser
 - `new_headed_session`: Start a new visible browser

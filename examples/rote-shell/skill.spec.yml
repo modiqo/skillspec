@@ -12,9 +12,21 @@ applies_when:
       - capture terminal-sensitive output
       - crystallize shell work into a TypeScript flow
       - combine local CLI facts with adapters or browser observations
+      - check a repository for roadmap or contribution markdown files
 
 entry:
   prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
+  decision_required: true
+  supersedes_skills:
+    - browser:browser
+  forbid_before_decision:
+    - raw_repo_search
+    - direct_file_read
+    - direct_cli_without_rote_exec
+    - direct_shell_command_without_rote_exec
+    - direct_harness_cli_call_without_rote_exec
+    - browser_browser_skill
+    - node_repl
 
 routes:
   - id: shell_then_browser_handoff
@@ -137,6 +149,7 @@ rules:
   - id: cli_invocations_use_rote_exec
     when:
       user_says_any:
+        - check
         - cli
         - command
         - shell command
@@ -158,6 +171,10 @@ rules:
         - node
         - python
         - curl
+        - roadmap
+        - contributing
+        - contribution
+        - markdown
     route_order:
       - one_shot_process
       - declared_file_io
@@ -369,6 +386,10 @@ rules:
     when:
       user_says_any:
         - file
+        - markdown
+        - roadmap
+        - contributing
+        - contribution
         - stdin
         - stdout
         - stderr
@@ -379,6 +400,26 @@ rules:
     forbid:
       - implicit_file_side_effects
     reason: File inputs and outputs need explicit provenance, hashes, and artifact pointers.
+
+  - id: repo_markdown_discovery_uses_rote_exec
+    when:
+      user_says_all_groups:
+        - [repo, repository]
+        - [roadmap, contributing, contribution, markdown]
+    prefer: one_shot_process
+    forbid:
+      - raw_repo_search
+      - direct_file_read
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_harness_cli_call_without_rote_exec
+      - untracked_stdout_scrollback
+    after_success:
+      - run_cli_only_through_rote_exec
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: Repository markdown discovery must be captured as rote-shell evidence, not direct `rg`, file listing, or file reads.
 
   - id: long_noninteractive_jobs_use_background
     when:
@@ -1331,6 +1372,21 @@ tests:
       route: declared_file_io
       forbid:
         - implicit_file_side_effects
+
+  - name: repo markdown discovery uses rote exec
+    input: check repo ~/tulving/skillspec if there is roadmap and contribution markdown
+    expect:
+      route: one_shot_process
+      matched_rules:
+        - cli_invocations_use_rote_exec
+        - repo_markdown_discovery_uses_rote_exec
+      forbid:
+        - raw_repo_search
+        - direct_file_read
+        - direct_cli_without_rote_exec
+        - direct_harness_cli_call_without_rote_exec
+      after_success:
+        - run_cli_only_through_rote_exec
 
   - name: tailing logs uses stream follow
     input: tail the server log until ready
