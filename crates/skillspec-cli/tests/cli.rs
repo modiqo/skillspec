@@ -1,7 +1,7 @@
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn bin() -> &'static str {
@@ -619,14 +619,38 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     assert_eq!(report["ok"], true);
     assert_eq!(
         report["summary"]["conclusion"],
-        "3 deterministic trace check(s) lack recorded evidence; 4 execution obligation(s) need structured evidence; no deterministic drift was detected"
+        "decision replay found no deterministic drift, but proof is incomplete: 3 deterministic trace check(s) and 4 execution obligation(s) remain unproven"
     );
+    assert_eq!(
+        report["summary"]["status_meaning"],
+        "unproven means no contradiction was found, but the trace lacks structured evidence for every fact alignment needs to prove"
+    );
+    assert_eq!(report["summary"]["layers"].as_array().unwrap().len(), 2);
+    assert_eq!(report["summary"]["layers"][0]["id"], "decision_replay");
+    assert!(report["summary"]["layers"][0]["measures"]
+        .as_str()
+        .unwrap()
+        .contains("Re-run the current resolved SkillSpec"));
+    assert_eq!(report["summary"]["layers"][1]["id"], "execution_proof");
+    assert!(report["summary"]["layers"][1]["interpretation"]
+        .as_str()
+        .unwrap()
+        .contains("execution evidence is incomplete"));
     assert_eq!(report["summary"]["selected_route"], "browser");
     assert_eq!(report["summary"]["route_selection_basis"], "rule_prefer");
     assert_eq!(report["summary"]["route_selection_rule"], "browse_rule");
     assert_eq!(report["summary"]["decision_checks"]["pass"], 7);
     assert_eq!(report["summary"]["decision_checks"]["unproven"], 3);
     assert_eq!(report["summary"]["execution_obligations"]["unproven"], 4);
+    let gaps = report["summary"]["evidence_gaps"].as_array().unwrap();
+    assert!(gaps
+        .iter()
+        .any(|gap| { gap["kind"] == "decision_trace" && gap["id"] == "forbids" }));
+    assert!(gaps.iter().any(|gap| {
+        gap["kind"] == "execution_obligation"
+            && gap["obligation_kind"] == "forbid"
+            && gap["id"] == "native_search_as_answer"
+    }));
     let checks = report["checks"].as_array().unwrap();
     assert!(checks
         .iter()
@@ -648,7 +672,13 @@ fn decide_enforces_required_trace_and_trace_compaction() {
         .unwrap();
     assert_success(&align_text);
     let align_text_stdout = stdout(&align_text);
-    assert!(align_text_stdout.contains("summary: 3 deterministic trace check(s) lack recorded evidence; 4 execution obligation(s) need structured evidence; no deterministic drift was detected"));
+    assert!(align_text_stdout.contains("summary: decision replay found no deterministic drift, but proof is incomplete: 3 deterministic trace check(s) and 4 execution obligation(s) remain unproven"));
+    assert!(align_text_stdout.contains("meaning: unproven means no contradiction was found"));
+    assert!(align_text_stdout.contains("model:"));
+    assert!(align_text_stdout.contains("decision_replay: Re-run the current resolved SkillSpec"));
+    assert!(align_text_stdout.contains("execution_proof: Derive obligations"));
+    assert!(align_text_stdout.contains("evidence_gaps:"));
+    assert!(align_text_stdout.contains("execution_obligation native_search_as_answer (forbid)"));
     assert!(align_text_stdout.contains("decision: route browser via rule_prefer (browse_rule)"));
     assert!(
         align_text_stdout.contains("proof: decision checks 7 pass, 0 fail, 3 unproven (10 total)")
@@ -879,6 +909,92 @@ dependencies:
     assert!(repo
         .join(".claude/skills/installed-skill/deps.toml")
         .is_file());
+}
+
+#[test]
+fn install_skill_detects_existing_target_before_overwrite() {
+    let dir = TempDir::new("install-existing");
+    let home = dir.path().join("home");
+    let skill = dir.path().join("skill-source");
+    let install_dir = home.join(".agents/skills/skill-source");
+    fs::create_dir_all(&install_dir).unwrap();
+    write_file(&install_dir.join("SKILL.md"), "# Old Skill\n");
+    write_file(&install_dir.join("skill.spec.yml"), "schema: old\n");
+    write_file(&install_dir.join("stale.txt"), "left alone\n");
+    write_file(
+        &skill.join("SKILL.md"),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n",
+    );
+    write_file(
+        &skill.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: installable.skill
+title: Installable Skill
+description: Install target fixture.
+routes:
+  - id: local
+    label: Local
+"#,
+    );
+
+    let dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--dry-run")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let planned = json_stdout(&dry_run);
+    assert_eq!(planned["installs"][0]["status"], "planned");
+    assert_eq!(planned["installs"][0]["existed"], true);
+    assert_eq!(
+        fs::read_to_string(install_dir.join("SKILL.md")).unwrap(),
+        "# Old Skill\n"
+    );
+
+    let refused = Command::new(bin())
+        .env("HOME", &home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_failure(&refused);
+    assert!(stderr(&refused).contains("rerun with --force to overwrite"));
+    assert_eq!(
+        fs::read_to_string(install_dir.join("SKILL.md")).unwrap(),
+        "# Old Skill\n"
+    );
+
+    let forced = Command::new(bin())
+        .env("HOME", &home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--force")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert_success(&forced);
+    let installed = json_stdout(&forced);
+    assert_eq!(installed["installs"][0]["status"], "installed");
+    assert_eq!(installed["installs"][0]["existed"], true);
+    assert_eq!(
+        fs::read_to_string(install_dir.join("SKILL.md")).unwrap(),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n"
+    );
+    assert!(install_dir.join("stale.txt").is_file());
 }
 
 #[test]

@@ -20,7 +20,7 @@ routes:
   - id: adapter_first_cli_fallback
     label: Use rote adapters, then rote exec CLI fallback
     rank: 4
-    description: Use when the task names external services, repos, issue trackers, profile enrichment, or Parallel search. Discover installed rote adapters first; only when no healthy adapter is available, prove CLI availability and auth through `rote exec --`.
+    description: Use when the task names external services, repos, issue trackers, profile enrichment, or Parallel search. Discover adapter and CLI candidates as paired capabilities; choose a healthy adapter when present, otherwise choose a proven CLI fallback through `rote exec --`.
   - id: browser_handoff
     label: Hand off to rote-browse for browser state
     rank: 5
@@ -119,16 +119,27 @@ rules:
       - web_search_tool_without_parallel_preflight
       - direct_parallelweb_tool_call
       - direct_cli_without_rote_exec
+      - using_parallel_cli_without_rote_exec
+      - adapter_only_parallel_check
+      - exact_parallel_binary_assumption
+      - static_parallel_cli_dependency
+      - parallel_cli_discovery_not_run
+      - parallel_cli_candidate_not_selected
+      - parallel_cli_not_checked
       - skipping_parallel_adapter_check
       - skipping_cli_readiness_check
     after_success:
       - identify_required_services_and_tools
       - discover_relevant_rote_adapters
+      - pair_parallel_adapter_and_cli_discovery
       - check_parallel_adapter_before_search
+      - check_parallel_cli_readiness_via_rote_exec
+      - choose_parallel_adapter_else_cli
       - preflight_cli_fallback
       - use_parallel_search_via_adapter_or_cli
+      - record_parallel_selection_evidence
       - capture_parallel_search_results
-    reason: When the user names Parallel, first check the Parallel/parallelweb rote adapter, then a CLI fallback through rote exec; never substitute native Codex web search.
+    reason: When the user names Parallel, run paired discovery for the Parallel/parallelweb adapter and a harness-discovered Parallel CLI candidate such as `parallel-cli`. Choose the adapter if healthy, otherwise choose the CLI only when readiness is proven through rote exec; never assume the binary is named `parallel` and never substitute native Codex web search.
 
   - id: browser_words_handoff_to_browse
     when:
@@ -426,6 +437,29 @@ dependencies:
   parallelweb_adapter:
     kind: adapter
     description: Preferred Parallel web search/enrichment access path. Check likely ids such as `parallelweb`, `parallel`, or installed registry aliases before CLI fallback.
+  parallel_cli:
+    kind: service
+    description: Harness-discovered local Parallel CLI fallback for explicit Parallel search/enrichment. The harness must scan executable names matching `*parallel*` on PATH, select the best candidate such as `parallel-cli`, and execute that selected binary only through `rote exec --`.
+    permission:
+      required: true
+      reason: The Parallel CLI may perform authenticated network search or enrichment.
+      safety: network_read
+    provision:
+      elicit: install_scope
+      options:
+        - id: user_global
+          label: Install Parallel CLI with a user package manager
+          safety: local_write
+        - id: leave_draft
+          label: Leave flow in draft
+          safety: read_only
+  rote_browse:
+    kind: browser
+    description: Browser execution capability owned by the rote-browse skill. Browser setup, daemon/session start, `rote browse` use, and cleanup must be handled by rote-browse rather than raw browser tooling in rote-shell.
+    permission:
+      required: true
+      reason: Browser work may attach to logged-in sessions or read live page state.
+      safety: browser_attach
   rote:
     kind: cli
     description: Rote CLI is required for workspace setup, process capture, stream capture, PTY capture, dependency preflight, traces, and replay.
@@ -533,12 +567,16 @@ states:
   discover_adapters:
     do:
       - discover_relevant_rote_adapters
+      - pair_parallel_adapter_and_cli_discovery
       - check_parallel_adapter_before_search
     next: preflight_fallbacks
   preflight_fallbacks:
     do:
       - verify_adapter_or_cli_readiness
+      - check_parallel_cli_readiness_via_rote_exec
+      - choose_parallel_adapter_else_cli
       - preflight_cli_fallback
+      - check_rote_browse_handoff_readiness
       - prepare_browser_skill_handoff_if_selected
     next: execute
   execute:
@@ -631,17 +669,43 @@ commands:
         - rote
         - gh
 
-  parallel_search_preflight:
-    description: For explicit Parallel search/enrichment, check the Parallel/parallelweb adapter first, then prove CLI fallback readiness through rote exec; never use native web search as the substitute.
+  parallel_cli_readiness:
+    description: Prove the harness-selected Parallel CLI fallback exists and is ready through typed rote exec evidence before it can be selected.
     template: |
-      rote adapter list parallelweb --json --health --probe
-      rote adapter list parallel --json --health --probe
-      rote exec -- <parallel-cli> --version
-      rote exec -- <parallel-cli> auth status
+      # Harness fills <selected-parallel-cli> from PATH candidates matching *parallel*, such as parallel-cli.
+      rote exec -- <selected-parallel-cli> --version
+      rote exec -- <selected-parallel-cli> auth status
     safety: network_read
     requires:
       dependencies:
         - rote
+        - parallel_cli
+
+  parallel_search_preflight:
+    description: For explicit Parallel search/enrichment, perform paired adapter discovery and harness CLI candidate discovery. Prefer a healthy adapter; otherwise use the selected CLI only after readiness is proven through rote exec.
+    template: |
+      rote adapter list parallelweb --json --health --probe
+      rote adapter list parallel --json --health --probe
+      # Harness fills <selected-parallel-cli> from PATH candidates matching *parallel*, such as parallel-cli.
+      rote exec -- <selected-parallel-cli> --version
+      rote exec -- <selected-parallel-cli> auth status
+    safety: network_read
+    requires:
+      dependencies:
+        - rote
+        - parallelweb_adapter
+        - parallel_cli
+
+  rote_browse_handoff_readiness:
+    description: Verify the browser handoff surface before delegating browser execution to the rote-browse skill.
+    template: |
+      rote guidance browser essential
+      rote browse --help
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+        - rote_browse
 
   exec:
     description: Capture a finite command as a typed process response.
@@ -792,14 +856,24 @@ closures:
     description: Extract named services and tools from the request (for example GitHub/gh/git and Parallel/parallelweb) before selecting adapters or CLI fallbacks.
   discover_relevant_rote_adapters:
     description: Run adapter discovery and health/probe checks for every named external service before using any CLI or native tool substitute.
+  pair_parallel_adapter_and_cli_discovery:
+    description: When Parallel is named, check both the Parallel/parallelweb adapter candidates and harness-discovered local CLI candidates whose executable names match `*parallel*` before choosing the execution path.
   check_parallel_adapter_before_search:
-    description: For "search using Parallel" or profile enrichment via Parallel, check installed `parallelweb`/`parallel` rote adapters before CLI fallback and forbid native Codex web search.
+    description: For "search using Parallel" or profile enrichment via Parallel, check installed `parallelweb`/`parallel` rote adapters before selecting any fallback and forbid native Codex web search.
+  check_parallel_cli_readiness_via_rote_exec:
+    description: Prove the harness-selected local Parallel CLI is installed and authenticated/ready with `rote exec -- <selected-parallel-cli> ...` before it can be used as fallback.
+  choose_parallel_adapter_else_cli:
+    description: If a healthy Parallel adapter and CLI candidate are both present, choose the adapter; if the adapter is missing or unhealthy and the selected CLI is ready, choose the CLI; if neither is ready, stop for setup instead of using native search.
+  record_parallel_selection_evidence:
+    description: Record the adapter health result, discovered CLI candidate path/name, CLI readiness result, and final adapter-vs-CLI choice before searching or summarizing.
+  check_rote_browse_handoff_readiness:
+    description: For browser-selected work, verify that the `rote-browse` handoff surface is available, then leave setup, daemon/session start, `rote browse` execution, and cleanup to rote-browse.
   verify_adapter_or_cli_readiness:
     description: Record whether each service will use a healthy adapter or a CLI fallback, and capture the evidence that made that choice.
   preflight_cli_fallback:
-    description: When adapter discovery fails, check CLI presence, auth/session status, and readiness through `rote exec --` before the CLI is used.
+    description: When adapter discovery is missing or unhealthy, check CLI presence, auth/session status, and readiness through `rote exec --` before the CLI is used.
   run_cli_only_through_rote_exec:
-    description: Execute non-rote CLIs such as `git`, `gh`, or a Parallel CLI only via `rote exec --`, preserving stdout, stderr, exit code, and typed response ids.
+    description: Execute non-rote CLIs such as `git`, `gh`, or a harness-selected Parallel CLI only via `rote exec --`, preserving stdout, stderr, exit code, and typed response ids.
   use_parallel_search_via_adapter_or_cli:
     description: Perform Parallel search/enrichment through the healthy Parallel adapter when present; otherwise use the proven CLI fallback through `rote exec --`.
   capture_parallel_search_results:
@@ -815,9 +889,20 @@ closures:
   compute_workspace_trace:
     description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
   compute_workspace_stats:
-    description: Run `rote stats --save`, then `rote workspace stats <workspace> --json`; extract `.metrics.context_tokens` as exploration tokens consumed and `.metrics.total_tokens` as API request+response tokens. If metrics are missing, say token math is unavailable.
+    description: >
+      Run `rote stats --save`, then `rote workspace stats <workspace> --json`;
+      extract `.metrics.context_tokens` as one-time exploration context-window
+      tokens and `.metrics.total_tokens` as API request+response tokens. If
+      metrics are missing, say context economy is unavailable.
   report_workspace_evidence_and_token_math:
-    description: End with the workspace name, important response ids, SkillSpec trace run directory, and token math only when stats were actually queried. Do not invent replay savings.
+    description: >
+      End with the workspace name, important response ids, SkillSpec trace run
+      directory, and context economy only when stats were actually queried.
+      Explain that workspace evidence is a context file system: future steps
+      can retrieve exact slices by id instead of carrying full outputs in the
+      model window. If the workflow is crystallized or memoried, repeat use can
+      avoid both API request tokens and context-window tokens for cached
+      evidence. Do not invent measured replay savings.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -837,7 +922,10 @@ snippets:
       Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
       SkillSpec route trace: {{ skillspec_trace_dir }}.
       Rote dependency trace: captured with `rote trace --deps`.
-      Token math: exploration consumed {{ context_tokens }} context tokens (API request+response tokens: {{ total_tokens }}). Replay savings: {{ replay_savings }} when measured; otherwise report unavailable.
+      Context economy:
+      - Exploration spent {{ context_tokens }} context-window tokens and {{ total_tokens }} API request+response tokens once.
+      - The important data now lives outside the prompt in the rote workspace, addressable by response ids/files instead of pasted back into the model window.
+      - If this is crystallized as a flow or remembered, repeat use can skip the API work and avoid reloading the full evidence into context; measured replay savings: {{ replay_savings }} when available, otherwise say not measured yet.
 
 proof:
   metrics:
@@ -914,21 +1002,32 @@ tests:
       after_success:
         - identify_required_services_and_tools
         - discover_relevant_rote_adapters
+        - pair_parallel_adapter_and_cli_discovery
         - verify_adapter_or_cli_readiness
         - preflight_cli_fallback
         - run_cli_only_through_rote_exec
         - check_parallel_adapter_before_search
+        - check_parallel_cli_readiness_via_rote_exec
+        - choose_parallel_adapter_else_cli
         - use_parallel_search_via_adapter_or_cli
+        - record_parallel_selection_evidence
         - capture_parallel_search_results
       forbid:
         - skipping_adapter_discovery
         - skipping_cli_readiness_check
         - direct_cli_without_rote_exec
+        - using_parallel_cli_without_rote_exec
         - direct_mcp_tool_call
         - native_search_as_answer
         - native_codex_web_search
         - web_search_tool_without_parallel_preflight
         - direct_parallelweb_tool_call
+        - adapter_only_parallel_check
+        - exact_parallel_binary_assumption
+        - static_parallel_cli_dependency
+        - parallel_cli_discovery_not_run
+        - parallel_cli_candidate_not_selected
+        - parallel_cli_not_checked
         - skipping_parallel_adapter_check
 
   - name: explicit parallel search forbids native web search
@@ -938,9 +1037,13 @@ tests:
       matched_rules:
         - explicit_parallel_search_uses_parallel_adapter_or_cli
       after_success:
+        - pair_parallel_adapter_and_cli_discovery
         - check_parallel_adapter_before_search
+        - check_parallel_cli_readiness_via_rote_exec
+        - choose_parallel_adapter_else_cli
         - preflight_cli_fallback
         - use_parallel_search_via_adapter_or_cli
+        - record_parallel_selection_evidence
         - capture_parallel_search_results
       forbid:
         - native_search_as_answer
@@ -948,7 +1051,46 @@ tests:
         - web_search_tool_without_parallel_preflight
         - direct_parallelweb_tool_call
         - direct_cli_without_rote_exec
+        - using_parallel_cli_without_rote_exec
+        - adapter_only_parallel_check
+        - exact_parallel_binary_assumption
+        - static_parallel_cli_dependency
+        - parallel_cli_discovery_not_run
+        - parallel_cli_candidate_not_selected
+        - parallel_cli_not_checked
         - skipping_parallel_adapter_check
+
+  - name: parallel search plus email browse pairs adapter cli and browser handoff
+    input: can you use parallel to search for chetan conikee and tell me more about him and his work and then browse his email to check if there any new emails
+    expect:
+      route: browser_handoff
+      matched_rules:
+        - explicit_parallel_search_uses_parallel_adapter_or_cli
+        - browser_words_handoff_to_browse
+      after_success:
+        - identify_required_services_and_tools
+        - discover_relevant_rote_adapters
+        - pair_parallel_adapter_and_cli_discovery
+        - check_parallel_adapter_before_search
+        - check_parallel_cli_readiness_via_rote_exec
+        - choose_parallel_adapter_else_cli
+        - record_parallel_selection_evidence
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - native_search_as_answer
+        - native_codex_web_search
+        - direct_cli_without_rote_exec
+        - using_parallel_cli_without_rote_exec
+        - adapter_only_parallel_check
+        - exact_parallel_binary_assumption
+        - static_parallel_cli_dependency
+        - parallel_cli_discovery_not_run
+        - parallel_cli_candidate_not_selected
+        - parallel_cli_not_checked
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
 
   - name: github cli fallback must be proven through rote exec
     input: if the github adapter is missing use gh to list recent assigned issues

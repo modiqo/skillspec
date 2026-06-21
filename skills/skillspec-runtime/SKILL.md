@@ -158,7 +158,20 @@ Completion obligations: <closures completed or still pending>
 ```
 
 If the underlying system exposes cost or replay metrics, include them only when
-they were actually queried. Do not invent token savings.
+they were actually queried. Explain the economics precisely:
+
+- Exploration context tokens are the one-time model-window spend needed to find
+  and validate the answer.
+- Captured responses, files, traces, and snapshots form a context file system:
+  future steps can retrieve exact slices by id instead of pasting whole payloads
+  back into the prompt.
+- If the workflow is crystallized or written to memory, repeat use can escape
+  both costs on the cached path: API request/response tokens are not re-spent,
+  and the full evidence does not need to re-enter the context window.
+
+Do not invent measured savings. If replay metrics were not measured, say the
+workspace evidence is now addressable outside context and that replay savings
+are not measured yet.
 
 ## Failure Handling
 

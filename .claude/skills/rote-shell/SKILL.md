@@ -7,7 +7,7 @@ description: "Structured version of the rote-shell skill for durable CLI, shell,
 
 Structured version of the rote-shell skill for durable CLI, shell, process, stream, PTY, dependency, and shell-flow crystallization work.
 
-This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements.
+This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
 ## Runtime Contract
 
@@ -20,9 +20,27 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
 
 3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.
 4. Preserve the emitted trace `run_dir`.
-5. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status with the trace path.
-6. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.
-7. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.
+5. Read the decision JSON before using tools. Do not act from route labels alone.
+6. Materialize the active contract described below, then execute only actions that satisfy it.
+7. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, meaning, model layers, evidence gaps, summary, and trace path.
+8. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+
+## How To Execute The Structure
+
+Before the first task action, convert the decision output and relevant spec sections into a checklist:
+
+- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
+- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.
+- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.
+- user constraints: carry explicit user instructions such as "do not search the web" into the same checklist. The spec adds structure; it does not erase the user's constraints.
+- `elicit`: ask the required question before irreversible work, side effects, installs, auth steps, or broad exploration.
+- `dependencies`: prove readiness for the active route, command, recipe, or code block before using it. Prefer command-scoped checks such as `skillspec deps check ./skill.spec.yml --command <id>` when a command id is known.
+- dependency evidence: a missing environment variable only proves that variable is absent; it does not prove that auth, API keys, browser sessions, keychains, vaults, or CLI-native credentials are absent. When auth can live outside env, prove readiness with the declared command, adapter, browser, or dependency check instead of grepping env.
+- `imports` and `resources`: load only the items required by the active route/rule/recipe/code, plus anything marked `always`.
+- `commands`, `recipes`, and `code`: use declared templates and ordered steps as the allowed execution surface. Check their `requires` fields first, preserve outputs as evidence, and do not replace them with unrelated tools unless the active contract allows that substitution.
+- `after_success` and closures: these are completion obligations. Do them before the final response, or report why they remain unproven.
+
+If every allowed route is blocked by missing dependencies, auth, permissions, or a forbid, report the blocker and ask how to proceed. Do not switch to native search, raw shell, browser automation, direct API calls, or installs just because they are available in the harness.
 
 ## Quick Commands
 
@@ -37,10 +55,11 @@ skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/trace
 
 ## Completion Report
 
-When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), key failed or unproven alignment checks, and the concrete execution evidence ids or files.
+When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files.
 
 ## Route Hints
 
+- `adapter_first_cli_fallback`: Use rote adapters, then rote exec CLI fallback
 - `browser_handoff`: Hand off to rote-browse for browser state
 - `one_shot_process`: Capture a one-shot process
 - `declared_file_io`: Capture declared file inputs or outputs

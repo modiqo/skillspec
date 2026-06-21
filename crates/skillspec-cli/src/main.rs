@@ -162,6 +162,9 @@ enum InstallCommand {
         /// Show the install plan without writing files.
         #[arg(long)]
         dry_run: bool,
+        /// Overwrite an existing installed skill folder without prompting.
+        #[arg(long)]
+        force: bool,
         /// Override the installed skill folder name.
         #[arg(long)]
         name: Option<String>,
@@ -289,6 +292,7 @@ fn run() -> Result<()> {
                 target,
                 all_detected,
                 dry_run,
+                force,
                 name,
             } => {
                 let targets = target
@@ -300,6 +304,7 @@ fn run() -> Result<()> {
                     &targets,
                     all_detected,
                     dry_run,
+                    force,
                     name.as_deref(),
                 )?;
                 report::json(&report)?;

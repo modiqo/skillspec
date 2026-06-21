@@ -151,6 +151,19 @@ pub fn align(report: &AlignReport) -> Result<()> {
     writeln!(stdout, "spec: {}", report.spec)?;
     writeln!(stdout, "decision_trace: {}", report.decision_trace)?;
     writeln!(stdout, "summary: {}", report.summary.conclusion)?;
+    writeln!(stdout, "meaning: {}", report.summary.status_meaning)?;
+    if !report.summary.layers.is_empty() {
+        writeln!(stdout, "model:")?;
+        for layer in &report.summary.layers {
+            writeln!(
+                stdout,
+                "  - {}: {}",
+                align_layer_name(layer.id),
+                layer.measures
+            )?;
+            writeln!(stdout, "    result: {}", layer.interpretation)?;
+        }
+    }
     if let Some(route) = &report.summary.selected_route {
         write!(stdout, "decision: route {route}")?;
         if let Some(basis) = &report.summary.route_selection_basis {
@@ -201,6 +214,30 @@ pub fn align(report: &AlignReport) -> Result<()> {
             .join(", ");
         writeln!(stdout, "unproven_by_kind: {groups}")?;
     }
+    if !report.summary.evidence_gaps.is_empty() {
+        writeln!(stdout, "evidence_gaps:")?;
+        for gap in &report.summary.evidence_gaps {
+            match gap.obligation_kind {
+                Some(kind) => writeln!(
+                    stdout,
+                    "  - {} {} ({}) from {}: {}",
+                    evidence_gap_kind_name(gap.kind),
+                    gap.id,
+                    obligation_kind_name(kind),
+                    gap.source,
+                    gap.needed
+                )?,
+                None => writeln!(
+                    stdout,
+                    "  - {} {} from {}: {}",
+                    evidence_gap_kind_name(gap.kind),
+                    gap.id,
+                    gap.source,
+                    gap.needed
+                )?,
+            }
+        }
+    }
     writeln!(stdout, "checks:")?;
     for check in &report.checks {
         writeln!(
@@ -239,6 +276,20 @@ fn align_status_name(status: AlignStatus) -> &'static str {
         AlignStatus::Pass => "pass",
         AlignStatus::Fail => "fail",
         AlignStatus::Unproven => "unproven",
+    }
+}
+
+fn align_layer_name(kind: crate::align::AlignLayerKind) -> &'static str {
+    match kind {
+        crate::align::AlignLayerKind::DecisionReplay => "decision_replay",
+        crate::align::AlignLayerKind::ExecutionProof => "execution_proof",
+    }
+}
+
+fn evidence_gap_kind_name(kind: crate::align::AlignEvidenceGapKind) -> &'static str {
+    match kind {
+        crate::align::AlignEvidenceGapKind::DecisionTrace => "decision_trace",
+        crate::align::AlignEvidenceGapKind::ExecutionObligation => "execution_obligation",
     }
 }
 

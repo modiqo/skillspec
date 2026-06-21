@@ -370,8 +370,9 @@ Rules can route around unsafe commands. Commands should not route around rules.
 Closures are how a skill finishes work without losing the value it just
 created. Typical closures include:
 
-- collect trace cost
-- estimate recurrence savings
+- collect trace cost and context-window spend
+- explain which evidence now lives outside the prompt
+- estimate recurrence savings for API work and context reloads
 - ask whether to remember the route
 - write the session digest
 - ask whether to push/share with a team
@@ -391,7 +392,9 @@ Proof can combine:
 - route decision accuracy
 - prose tokens reduced
 - failed branches avoided
-- remembered-route token savings
+- workspace evidence made addressable outside the context window
+- remembered-route API token savings
+- remembered-route context-window savings
 - completion cost projections
 
 SkillSpec should eventually support reports such as:
@@ -400,7 +403,8 @@ SkillSpec should eventually support reports such as:
 42/44 scenarios passed
 skill prose reduced by 82%
 3 known drift bugs covered by tests
-estimated 18,400 tokens avoided per remembered run
+exploration evidence captured once and now addressable by id
+estimated 18,400 API tokens and 6,200 context-window tokens avoided per remembered run
 ```
 
 ## Imports And Future Inheritance

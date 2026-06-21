@@ -1,0 +1,3 @@
+# Example dependency manifest placeholder for examples/rote-browse/skill.spec.yml.
+# Real released browser flows should replace this with the manifest format
+# expected by their target rote runtime and declared browser session policy.

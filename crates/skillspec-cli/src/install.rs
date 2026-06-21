@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
@@ -53,6 +54,7 @@ pub struct InstallTargetReport {
     pub target: HarnessTarget,
     pub id: &'static str,
     pub path: PathBuf,
+    pub existed: bool,
     pub status: InstallStatus,
 }
 
@@ -80,6 +82,7 @@ pub fn install_skill(
     targets: &[HarnessTarget],
     all_detected: bool,
     dry_run: bool,
+    force: bool,
     name: Option<&str>,
 ) -> Result<InstallReport> {
     let skill_name = match name {
@@ -97,24 +100,56 @@ pub fn install_skill(
         });
     }
 
-    let mut installs = Vec::new();
+    let mut pending = Vec::new();
     for root in target_roots {
         let install_dir = root.path.join(&skill_name);
+        let existed = install_dir.exists();
+        if existed && !install_dir.is_dir() {
+            return Err(Error::InvalidInput {
+                message: format!(
+                    "install target already exists and is not a directory: {}",
+                    install_dir.display()
+                ),
+            });
+        }
+        pending.push(PendingInstall {
+            root,
+            install_dir,
+            existed,
+        });
+    }
+
+    if !dry_run && !force {
+        for install in pending.iter().filter(|install| install.existed) {
+            if !confirm_overwrite(&install.install_dir)? {
+                return Err(Error::InvalidInput {
+                    message: format!(
+                        "install target already exists; overwrite declined: {}",
+                        install.install_dir.display()
+                    ),
+                });
+            }
+        }
+    }
+
+    let mut installs = Vec::new();
+    for install in pending {
         if !dry_run {
-            fs::create_dir_all(&install_dir).map_err(|source| Error::Write {
-                path: install_dir.clone(),
+            fs::create_dir_all(&install.install_dir).map_err(|source| Error::Write {
+                path: install.install_dir.clone(),
                 source,
             })?;
-            copy_file(skill_folder, &install_dir, "SKILL.md")?;
-            copy_file(skill_folder, &install_dir, "skill.spec.yml")?;
+            copy_file(skill_folder, &install.install_dir, "SKILL.md")?;
+            copy_file(skill_folder, &install.install_dir, "skill.spec.yml")?;
             for relative_path in &support_files {
-                copy_relative_file(skill_folder, &install_dir, relative_path)?;
+                copy_relative_file(skill_folder, &install.install_dir, relative_path)?;
             }
         }
         installs.push(InstallTargetReport {
-            target: root.target,
-            id: root.id,
-            path: install_dir,
+            target: install.root.target,
+            id: install.root.id,
+            path: install.install_dir,
+            existed: install.existed,
             status: if dry_run {
                 InstallStatus::Planned
             } else {
@@ -128,6 +163,12 @@ pub fn install_skill(
         dry_run,
         installs,
     })
+}
+
+struct PendingInstall {
+    root: HarnessRoot,
+    install_dir: PathBuf,
+    existed: bool,
 }
 
 fn selected_roots(targets: &[HarnessTarget], all_detected: bool) -> Result<Vec<HarnessRoot>> {
@@ -145,6 +186,34 @@ fn selected_roots(targets: &[HarnessTarget], all_detected: bool) -> Result<Vec<H
         .filter(|root| selected.contains(&root.target))
         .collect::<Vec<_>>();
     Ok(roots)
+}
+
+fn confirm_overwrite(path: &Path) -> Result<bool> {
+    let stdin = io::stdin();
+    if !stdin.is_terminal() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "install target already exists: {}; rerun with --force to overwrite",
+                path.display()
+            ),
+        });
+    }
+
+    let mut stderr = io::stderr().lock();
+    write!(
+        stderr,
+        "install target already exists: {}. Overwrite? [y/N] ",
+        path.display()
+    )?;
+    stderr.flush()?;
+
+    let mut answer = String::new();
+    stdin.read_line(&mut answer)?;
+    Ok(is_yes(&answer))
+}
+
+fn is_yes(answer: &str) -> bool {
+    matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
 fn validate_skill_folder(skill_folder: &Path) -> Result<()> {
@@ -296,4 +365,20 @@ fn find_claude_skills_root() -> Result<Option<PathBuf>> {
         }
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_yes;
+
+    #[test]
+    fn confirmation_accepts_only_explicit_yes() {
+        for value in ["y", "Y", "yes", "YES", " yes\n"] {
+            assert!(is_yes(value), "{value:?} should confirm overwrite");
+        }
+
+        for value in ["", "n", "no", "true", "sure", " y please "] {
+            assert!(!is_yes(value), "{value:?} should decline overwrite");
+        }
+    }
 }

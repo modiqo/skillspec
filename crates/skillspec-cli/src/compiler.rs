@@ -60,7 +60,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push('\n');
     let _ = writeln!(output, "{}", spec.description);
     output.push('\n');
-    output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements.\n\n");
+    output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.\n\n");
     output.push_str("## Runtime Contract\n\n");
     output.push_str(
         "1. Load `./skill.spec.yml` from this skill folder before taking task actions.\n",
@@ -71,9 +71,25 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("   ```\n\n");
     output.push_str("3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.\n");
     output.push_str("4. Preserve the emitted trace `run_dir`.\n");
-    output.push_str("5. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, summary, and trace path.\n");
-    output.push_str("6. Follow the selected route, matched rules, forbids, elicitations, dependencies, imports, recipes, and closures from `skill.spec.yml`.\n");
-    output.push_str("7. If the CLI is unavailable, read `skill.spec.yml` directly and apply its rules manually. Do not expand this loader into a second source of truth.\n\n");
+    output.push_str(
+        "5. Read the decision JSON before using tools. Do not act from route labels alone.\n",
+    );
+    output.push_str("6. Materialize the active contract described below, then execute only actions that satisfy it.\n");
+    output.push_str("7. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, meaning, model layers, evidence gaps, summary, and trace path.\n");
+    output.push_str("8. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    output.push_str("## How To Execute The Structure\n\n");
+    output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
+    output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
+    output.push_str("- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.\n");
+    output.push_str("- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.\n");
+    output.push_str("- user constraints: carry explicit user instructions such as \"do not search the web\" into the same checklist. The spec adds structure; it does not erase the user's constraints.\n");
+    output.push_str("- `elicit`: ask the required question before irreversible work, side effects, installs, auth steps, or broad exploration.\n");
+    output.push_str("- `dependencies`: prove readiness for the active route, command, recipe, or code block before using it. Prefer command-scoped checks such as `skillspec deps check ./skill.spec.yml --command <id>` when a command id is known.\n");
+    output.push_str("- dependency evidence: a missing environment variable only proves that variable is absent; it does not prove that auth, API keys, browser sessions, keychains, vaults, or CLI-native credentials are absent. When auth can live outside env, prove readiness with the declared command, adapter, browser, or dependency check instead of grepping env.\n");
+    output.push_str("- `imports` and `resources`: load only the items required by the active route/rule/recipe/code, plus anything marked `always`.\n");
+    output.push_str("- `commands`, `recipes`, and `code`: use declared templates and ordered steps as the allowed execution surface. Check their `requires` fields first, preserve outputs as evidence, and do not replace them with unrelated tools unless the active contract allows that substitution.\n");
+    output.push_str("- `after_success` and closures: these are completion obligations. Do them before the final response, or report why they remain unproven.\n\n");
+    output.push_str("If every allowed route is blocked by missing dependencies, auth, permissions, or a forbid, report the blocker and ask how to proceed. Do not switch to native search, raw shell, browser automation, direct API calls, or installs just because they are available in the harness.\n\n");
     output.push_str("## Quick Commands\n\n");
     output.push_str("```bash\n");
     output.push_str("skillspec validate ./skill.spec.yml\n");
@@ -84,7 +100,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\"\n");
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
-    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), the align summary/conclusion, key failed or unproven alignment checks, and the concrete execution evidence ids or files.\n\n");
+    output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files.\n\n");
     if !spec.routes.is_empty() {
         output.push_str("## Route Hints\n\n");
         let mut routes = spec.routes.iter().collect::<Vec<_>>();
@@ -465,7 +481,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
     output.push_str("- After `skillspec decide` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
-    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, summary, and any failed/unproven checks in the completion report.\n\n");
+    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, summary, and any failed/unproven checks in the completion report.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {
@@ -1144,6 +1160,18 @@ mod tests {
         assert!(output.contains("trace align"));
         assert!(output.contains("Completion Report"));
         assert!(output.contains("run_dir"));
+        assert!(output.contains("status meaning"));
+        assert!(output.contains("decision-replay and execution-proof layer results"));
+        assert!(output.contains("evidence gaps"));
+        assert!(output.contains("Do not act from route labels alone"));
+        assert!(output.contains("forbids are hard negative constraints"));
+        assert!(
+            output.contains("The spec adds structure; it does not erase the user's constraints")
+        );
+        assert!(
+            output.contains("a missing environment variable only proves that variable is absent")
+        );
+        assert!(output.contains("do not replace them with unrelated tools"));
         assert!(!output.contains("## Rules"));
         assert!(!output.contains("## Dependencies"));
     }

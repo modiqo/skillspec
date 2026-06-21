@@ -1,11 +1,11 @@
 ---
-name: rote-computer
-description: "Task-first supertool policy for remembered computer work."
+name: rote-browse
+description: "Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup."
 ---
 
-# rote computer
+# rote browse
 
-Task-first supertool policy for remembered computer work.
+Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -59,8 +59,10 @@ When reporting completion, include the selected route, the SkillSpec trace `run_
 
 ## Route Hints
 
-- `remembered_route`: Use a saved route
-- `connected_service`: Connect the service
-- `local_cli`: Use the command line
-- `browser`: Use the browser
-- `one_off_shell`: Do a one-off local check
+- `attach_existing_session`: Attach to an active browser
+- `new_headed_session`: Start a new visible browser
+- `new_headless_session`: Start a new headless browser
+- `saved_auth_replay`: Use saved browser auth state
+- `page_recovery`: Recover browser page or ref state
+- `stateful_page_flow`: Work through a stateful page
+- `browser_flow_crystallization`: Crystallize browser exploration

@@ -1,0 +1,656 @@
+schema: skillspec/v0
+id: rote.browse
+title: rote browse
+description: Browser automation through rote with page leases, snapshots, slices, attach-existing sessions, auth gates, and cleanup.
+
+applies_when:
+  - user_intent:
+      - browse a website with rote
+      - attach to an active browser
+      - inspect logged-in web app state
+      - snapshot or slice a page
+      - click or type in a page
+      - recover a stale browser ref or page lease
+      - crystallize browser exploration into a reusable flow
+
+entry:
+  prompt: Choose the browser launch shape before navigating, then use rote browser ledger evidence instead of raw browser automation.
+
+routes:
+  - id: attach_existing_session
+    label: Attach to an active browser
+    rank: 10
+    description: Use the user's existing Chrome or Edge session when login, SSO, MFA, extensions, Gmail, or active tab state matters.
+  - id: new_headed_session
+    label: Start a new visible browser
+    rank: 20
+    description: Use a rote-managed headed browser when visual debugging matters but personal browser state should not be reused.
+  - id: new_headless_session
+    label: Start a new headless browser
+    rank: 30
+    description: Use a deterministic headless session for public pages, scripts, CI, or replay-like browsing.
+  - id: saved_auth_replay
+    label: Use saved browser auth state
+    rank: 40
+    description: Use saved auth state for authenticated replay without attaching to the live personal browser.
+  - id: page_recovery
+    label: Recover browser page or ref state
+    rank: 50
+    description: Use when a page lease is missing, snapshot capture failed, or an element ref became stale.
+  - id: stateful_page_flow
+    label: Work through a stateful page
+    rank: 60
+    description: Use for forms, pickers, filters, calendars, schedulers, and other multi-step web UI state machines.
+  - id: browser_flow_crystallization
+    label: Crystallize browser exploration
+    rank: 70
+    description: Use after successful exploration when the user wants private recall or controlled replay.
+
+rules:
+  - id: logged_in_browser_state_attaches_existing
+    when:
+      user_says_any:
+        - attach to my browser
+        - active browser
+        - existing browser
+        - logged-in browser
+        - gmail
+        - calendar
+        - sso
+        - mfa
+    prefer: attach_existing_session
+    forbid:
+      - headless_for_personal_browser_state
+      - saved_auth_without_existing_profile_approval
+      - native_search_as_answer
+      - raw_playwright
+    elicit:
+      - browser_launch_shape
+    after_success:
+      - capture_browser_ledger_evidence
+      - cleanup_owned_browser_resources
+    reason: Existing logged-in browser state needs a headed attach flow and human-aware setup choices.
+
+  - id: bare_browser_intent_requires_launch_choice
+    when:
+      user_says_any:
+        - browse
+        - open this site
+        - click
+        - type
+        - snapshot
+        - inspect page
+        - extract from page
+    route_order:
+      - attach_existing_session
+      - new_headed_session
+      - new_headless_session
+    forbid:
+      - native_search_as_answer
+      - web_fetch_as_browser_substitute
+      - curl_as_browser_substitute
+      - raw_playwright
+    allow:
+      native_search: url_discovery_only
+    elicit:
+      - browser_launch_shape
+    after_success:
+      - capture_browser_ledger_evidence
+      - cleanup_owned_browser_resources
+    reason: Browser intent must be satisfied by live page observation and a chosen launch/session mode.
+
+  - id: public_scriptable_pages_can_be_headless
+    when:
+      user_says_any:
+        - headless
+        - ci
+        - script
+        - public page
+        - replay
+    prefer: new_headless_session
+    forbid:
+      - attach_personal_browser_without_need
+    after_success:
+      - capture_browser_ledger_evidence
+      - cleanup_owned_browser_resources
+    reason: Public or replay-like browsing should avoid personal browser state unless the user asks for it.
+
+  - id: forms_and_pickers_are_state_machines
+    when:
+      user_says_any:
+        - form
+        - picker
+        - filter
+        - calendar
+        - scheduler
+        - checkout
+        - search results
+    prefer: stateful_page_flow
+    forbid:
+      - chained_unobserved_form_actions
+      - stale_ref_reuse
+      - transactional_click_without_approval
+    elicit:
+      - transactional_approval
+    after_success:
+      - capture_transition_evidence
+      - cleanup_owned_browser_resources
+    reason: Stateful UIs require observe-act-observe loops and explicit approval before transactional steps.
+
+  - id: auth_or_challenge_stops_for_human_gate
+    when:
+      user_says_any:
+        - login
+        - captcha
+        - mfa
+        - permission prompt
+        - challenge
+        - access denied
+    prefer: attach_existing_session
+    forbid:
+      - hidden_credential_prompt
+      - captcha_bypass
+      - secret_in_browser_command
+      - loop_on_human_gate
+    elicit:
+      - human_gate_resolution
+    after_success:
+      - classify_auth_or_modal_gate
+      - refresh_browser_state_after_human_gate
+    reason: Credentials, MFA, CAPTCHA, and permission gates require human handoff, not automated bypass or repeated snapshots.
+
+  - id: stale_or_missing_page_uses_recovery
+    when:
+      user_says_any:
+        - stale ref
+        - stale reference
+        - target missing
+        - capture failed
+        - missing tab
+        - page disappeared
+    prefer: page_recovery
+    forbid:
+      - acting_on_unknown_tab
+      - repeated_empty_snapshots
+      - stale_ref_reuse
+    after_success:
+      - inspect_page_lease
+      - regrant_or_rebase_before_action
+    reason: Missing leases and stale refs must be recovered through page ledger state before acting.
+
+  - id: browser_flow_reuse_saves_auth_state
+    when:
+      user_says_any:
+        - crystallize
+        - reusable flow
+        - save auth
+        - replay headlessly
+        - private recall
+    prefer: browser_flow_crystallization
+    forbid:
+      - raw_password_in_flow
+      - public_share_without_portability_validation
+      - released_without_saved_auth_dependency
+    after_success:
+      - save_browser_auth_when_needed
+      - state_private_replay_caveat
+      - run_browser_flow_preflight
+    reason: Authenticated browser flows need declared browser-session dependencies and private replay caveats.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - allow_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+
+elicitations:
+  browser_launch_shape:
+    question: Which browser launch shape should rote use?
+    max_choices: 1
+    choices:
+      - id: attach_existing
+        label: Attach existing browser
+        description: Reuse the user's logged-in Chrome or Edge session for stateful or authenticated pages.
+        sets:
+          browser_mode: attach_existing
+        route: attach_existing_session
+        next: prepare_browser
+        safety: browser_attach
+      - id: new_headed
+        label: New visible browser
+        description: Start an isolated visible browser for debugging without personal browser state.
+        sets:
+          browser_mode: new_headed
+        route: new_headed_session
+        next: prepare_browser
+        safety: browser_attach
+      - id: new_headless
+        label: New headless browser
+        description: Start a deterministic background browser for public pages or replay-like work.
+        sets:
+          browser_mode: new_headless
+        route: new_headless_session
+        next: prepare_browser
+        safety: network_read
+      - id: saved_auth
+        label: Saved auth state
+        description: Use a declared saved browser session for authenticated replay.
+        sets:
+          browser_mode: saved_auth
+        route: saved_auth_replay
+        next: prepare_browser
+        safety: browser_attach
+
+  transactional_approval:
+    question: Do you approve the transactional browser action?
+    required_when:
+      - missing: transactional_approval
+    max_choices: 1
+    choices:
+      - id: approve_read_only
+        label: Read-only only
+        description: Stop after inspection, filtering, comparison, or result selection.
+        sets:
+          transactional_approval: read_only
+        safety: read_only
+      - id: approve_transaction
+        label: Approve transaction
+        description: Continue with the explicit send, submit, save, purchase, delete, or upload action.
+        sets:
+          transactional_approval: approved
+        safety: destructive
+
+  human_gate_resolution:
+    question: How should the human-required browser gate be handled?
+    required_when:
+      - missing: human_gate_resolution
+    max_choices: 1
+    choices:
+      - id: human_resolves
+        label: Human resolves
+        description: Pause for the user to complete login, MFA, CAPTCHA, consent, or permission in the browser.
+        sets:
+          human_gate_resolution: wait_for_human
+        safety: browser_attach
+      - id: stop_read_only
+        label: Stop read-only
+        description: Stop without trying to bypass the gate or entering secrets.
+        sets:
+          human_gate_resolution: stop
+        safety: read_only
+
+  install_scope:
+    question: How should missing local tools be provisioned?
+    required_when:
+      - missing: dependency_install_scope
+    max_choices: 1
+    choices:
+      - id: rote_managed
+        label: Rote-managed or project-local
+        description: Prefer isolated provisioning that does not mutate the whole machine.
+        sets:
+          dependency_install_scope: rote_managed
+        safety: local_write
+      - id: leave_draft
+        label: Leave draft
+        description: Do not install anything; keep the skill draft-only until dependencies are available.
+        sets:
+          dependency_install_scope: none
+        safety: read_only
+
+dependencies:
+  skillspec:
+    kind: cli
+    description: SkillSpec CLI is required for validation, tests, compilation, and dependency checks for this example.
+    command: skillspec
+    check:
+      command: skillspec
+  rote:
+    kind: cli
+    description: Rote CLI is required for browser workspace setup, page ledger commands, snapshots, slices, auth state, and flow crystallization.
+    command: rote
+    check:
+      command: rote
+    provision:
+      elicit: install_scope
+      options:
+        - id: rote_managed
+          label: Install or update rote through the project-approved path
+          safety: local_write
+  deps_toml:
+    kind: file
+    description: Example dependency manifest copied with this folder-shaped skill.
+    path: deps.toml
+    check:
+      path: deps.toml
+  active_browser:
+    kind: browser
+    description: A Chrome or Edge profile with the Playwright extension configured is required for attach-existing workflows.
+    permission:
+      required: true
+      reason: Attach-existing browser work may read logged-in page state and active tabs.
+      safety: browser_attach
+  browser_auth_state:
+    kind: browser
+    description: Saved browser auth state is required for authenticated replay without the live browser.
+    permission:
+      required: true
+      reason: Saved auth state grants authenticated browser access during replay.
+      safety: browser_attach
+  browser_session:
+    kind: browser
+    description: A rote-managed headed or headless browser session is required for page navigation and snapshots.
+    permission:
+      required: true
+      reason: Browser automation can navigate pages and interact with controls.
+      safety: browser_attach
+
+states:
+  start:
+    do:
+      - choose_browser_route
+      - load_browser_guidance
+    next: prepare_browser
+  prepare_browser:
+    do:
+      - inspect_browser_readiness
+      - prepare_launch_shape
+    next: navigate
+  navigate:
+    do:
+      - open_or_attach_page
+      - wait_for_positive_readiness
+      - capture_snapshot
+    next: inspect
+  inspect:
+    do:
+      - inspect_page_lease
+      - inspect_targeted_slices
+      - classify_auth_or_modal_gate
+    next: act_or_recover
+  act_or_recover:
+    do:
+      - run_stateful_transition_loop
+      - regrant_or_rebase_before_action
+    next: complete
+  complete:
+    do:
+      - capture_browser_ledger_evidence
+      - cleanup_owned_browser_resources
+    next: done
+  done:
+    say: done_summary
+
+commands:
+  load_browser_guidance:
+    description: Load the complete rote browser guidance before browser execution.
+    template: "rote guidance browser essential"
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  inspect_workspace_state:
+    description: Inspect rote inventory, browser preferences, and workspace variables.
+    template: |
+      rote inventory
+      rote config browser show
+      rote vars --json
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  prepare_attach_existing:
+    description: Prepare active browser attach when logged-in browser state matters.
+    template: "rote browser attach setup --method extension --browser <chrome-or-edge>"
+    safety: browser_attach
+    requires:
+      dependencies:
+        - rote
+        - active_browser
+
+  browse_attach_existing:
+    description: Open the target in the user's existing headed browser session without taking an immediate snapshot.
+    template: "rote browse <url> -w <workspace> --headed --attach-existing --new-tab --no-prompt --no-snapshot"
+    safety: browser_attach
+    requires:
+      dependencies:
+        - rote
+        - active_browser
+
+  browse_new_headed:
+    description: Open the target in a new visible rote-managed browser session.
+    template: "rote browse <url> -w <workspace> --headed --new-session --new-tab --no-snapshot"
+    safety: browser_attach
+    requires:
+      dependencies:
+        - rote
+        - browser_session
+
+  browse_new_headless:
+    description: Open the target in a new deterministic headless browser session.
+    template: "rote browse <url> -w <workspace> --headless --new-session --new-tab --no-prompt --no-snapshot"
+    safety: network_read
+    requires:
+      dependencies:
+        - rote
+        - browser_session
+
+  wait_and_snapshot:
+    description: Wait for a positive readiness signal before snapshotting dynamic pages.
+    template: |
+      rote browse wait --selector '<ready-selector>' --timeout 30 --quiet-ms 750
+      rote browse snapshot
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  inspect_page_state:
+    description: Inspect current page metadata, targeted slices, and browser dependency ledger.
+    template: |
+      rote browser page current --format compact
+      rote browser slice @page.current clickable --format json
+      rote browser slice @page.current forms --format json
+      rote browser deps --format compact
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  recover_page_lease:
+    description: Recover a missing target or stale ref by inspecting tabs and granting a fresh lease before acting.
+    template: |
+      rote browser tabs list --format json
+      rote browser tabs activate --title-regex '<site-or-title>' --grant-lease --format json
+      rote browse snapshot
+    safety: browser_attach
+    requires:
+      dependencies:
+        - rote
+        - browser_session
+
+  detect_human_gate:
+    description: Classify modal, auth, CAPTCHA, login, access-denied, and other human-required gates before retrying.
+    template: |
+      rote browser modal detect --format json
+      rote browse auth detect --json
+    safety: read_only
+    requires:
+      dependencies:
+        - rote
+
+  save_browser_auth:
+    description: Save browser auth state after logged-in exploration when a replay flow will depend on it.
+    template: "rote browse auth save --domain <domain> --profile <profile>"
+    safety: browser_attach
+    requires:
+      dependencies:
+        - rote
+        - browser_auth_state
+
+  close_browser_session:
+    description: Close only browser resources owned by this workspace/session.
+    template: "rote browse close"
+    safety: local_write
+    requires:
+      dependencies:
+        - rote
+
+  deps_check:
+    description: Check the example dependency manifest before release or install validation.
+    template: "skillspec deps check examples/rote-browse/skill.spec.yml"
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec
+        - deps_toml
+
+closures:
+  choose_browser_route:
+    description: Choose attach-existing, headed, headless, saved-auth replay, recovery, stateful flow, or crystallization route from the user's task.
+  inspect_browser_readiness:
+    description: Check rote browser inventory, preferences, attach prerequisites, saved auth state, and workspace variables.
+  prepare_launch_shape:
+    description: Use the selected or elicited browser launch shape and do not silently attach to a personal browser.
+  open_or_attach_page:
+    description: Navigate or attach through rote browse primitives, never raw Playwright, curl, or WebFetch as a browser substitute.
+  wait_for_positive_readiness:
+    description: Wait for an explicit selector, text, or settled-page signal before snapshotting dynamic apps.
+  capture_snapshot:
+    description: Capture a page snapshot after readiness and keep the response handle for later inspection.
+  inspect_page_lease:
+    description: Inspect the current page lease, tabs, prior snapshot, and capture failure state before taking actions.
+  inspect_targeted_slices:
+    description: Prefer page slices and targeted finds over loading full snapshots into context.
+  classify_auth_or_modal_gate:
+    description: Detect login, MFA, CAPTCHA, consent, permission, language, cookie, or access-denied gates before retrying.
+  run_stateful_transition_loop:
+    description: For forms and pickers, alternate observe, one action, wait, snapshot, and rebase before the next action.
+  regrant_or_rebase_before_action:
+    description: Regrant a tab lease or rebase stale refs before acting when the page changed.
+  capture_transition_evidence:
+    description: Capture each meaningful state transition with page/slice evidence.
+  capture_browser_ledger_evidence:
+    description: Record page snapshots, refs, slices, actions, tabs, dependencies, and evidence handles before summarizing.
+  cleanup_owned_browser_resources:
+    description: Close only rote-created browser sessions or tabs; keep external human/imported tabs unless explicitly asked to close them.
+  refresh_browser_state_after_human_gate:
+    description: After the user resolves a human gate, wait, snapshot, and save auth if replay will need it.
+  save_browser_auth_when_needed:
+    description: Save browser auth for replay only when exploration used authenticated state and the user intends reuse.
+  state_private_replay_caveat:
+    description: State that live-attached browser flows are intended for private recall unless headless replay and dependencies are validated.
+  run_browser_flow_preflight:
+    description: Preflight browser dependencies, saved auth sessions, and runtime endpoints before marking a browser flow reusable.
+
+snippets:
+  done_summary:
+    text: |
+      Browser work is complete when the result cites rote browser evidence handles, page state, and cleanup ownership.
+      For authenticated browser flows, include any saved-auth dependency and the private replay caveat.
+
+proof:
+  metrics:
+    - browser_route_decision_accuracy
+    - forbidden_substitution_coverage
+    - browser_ledger_evidence_completeness
+    - human_gate_safety
+    - replay_readiness
+
+tests:
+  - name: logged in Gmail attaches existing browser
+    input: browse Gmail in my active browser and snapshot the inbox
+    expect:
+      route: attach_existing_session
+      elicit:
+        - browser_launch_shape
+      after_success:
+        - capture_browser_ledger_evidence
+        - cleanup_owned_browser_resources
+      forbid:
+        - headless_for_personal_browser_state
+        - native_search_as_answer
+        - raw_playwright
+
+  - name: bare browse asks for launch shape
+    input: browse the dashboard and extract the visible buttons
+    expect:
+      route: attach_existing_session
+      route_order:
+        - attach_existing_session
+        - new_headed_session
+        - new_headless_session
+      elicit:
+        - browser_launch_shape
+      forbid:
+        - native_search_as_answer
+        - web_fetch_as_browser_substitute
+        - raw_playwright
+
+  - name: public headless page avoids personal browser
+    input: browse this public page headless in CI and summarize headings
+    expect:
+      route: new_headless_session
+      forbid:
+        - attach_personal_browser_without_need
+
+  - name: calendar picker uses stateful flow
+    input: use the calendar picker to find available times and do not book anything
+    expect:
+      route: stateful_page_flow
+      matched_rules:
+        - logged_in_browser_state_attaches_existing
+        - forms_and_pickers_are_state_machines
+      forbid:
+        - chained_unobserved_form_actions
+        - transactional_click_without_approval
+
+  - name: captcha stops at human gate
+    input: the page shows a captcha challenge while logging in
+    expect:
+      route: attach_existing_session
+      elicit:
+        - human_gate_resolution
+      after_success:
+        - classify_auth_or_modal_gate
+        - refresh_browser_state_after_human_gate
+      forbid:
+        - hidden_credential_prompt
+        - captcha_bypass
+        - loop_on_human_gate
+
+  - name: stale ref recovers page lease
+    input: stale ref and missing tab while clicking the page
+    expect:
+      route: page_recovery
+      after_success:
+        - inspect_page_lease
+        - regrant_or_rebase_before_action
+      forbid:
+        - acting_on_unknown_tab
+        - stale_ref_reuse
+
+  - name: crystallized flow saves auth dependency
+    input: crystallize this authenticated browser flow for private recall
+    expect:
+      route: browser_flow_crystallization
+      after_success:
+        - save_browser_auth_when_needed
+        - state_private_replay_caveat
+        - run_browser_flow_preflight
+      forbid:
+        - raw_password_in_flow
+        - public_share_without_portability_validation
+        - released_without_saved_auth_dependency

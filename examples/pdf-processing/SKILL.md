@@ -1,10 +1,63 @@
-# PDF Processing
+---
+name: pdf-processing
+description: "Structured representation of a multi-file PDF skill with references, code snippets, artifacts, and an ordered form-filling recipe."
+---
 
-Use this skill for PDF inspection, extraction, and form filling.
+# PDF Processing SkillSpec
 
-The structured contract lives in `skill.spec.yml`. This prose file is retained
-as imported source material so agents and reviewers can inspect the original
-orientation without treating Markdown as the runtime control plane.
+Structured representation of a multi-file PDF skill with references, code snippets, artifacts, and an ordered form-filling recipe.
 
-Always inspect the PDF before choosing a transformation path. For form filling,
-load `forms.md` and follow the ordered probe-first recipe in the SkillSpec.
+This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
+
+## Runtime Contract
+
+1. Load `./skill.spec.yml` from this skill folder before taking task actions.
+2. When the `skillspec` CLI is available, run:
+
+   ```bash
+   skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+   ```
+
+3. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/rote-shell-spec` before passing `--input`.
+4. Preserve the emitted trace `run_dir`.
+5. Read the decision JSON before using tools. Do not act from route labels alone.
+6. Materialize the active contract described below, then execute only actions that satisfy it.
+7. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and report the alignment status, meaning, model layers, evidence gaps, summary, and trace path.
+8. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+
+## How To Execute The Structure
+
+Before the first task action, convert the decision output and relevant spec sections into a checklist:
+
+- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
+- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.
+- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.
+- user constraints: carry explicit user instructions such as "do not search the web" into the same checklist. The spec adds structure; it does not erase the user's constraints.
+- `elicit`: ask the required question before irreversible work, side effects, installs, auth steps, or broad exploration.
+- `dependencies`: prove readiness for the active route, command, recipe, or code block before using it. Prefer command-scoped checks such as `skillspec deps check ./skill.spec.yml --command <id>` when a command id is known.
+- dependency evidence: a missing environment variable only proves that variable is absent; it does not prove that auth, API keys, browser sessions, keychains, vaults, or CLI-native credentials are absent. When auth can live outside env, prove readiness with the declared command, adapter, browser, or dependency check instead of grepping env.
+- `imports` and `resources`: load only the items required by the active route/rule/recipe/code, plus anything marked `always`.
+- `commands`, `recipes`, and `code`: use declared templates and ordered steps as the allowed execution surface. Check their `requires` fields first, preserve outputs as evidence, and do not replace them with unrelated tools unless the active contract allows that substitution.
+- `after_success` and closures: these are completion obligations. Do them before the final response, or report why they remain unproven.
+
+If every allowed route is blocked by missing dependencies, auth, permissions, or a forbid, report the blocker and ask how to proceed. Do not switch to native search, raw shell, browser automation, direct API calls, or installs just because they are available in the harness.
+
+## Quick Commands
+
+```bash
+skillspec validate ./skill.spec.yml
+skillspec imports check ./skill.spec.yml
+skillspec test ./skill.spec.yml
+skillspec deps check ./skill.spec.yml
+skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>"
+```
+
+## Completion Report
+
+When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the concrete execution evidence ids or files.
+
+## Route Hints
+
+- `inspect_pdf`: Inspect PDF structure
+- `fill_pdf_form`: Fill PDF form

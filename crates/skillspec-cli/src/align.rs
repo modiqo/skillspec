@@ -39,6 +39,10 @@ pub struct AlignReport {
 pub struct AlignSummary {
     /// One-sentence interpretation of the report status.
     pub conclusion: String,
+    /// What the overall status means for a human reader.
+    pub status_meaning: String,
+    /// The two-layer measurement model used by alignment.
+    pub layers: Vec<AlignLayerSummary>,
     /// Selected route from the fresh decision, when any route was selected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_route: Option<String>,
@@ -56,6 +60,49 @@ pub struct AlignSummary {
     pub execution_obligations: AlignStatusCounts,
     /// Unproven obligations grouped by kind for fast triage.
     pub unproven_obligation_kinds: Vec<AlignObligationKindCount>,
+    /// Missing proof items that explain an `unproven` status.
+    pub evidence_gaps: Vec<AlignEvidenceGap>,
+}
+
+/// One layer of the alignment measurement model.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignLayerSummary {
+    pub id: AlignLayerKind,
+    pub label: String,
+    pub measures: String,
+    pub interpretation: String,
+    pub counts: AlignStatusCounts,
+}
+
+/// High-level alignment measurement layer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlignLayerKind {
+    /// Replays the current spec on captured input and compares the decision facts.
+    DecisionReplay,
+    /// Checks structured evidence for obligations implied by the active decision.
+    ExecutionProof,
+}
+
+/// One missing proof item that prevents a full `pass`.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignEvidenceGap {
+    pub id: String,
+    pub kind: AlignEvidenceGapKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub obligation_kind: Option<AlignObligationKind>,
+    pub source: String,
+    pub needed: String,
+}
+
+/// Source category for a missing proof item.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlignEvidenceGapKind {
+    /// A deterministic trace fact was absent from the decision trace.
+    DecisionTrace,
+    /// An execution-side obligation lacked structured proof.
+    ExecutionObligation,
 }
 
 /// Counts for pass/fail/unproven status groups.
@@ -302,9 +349,14 @@ fn summary_for(
         status_counts(obligations.iter().map(|obligation| obligation.status));
     let unproven_obligation_kinds = unproven_obligation_kinds(obligations);
     let conclusion = align_conclusion(status, &decision_checks, &execution_obligations);
+    let status_meaning = align_status_meaning(status).to_owned();
+    let layers = align_layers(&decision_checks, &execution_obligations);
+    let evidence_gaps = evidence_gaps(checks, obligations);
 
     AlignSummary {
         conclusion,
+        status_meaning,
+        layers,
         selected_route: decision.route.as_ref().map(|route| route.0.clone()),
         route_selection_basis: decision
             .route_selection
@@ -323,6 +375,71 @@ fn summary_for(
         decision_checks,
         execution_obligations,
         unproven_obligation_kinds,
+        evidence_gaps,
+    }
+}
+
+fn align_status_meaning(status: AlignStatus) -> &'static str {
+    match status {
+        AlignStatus::Pass => {
+            "pass means the current spec reproduced the trace decision and every active execution obligation has structured proof"
+        }
+        AlignStatus::Fail => {
+            "fail means the current spec contradicts the recorded decision trace; treat this as spec drift or a trace/spec mismatch"
+        }
+        AlignStatus::Unproven => {
+            "unproven means no contradiction was found, but the trace lacks structured evidence for every fact alignment needs to prove"
+        }
+    }
+}
+
+fn align_layers(
+    decision_checks: &AlignStatusCounts,
+    execution_obligations: &AlignStatusCounts,
+) -> Vec<AlignLayerSummary> {
+    vec![
+        AlignLayerSummary {
+            id: AlignLayerKind::DecisionReplay,
+            label: "decision replay".to_owned(),
+            measures: "Re-run the current resolved SkillSpec on the captured input, then compare identity, route selection, matched rules, forbids, elicitations, and after-success scheduling against the trace.".to_owned(),
+            interpretation: layer_interpretation(
+                decision_checks,
+                "decision replay",
+                "the spec-to-input decision is reproducible",
+                "the decision trace is missing some deterministic facts",
+                "the current spec no longer reproduces the recorded decision",
+            ),
+            counts: decision_checks.clone(),
+        },
+        AlignLayerSummary {
+            id: AlignLayerKind::ExecutionProof,
+            label: "execution proof".to_owned(),
+            measures: "Derive obligations from the selected route and matched rules, then require structured evidence that the route/checks/closures were fulfilled and forbids were not violated.".to_owned(),
+            interpretation: layer_interpretation(
+                execution_obligations,
+                "execution proof",
+                "every active execution obligation has structured proof",
+                "the decision is known, but execution evidence is incomplete",
+                "structured execution evidence contradicts the active contract",
+            ),
+            counts: execution_obligations.clone(),
+        },
+    ]
+}
+
+fn layer_interpretation(
+    counts: &AlignStatusCounts,
+    label: &str,
+    pass_text: &str,
+    unproven_text: &str,
+    fail_text: &str,
+) -> String {
+    if counts.fail > 0 {
+        format!("{label}: {fail_text}")
+    } else if counts.unproven > 0 {
+        format!("{label}: {unproven_text}")
+    } else {
+        format!("{label}: {pass_text}")
     }
 }
 
@@ -368,6 +485,35 @@ fn unproven_obligation_kinds(obligations: &[AlignObligation]) -> Vec<AlignObliga
         .collect()
 }
 
+fn evidence_gaps(checks: &[AlignCheck], obligations: &[AlignObligation]) -> Vec<AlignEvidenceGap> {
+    let mut gaps = Vec::new();
+    for check in checks
+        .iter()
+        .filter(|check| check.status == AlignCheckStatus::Unproven)
+    {
+        gaps.push(AlignEvidenceGap {
+            id: check.id.clone(),
+            kind: AlignEvidenceGapKind::DecisionTrace,
+            obligation_kind: None,
+            source: format!("checks.{}", check.id),
+            needed: check.message.clone(),
+        });
+    }
+    for obligation in obligations
+        .iter()
+        .filter(|obligation| obligation.status == AlignCheckStatus::Unproven)
+    {
+        gaps.push(AlignEvidenceGap {
+            id: obligation.id.clone(),
+            kind: AlignEvidenceGapKind::ExecutionObligation,
+            obligation_kind: Some(obligation.kind),
+            source: obligation.source.clone(),
+            needed: obligation.message.clone(),
+        });
+    }
+    gaps
+}
+
 fn align_conclusion(
     status: AlignStatus,
     checks: &AlignStatusCounts,
@@ -381,26 +527,33 @@ fn align_conclusion(
             "{} deterministic check(s) failed; the current spec no longer aligns with the decision trace",
             checks.fail
         ),
-        AlignStatus::Unproven => {
-            let mut reasons = Vec::new();
-            if checks.unproven > 0 {
-                reasons.push(format!(
-                    "{} deterministic trace check(s) lack recorded evidence",
-                    checks.unproven
-                ));
-            }
-            if obligations.unproven > 0 {
-                reasons.push(format!(
-                    "{} execution obligation(s) need structured evidence",
-                    obligations.unproven
-                ));
-            }
-            if checks.fail == 0 {
-                reasons.push("no deterministic drift was detected".to_owned());
-            }
-            reasons.join("; ")
-        }
+        AlignStatus::Unproven => align_unproven_conclusion(checks, obligations),
     }
+}
+
+fn align_unproven_conclusion(
+    checks: &AlignStatusCounts,
+    obligations: &AlignStatusCounts,
+) -> String {
+    let mut gaps = Vec::new();
+    if checks.unproven > 0 {
+        gaps.push(format!("{} deterministic trace check(s)", checks.unproven));
+    }
+    if obligations.unproven > 0 {
+        gaps.push(format!("{} execution obligation(s)", obligations.unproven));
+    }
+    let gap_text = match gaps.len() {
+        0 => "required evidence".to_owned(),
+        1 => gaps[0].clone(),
+        _ => format!(
+            "{} and {}",
+            gaps[..gaps.len() - 1].join(", "),
+            gaps[gaps.len() - 1]
+        ),
+    };
+    format!(
+        "decision replay found no deterministic drift, but proof is incomplete: {gap_text} remain unproven"
+    )
 }
 
 fn trace_input(envelopes: &[TraceEnvelope]) -> Result<String> {

@@ -388,7 +388,7 @@ recipes bind ordered procedures
 commands perform named actions
 tests prove steering behavior
 trace records runtime causality
-proof summarizes accuracy and savings
+proof summarizes accuracy, context escape, and replay savings
 ```
 
 ## Status
