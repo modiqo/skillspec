@@ -17,6 +17,136 @@ entry:
   prompt: Choose the browser launch shape before navigating. Browser execution is owned by rote-browse and its declared rote browser primitives; do not substitute any direct browser runtime, browser API, or raw automation tool.
 
 routes:
+  - id: browser_access_ladder
+    label: Try browser access, then shell auth, then adapters
+    rank: 5
+    description: >
+      Use when a browser task may require login, active session state, or alternate access paths.
+      Try browser-owned launch shapes first, then jump to rote-shell for CLI auth if browser auth is blocked,
+      and finally jump to rote adapters only when browser and CLI access cannot satisfy the task.
+    checks:
+      - rote_browse_owns_browser_execution
+      - no_direct_browser_tooling
+      - capture_browser_ledger_evidence
+    execution_plan:
+      mode: ordered
+      reason: Browser tasks should exhaust declared browser access paths before jumping to shell auth or adapters.
+      phases:
+        - id: attach_existing_browser
+          owner_skill: rote-browse
+          route: attach_existing_session
+          description: Try the user's existing browser session first when login, active tabs, extensions, or profile state may matter.
+          requires:
+            - inspect_browser_readiness
+            - prepare_attach_existing
+            - browse_attach_existing
+            - capture_browser_ledger_evidence
+          forbid:
+            - native_browser_tool_without_rote_browse
+            - direct_browser_tool_without_rote_browse
+            - browser_runtime_without_rote_browse
+          jumps:
+            - when: active_browser_unavailable
+              to_phase: new_headed_browser
+              reason: If an existing browser cannot be attached, try a rote-managed visible browser next.
+            - when: auth_required
+              to_phase: cli_auth_via_rote_shell
+              reason: If browser access is blocked by auth that has a CLI path, transfer auth work to rote-shell.
+        - id: new_headed_browser
+          owner_skill: rote-browse
+          route: new_headed_session
+          description: Start a new visible rote-managed browser when existing-session attach is unavailable or not appropriate.
+          requires:
+            - prepare_launch_shape
+            - browse_new_headed
+            - capture_browser_ledger_evidence
+          forbid:
+            - native_browser_tool_without_rote_browse
+            - direct_browser_tool_without_rote_browse
+            - browser_runtime_without_rote_browse
+          jumps:
+            - when: headed_session_unavailable
+              to_phase: headless_browser
+              reason: If a visible browser cannot be started, try the deterministic headless browser path.
+            - when: auth_required
+              to_phase: cli_auth_via_rote_shell
+              reason: If the new browser hits an auth gate with a CLI path, transfer auth work to rote-shell.
+        - id: headless_browser
+          owner_skill: rote-browse
+          route: new_headless_session
+          description: Try deterministic headless browsing for public, CI, or replay-like access before leaving browser ownership.
+          requires:
+            - prepare_launch_shape
+            - browse_new_headless
+            - capture_browser_ledger_evidence
+          forbid:
+            - attach_personal_browser_without_need
+            - native_browser_tool_without_rote_browse
+            - direct_browser_tool_without_rote_browse
+            - browser_runtime_without_rote_browse
+          jumps:
+            - when: auth_required
+              to_phase: cli_auth_via_rote_shell
+              reason: Headless browser auth blockers must not trigger raw browser bypasses; try CLI auth next.
+            - when: browser_blocked
+              to_phase: cli_auth_via_rote_shell
+              reason: If all browser launch paths are blocked, jump to shell-owned auth/readiness checks.
+        - id: cli_auth_via_rote_shell
+          owner_skill: rote-shell
+          description: Hand auth/readiness work to rote-shell so any CLI checks run through a named rote workspace and `rote exec --`.
+          requires:
+            - handoff_to_rote_shell_for_cli_auth
+            - record_browser_jump_decision
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_harness_cli_call_without_rote_exec
+          handoff:
+            to_skill: rote-shell
+            boundary: resume_after_handoff
+            pass_context:
+              - user_intent
+              - workspace
+              - evidence_context
+              - browser_phase_result
+              - auth_blocker
+            forbid:
+              - direct_cli_without_rote_exec
+              - direct_shell_command_without_rote_exec
+              - direct_harness_cli_call_without_rote_exec
+            reason: CLI auth and local readiness checks are shell-owned and must be captured through rote-shell.
+          jumps:
+            - when: cli_auth_completed
+              to_phase: attach_existing_browser
+              reason: After CLI auth succeeds, return to browser observation with fresh evidence.
+            - when: cli_auth_unavailable
+              to_phase: adapter_fallback
+              reason: If CLI auth cannot satisfy the task, use adapter discovery as the final fallback.
+        - id: adapter_fallback
+          owner_skill: rote-using-adapters
+          description: Use installed or catalogued rote adapters only after browser access and shell auth are blocked or insufficient.
+          requires:
+            - discover_relevant_rote_adapters
+            - handoff_to_rote_adapter_or_setup
+            - record_browser_jump_decision
+          forbid:
+            - direct_mcp_tool_call
+            - native_search_as_answer
+            - adapter_setup_before_browser_attempts
+          handoff:
+            to_skill: rote-using-adapters
+            boundary: stop_current_skill
+            pass_context:
+              - user_intent
+              - workspace
+              - evidence_context
+              - browser_phase_result
+              - cli_auth_result
+            forbid:
+              - direct_mcp_tool_call
+              - native_search_as_answer
+            reason: Adapter work is the final fallback after browser and shell access paths are exhausted.
+
   - id: attach_existing_session
     label: Attach to an active browser
     rank: 10
@@ -87,7 +217,7 @@ rules:
         - calendar
         - sso
         - mfa
-    prefer: attach_existing_session
+    prefer: browser_access_ladder
     forbid:
       - headless_for_personal_browser_state
       - saved_auth_without_existing_profile_approval
@@ -101,8 +231,9 @@ rules:
       - browser_launch_shape
     after_success:
       - capture_browser_ledger_evidence
+      - record_browser_jump_decision
       - cleanup_owned_browser_resources
-    reason: Existing logged-in browser state needs a headed attach flow and human-aware setup choices.
+    reason: Existing logged-in browser state starts with the browser access ladder and may jump to shell or adapters only through declared phase jumps.
 
   - id: bare_browser_intent_requires_launch_choice
     when:
@@ -115,6 +246,7 @@ rules:
         - inspect page
         - extract from page
     route_order:
+      - browser_access_ladder
       - attach_existing_session
       - new_headed_session
       - new_headless_session
@@ -133,6 +265,7 @@ rules:
       - browser_launch_shape
     after_success:
       - capture_browser_ledger_evidence
+      - record_browser_jump_decision
       - cleanup_owned_browser_resources
     reason: Browser intent must be satisfied by live page observation and a chosen launch/session mode.
 
@@ -191,7 +324,7 @@ rules:
         - permission prompt
         - challenge
         - access denied
-    prefer: attach_existing_session
+    prefer: browser_access_ladder
     forbid:
       - hidden_credential_prompt
       - captcha_bypass
@@ -201,8 +334,9 @@ rules:
       - human_gate_resolution
     after_success:
       - classify_auth_or_modal_gate
+      - record_browser_jump_decision
       - refresh_browser_state_after_human_gate
-    reason: Credentials, MFA, CAPTCHA, and permission gates require human handoff, not automated bypass or repeated snapshots.
+    reason: Credentials, MFA, CAPTCHA, and permission gates start in browser evidence but may only leave browser ownership through declared shell or adapter jump points.
 
   - id: stale_or_missing_page_uses_recovery
     when:
@@ -596,6 +730,14 @@ closures:
     description: Capture each meaningful state transition with page/slice evidence.
   capture_browser_ledger_evidence:
     description: Record page snapshots, refs, slices, actions, tabs, dependencies, and evidence handles before summarizing.
+  record_browser_jump_decision:
+    description: Record the active execution phase, any matched jump condition, and the evidence that justified moving from browser to shell or adapters.
+  handoff_to_rote_shell_for_cli_auth:
+    description: Stop browser-owned auth work and pass the blocker, page evidence, workspace, and user intent to rote-shell for CLI auth or local readiness checks through `rote exec --`.
+  discover_relevant_rote_adapters:
+    description: Discover installed and catalogued rote adapters only after browser access and shell auth/readiness paths cannot satisfy the task.
+  handoff_to_rote_adapter_or_setup:
+    description: Transfer to rote adapter execution or adapter setup only with browser and shell blocker evidence attached.
   cleanup_owned_browser_resources:
     description: Close only rote-created browser sessions or tabs; keep external human/imported tabs unless explicitly asked to close them.
   refresh_browser_state_after_human_gate:
@@ -625,11 +767,22 @@ tests:
   - name: logged in web app attaches existing browser
     input: browse a logged-in web app in my active browser and snapshot the current page
     expect:
-      route: attach_existing_session
+      route: browser_access_ladder
+      plan_phases:
+        - attach_existing_browser
+        - new_headed_browser
+        - headless_browser
+        - cli_auth_via_rote_shell
+        - adapter_fallback
+      plan_jumps:
+        - attach_existing_browser:auth_required->cli_auth_via_rote_shell
+        - headless_browser:browser_blocked->cli_auth_via_rote_shell
+        - cli_auth_via_rote_shell:cli_auth_unavailable->adapter_fallback
       elicit:
         - browser_launch_shape
       after_success:
         - capture_browser_ledger_evidence
+        - record_browser_jump_decision
         - cleanup_owned_browser_resources
       forbid:
         - headless_for_personal_browser_state
@@ -643,11 +796,22 @@ tests:
   - name: bare browse asks for launch shape
     input: browse the dashboard and extract the visible buttons
     expect:
-      route: attach_existing_session
+      route: browser_access_ladder
       route_order:
+        - browser_access_ladder
         - attach_existing_session
         - new_headed_session
         - new_headless_session
+      plan_phases:
+        - attach_existing_browser
+        - new_headed_browser
+        - headless_browser
+        - cli_auth_via_rote_shell
+        - adapter_fallback
+      plan_jumps:
+        - attach_existing_browser:active_browser_unavailable->new_headed_browser
+        - new_headed_browser:headed_session_unavailable->headless_browser
+        - cli_auth_via_rote_shell:cli_auth_unavailable->adapter_fallback
       elicit:
         - browser_launch_shape
       forbid:
@@ -680,11 +844,18 @@ tests:
   - name: captcha stops at human gate
     input: the page shows a captcha challenge while logging in
     expect:
-      route: attach_existing_session
+      route: browser_access_ladder
+      plan_phases:
+        - attach_existing_browser
+        - new_headed_browser
+        - headless_browser
+        - cli_auth_via_rote_shell
+        - adapter_fallback
       elicit:
         - human_gate_resolution
       after_success:
         - classify_auth_or_modal_gate
+        - record_browser_jump_decision
         - refresh_browser_state_after_human_gate
       forbid:
         - hidden_credential_prompt

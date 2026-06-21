@@ -135,6 +135,17 @@ pub struct ExecutionPhase {
     pub forbid: Vec<String>,
     #[serde(default)]
     pub handoff: Option<RouteHandoff>,
+    #[serde(default)]
+    pub jumps: Vec<ExecutionJump>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionJump {
+    pub when: String,
+    pub to_phase: String,
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -795,6 +806,8 @@ pub struct Expectation {
     #[serde(default)]
     pub plan_phases: Vec<String>,
     #[serde(default)]
+    pub plan_jumps: Vec<String>,
+    #[serde(default)]
     pub forbid: Vec<String>,
     #[serde(default)]
     pub forbid_exact: Option<Vec<String>>,
@@ -825,6 +838,7 @@ impl Expectation {
         self.route.is_some()
             || !self.route_order.is_empty()
             || !self.plan_phases.is_empty()
+            || !self.plan_jumps.is_empty()
             || !self.forbid.is_empty()
             || self.forbid_exact.is_some()
             || !self.not_forbid.is_empty()

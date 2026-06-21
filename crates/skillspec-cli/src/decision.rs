@@ -284,6 +284,28 @@ fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<St
             ));
         }
     }
+    if !expectation.plan_jumps.is_empty() {
+        let actual = decision
+            .execution_plan
+            .as_ref()
+            .map(|plan| {
+                plan.phases
+                    .iter()
+                    .flat_map(|phase| {
+                        phase
+                            .jumps
+                            .iter()
+                            .map(|jump| format!("{}:{}->{}", phase.id, jump.when, jump.to_phase))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for expected in &expectation.plan_jumps {
+            if !actual.iter().any(|jump| jump == expected) {
+                failures.push(format!("expected plan_jump {expected:?}, got {:?}", actual));
+            }
+        }
+    }
 
     for expected in &expectation.forbid {
         if !decision.forbid.iter().any(|actual| actual == expected) {

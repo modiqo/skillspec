@@ -163,7 +163,21 @@
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
         },
-        "handoff": { "$ref": "#/$defs/route_handoff" }
+        "handoff": { "$ref": "#/$defs/route_handoff" },
+        "jumps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/execution_jump" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "execution_jump": {
+      "type": "object",
+      "required": ["when", "to_phase"],
+      "properties": {
+        "when": { "$ref": "#/$defs/identifier" },
+        "to_phase": { "$ref": "#/$defs/identifier" },
+        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -831,6 +845,10 @@
         "plan_phases": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
+        },
+        "plan_jumps": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "forbid": {
           "type": "array",

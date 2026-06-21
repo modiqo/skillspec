@@ -140,6 +140,10 @@ routes:
           route: local
           requires: [run_cli_only_through_rote_exec]
           forbid: [direct_cli_without_rote_exec]
+          jumps:
+            - when: cli_evidence_missing
+              to_phase: browser_handoff
+              reason: Browser can collect fallback evidence.
         - id: browser_handoff
           owner_skill: rote-browse
           route: browser
@@ -201,6 +205,8 @@ tests:
     expect:
       route: browser
       plan_phases: [collect_cli_evidence, browser_handoff]
+      plan_jumps:
+        - collect_cli_evidence:cli_evidence_missing->browser_handoff
       forbid_exact: [native_search_as_answer]
       elicit_exact: [mode]
       after_success_exact: [cleanup]
@@ -496,6 +502,7 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert!(route_refs_out.contains("handoff.to_skill -> skill: rote-browse"));
     assert!(route_refs_out.contains("execution_plan.owner_skill -> skill: rote-shell"));
     assert!(route_refs_out.contains("execution_plan.route -> route: local"));
+    assert!(route_refs_out.contains("execution_plan.jump.to_phase -> phase: browser_handoff"));
 
     let missing = Command::new(bin())
         .arg("query")

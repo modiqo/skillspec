@@ -880,6 +880,14 @@ fn outgoing_refs(spec: &SkillSpec, parsed: &ParsedHandle) -> Result<Vec<Referenc
                         handoff_targets,
                     ));
                 }
+                let jump_targets = plan
+                    .phases
+                    .iter()
+                    .flat_map(|phase| phase.jumps.iter().map(|jump| jump.to_phase.clone()))
+                    .collect::<Vec<_>>();
+                if !jump_targets.is_empty() {
+                    edges.push(edge("execution_plan.jump.to_phase", "phase", jump_targets));
+                }
             }
             Ok(edges)
         }

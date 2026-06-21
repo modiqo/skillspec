@@ -83,7 +83,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
     output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
-    output.push_str("- execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase.\n");
+    output.push_str("- execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.\n");
     output.push_str("- route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.\n");
     output.push_str("- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.\n");
     output.push_str("- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.\n");
@@ -658,7 +658,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("## Runtime Contract\n\n");
     output.push_str("- Read this generated skill for orientation and immediate rules.\n");
     output.push_str("- Treat routes, rules, states, commands, tests, and review notes below as authoritative.\n");
-    output.push_str("- Route `execution_plan` entries are ordered hard obligations. Execute phase 1 before phase 2; do not jump to a later handoff just because that substrate is available.\n");
+    output.push_str("- Route `execution_plan` entries are ordered hard obligations. Execute phase 1 before phase 2; do not jump to a later handoff just because that substrate is available. Phase `jumps` are the only declared conditional exits from the default order.\n");
     output.push_str("- Route `handoff` entries are hard execution boundaries, not prose. If a selected route has `handoff.boundary: stop_current_skill`, stop current-skill execution except to pass the declared context to the target skill.\n");
     output.push_str("- Rules beat prose when there is tension.\n");
     output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
@@ -787,6 +787,19 @@ fn write_route(output: &mut String, route: &Route) {
                     "    - handoff.boundary: `{}`",
                     handoff_boundary_name(&handoff.boundary)
                 );
+            }
+            if !phase.jumps.is_empty() {
+                let _ = writeln!(output, "    - jumps:");
+                for jump in &phase.jumps {
+                    let _ = writeln!(
+                        output,
+                        "      - when `{}` -> phase `{}`",
+                        jump.when, jump.to_phase
+                    );
+                    if let Some(reason) = &jump.reason {
+                        let _ = writeln!(output, "        reason: {reason}");
+                    }
+                }
             }
         }
     }
