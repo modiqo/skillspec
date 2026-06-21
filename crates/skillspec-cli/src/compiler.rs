@@ -1,9 +1,9 @@
 use crate::model::{
     Artifact, ArtifactKind, CodeBlock, CodeKind, CodeSource, CommandRequires, CommandTemplate,
-    Dependency, DependencyKind, Elicitation, ElicitationChoice, HandoffBoundary, Import,
-    ImportLoad, ImportRole, ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep, Resource,
-    ResourceRole, ResourceUse, ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest, SkillSpec,
-    State, TraceEventKind,
+    Dependency, DependencyKind, Elicitation, ElicitationChoice, ExecutionPlanMode, HandoffBoundary,
+    Import, ImportLoad, ImportRole, ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep,
+    Resource, ResourceRole, ResourceUse, ResourceUseKind, Route, Rule, SafetyClass, ScenarioTest,
+    SkillSpec, State, TraceEventKind,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -83,6 +83,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
     output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
+    output.push_str("- execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase.\n");
     output.push_str("- route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.\n");
     output.push_str("- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.\n");
     output.push_str("- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.\n");
@@ -657,6 +658,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("## Runtime Contract\n\n");
     output.push_str("- Read this generated skill for orientation and immediate rules.\n");
     output.push_str("- Treat routes, rules, states, commands, tests, and review notes below as authoritative.\n");
+    output.push_str("- Route `execution_plan` entries are ordered hard obligations. Execute phase 1 before phase 2; do not jump to a later handoff just because that substrate is available.\n");
     output.push_str("- Route `handoff` entries are hard execution boundaries, not prose. If a selected route has `handoff.boundary: stop_current_skill`, stop current-skill execution except to pass the declared context to the target skill.\n");
     output.push_str("- Rules beat prose when there is tension.\n");
     output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
@@ -751,7 +753,50 @@ fn write_route(output: &mut String, route: &Route) {
             let _ = writeln!(output, "  - reason: {reason}");
         }
     }
+    if let Some(plan) = &route.execution_plan {
+        let _ = writeln!(
+            output,
+            "- execution_plan: {}",
+            execution_plan_mode_name(&plan.mode)
+        );
+        if let Some(reason) = &plan.reason {
+            let _ = writeln!(output, "  - reason: {reason}");
+        }
+        for phase in &plan.phases {
+            let _ = writeln!(output, "  - phase `{}`:", phase.id);
+            let _ = writeln!(output, "    - owner_skill: `{}`", phase.owner_skill);
+            if let Some(route) = &phase.route {
+                let _ = writeln!(output, "    - route: `{}`", route.0);
+            }
+            if let Some(description) = &phase.description {
+                let _ = writeln!(output, "    - description: {description}");
+            }
+            if !phase.requires.is_empty() {
+                let _ = writeln!(output, "    - requires: {}", phase.requires.join(", "));
+            }
+            if !phase.checks.is_empty() {
+                let _ = writeln!(output, "    - checks: {}", phase.checks.join(", "));
+            }
+            if !phase.forbid.is_empty() {
+                let _ = writeln!(output, "    - forbid: {}", phase.forbid.join(", "));
+            }
+            if let Some(handoff) = &phase.handoff {
+                let _ = writeln!(output, "    - handoff.to_skill: `{}`", handoff.to_skill);
+                let _ = writeln!(
+                    output,
+                    "    - handoff.boundary: `{}`",
+                    handoff_boundary_name(&handoff.boundary)
+                );
+            }
+        }
+    }
     output.push('\n');
+}
+
+fn execution_plan_mode_name(mode: &ExecutionPlanMode) -> &'static str {
+    match mode {
+        ExecutionPlanMode::Ordered => "ordered",
+    }
 }
 
 fn handoff_boundary_name(boundary: &HandoffBoundary) -> &'static str {
@@ -904,6 +949,15 @@ fn write_predicate(output: &mut String, predicate: &Predicate) {
             "  - user_says_any: {}",
             quoted_list(&predicate.user_says_any)
         );
+    }
+    if !predicate.user_says_all_groups.is_empty() {
+        let groups = predicate
+            .user_says_all_groups
+            .iter()
+            .map(|group| format!("[{}]", quoted_list(group)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(output, "  - user_says_all_groups: {groups}");
     }
     if let Some(value) = predicate.task_recurrence_likely {
         let _ = writeln!(output, "  - task_recurrence_likely: {value}");
@@ -1365,6 +1419,7 @@ mod tests {
                 description: None,
                 checks: Vec::new(),
                 handoff: None,
+                execution_plan: None,
             }],
             rules: Vec::new(),
             states: BTreeMap::new(),

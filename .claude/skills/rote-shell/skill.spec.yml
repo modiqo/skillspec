@@ -17,6 +17,63 @@ entry:
   prompt: Choose the narrowest rote shell route that preserves the evidence the user will need later.
 
 routes:
+  - id: shell_then_browser_handoff
+    label: Run shell evidence, then hand off browser work
+    rank: 3
+    description: >
+      Use when one user request combines local CLI/repo/service status work with browser-owned page or email-draft work.
+      Execute the shell evidence phase through rote-shell first, then stop at the browser phase and hand off to rote-browse.
+    execution_plan:
+      mode: ordered
+      reason: Compound shell-plus-browser requests must not let the browser handoff hide or skip the shell phase.
+      phases:
+        - id: shell_status_via_rote_exec
+          owner_skill: rote-shell
+          route: adapter_first_cli_fallback
+          description: Complete repo, GitHub, local CLI, and status checks through a named rote workspace and `rote exec --` before any browser work.
+          requires:
+            - initialize_rote_workspace
+            - discover_relevant_rote_adapters
+            - verify_adapter_or_cli_readiness
+            - preflight_cli_fallback
+            - run_cli_only_through_rote_exec
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_harness_cli_call_without_rote_exec
+            - untracked_stdout_scrollback
+            - rote_exec_outside_workspace
+            - anonymous_workspace
+        - id: browser_draft_handoff
+          owner_skill: rote-browse
+          route: browser_handoff
+          description: Pass the shell evidence summary and browser/email-draft intent to rote-browse; do not run browser tools inside rote-shell.
+          requires:
+            - handoff_browser_work_to_rote_browse_skill
+            - pass_browser_context_to_rote_browse
+            - resume_shell_work_after_browser_evidence
+          forbid:
+            - native_search_as_answer
+            - raw_playwright
+            - native_browser_tool_without_rote_browse
+            - direct_browser_tool_without_rote_browse
+            - browser_cli_commands_in_rote_shell
+          handoff:
+            to_skill: rote-browse
+            boundary: stop_current_skill
+            pass_context:
+              - user_intent
+              - workspace
+              - evidence_context
+              - shell_prerequisites
+              - shell_phase_result
+            forbid:
+              - native_browser_tool_without_rote_browse
+              - direct_browser_tool_without_rote_browse
+              - browser_cli_commands_in_rote_shell
+              - raw_playwright
+            reason: Browser drafting is owned by rote-browse after shell evidence is captured.
+
   - id: adapter_first_cli_fallback
     label: Use rote adapters, then rote exec CLI fallback
     rank: 4
@@ -241,6 +298,34 @@ rules:
       - pass_browser_context_to_rote_browse
       - resume_shell_work_after_browser_evidence
     reason: Browser intent must be satisfied by browser evidence owned by the rote-browse skill, not search summaries, raw browser automation, or shell-level browser command recipes.
+
+  - id: compound_shell_then_browser_uses_ordered_plan
+    when:
+      user_says_all_groups:
+        - [gh, git, repo, branch, remote, pending checkins, pending check-ins]
+        - [browse, email draft, draft email, reminder, inbox in browser, logged-in inbox]
+    prefer: shell_then_browser_handoff
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_harness_cli_call_without_rote_exec
+      - untracked_stdout_scrollback
+      - native_search_as_answer
+      - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - browser_cli_commands_in_rote_shell
+    after_success:
+      - run_cli_only_through_rote_exec
+      - handoff_browser_work_to_rote_browse_skill
+      - pass_browser_context_to_rote_browse
+      - resume_shell_work_after_browser_evidence
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - report_workspace_evidence_and_token_math
+    reason: >
+      A compound shell-plus-browser request must emit an ordered execution plan:
+      shell evidence through rote exec first, then browser handoff.
 
   - id: durable_work_requires_named_workspace
     when:
@@ -1031,6 +1116,30 @@ tests:
         - direct_browser_tool_without_rote_browse
         - browser_cli_commands_in_rote_shell
 
+  - name: repo status then email reminder uses ordered shell then browser plan
+    input: check my gh status for repo ~/tulving/skillspec against the remote repo for pending checkins, then browse to create an email draft summary to act as a reminder
+    expect:
+      route: shell_then_browser_handoff
+      plan_phases:
+        - shell_status_via_rote_exec
+        - browser_draft_handoff
+      matched_rules:
+        - cli_invocations_use_rote_exec
+        - external_service_tasks_are_adapter_first
+        - browser_words_handoff_to_browse
+        - compound_shell_then_browser_uses_ordered_plan
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_harness_cli_call_without_rote_exec
+        - raw_playwright
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_rote_shell
+      after_success:
+        - run_cli_only_through_rote_exec
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - resume_shell_work_after_browser_evidence
+
   - name: browser setup belongs to rote-browse
     input: attach to my browser, click through the dashboard, snapshot the result, and stop the daemon when done
     expect:
@@ -1047,7 +1156,10 @@ tests:
   - name: browsing profiles does not trigger file io
     input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
     expect:
-      route: browser_handoff
+      route: shell_then_browser_handoff
+      plan_phases:
+        - shell_status_via_rote_exec
+        - browser_draft_handoff
       after_success:
         - compute_workspace_trace
         - compute_workspace_stats

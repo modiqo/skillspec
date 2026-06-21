@@ -132,6 +132,22 @@ routes:
       pass_context: [user_intent, evidence_context]
       forbid: [direct_browser_tool_without_rote_browse]
       reason: Browser execution belongs to rote-browse.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: collect_cli_evidence
+          owner_skill: rote-shell
+          route: local
+          requires: [run_cli_only_through_rote_exec]
+          forbid: [direct_cli_without_rote_exec]
+        - id: browser_handoff
+          owner_skill: rote-browse
+          route: browser
+          handoff:
+            to_skill: rote-browse
+            boundary: stop_current_skill
+          forbid: [direct_browser_tool_without_rote_browse]
+      reason: Shell evidence must be collected before browser handoff.
   - id: local
     label: Local
     rank: 20
@@ -184,6 +200,7 @@ tests:
     input: browse the dashboard
     expect:
       route: browser
+      plan_phases: [collect_cli_evidence, browser_handoff]
       forbid_exact: [native_search_as_answer]
       elicit_exact: [mode]
       after_success_exact: [cleanup]
@@ -451,6 +468,10 @@ fn sensemake_and_query_teach_progressive_navigation() {
         route_report["value"]["handoff"]["boundary"],
         "stop_current_skill"
     );
+    assert_eq!(
+        route_report["value"]["execution_plan"]["phases"][0]["id"],
+        "collect_cli_evidence"
+    );
 
     let refs = Command::new(bin())
         .arg("refs")
@@ -473,6 +494,8 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert_success(&route_refs);
     let route_refs_out = stdout(&route_refs);
     assert!(route_refs_out.contains("handoff.to_skill -> skill: rote-browse"));
+    assert!(route_refs_out.contains("execution_plan.owner_skill -> skill: rote-shell"));
+    assert!(route_refs_out.contains("execution_plan.route -> route: local"));
 
     let missing = Command::new(bin())
         .arg("query")

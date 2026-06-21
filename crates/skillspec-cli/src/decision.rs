@@ -1,5 +1,6 @@
 use crate::model::{
-    Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec, TraceEventKind,
+    ExecutionPlan, Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec,
+    TraceEventKind,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -10,6 +11,7 @@ pub struct Decision {
     pub route: Option<RouteId>,
     pub route_selection: Option<RouteSelection>,
     pub route_order: Vec<RouteId>,
+    pub execution_plan: Option<ExecutionPlan>,
     pub forbid: Vec<String>,
     pub allow: BTreeMap<String, serde_yaml::Value>,
     pub elicit: Vec<String>,
@@ -122,6 +124,7 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
         route: None,
         route_selection: None,
         route_order: default_route_order(spec),
+        execution_plan: None,
         forbid: Vec::new(),
         allow: BTreeMap::new(),
         elicit: Vec::new(),
@@ -191,6 +194,8 @@ pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
     dedupe_strings(&mut decision.forbid);
     dedupe_strings(&mut decision.elicit);
     dedupe_strings(&mut decision.after_success);
+    decision.execution_plan = selected_route(spec, decision.route.as_ref())
+        .and_then(|route| route.execution_plan.clone());
     events.push(DecisionEvent::OutcomeRecorded {
         route: decision.route.clone(),
         route_selection: decision.route_selection.clone(),
@@ -260,6 +265,24 @@ fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<St
             route_names(&expectation.route_order),
             route_names(&decision.route_order)
         ));
+    }
+    if !expectation.plan_phases.is_empty() {
+        let actual = decision
+            .execution_plan
+            .as_ref()
+            .map(|plan| {
+                plan.phases
+                    .iter()
+                    .map(|phase| phase.id.clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if expectation.plan_phases != actual {
+            failures.push(format!(
+                "expected plan_phases {:?}, got {:?}",
+                expectation.plan_phases, actual
+            ));
+        }
     }
 
     for expected in &expectation.forbid {
@@ -400,6 +423,21 @@ fn matches_predicate(predicate: &Predicate, input: &str) -> bool {
         }
     }
 
+    if !predicate.user_says_all_groups.is_empty() {
+        has_condition = true;
+        for group in &predicate.user_says_all_groups {
+            if group.is_empty() {
+                return false;
+            }
+            if !group
+                .iter()
+                .any(|needle| contains_phrase(&normalized, &needle.to_lowercase()))
+            {
+                return false;
+            }
+        }
+    }
+
     if let Some(expected) = predicate.task_recurrence_likely {
         has_condition = true;
         if recurrence_likely(&normalized) != expected {
@@ -532,6 +570,14 @@ fn default_route_order(spec: &SkillSpec) -> Vec<RouteId> {
     let mut routes = spec.routes.clone();
     routes.sort_by_key(|route| route.rank.unwrap_or(i64::MAX));
     routes.into_iter().map(|route| route.id).collect()
+}
+
+fn selected_route<'a>(
+    spec: &'a SkillSpec,
+    route_id: Option<&RouteId>,
+) -> Option<&'a crate::model::Route> {
+    let route_id = route_id?;
+    spec.routes.iter().find(|route| &route.id == route_id)
 }
 
 fn recurrence_likely(input: &str) -> bool {

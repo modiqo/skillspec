@@ -77,6 +77,8 @@ pub struct Route {
     pub checks: Vec<String>,
     #[serde(default)]
     pub handoff: Option<RouteHandoff>,
+    #[serde(default)]
+    pub execution_plan: Option<ExecutionPlan>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -97,6 +99,42 @@ pub struct RouteHandoff {
 pub enum HandoffBoundary {
     StopCurrentSkill,
     ResumeAfterHandoff,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionPlan {
+    #[serde(default)]
+    pub mode: ExecutionPlanMode,
+    pub phases: Vec<ExecutionPhase>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionPlanMode {
+    #[default]
+    Ordered,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionPhase {
+    pub id: String,
+    pub owner_skill: String,
+    #[serde(default)]
+    pub route: Option<RouteId>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub requires: Vec<String>,
+    #[serde(default)]
+    pub checks: Vec<String>,
+    #[serde(default)]
+    pub forbid: Vec<String>,
+    #[serde(default)]
+    pub handoff: Option<RouteHandoff>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -126,6 +164,8 @@ pub struct Rule {
 pub struct Predicate {
     #[serde(default)]
     pub user_says_any: Vec<String>,
+    #[serde(default)]
+    pub user_says_all_groups: Vec<Vec<String>>,
     #[serde(default)]
     pub task_recurrence_likely: Option<bool>,
     #[serde(default)]
@@ -753,6 +793,8 @@ pub struct Expectation {
     #[serde(default)]
     pub route_order: Vec<RouteId>,
     #[serde(default)]
+    pub plan_phases: Vec<String>,
+    #[serde(default)]
     pub forbid: Vec<String>,
     #[serde(default)]
     pub forbid_exact: Option<Vec<String>>,
@@ -782,6 +824,7 @@ impl Expectation {
     pub fn has_assertions(&self) -> bool {
         self.route.is_some()
             || !self.route_order.is_empty()
+            || !self.plan_phases.is_empty()
             || !self.forbid.is_empty()
             || self.forbid_exact.is_some()
             || !self.not_forbid.is_empty()

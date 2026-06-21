@@ -120,6 +120,49 @@
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
         },
+        "handoff": { "$ref": "#/$defs/route_handoff" },
+        "execution_plan": { "$ref": "#/$defs/execution_plan" }
+      },
+      "additionalProperties": false
+    },
+    "execution_plan": {
+      "type": "object",
+      "required": ["phases"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["ordered"],
+          "default": "ordered"
+        },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/execution_phase" }
+        },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "execution_phase": {
+      "type": "object",
+      "required": ["id", "owner_skill"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "owner_skill": { "type": "string", "minLength": 1 },
+        "route": { "$ref": "#/$defs/identifier" },
+        "description": { "type": "string" },
+        "requires": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "forbid": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
         "handoff": { "$ref": "#/$defs/route_handoff" }
       },
       "additionalProperties": false
@@ -151,6 +194,14 @@
         "user_says_any": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "user_says_all_groups": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
         },
         "task_recurrence_likely": { "type": "boolean" },
         "domain_object_task": { "type": "boolean" },
@@ -774,6 +825,10 @@
       "properties": {
         "route": { "$ref": "#/$defs/identifier" },
         "route_order": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "plan_phases": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
         },

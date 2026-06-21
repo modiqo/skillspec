@@ -636,6 +636,7 @@ fn route_summary(route: &crate::model::Route) -> Value {
         "description": route.description,
         "checks": route.checks,
         "handoff": route.handoff,
+        "execution_plan": route.execution_plan,
     })
 }
 
@@ -668,6 +669,7 @@ fn command_summary(id: &str, command: &crate::model::CommandTemplate) -> Value {
 fn predicate_summary(predicate: &Predicate) -> Value {
     json!({
         "user_says_any": predicate.user_says_any,
+        "user_says_all_groups": predicate.user_says_all_groups,
         "task_recurrence_likely": predicate.task_recurrence_likely,
         "domain_object_task": predicate.domain_object_task,
         "interactive_prompt_likely": predicate.interactive_prompt_likely,
@@ -848,6 +850,36 @@ fn outgoing_refs(spec: &SkillSpec, parsed: &ParsedHandle) -> Result<Vec<Referenc
                     "skill",
                     vec![handoff.to_skill.clone()],
                 ));
+            }
+            if let Some(plan) = &route.execution_plan {
+                let owner_skills = plan
+                    .phases
+                    .iter()
+                    .map(|phase| phase.owner_skill.clone())
+                    .collect::<Vec<_>>();
+                if !owner_skills.is_empty() {
+                    edges.push(edge("execution_plan.owner_skill", "skill", owner_skills));
+                }
+                let phase_routes = plan
+                    .phases
+                    .iter()
+                    .filter_map(|phase| phase.route.as_ref().map(|route| route.0.clone()))
+                    .collect::<Vec<_>>();
+                if !phase_routes.is_empty() {
+                    edges.push(edge("execution_plan.route", "route", phase_routes));
+                }
+                let handoff_targets = plan
+                    .phases
+                    .iter()
+                    .filter_map(|phase| phase.handoff.as_ref().map(|handoff| handoff.to_skill.clone()))
+                    .collect::<Vec<_>>();
+                if !handoff_targets.is_empty() {
+                    edges.push(edge(
+                        "execution_plan.handoff.to_skill",
+                        "skill",
+                        handoff_targets,
+                    ));
+                }
             }
             Ok(edges)
         }
