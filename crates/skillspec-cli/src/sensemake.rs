@@ -82,14 +82,25 @@ pub fn sensemake(spec: &SkillSpec, path: &Path, view: View) -> SensemakeReport {
         spec_path: spec_path.clone(),
         view,
         sections: sections(spec, view),
-        navigation: navigation(&spec_path),
-        escalation: vec![
-            "start with sensemake --view index only when unfamiliar".to_owned(),
-            "use decide for task routing".to_owned(),
-            "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
-            "escalate index -> summary -> full only when needed".to_owned(),
-        ],
+        navigation: navigation(spec, &spec_path),
+        escalation: escalation(spec),
     }
+}
+
+fn escalation(spec: &SkillSpec) -> Vec<String> {
+    let mut items = vec![
+        "start with sensemake --view index only when unfamiliar".to_owned(),
+        "use decide for task routing".to_owned(),
+        "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
+        "escalate index -> summary -> full only when needed".to_owned(),
+    ];
+    if has_capability_bootstrap(spec) {
+        items.push(
+            "for capability_bootstrap, query ranked local seeds before executing provider tools"
+                .to_owned(),
+        );
+    }
+    items
 }
 
 pub fn query(spec: &SkillSpec, path: &Path, handle: &str, view: View) -> Result<QueryReport> {
@@ -308,8 +319,8 @@ fn sections(spec: &SkillSpec, view: View) -> Vec<SectionMap> {
     maps
 }
 
-fn navigation(spec_path: &str) -> Vec<NavigationHint> {
-    vec![
+fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
+    let mut hints = vec![
         NavigationHint {
             intent: "orient",
             command: format!("skillspec sensemake {spec_path} --view index"),
@@ -342,7 +353,40 @@ fn navigation(spec_path: &str) -> Vec<NavigationHint> {
             intent: "prove completion",
             command: format!("skillspec trace align {spec_path} --decision-trace <run_dir>"),
         },
-    ]
+    ];
+    if has_capability_bootstrap(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "inspect capability bootstrap route",
+                command: format!(
+                    "skillspec query {spec_path} route:capability_bootstrap --view summary"
+                ),
+            },
+            NavigationHint {
+                intent: "rank capability seeds",
+                command:
+                    "skillspec capability search <capability> --domain <domain> --explain --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "verify selected seed",
+                command: "skillspec capability verify <seed-id> --domain <domain> --json"
+                    .to_owned(),
+            },
+        ]);
+    }
+    hints
+}
+
+fn has_capability_bootstrap(spec: &SkillSpec) -> bool {
+    spec.routes
+        .iter()
+        .any(|route| route.id.0 == "capability_bootstrap")
+        || spec.resources.contains_key("local_capability_seed_store")
+        || spec
+            .commands
+            .keys()
+            .any(|id| id.contains("capability_seed"))
 }
 
 #[derive(Clone, Debug)]
@@ -680,6 +724,7 @@ fn predicate_summary(predicate: &Predicate) -> Value {
 fn requires_summary(requires: &CommandRequires) -> Value {
     json!({
         "dependencies": requires.dependencies,
+        "resources": requires.resources,
         "files": requires.files,
         "env": requires.env,
         "auth": requires.auth,
@@ -770,6 +815,13 @@ fn outgoing_refs(spec: &SkillSpec, parsed: &ParsedHandle) -> Result<Vec<Referenc
                     "requires.files",
                     "file",
                     command.requires.files.clone(),
+                ));
+            }
+            if !command.requires.resources.is_empty() {
+                edges.push(edge(
+                    "requires.resources",
+                    "resource",
+                    command.requires.resources.clone(),
                 ));
             }
             if !command.requires.env.is_empty() {

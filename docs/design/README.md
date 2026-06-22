@@ -47,6 +47,8 @@ The intended design-doc set is:
   from resources, code blocks, artifacts, commands, and recipes.
 - `traces-and-alignment.md`: how decision traces and alignment reports support
   review, replay, and self-reflection.
+- `capability-bootstrap.md`: how durable-executor uses local capability seeds
+  under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet.
 - `qa-process.md`: the detailed review checklist used to keep the docs aligned
   with implementation.
 
@@ -65,6 +67,7 @@ Every design claim should be grounded in one or more of these sources:
 | Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/prose-vs-skillspec.md` |
 | Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
+| Capability bootstrap | `crates/skillspec-cli/src/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
 | Traces and alignment | `spec/trace.md`, `crates/skillspec-cli/src/trace.rs`, `crates/skillspec-cli/src/align.rs` |
 | CLI surface | `crates/skillspec-cli/src/main.rs` |
 

@@ -571,6 +571,7 @@ fn validate_branch_target(
 
 fn validate_commands(spec: &SkillSpec) -> Result<()> {
     let dependency_ids = spec.dependencies.keys().cloned().collect::<BTreeSet<_>>();
+    let resource_ids = spec.resources.keys().cloned().collect::<BTreeSet<_>>();
 
     for (command_id, command) in &spec.commands {
         validate_identifier("commands key", command_id)?;
@@ -580,6 +581,9 @@ fn validate_commands(spec: &SkillSpec) -> Result<()> {
                 &dependency_ids,
                 dependency,
             )?;
+        }
+        for resource in &command.requires.resources {
+            validate_known_resource("commands.requires.resources", &resource_ids, resource)?;
         }
     }
     Ok(())
@@ -1031,6 +1035,11 @@ fn resource_references(spec: &SkillSpec) -> BTreeMap<String, usize> {
             if let RecipeStep::LoadResource(step) = step {
                 increment(&mut references, &step.load_resource);
             }
+        }
+    }
+    for command in spec.commands.values() {
+        for resource in &command.requires.resources {
+            increment(&mut references, resource);
         }
     }
     references

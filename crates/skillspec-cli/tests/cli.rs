@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_skillspec")
 }
@@ -40,6 +43,14 @@ fn write_file(path: &Path, content: &str) {
         fs::create_dir_all(parent).unwrap();
     }
     fs::write(path, content).unwrap();
+}
+
+#[cfg(unix)]
+fn write_executable(path: &Path, content: &str) {
+    write_file(path, content);
+    let mut permissions = fs::metadata(path).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).unwrap();
 }
 
 fn assert_success(output: &Output) {
@@ -366,6 +377,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("sensemake"));
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
+    assert!(stdout(&top).contains("capability"));
 
     let trace = Command::new(bin())
         .arg("trace")
@@ -391,6 +403,313 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("--execution-trace <EXECUTION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--json"));
+}
+
+#[test]
+#[cfg(unix)]
+fn capability_add_inspect_verify_search_prefer_and_remove() {
+    let dir = TempDir::new("capability");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let bin_dir = dir.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    write_executable(
+        &bin_dir.join("elevenlabs"),
+        "#!/bin/sh\nprintf 'ElevenLabs text to speech voice generation\\n'\n",
+    );
+    write_executable(
+        &bin_dir.join("say"),
+        "#!/bin/sh\nprintf 'macOS say text to speech local voice\\n'\n",
+    );
+    let path = format!(
+        "{}:{}",
+        bin_dir.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    let add = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("capability")
+        .arg("add")
+        .arg("elevenlabs-cli")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--kind")
+        .arg("cli")
+        .arg("--command")
+        .arg("elevenlabs")
+        .arg("--provides")
+        .arg("text_to_speech")
+        .arg("--provides")
+        .arg("voice_generation")
+        .arg("--alias")
+        .arg("voice message")
+        .arg("--priority")
+        .arg("80")
+        .arg("--preferred-for")
+        .arg("text_to_speech")
+        .arg("--tie")
+        .arg("quality=high")
+        .arg("--auth-env")
+        .arg("ELEVENLABS_API_KEY")
+        .arg("--external-service")
+        .arg("--may-cost-money")
+        .arg("--evidence-command")
+        .arg("elevenlabs --help")
+        .arg("--suggested-skill-id")
+        .arg("elevenlabs.voice")
+        .output()
+        .unwrap();
+    assert_success(&add);
+    let add_report = json_stdout(&add);
+    assert_eq!(add_report["status"], "written");
+    assert!(skillspec_home
+        .join("capabilities/voice/elevenlabs-cli.yml")
+        .is_file());
+
+    let inspect = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("inspect")
+        .arg("elevenlabs-cli")
+        .arg("--domain")
+        .arg("voice")
+        .output()
+        .unwrap();
+    assert_success(&inspect);
+    let inspected = json_stdout(&inspect);
+    assert_eq!(inspected["seed"]["rank"]["tie_breakers"]["quality"], "high");
+    assert_eq!(
+        inspected["seed"]["promotion"]["suggested_skill_id"],
+        "elevenlabs.voice"
+    );
+
+    let verify = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("capability")
+        .arg("verify")
+        .arg("elevenlabs-cli")
+        .arg("--domain")
+        .arg("voice")
+        .output()
+        .unwrap();
+    assert_success(&verify);
+    let verified = json_stdout(&verify);
+    assert_eq!(verified["status"], "verified");
+    assert!(verified["outcomes"].as_array().unwrap().len() >= 2);
+
+    let search = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("search")
+        .arg("text_to_speech")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--explain")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&search);
+    let ranked = json_stdout(&search);
+    assert_eq!(ranked["selected"], "elevenlabs-cli");
+    assert_eq!(ranked["candidates"][0]["id"], "elevenlabs-cli");
+    assert!(ranked["candidates"][0]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason.as_str().unwrap().contains("direct provides match")));
+    assert!(ranked["candidates"][0]["required_gates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|gate| gate == "provider_cost_approval"));
+    assert!(ranked["candidates"][0]["required_gates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|gate| gate == "secret_use_approval"));
+
+    let prefer = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("prefer")
+        .arg("elevenlabs-cli")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--for")
+        .arg("realistic_voice")
+        .arg("--priority")
+        .arg("90")
+        .output()
+        .unwrap();
+    assert_success(&prefer);
+    let preferred = json_stdout(&prefer);
+    assert_eq!(preferred["seed"]["rank"]["default_priority"], 90);
+    assert!(preferred["seed"]["rank"]["preferred_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "realistic_voice"));
+
+    let remove = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("remove")
+        .arg("elevenlabs-cli")
+        .arg("--domain")
+        .arg("voice")
+        .output()
+        .unwrap();
+    assert_success(&remove);
+    assert!(!skillspec_home
+        .join("capabilities/voice/elevenlabs-cli.yml")
+        .exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn capability_search_explains_close_candidates_and_local_only_filter() {
+    let dir = TempDir::new("capability-ranking");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let bin_dir = dir.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    write_executable(
+        &bin_dir.join("elevenlabs"),
+        "#!/bin/sh\nprintf 'ElevenLabs text to speech voice generation\\n'\n",
+    );
+    write_executable(
+        &bin_dir.join("say"),
+        "#!/bin/sh\nprintf 'macOS say text to speech local voice\\n'\n",
+    );
+    let path = format!(
+        "{}:{}",
+        bin_dir.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    for (id, command, priority, external) in [
+        ("elevenlabs-cli", "elevenlabs", "80", true),
+        ("macos-say", "say", "75", false),
+    ] {
+        let mut add = Command::new(bin());
+        add.env("SKILLSPEC_HOME", &skillspec_home)
+            .env("PATH", &path)
+            .arg("capability")
+            .arg("add")
+            .arg(id)
+            .arg("--domain")
+            .arg("voice")
+            .arg("--kind")
+            .arg("cli")
+            .arg("--command")
+            .arg(command)
+            .arg("--provides")
+            .arg("text_to_speech")
+            .arg("--priority")
+            .arg(priority)
+            .arg("--evidence-command")
+            .arg(format!("{command} --help"));
+        if external {
+            add.arg("--external-service").arg("--may-cost-money");
+        }
+        let output = add.output().unwrap();
+        assert_success(&output);
+
+        let verify = Command::new(bin())
+            .env("SKILLSPEC_HOME", &skillspec_home)
+            .env("PATH", &path)
+            .arg("capability")
+            .arg("verify")
+            .arg(id)
+            .arg("--domain")
+            .arg("voice")
+            .output()
+            .unwrap();
+        assert_success(&verify);
+    }
+
+    let close = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("search")
+        .arg("text_to_speech")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--explain")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&close);
+    let close_report = json_stdout(&close);
+    assert_eq!(close_report["selected"], Value::Null);
+    assert_eq!(
+        close_report["ask_policy"]["reason"],
+        "top_candidates_within_10_points"
+    );
+    assert_eq!(close_report["candidates"].as_array().unwrap().len(), 2);
+
+    let local_only = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("search")
+        .arg("text_to_speech")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--local-only")
+        .output()
+        .unwrap();
+    assert_success(&local_only);
+    let local_report = json_stdout(&local_only);
+    assert_eq!(local_report["selected"], "macos-say");
+    assert_eq!(local_report["candidates"].as_array().unwrap().len(), 1);
+    assert_eq!(local_report["candidates"][0]["id"], "macos-say");
+}
+
+#[test]
+fn sensemake_teaches_capability_bootstrap_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-capability");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: durable.executor
+title: Durable Executor
+description: Capability bootstrap fixture.
+routes:
+  - id: capability_bootstrap
+    label: Capability Bootstrap
+resources:
+  local_capability_seed_store:
+    path: ~/.skillspec/capabilities
+    role: reference
+    used_by:
+      - kind: route
+        id: capability_bootstrap
+commands:
+  search_capability_seed_store:
+    template: skillspec capability search {{capability_id}} --domain {{domain_id}} --explain --json
+tests:
+  - name: route assertion
+    input: create a voice message
+    expect:
+      route: capability_bootstrap
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("inspect capability bootstrap route"));
+    assert!(
+        out.contains("skillspec capability search <capability> --domain <domain> --explain --json")
+    );
+    assert!(out.contains("query ranked local seeds"));
 }
 
 #[test]

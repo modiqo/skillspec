@@ -1,4 +1,5 @@
 mod align;
+mod capability;
 mod compiler;
 mod decision;
 mod deps;
@@ -27,6 +28,7 @@ struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Command {
     #[command(about = "Validate a skill.spec.yml file")]
     Validate {
@@ -133,6 +135,11 @@ enum Command {
         #[command(subcommand)]
         command: InstallCommand,
     },
+    #[command(about = "Manage local capability seeds for durable bootstrap")]
+    Capability {
+        #[command(subcommand)]
+        command: CapabilityCommand,
+    },
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]
@@ -210,6 +217,138 @@ enum InstallCommand {
         #[arg(long)]
         name: Option<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
+enum CapabilityCommand {
+    #[command(about = "Show the local capability seed store path")]
+    Store,
+    #[command(about = "Create or update a local capability seed")]
+    Add {
+        /// Stable seed id, such as elevenlabs-cli.
+        id: String,
+        /// Capability domain folder, such as voice or pdf.
+        #[arg(long)]
+        domain: String,
+        /// Seed kind, such as cli, adapter, script, or flow.
+        #[arg(long)]
+        kind: String,
+        /// CLI command name or path.
+        #[arg(long)]
+        command: Option<String>,
+        /// Adapter id or name.
+        #[arg(long)]
+        adapter: Option<String>,
+        /// Local script path.
+        #[arg(long)]
+        script: Option<String>,
+        /// Capability provided by this seed. Repeat for multiple capabilities.
+        #[arg(long)]
+        provides: Vec<String>,
+        /// User phrase alias for this seed. Repeat for multiple aliases.
+        #[arg(long)]
+        alias: Vec<String>,
+        /// Default priority from 0 to 100, used only as a tie-breaker.
+        #[arg(long)]
+        priority: Option<u8>,
+        /// Capability this seed is preferred for. Repeat for multiple capabilities.
+        #[arg(long)]
+        preferred_for: Vec<String>,
+        /// Capability this seed should avoid. Repeat for multiple capabilities.
+        #[arg(long)]
+        avoid_for: Vec<String>,
+        /// Tie-breaker metadata as key=value. Repeat for multiple entries.
+        #[arg(long = "tie")]
+        ties: Vec<String>,
+        /// Environment variable used for auth. Repeat for multiple vars.
+        #[arg(long)]
+        auth_env: Vec<String>,
+        /// Mark this seed as using an external service.
+        #[arg(long)]
+        external_service: bool,
+        /// Mark this seed as potentially spending provider credits or money.
+        #[arg(long)]
+        may_cost_money: bool,
+        /// Evidence command, such as "tool --help". Repeat for multiple checks.
+        #[arg(long)]
+        evidence_command: Vec<String>,
+        /// Suggested domain SkillSpec id to generate after a successful trace.
+        #[arg(long)]
+        suggested_skill_id: Option<String>,
+    },
+    #[command(about = "List local capability seeds")]
+    List {
+        /// Limit results to one domain.
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    #[command(about = "Search and rank local capability seeds")]
+    Search {
+        /// Capability to search for, such as text_to_speech.
+        capability: String,
+        /// Limit results to one domain.
+        #[arg(long)]
+        domain: Option<String>,
+        /// Include ranking reasons in the JSON output.
+        #[arg(long)]
+        explain: bool,
+        /// Emit JSON output. Accepted for command symmetry; JSON is always emitted.
+        #[arg(long)]
+        json: bool,
+        /// Exclude external service candidates.
+        #[arg(long)]
+        local_only: bool,
+        /// Explicitly preferred seed id for this search.
+        #[arg(long)]
+        preferred_seed: Option<String>,
+    },
+    #[command(about = "Inspect one local capability seed")]
+    Inspect {
+        /// Seed id to inspect.
+        id: String,
+        /// Disambiguating domain when the id appears in multiple domains.
+        #[arg(long)]
+        domain: Option<String>,
+        /// Emit JSON output. Accepted for command symmetry; JSON is always emitted.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Verify one local capability seed's evidence")]
+    Verify {
+        /// Seed id to verify.
+        id: String,
+        /// Disambiguating domain when the id appears in multiple domains.
+        #[arg(long)]
+        domain: Option<String>,
+        /// Emit JSON output. Accepted for command symmetry; JSON is always emitted.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Update preferred capability and priority metadata for a seed")]
+    Prefer {
+        /// Seed id to update.
+        id: String,
+        /// Disambiguating domain when the id appears in multiple domains.
+        #[arg(long)]
+        domain: Option<String>,
+        /// Capability this seed should be preferred for.
+        #[arg(long = "for")]
+        for_capability: String,
+        /// Default priority from 0 to 100.
+        #[arg(long)]
+        priority: Option<u8>,
+    },
+    #[command(about = "Remove one local capability seed")]
+    Remove {
+        /// Seed id to remove.
+        id: String,
+        /// Disambiguating domain when the id appears in multiple domains.
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    #[command(about = "Scan for seed proposals")]
+    Scan,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -395,6 +534,104 @@ fn run() -> Result<()> {
                     name.as_deref(),
                 )?;
                 report::json(&report)?;
+            }
+        },
+        Command::Capability { command } => match command {
+            CapabilityCommand::Store => {
+                report::json(&capability::store()?)?;
+            }
+            CapabilityCommand::Add {
+                id,
+                domain,
+                kind,
+                command,
+                adapter,
+                script,
+                provides,
+                alias,
+                priority,
+                preferred_for,
+                avoid_for,
+                ties,
+                auth_env,
+                external_service,
+                may_cost_money,
+                evidence_command,
+                suggested_skill_id,
+            } => {
+                let report = capability::add(capability::AddOptions {
+                    id,
+                    domain,
+                    kind,
+                    command,
+                    adapter,
+                    script,
+                    provides,
+                    aliases: alias,
+                    priority,
+                    preferred_for,
+                    avoid_for,
+                    ties,
+                    auth_env,
+                    external_service,
+                    may_cost_money,
+                    evidence_command,
+                    suggested_skill_id,
+                })?;
+                report::json(&report)?;
+            }
+            CapabilityCommand::List { domain } => {
+                report::json(&capability::list(domain.as_deref())?)?;
+            }
+            CapabilityCommand::Search {
+                capability: capability_id,
+                domain,
+                explain: _,
+                json: _,
+                local_only,
+                preferred_seed,
+            } => {
+                let report = capability::search(capability::SearchOptions {
+                    capability: capability_id,
+                    domain,
+                    local_only,
+                    preferred_seed,
+                })?;
+                report::json(&report)?;
+            }
+            CapabilityCommand::Inspect {
+                id,
+                domain,
+                json: _,
+            } => {
+                report::json(&capability::inspect(&id, domain.as_deref())?)?;
+            }
+            CapabilityCommand::Verify {
+                id,
+                domain,
+                json: _,
+            } => {
+                report::json(&capability::verify(&id, domain.as_deref())?)?;
+            }
+            CapabilityCommand::Prefer {
+                id,
+                domain,
+                for_capability,
+                priority,
+            } => {
+                let report = capability::prefer(capability::PreferOptions {
+                    id,
+                    domain,
+                    for_capability,
+                    priority,
+                })?;
+                report::json(&report)?;
+            }
+            CapabilityCommand::Remove { id, domain } => {
+                report::json(&capability::remove(&id, domain.as_deref())?)?;
+            }
+            CapabilityCommand::Scan => {
+                report::json(&capability::scan()?)?;
             }
         },
     }

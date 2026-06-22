@@ -813,6 +813,10 @@
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
         },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/identifier" }
+        },
         "files": {
           "type": "array",
           "items": { "type": "string" }

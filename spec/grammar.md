@@ -58,6 +58,7 @@ References are symbolic. A v0 document is well-formed when:
 - every `Test.expect.elicit` item references an existing elicitation
 - every `Trace.record` item is one of the v0 trace event kinds
 - every `Command.requires.dependencies` item references an existing dependency
+- every `Command.requires.resources` item references an existing resource
 - every `Dependency.provision.elicit` references an existing elicitation
 - every `Import.requires.imports` item references an existing import
 - every `Import.used_by` item references the target it names
@@ -626,6 +627,7 @@ command         = [ "description" ":" string ] ,
 
 command-requires
                 = [ "dependencies" ":" sequence-of dependency-id ] ,
+                  [ "resources" ":" sequence-of resource-id ] ,
                   [ "files" ":" sequence-of string ] ,
                   [ "env" ":" sequence-of string ] ,
                   [ "auth" ":" sequence-of string ] ,

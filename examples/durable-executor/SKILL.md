@@ -94,6 +94,7 @@ Minimum final response shape when workspace evidence exists:
 ## Route Hints
 
 - `durable_domain_handoff`: Hand off domain work and return for durable closure
+- `capability_bootstrap`: Bootstrap capability when no domain SkillSpec exists
 - `shell_then_browser_handoff`: Run shell evidence, then hand off browser work
 - `adapter_first_cli_fallback`: Use rote adapters, then rote exec CLI fallback
 - `browser_handoff`: Hand off to rote-browse for browser state

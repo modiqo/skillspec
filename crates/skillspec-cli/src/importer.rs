@@ -159,6 +159,7 @@ fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTe
                     safety: None,
                     requires: CommandRequires {
                         dependencies,
+                        resources: Vec::new(),
                         files: Vec::new(),
                         env: Vec::new(),
                         auth: Vec::new(),

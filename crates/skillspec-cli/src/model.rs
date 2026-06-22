@@ -317,6 +317,8 @@ pub struct CommandRequires {
     #[serde(default)]
     pub dependencies: Vec<String>,
     #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
     pub files: Vec<String>,
     #[serde(default)]
     pub env: Vec<String>,
@@ -327,6 +329,7 @@ pub struct CommandRequires {
 impl CommandRequires {
     pub fn is_empty(&self) -> bool {
         self.dependencies.is_empty()
+            && self.resources.is_empty()
             && self.files.is_empty()
             && self.env.is_empty()
             && self.auth.is_empty()

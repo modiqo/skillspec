@@ -117,6 +117,83 @@ routes:
           forbid:
             - final_summary_without_workspace
             - final_summary_without_trace_math
+
+  - id: capability_bootstrap
+    label: Bootstrap capability when no domain SkillSpec exists
+    rank: 2
+    description: >
+      Use when the task maps to a capability, no installed domain SkillSpec owns that capability,
+      and an evidence-backed seed under `~/.skillspec/capabilities/`, adapter, CLI, script, or
+      previous trace can satisfy the immediate task through durable execution. This is an escape
+      hatch for missing skill coverage, not a permanent vendor registry or runtime engine.
+    execution_plan:
+      mode: ordered
+      reason: Capability bootstrap must preserve durable evidence while ranking dynamic local seeds before any provider tool runs.
+      phases:
+        - id: establish_durable_context
+          owner_skill: durable-executor
+          description: Create or enter one named rote workspace and prepare a trace before inspecting seeds or provider tools.
+          requires:
+            - initialize_rote_workspace
+            - derive_workspace_name
+            - prepare_bootstrap_trace
+          forbid:
+            - anonymous_workspace
+            - untracked_stdout_scrollback
+        - id: infer_capability
+          owner_skill: durable-executor
+          description: Map user language such as voice message, narration, or read aloud into capability ids such as text_to_speech.
+          requires:
+            - map_user_intent_to_capability_terms
+            - search_installed_domain_skills
+        - id: discover_candidate_tools
+          owner_skill: durable-executor
+          description: Query and rank local capability seeds before inspecting adapters, CLIs, scripts, or previous traces.
+          requires:
+            - query_local_capability_seed_store
+            - search_capability_seed_store
+            - rank_capability_candidates
+            - inspect_capability_seed
+            - verify_capability_seed
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+        - id: gate_risk
+          owner_skill: durable-executor
+          description: Apply ask policy for close-ranked candidates, external services, paid providers, secrets, personal data, and writes.
+          requires:
+            - apply_capability_ask_policy
+            - classify_external_service_risk
+            - ask_for_provider_cost_or_secret_approval
+          forbid:
+            - provider_action_without_risk_gate
+        - id: execute_bootstrap
+          owner_skill: durable-executor
+          description: Execute the selected candidate through a rote adapter or `rote exec --`, then capture artifacts and evidence.
+          requires:
+            - preserve_capability_ranking_evidence
+            - run_adapter_or_cli_through_durable_substrate
+            - capture_execution_evidence
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+        - id: generate_skill_draft
+          owner_skill: durable-executor
+          description: Draft a narrow domain SkillSpec from the successful trace and leave it for review instead of auto-installing it.
+          requires:
+            - draft_domain_skillspec_from_trace
+            - run_generated_skill_qa
+            - present_skill_draft_for_review
+          forbid:
+            - generated_skill_install_without_review
+        - id: durable_closure
+          owner_skill: durable-executor
+          description: Report workspace evidence, selected seed, ranking reasons, gates, artifacts, alignment, and token-savings context.
+          requires:
+            - compute_workspace_trace
+            - compute_workspace_stats
+            - report_workspace_evidence_and_token_math
   - id: shell_then_browser_handoff
     label: Run shell evidence, then hand off browser work
     rank: 3
@@ -285,6 +362,29 @@ rules:
       - receive_domain_return_packet
       - report_workspace_evidence_and_token_math
     reason: Domain skills own domain decisions, but durable-executor owns the workspace, execution substrate, evidence, and final closure.
+
+  - id: no_domain_skill_uses_capability_bootstrap
+    when:
+      user_says_all_groups:
+        - [no skill, no voice skill, no domain skill, no matching skill, missing skill, capability exists without skill]
+        - [cli, adapter, capability seed, installed tool, installed cli, available capability]
+    prefer: capability_bootstrap
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_api_call_without_rote_adapter_or_rote_exec
+      - provider_action_without_risk_gate
+      - generated_skill_install_without_review
+    after_success:
+      - query_local_capability_seed_store
+      - search_capability_seed_store
+      - rank_capability_candidates
+      - preserve_capability_ranking_evidence
+      - capture_execution_evidence
+      - draft_domain_skillspec_from_trace
+      - run_generated_skill_qa
+      - report_workspace_evidence_and_token_math
+    reason: When no domain SkillSpec exists but a local seed, adapter, CLI, or previous trace can satisfy the capability, durable-executor may bootstrap the immediate task and draft a starter SkillSpec from evidence.
 
   - id: cli_invocations_use_rote_exec
     when:
@@ -840,6 +940,12 @@ dependencies:
           label: Leave the flow in draft
           description: Do not install rote; keep the work unreleased until the tool is available.
           safety: read_only
+  skillspec:
+    kind: cli
+    description: SkillSpec CLI is required to search, rank, inspect, and verify local capability seeds during capability bootstrap.
+    command: skillspec
+    check:
+      command: skillspec
   gh:
     kind: cli
     description: GitHub CLI may be used by shell workflows that inspect repositories, pull requests, users, or auth state.
@@ -908,6 +1014,15 @@ dependencies:
     path: deps.toml
     check:
       path: deps.toml
+
+resources:
+  local_capability_seed_store:
+    path: ~/.skillspec/capabilities
+    role: reference
+    description: User-owned local capability seed store. durable-executor queries this dynamic folder through `skillspec capability ...` commands when no domain SkillSpec owns the requested capability.
+    used_by:
+      - kind: route
+        id: capability_bootstrap
 
 states:
   start:
@@ -990,6 +1105,36 @@ commands:
     requires:
       dependencies:
         - rote
+
+  search_capability_seed_store:
+    description: Search and rank local capability seeds for a requested domain and capability.
+    template: "skillspec capability search <capability_id> --domain <domain_id> --explain --json"
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec
+      resources:
+        - local_capability_seed_store
+
+  inspect_capability_seed:
+    description: Inspect the selected seed's metadata, rank hints, risk flags, and verification evidence.
+    template: "skillspec capability inspect <seed_id> --domain <domain_id> --json"
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec
+      resources:
+        - local_capability_seed_store
+
+  verify_capability_seed:
+    description: Verify the selected capability seed before provider execution.
+    template: "skillspec capability verify <seed_id> --domain <domain_id> --json"
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec
+      resources:
+        - local_capability_seed_store
 
   adapter_discovery:
     description: Discover installed and healthy rote adapters for the services named by the task before using any CLI fallback.
@@ -1226,6 +1371,34 @@ closures:
       requested direct/no-rote execution.
   receive_domain_return_packet:
     description: Review the domain skill return packet for status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths before final closure.
+  prepare_bootstrap_trace:
+    description: Create a decision trace and branch labels before querying capability seeds or executing candidate tools.
+  map_user_intent_to_capability_terms:
+    description: Map user language such as voice message, narration, read aloud, or make audio into capability ids such as text_to_speech, voice_generation, speech_synthesis, or audio_generation.
+  search_installed_domain_skills:
+    description: Check installed SkillSpec metadata first; use capability bootstrap only when no reviewed domain SkillSpec owns the requested capability.
+  query_local_capability_seed_store:
+    description: Query `~/.skillspec/capabilities/` through `skillspec capability search`, not by embedding vendor knowledge in durable-executor.
+  rank_capability_candidates:
+    description: Use the ranked JSON from `skillspec capability search --explain --json`; preserve candidate scores, reasons, risks, gates, and close-candidate ask policy.
+  apply_capability_ask_policy:
+    description: Ask before auto-selecting close-ranked candidates, weak evidence, paid/external providers, secret use, personal data, writes, publishes, or messages.
+  classify_external_service_risk:
+    description: Classify provider candidates for external service use, cost, secret use, personal-account access, mutation, and publication risk before execution.
+  ask_for_provider_cost_or_secret_approval:
+    description: Get explicit user approval before any candidate uses provider credits, secrets, external services, personal data, writes, publishes, or messages.
+  run_adapter_or_cli_through_durable_substrate:
+    description: Execute the selected candidate only through a rote adapter or `rote exec --`, preserving stdout, stderr, exit code, artifacts, and response handles.
+  capture_execution_evidence:
+    description: Capture selected seed id, command or adapter id, artifact paths, output handles, blockers, and trace paths before summarizing.
+  preserve_capability_ranking_evidence:
+    description: Store the capability search JSON, selected seed id, candidate scores, ranking reasons, ask-policy result, and required gates in durable evidence.
+  draft_domain_skillspec_from_trace:
+    description: Draft a narrow starter domain SkillSpec from the successful bootstrap trace, including activation, dependencies, commands, risk gates, artifacts, tests, and durable handoff compatibility.
+  run_generated_skill_qa:
+    description: Validate the generated SkillSpec, run tests, check imports, and check dependencies before offering installation.
+  present_skill_draft_for_review:
+    description: Present what was generated, what the trace proved, what remains unproven, and whether the draft is ready to install.
   prepare_browser_skill_handoff_if_selected:
     description: If the selected route is `browser_handoff`, stop shell-owned browser planning and prepare a concise handoff note for the `rote-browse` skill.
   handoff_browser_work_to_rote_browse_skill:
@@ -1342,6 +1515,33 @@ tests:
         - direct_cli_without_rote_exec
         - direct_shell_command_without_rote_exec
         - direct_api_call_without_rote_adapter_or_rote_exec
+
+  - name: missing voice skill uses capability bootstrap
+    input: no voice skill is installed but an elevenlabs cli capability seed exists; create a voice message from this paragraph
+    expect:
+      route: capability_bootstrap
+      plan_phases:
+        - establish_durable_context
+        - infer_capability
+        - discover_candidate_tools
+        - gate_risk
+        - execute_bootstrap
+        - generate_skill_draft
+        - durable_closure
+      matched_rules:
+        - no_domain_skill_uses_capability_bootstrap
+      after_success:
+        - query_local_capability_seed_store
+        - search_capability_seed_store
+        - rank_capability_candidates
+        - preserve_capability_ranking_evidence
+        - capture_execution_evidence
+        - draft_domain_skillspec_from_trace
+        - run_generated_skill_qa
+      forbid:
+        - direct_cli_without_rote_exec
+        - provider_action_without_risk_gate
+        - generated_skill_install_without_review
 
   - name: gh repo sync check remains adapter cli fallback
     input: can you check the gh status for repo skillspec and let me know if its ahead or sync with remote

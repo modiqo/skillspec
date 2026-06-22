@@ -58,6 +58,7 @@ skillspec deps check --help
 skillspec sensemake --help
 skillspec query --help
 skillspec refs --help
+skillspec capability --help
 ```
 
 ## Create A SkillSpec From An Existing Skill
@@ -152,6 +153,54 @@ Current install targets:
 - `agents`: `~/.agents/skills/<skill-name>`
 - `codex`: `~/.codex/skills/<skill-name>`
 - `claude-local`: nearest `.claude/skills/<skill-name>` in the current repo
+
+## Seed A Local Capability
+
+When a CLI, adapter, or script exists before a reviewed domain SkillSpec exists,
+record it as a local capability seed. Seeds live under:
+
+```text
+~/.skillspec/capabilities/<domain>/<seed-id>.yml
+```
+
+Example for a voice/text-to-speech CLI:
+
+```sh
+skillspec capability add elevenlabs-cli \
+  --domain voice \
+  --kind cli \
+  --command elevenlabs \
+  --provides text_to_speech \
+  --provides voice_generation \
+  --alias "voice message" \
+  --priority 80 \
+  --preferred-for text_to_speech \
+  --tie quality=high \
+  --auth-env ELEVENLABS_API_KEY \
+  --external-service \
+  --may-cost-money \
+  --evidence-command "elevenlabs --help" \
+  --suggested-skill-id elevenlabs.voice
+
+skillspec capability verify elevenlabs-cli --domain voice --json
+skillspec capability search text_to_speech --domain voice --explain --json
+```
+
+`search` returns ranked candidates with scores, reasons, risk flags, and
+required gates. If the top candidates are close, `selected` is `null` and the
+agent should ask the user rather than auto-picking. Use `prefer` to adjust local
+ranking without editing durable-executor:
+
+```sh
+skillspec capability prefer elevenlabs-cli \
+  --domain voice \
+  --for text_to_speech \
+  --priority 90
+```
+
+durable-executor uses these seeds only as a bootstrap path when no domain
+SkillSpec owns the capability yet. A successful traced run can draft a reviewed
+domain SkillSpec; seeds are not a replacement for domain skills.
 
 ## Use A SkillSpec-Backed Skill
 
