@@ -28,6 +28,40 @@ pub struct AddOptions {
 }
 
 #[derive(Clone, Debug)]
+pub struct UpdateOptions {
+    pub id: String,
+    pub domain: Option<String>,
+    pub kind: Option<String>,
+    pub command: Option<String>,
+    pub clear_command: bool,
+    pub adapter: Option<String>,
+    pub clear_adapter: bool,
+    pub script: Option<String>,
+    pub clear_script: bool,
+    pub add_provides: Vec<String>,
+    pub remove_provides: Vec<String>,
+    pub add_alias: Vec<String>,
+    pub remove_alias: Vec<String>,
+    pub priority: Option<u8>,
+    pub clear_priority: bool,
+    pub add_preferred_for: Vec<String>,
+    pub remove_preferred_for: Vec<String>,
+    pub add_avoid_for: Vec<String>,
+    pub remove_avoid_for: Vec<String>,
+    pub add_ties: Vec<String>,
+    pub remove_tie: Vec<String>,
+    pub add_auth_env: Vec<String>,
+    pub remove_auth_env: Vec<String>,
+    pub external_service: Option<bool>,
+    pub may_cost_money: Option<bool>,
+    pub add_evidence_command: Vec<String>,
+    pub remove_evidence_command: Vec<String>,
+    pub suggested_skill_id: Option<String>,
+    pub clear_suggested_skill_id: bool,
+    pub verification_status: Option<VerificationStatus>,
+}
+
+#[derive(Clone, Debug)]
 pub struct SearchOptions {
     pub capability: String,
     pub domain: Option<String>,
@@ -320,6 +354,131 @@ pub fn add(options: AddOptions) -> Result<SeedWriteReport> {
         verification: None,
     };
     write_seed(seed, "written")
+}
+
+pub fn update(options: UpdateOptions) -> Result<SeedWriteReport> {
+    validate_id("capability id", &options.id)?;
+    if let Some(domain) = &options.domain {
+        validate_id("domain", domain)?;
+    }
+    let priority = validate_priority(options.priority)?;
+    let add_ties = parse_ties(&options.add_ties)?;
+    let loaded = find_seed(&options.id, options.domain.as_deref())?;
+    let mut seed = loaded.seed;
+
+    if let Some(kind) = options.kind {
+        seed.kind = kind;
+    }
+    if options.clear_command {
+        seed.command = None;
+    }
+    if let Some(command) = options.command {
+        seed.command = Some(command);
+    }
+    if options.clear_adapter {
+        seed.adapter = None;
+    }
+    if let Some(adapter) = options.adapter {
+        seed.adapter = Some(adapter);
+    }
+    if options.clear_script {
+        seed.script = None;
+    }
+    if let Some(script) = options.script {
+        seed.script = Some(script);
+    }
+
+    for capability in options.add_provides {
+        validate_id("add-provides", &capability)?;
+        push_unique_canonical(&mut seed.provides, capability);
+    }
+    for capability in options.remove_provides {
+        validate_id("remove-provides", &capability)?;
+        remove_canonical(&mut seed.provides, &capability);
+    }
+    for alias in options.add_alias {
+        push_unique_canonical(&mut seed.aliases, alias);
+    }
+    for alias in options.remove_alias {
+        remove_canonical(&mut seed.aliases, &alias);
+    }
+
+    if options.clear_priority {
+        seed.rank.default_priority = None;
+    }
+    if let Some(priority) = priority {
+        seed.rank.default_priority = Some(priority);
+    }
+    for capability in options.add_preferred_for {
+        validate_id("add-preferred-for", &capability)?;
+        push_unique_canonical(&mut seed.rank.preferred_for, capability);
+    }
+    for capability in options.remove_preferred_for {
+        validate_id("remove-preferred-for", &capability)?;
+        remove_canonical(&mut seed.rank.preferred_for, &capability);
+    }
+    for capability in options.add_avoid_for {
+        validate_id("add-avoid-for", &capability)?;
+        push_unique_canonical(&mut seed.rank.avoid_for, capability);
+    }
+    for capability in options.remove_avoid_for {
+        validate_id("remove-avoid-for", &capability)?;
+        remove_canonical(&mut seed.rank.avoid_for, &capability);
+    }
+    for (key, value) in add_ties {
+        seed.rank.tie_breakers.insert(key, value);
+    }
+    for key in options.remove_tie {
+        validate_id("remove-tie", &key)?;
+        seed.rank.tie_breakers.remove(&key);
+    }
+
+    for env in options.add_auth_env {
+        push_unique_canonical(&mut seed.auth.env, env);
+    }
+    for env in options.remove_auth_env {
+        remove_canonical(&mut seed.auth.env, &env);
+    }
+    if let Some(external_service) = options.external_service {
+        seed.risk.external_service = external_service;
+    }
+    if let Some(may_cost_money) = options.may_cost_money {
+        seed.risk.may_cost_money = may_cost_money;
+    }
+
+    for command in options.add_evidence_command {
+        if !seed
+            .evidence
+            .iter()
+            .any(|evidence| evidence.command.as_deref() == Some(command.as_str()))
+        {
+            seed.evidence.push(CapabilityEvidence {
+                source: "cli_help".to_owned(),
+                command: Some(command),
+                detail: None,
+            });
+        }
+    }
+    for command in options.remove_evidence_command {
+        seed.evidence
+            .retain(|evidence| evidence.command.as_deref() != Some(command.as_str()));
+    }
+
+    if options.clear_suggested_skill_id {
+        seed.promotion = None;
+    }
+    if let Some(suggested_skill_id) = options.suggested_skill_id {
+        seed.promotion = Some(CapabilityPromotion { suggested_skill_id });
+    }
+    if let Some(status) = options.verification_status {
+        seed.verification = Some(CapabilityVerification {
+            status,
+            verified_at_unix: now_unix(),
+            outcomes: Vec::new(),
+        });
+    }
+
+    write_seed_at(seed, &loaded.path, "updated")
 }
 
 pub fn prefer(options: PreferOptions) -> Result<SeedWriteReport> {
@@ -875,6 +1034,20 @@ fn canonical(value: &str) -> String {
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
         .join("_")
+}
+
+fn push_unique_canonical(values: &mut Vec<String>, value: String) {
+    if !values
+        .iter()
+        .any(|existing| canonical(existing) == canonical(&value))
+    {
+        values.push(value);
+    }
+}
+
+fn remove_canonical(values: &mut Vec<String>, value: &str) {
+    let target = canonical(value);
+    values.retain(|existing| canonical(existing) != target);
 }
 
 fn text_matches(text: &str, capability: &str) -> bool {

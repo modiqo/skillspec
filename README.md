@@ -166,24 +166,34 @@ record it as a local capability seed. Seeds live under:
 Example for a voice/text-to-speech CLI:
 
 ```sh
-skillspec capability add elevenlabs-cli \
+skillspec capability add preferred-voice-cli \
   --domain voice \
   --kind cli \
-  --command elevenlabs \
+  --command voice-cli \
   --provides text_to_speech \
   --provides voice_generation \
   --alias "voice message" \
   --priority 80 \
   --preferred-for text_to_speech \
   --tie quality=high \
-  --auth-env ELEVENLABS_API_KEY \
+  --auth-env VOICE_PROVIDER_API_KEY \
   --external-service \
   --may-cost-money \
-  --evidence-command "elevenlabs --help" \
-  --suggested-skill-id elevenlabs.voice
+  --evidence-command "voice-cli --help" \
+  --suggested-skill-id voice.provider
 
-skillspec capability verify elevenlabs-cli --domain voice --json
+skillspec capability verify preferred-voice-cli --domain voice --json
 skillspec capability search text_to_speech --domain voice --explain --json
+```
+
+Use `update` for patch-style changes that preserve unspecified fields:
+
+```sh
+skillspec capability update preferred-voice-cli \
+  --domain voice \
+  --add-provides speech_synthesis \
+  --add-alias "read aloud" \
+  --add-preferred-for speech_synthesis
 ```
 
 `search` returns ranked candidates with scores, reasons, risk flags, and
@@ -192,15 +202,34 @@ agent should ask the user rather than auto-picking. Use `prefer` to adjust local
 ranking without editing durable-executor:
 
 ```sh
-skillspec capability prefer elevenlabs-cli \
+skillspec capability prefer preferred-voice-cli \
   --domain voice \
   --for text_to_speech \
   --priority 90
 ```
 
+If a seed stops working for a capability, mark it failed and de-prioritize that
+capability without deleting the seed:
+
+```sh
+skillspec capability update preferred-voice-cli \
+  --domain voice \
+  --remove-preferred-for text_to_speech \
+  --add-avoid-for text_to_speech \
+  --priority 0 \
+  --mark-failed
+```
+
 durable-executor uses these seeds only as a bootstrap path when no domain
 SkillSpec owns the capability yet. A successful traced run can draft a reviewed
 domain SkillSpec; seeds are not a replacement for domain skills.
+
+If the first seed search is empty, the agent should search related normalized
+capabilities and domains before using any unseeded local fallback. For example,
+a voice request may need searches for `voice`, `text_to_speech`,
+`voice_generation`, `speech_synthesis`, `audio_generation`, and
+`voice_message`. If no seed is found, the agent should ask before using the
+fallback or create and verify a seed for it first.
 
 ## Use A SkillSpec-Backed Skill
 

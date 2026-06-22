@@ -1,11 +1,11 @@
 ---
 name: durable-executor
-description: "Universal durable-work meta-router for CLI, API, shell, browser, and domain-skill work with trace, alignment, evidence capture, and future recall. Use for remember this workflow, future recall, trace and alignment, durable execution, route through durable executor, browse Gmail or email web app through durable executor, browse a website with durable evidence, browser automation with trace and alignment, browser handoff to rote-browse, inspect logged-in web app state, run any CLI command and run any shell command. Use when the task needs to remember this workflow for future recall, preserve evidence with trace and alignment, route durable work through a meta-router, hand off to a domain skill and return for closure, route browser work through durable executor before rote-browse"
+description: "Universal first-hop for any tool-backed request that may execute, inspect, mutate, automate, browse, call, fetch, generate, install, test, run, or create artifacts through CLI, shell, API, adapter, browser, provider, local process, or external tool, with trace, alignment, evidence capture, and future recall. Use for any tool-backed request, any and all tool execution, all tool execution starts here, universal cli api shell browser provider router, universal tool-backed execution router, execute inspect mutate automate browse call fetch generate install test run create artifacts, create an artifact with a tool, generate a file with a tool, create audio, create a voice message, generate audio and text to speech. Use when the task needs to remember this workflow for future recall, preserve evidence with trace and alignment, route durable work through a meta-router"
 ---
 
 # durable executor
 
-Universal durable-work meta-router and CLI/API/shell execution substrate for remembered, traced, aligned, and reusable work.
+Universal durable-work meta-router and first-hop execution substrate for any tool-backed CLI/API/shell/browser/provider/local-process/artifact work that should be traced, aligned, gated, or reusable.
 
 ## Entry Gate
 

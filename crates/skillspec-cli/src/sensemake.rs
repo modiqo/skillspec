@@ -369,9 +369,21 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                         .to_owned(),
             },
             NavigationHint {
+                intent: "broaden empty capability search before fallback",
+                command:
+                    "if selected is null and candidates is empty, search related capability/domain terms before using an unseeded local tool"
+                        .to_owned(),
+            },
+            NavigationHint {
                 intent: "verify selected seed",
                 command: "skillspec capability verify <seed-id> --domain <domain> --json"
                     .to_owned(),
+            },
+            NavigationHint {
+                intent: "patch seed metadata without rewriting it",
+                command:
+                    "skillspec capability update <seed-id> --domain <domain> --add-provides <capability> --priority <0-100>"
+                        .to_owned(),
             },
         ]);
     }

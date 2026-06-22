@@ -241,6 +241,7 @@ Subcommands:
 
 - `store`
 - `add <id> --domain <domain> --kind <kind> --provides <capability>...`
+- `update <id> [--domain <domain>] [patch options...]`
 - `list [--domain <domain>]`
 - `search <capability> [--domain <domain>] [--explain] [--json] [--local-only] [--preferred-seed <id>]`
 - `inspect <id> [--domain <domain>] [--json]`
@@ -271,7 +272,7 @@ Important options:
 - `--external-service`: mark the seed as using an external service.
 - `--may-cost-money`: mark the seed as potentially spending credits or money.
 - `--evidence-command <COMMAND>`: verification evidence command such as
-  `elevenlabs --help`.
+  `<tool> --help`.
 - `--suggested-skill-id <ID>`: domain SkillSpec id to draft after a successful
   trace.
 
@@ -279,6 +280,39 @@ Seeds are written to:
 
 ```text
 ~/.skillspec/capabilities/<domain>/<id>.yml
+```
+
+`add` rewrites the seed from the supplied flags. Use `update` for patch-style
+changes that preserve unspecified fields.
+
+### `capability update`
+
+```text
+skillspec capability update preferred-voice-cli --domain voice --add-provides speech_synthesis --priority 70
+```
+
+`update` patches an existing seed and preserves unspecified fields. It fails if
+the seed does not exist. Patch options include:
+
+- `--kind <KIND>`, `--command <COMMAND>`, `--adapter <ADAPTER>`, `--script <SCRIPT>`
+- `--clear-command`, `--clear-adapter`, `--clear-script`
+- `--add-provides <CAPABILITY>`, `--remove-provides <CAPABILITY>`
+- `--add-alias <ALIAS>`, `--remove-alias <ALIAS>`
+- `--priority <0-100>`, `--clear-priority`
+- `--add-preferred-for <CAPABILITY>`, `--remove-preferred-for <CAPABILITY>`
+- `--add-avoid-for <CAPABILITY>`, `--remove-avoid-for <CAPABILITY>`
+- `--add-tie <KEY=VALUE>`, `--remove-tie <KEY>`
+- `--add-auth-env <ENV>`, `--remove-auth-env <ENV>`
+- `--external-service <true|false>`, `--may-cost-money <true|false>`
+- `--add-evidence-command <COMMAND>`, `--remove-evidence-command <COMMAND>`
+- `--suggested-skill-id <ID>`, `--clear-suggested-skill-id`
+- `--mark-unverified`, `--mark-failed`
+
+When a seed stops working for a capability, de-prioritize it without deleting
+historical metadata:
+
+```text
+skillspec capability update preferred-voice-cli --domain voice --remove-preferred-for text_to_speech --add-avoid-for text_to_speech --priority 0 --mark-failed
 ```
 
 ### `capability search`
@@ -295,10 +329,19 @@ explains that the agent should ask the user instead of auto-picking.
 `--local-only` filters out external-service seeds. `--preferred-seed <id>` adds
 an explicit preference bonus but does not bypass verification or risk gates.
 
+An empty result for the first capability/domain pair is not permission to use an
+unseeded local fallback. Durable agents should preserve the empty result as
+evidence, broaden through related capability and domain terms, and search again.
+For voice/audio work, related terms commonly include `voice`, `text_to_speech`,
+`voice_generation`, `speech_synthesis`, `audio_generation`, and
+`voice_message` across plausible domains such as `voice` and `audio`. If no
+seed is found after related searches, ask before using the fallback or create
+and verify a seed for that fallback first.
+
 ### `capability verify`
 
 ```text
-skillspec capability verify elevenlabs-cli --domain voice --json
+skillspec capability verify preferred-voice-cli --domain voice --json
 ```
 
 Verification runs declared low-level evidence checks, such as path lookup for a
@@ -308,7 +351,7 @@ with verification status and outcomes.
 ### `capability prefer`
 
 ```text
-skillspec capability prefer elevenlabs-cli --domain voice --for text_to_speech --priority 90
+skillspec capability prefer preferred-voice-cli --domain voice --for text_to_speech --priority 90
 ```
 
 `prefer` updates ranking metadata without editing durable-executor's spec. This

@@ -1,11 +1,27 @@
 schema: skillspec/v0
 id: durable.executor
 title: durable executor
-description: Universal durable-work meta-router and CLI/API/shell execution substrate for remembered, traced, aligned, and reusable work.
+description: Universal durable-work meta-router and first-hop execution substrate for any tool-backed CLI/API/shell/browser/provider/local-process/artifact work that should be traced, aligned, gated, or reusable.
 
 activation:
-  summary: Universal durable-work meta-router for CLI, API, shell, browser, and domain-skill work with trace, alignment, evidence capture, and future recall.
+  summary: Universal first-hop for any tool-backed request that may execute, inspect, mutate, automate, browse, call, fetch, generate, install, test, run, or create artifacts through CLI, shell, API, adapter, browser, provider, local process, or external tool, with trace, alignment, evidence capture, and future recall.
   keywords:
+    - any tool-backed request
+    - any and all tool execution
+    - all tool execution starts here
+    - universal cli api shell browser provider router
+    - universal tool-backed execution router
+    - execute inspect mutate automate browse call fetch generate install test run create artifacts
+    - create an artifact with a tool
+    - generate a file with a tool
+    - create audio
+    - create a voice message
+    - generate audio
+    - text to speech
+    - use a provider
+    - use an external tool
+    - use a local process
+    - use a CLI or provider
     - remember this workflow
     - future recall
     - trace and alignment
@@ -34,6 +50,10 @@ applies_when:
       - browse Gmail or an email web app with trace and alignment
       - extract browser page or email evidence for future recall
       - execute all CLI API shell and provider commands through rote exec
+      - use durable-executor as the first hop for any tool-backed execution
+      - create or generate artifacts through a CLI API provider browser local process or external tool
+      - generate audio or voice through a CLI API provider local process or capability seed
+      - run inspect fetch call browse mutate install test or automate through a tool
       - run a local command and remember the result
       - inspect CLI output with provenance
       - follow a log or process stream
@@ -106,6 +126,33 @@ routes:
               - direct_shell_command_without_rote_exec
               - direct_api_call_without_rote_adapter_or_rote_exec
             reason: Domain semantics belong to the selected domain skill; durable execution and final closure return to durable-executor.
+          jumps:
+            - when: no_matching_domain_skill_installed
+              to_phase: capability_seed_fallback
+              reason: If no installed domain SkillSpec owns the requested capability, do not use a raw tool directly; query local capability seeds and continue through capability bootstrap.
+        - id: capability_seed_fallback
+          owner_skill: durable-executor
+          route: capability_bootstrap
+          description: >
+            Staircase fallback for machines that have CLIs, adapters, scripts, or provider tools but no reviewed
+            domain SkillSpec yet. Query the local capability seed store, rank candidates, apply gates, execute
+            through the durable substrate, and recommend drafting a domain SkillSpec from the successful trace.
+          requires:
+            - search_installed_domain_skills
+            - query_local_capability_seed_store
+            - search_capability_seed_store
+            - search_related_capability_seed_domains
+            - rank_capability_candidates
+            - apply_capability_ask_policy
+            - run_adapter_or_cli_through_durable_substrate
+            - draft_domain_skillspec_from_trace
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+            - provider_action_without_risk_gate
+            - unseeded_local_tool_fallback_without_seed_or_user_approval
+            - generated_skill_install_without_review
         - id: durable_closure
           owner_skill: durable-executor
           description: Review the domain return packet, align traces, summarize evidence, report token-savings context, and handle recall or crystallization closure.
@@ -152,12 +199,14 @@ routes:
           requires:
             - query_local_capability_seed_store
             - search_capability_seed_store
+            - search_related_capability_seed_domains
             - rank_capability_candidates
             - inspect_capability_seed
             - verify_capability_seed
           forbid:
             - direct_cli_without_rote_exec
             - direct_api_call_without_rote_adapter_or_rote_exec
+            - unseeded_local_tool_fallback_without_seed_or_user_approval
         - id: gate_risk
           owner_skill: durable-executor
           description: Apply ask policy for close-ranked candidates, external services, paid providers, secrets, personal data, and writes.
@@ -328,6 +377,7 @@ rules:
       - direct_cli_without_rote_exec
       - direct_shell_command_without_rote_exec
       - direct_api_call_without_rote_adapter_or_rote_exec
+      - unseeded_local_tool_fallback_without_seed_or_user_approval
       - final_summary_without_workspace
       - final_summary_without_trace_math
     after_success:
@@ -345,7 +395,6 @@ rules:
       user_says_any:
         - voice message
         - text to speech
-        - elevenlabs
         - audio generation
         - pdf
         - spreadsheet
@@ -355,6 +404,7 @@ rules:
       - direct_cli_without_rote_exec
       - direct_shell_command_without_rote_exec
       - direct_api_call_without_rote_adapter_or_rote_exec
+      - unseeded_local_tool_fallback_without_seed_or_user_approval
     after_success:
       - prepare_durable_handoff_packet
       - preserve_durable_context
@@ -374,6 +424,7 @@ rules:
       - direct_shell_command_without_rote_exec
       - direct_api_call_without_rote_adapter_or_rote_exec
       - provider_action_without_risk_gate
+      - unseeded_local_tool_fallback_without_seed_or_user_approval
       - generated_skill_install_without_review
     after_success:
       - query_local_capability_seed_store
@@ -1379,6 +1430,14 @@ closures:
     description: Check installed SkillSpec metadata first; use capability bootstrap only when no reviewed domain SkillSpec owns the requested capability.
   query_local_capability_seed_store:
     description: Query `~/.skillspec/capabilities/` through `skillspec capability search`, not by embedding vendor knowledge in durable-executor.
+  search_related_capability_seed_domains:
+    description: >
+      If the first capability search returns no candidates, broaden through normalized capability/domain
+      equivalents before using any local fallback tool. For voice and audio requests, try terms such as
+      voice, text_to_speech, voice_generation, speech_synthesis, audio_generation, and voice_message
+      across plausible domains such as voice and audio. Preserve every empty and non-empty search result
+      as ranking evidence. If no seed is found, ask before using an unseeded local fallback or create and
+      verify a local seed for that fallback first.
   rank_capability_candidates:
     description: Use the ranked JSON from `skillspec capability search --explain --json`; preserve candidate scores, reasons, risks, gates, and close-candidate ask policy.
   apply_capability_ask_policy:
@@ -1492,13 +1551,16 @@ proof:
 
 tests:
   - name: remembered voice work hands off to domain skill
-    input: create a voice message with ElevenLabs and remember this workflow for future reuse
+    input: create a voice message with the preferred voice provider and remember this workflow for future reuse
     expect:
       route: durable_domain_handoff
       plan_phases:
         - establish_durable_context
         - domain_skill_handoff
+        - capability_seed_fallback
         - durable_closure
+      plan_jumps:
+        - domain_skill_handoff:no_matching_domain_skill_installed->capability_seed_fallback
       matched_rules:
         - durable_memory_tasks_start_at_meta_router
         - domain_objects_handoff_but_keep_durable_execution
@@ -1515,9 +1577,35 @@ tests:
         - direct_cli_without_rote_exec
         - direct_shell_command_without_rote_exec
         - direct_api_call_without_rote_adapter_or_rote_exec
+        - unseeded_local_tool_fallback_without_seed_or_user_approval
+
+  - name: plain tool backed voice request enters durable executor with seed fallback
+    input: create the voice message now from this text
+    expect:
+      route: durable_domain_handoff
+      plan_phases:
+        - establish_durable_context
+        - domain_skill_handoff
+        - capability_seed_fallback
+        - durable_closure
+      plan_jumps:
+        - domain_skill_handoff:no_matching_domain_skill_installed->capability_seed_fallback
+      matched_rules:
+        - domain_objects_handoff_but_keep_durable_execution
+      after_success:
+        - prepare_durable_handoff_packet
+        - preserve_durable_context
+        - require_domain_execution_through_durable_executor
+        - receive_domain_return_packet
+        - report_workspace_evidence_and_token_math
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_shell_command_without_rote_exec
+        - direct_api_call_without_rote_adapter_or_rote_exec
+        - unseeded_local_tool_fallback_without_seed_or_user_approval
 
   - name: missing voice skill uses capability bootstrap
-    input: no voice skill is installed but an elevenlabs cli capability seed exists; create a voice message from this paragraph
+    input: no voice skill is installed but a cli capability seed exists; create a voice message from this paragraph
     expect:
       route: capability_bootstrap
       plan_phases:
@@ -1541,6 +1629,7 @@ tests:
       forbid:
         - direct_cli_without_rote_exec
         - provider_action_without_risk_gate
+        - unseeded_local_tool_fallback_without_seed_or_user_approval
         - generated_skill_install_without_review
 
   - name: gh repo sync check remains adapter cli fallback

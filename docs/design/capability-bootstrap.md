@@ -26,6 +26,7 @@ Implemented commands:
 ```sh
 skillspec capability store
 skillspec capability add <id> --domain <domain> --kind <kind> --provides <capability>
+skillspec capability update <id> --domain <domain> [patch options]
 skillspec capability list [--domain <domain>]
 skillspec capability search <capability> --domain <domain> --explain --json
 skillspec capability inspect <id> --domain <domain> --json
@@ -39,15 +40,21 @@ All capability commands emit JSON. `scan` is intentionally conservative in the
 current implementation: it reports that no scan providers are configured rather
 than guessing vendor capabilities from the environment.
 
+`add` writes a complete seed from the supplied flags. `update` patches an
+existing seed and preserves unspecified fields. This distinction matters for
+long-lived local capability records: agents can add a new provided capability,
+remove one stale alias, lower priority, or mark a seed failed without
+accidentally deleting evidence, auth references, or promotion metadata.
+
 ## Seed Shape
 
 A seed is strict YAML. Unknown fields are rejected by serde.
 
 ```yaml
-id: elevenlabs-cli
+id: preferred-voice-cli
 domain: voice
 kind: cli
-command: elevenlabs
+command: voice-cli
 provides:
   - text_to_speech
 aliases:
@@ -60,15 +67,15 @@ rank:
     quality: high
 auth:
   env:
-    - ELEVENLABS_API_KEY
+    - VOICE_PROVIDER_API_KEY
 risk:
   external_service: true
   may_cost_money: true
 evidence:
   - source: cli_help
-    command: elevenlabs --help
+    command: voice-cli --help
 promotion:
-  suggested_skill_id: elevenlabs.voice
+  suggested_skill_id: voice.provider
 ```
 
 The seed is not a SkillSpec and not a handoff target. It is evidence that a
@@ -94,6 +101,43 @@ The current implementation uses:
 Failed verification excludes a candidate. If the top two candidates are within
 10 points, `selected` is `null` and `ask_policy.reason` is
 `top_candidates_within_10_points`.
+
+## Updating Broken Or Degraded Seeds
+
+When a seed stops working for a capability, do not delete it as the first
+response. Preserve the historical metadata and patch the ranking/verification
+state:
+
+```sh
+skillspec capability update preferred-voice-cli \
+  --domain voice \
+  --remove-preferred-for text_to_speech \
+  --add-avoid-for text_to_speech \
+  --priority 0 \
+  --mark-failed
+```
+
+This removes the positive ranking signal, adds an avoid signal, and marks the
+verification state failed while keeping the command, auth references, aliases,
+evidence commands, and promotion metadata intact. A later `verify` can restore
+the seed to `verified` if the underlying tool recovers.
+
+## Empty Search Behavior
+
+An empty first search is not permission to use an unseeded local tool. The
+agent must preserve the empty result as evidence, broaden through normalized
+capability and domain equivalents, and search again before falling back.
+
+For example, a voice request may be normalized as `text_to_speech` by one
+agent and `voice_generation` by another. The durable-executor pattern requires
+checking related terms such as `voice`, `text_to_speech`, `voice_generation`,
+`speech_synthesis`, `audio_generation`, and `voice_message` across plausible
+domains such as `voice` and `audio`.
+
+If no seed is found after related searches, the agent must ask before using an
+unseeded local fallback or create and verify a local seed for that fallback
+first. This prevents a machine-local command from bypassing seed ranking,
+risk gates, and future skill-draft evidence.
 
 ## Verification Behavior
 

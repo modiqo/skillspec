@@ -226,7 +226,7 @@ enum CapabilityCommand {
     Store,
     #[command(about = "Create or update a local capability seed")]
     Add {
-        /// Stable seed id, such as elevenlabs-cli.
+        /// Stable seed id, such as preferred-voice-cli.
         id: String,
         /// Capability domain folder, such as voice or pdf.
         #[arg(long)]
@@ -277,17 +277,114 @@ enum CapabilityCommand {
         #[arg(long)]
         suggested_skill_id: Option<String>,
     },
+    #[command(
+        about = "Patch an existing local capability seed without rewriting unspecified fields"
+    )]
+    Update {
+        /// Seed id to update.
+        id: String,
+        /// Disambiguating domain when the id appears in multiple domains.
+        #[arg(long)]
+        domain: Option<String>,
+        /// Replace seed kind.
+        #[arg(long)]
+        kind: Option<String>,
+        /// Set CLI command name or path.
+        #[arg(long)]
+        command: Option<String>,
+        /// Clear CLI command.
+        #[arg(long)]
+        clear_command: bool,
+        /// Set adapter id or name.
+        #[arg(long)]
+        adapter: Option<String>,
+        /// Clear adapter id or name.
+        #[arg(long)]
+        clear_adapter: bool,
+        /// Set local script path.
+        #[arg(long)]
+        script: Option<String>,
+        /// Clear local script path.
+        #[arg(long)]
+        clear_script: bool,
+        /// Add a capability provided by this seed. Repeat for multiple capabilities.
+        #[arg(long)]
+        add_provides: Vec<String>,
+        /// Remove a provided capability. Repeat for multiple capabilities.
+        #[arg(long)]
+        remove_provides: Vec<String>,
+        /// Add a user phrase alias. Repeat for multiple aliases.
+        #[arg(long)]
+        add_alias: Vec<String>,
+        /// Remove a user phrase alias. Repeat for multiple aliases.
+        #[arg(long)]
+        remove_alias: Vec<String>,
+        /// Set default priority from 0 to 100.
+        #[arg(long)]
+        priority: Option<u8>,
+        /// Clear default priority.
+        #[arg(long)]
+        clear_priority: bool,
+        /// Add a preferred capability. Repeat for multiple capabilities.
+        #[arg(long)]
+        add_preferred_for: Vec<String>,
+        /// Remove a preferred capability. Repeat for multiple capabilities.
+        #[arg(long)]
+        remove_preferred_for: Vec<String>,
+        /// Add an avoided capability. Useful when a seed stops working for a task.
+        #[arg(long)]
+        add_avoid_for: Vec<String>,
+        /// Remove an avoided capability.
+        #[arg(long)]
+        remove_avoid_for: Vec<String>,
+        /// Add or replace tie-breaker metadata as key=value. Repeat for multiple entries.
+        #[arg(long)]
+        add_tie: Vec<String>,
+        /// Remove tie-breaker metadata by key. Repeat for multiple entries.
+        #[arg(long)]
+        remove_tie: Vec<String>,
+        /// Add an auth environment variable. Repeat for multiple vars.
+        #[arg(long)]
+        add_auth_env: Vec<String>,
+        /// Remove an auth environment variable. Repeat for multiple vars.
+        #[arg(long)]
+        remove_auth_env: Vec<String>,
+        /// Set external service risk flag.
+        #[arg(long)]
+        external_service: Option<bool>,
+        /// Set provider cost risk flag.
+        #[arg(long)]
+        may_cost_money: Option<bool>,
+        /// Add evidence command, such as "tool --help". Repeat for multiple checks.
+        #[arg(long)]
+        add_evidence_command: Vec<String>,
+        /// Remove an evidence command. Repeat for multiple checks.
+        #[arg(long)]
+        remove_evidence_command: Vec<String>,
+        /// Set suggested domain SkillSpec id to generate after a successful trace.
+        #[arg(long)]
+        suggested_skill_id: Option<String>,
+        /// Clear suggested domain SkillSpec id.
+        #[arg(long)]
+        clear_suggested_skill_id: bool,
+        /// Mark verification status unverified without running checks.
+        #[arg(long, conflicts_with = "mark_failed")]
+        mark_unverified: bool,
+        /// Mark verification status failed without running checks.
+        #[arg(long, conflicts_with = "mark_unverified")]
+        mark_failed: bool,
+    },
     #[command(about = "List local capability seeds")]
     List {
         /// Limit results to one domain.
         #[arg(long)]
         domain: Option<String>,
     },
-    #[command(about = "Search and rank local capability seeds")]
+    #[command(about = "Search and rank local capability seeds for one capability/domain pair")]
     Search {
         /// Capability to search for, such as text_to_speech.
         capability: String,
-        /// Limit results to one domain.
+        /// Limit results to one domain. If no candidates are found, callers should search related domains before using an unseeded fallback.
         #[arg(long)]
         domain: Option<String>,
         /// Include ranking reasons in the JSON output.
@@ -577,6 +674,80 @@ fn run() -> Result<()> {
                     may_cost_money,
                     evidence_command,
                     suggested_skill_id,
+                })?;
+                report::json(&report)?;
+            }
+            CapabilityCommand::Update {
+                id,
+                domain,
+                kind,
+                command,
+                clear_command,
+                adapter,
+                clear_adapter,
+                script,
+                clear_script,
+                add_provides,
+                remove_provides,
+                add_alias,
+                remove_alias,
+                priority,
+                clear_priority,
+                add_preferred_for,
+                remove_preferred_for,
+                add_avoid_for,
+                remove_avoid_for,
+                add_tie,
+                remove_tie,
+                add_auth_env,
+                remove_auth_env,
+                external_service,
+                may_cost_money,
+                add_evidence_command,
+                remove_evidence_command,
+                suggested_skill_id,
+                clear_suggested_skill_id,
+                mark_unverified,
+                mark_failed,
+            } => {
+                let verification_status = if mark_failed {
+                    Some(capability::VerificationStatus::Failed)
+                } else if mark_unverified {
+                    Some(capability::VerificationStatus::Unverified)
+                } else {
+                    None
+                };
+                let report = capability::update(capability::UpdateOptions {
+                    id,
+                    domain,
+                    kind,
+                    command,
+                    clear_command,
+                    adapter,
+                    clear_adapter,
+                    script,
+                    clear_script,
+                    add_provides,
+                    remove_provides,
+                    add_alias,
+                    remove_alias,
+                    priority,
+                    clear_priority,
+                    add_preferred_for,
+                    remove_preferred_for,
+                    add_avoid_for,
+                    remove_avoid_for,
+                    add_ties: add_tie,
+                    remove_tie,
+                    add_auth_env,
+                    remove_auth_env,
+                    external_service,
+                    may_cost_money,
+                    add_evidence_command,
+                    remove_evidence_command,
+                    suggested_skill_id,
+                    clear_suggested_skill_id,
+                    verification_status,
                 })?;
                 report::json(&report)?;
             }

@@ -413,8 +413,8 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
     let bin_dir = dir.path().join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
     write_executable(
-        &bin_dir.join("elevenlabs"),
-        "#!/bin/sh\nprintf 'ElevenLabs text to speech voice generation\\n'\n",
+        &bin_dir.join("voice-cli"),
+        "#!/bin/sh\nprintf 'remote voice text to speech voice generation\\n'\n",
     );
     write_executable(
         &bin_dir.join("say"),
@@ -431,13 +431,13 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .env("PATH", &path)
         .arg("capability")
         .arg("add")
-        .arg("elevenlabs-cli")
+        .arg("remote-voice-cli")
         .arg("--domain")
         .arg("voice")
         .arg("--kind")
         .arg("cli")
         .arg("--command")
-        .arg("elevenlabs")
+        .arg("voice-cli")
         .arg("--provides")
         .arg("text_to_speech")
         .arg("--provides")
@@ -451,27 +451,27 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .arg("--tie")
         .arg("quality=high")
         .arg("--auth-env")
-        .arg("ELEVENLABS_API_KEY")
+        .arg("VOICE_PROVIDER_API_KEY")
         .arg("--external-service")
         .arg("--may-cost-money")
         .arg("--evidence-command")
-        .arg("elevenlabs --help")
+        .arg("voice-cli --help")
         .arg("--suggested-skill-id")
-        .arg("elevenlabs.voice")
+        .arg("voice.provider")
         .output()
         .unwrap();
     assert_success(&add);
     let add_report = json_stdout(&add);
     assert_eq!(add_report["status"], "written");
     assert!(skillspec_home
-        .join("capabilities/voice/elevenlabs-cli.yml")
+        .join("capabilities/voice/remote-voice-cli.yml")
         .is_file());
 
     let inspect = Command::new(bin())
         .env("SKILLSPEC_HOME", &skillspec_home)
         .arg("capability")
         .arg("inspect")
-        .arg("elevenlabs-cli")
+        .arg("remote-voice-cli")
         .arg("--domain")
         .arg("voice")
         .output()
@@ -481,7 +481,7 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
     assert_eq!(inspected["seed"]["rank"]["tie_breakers"]["quality"], "high");
     assert_eq!(
         inspected["seed"]["promotion"]["suggested_skill_id"],
-        "elevenlabs.voice"
+        "voice.provider"
     );
 
     let verify = Command::new(bin())
@@ -489,7 +489,7 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .env("PATH", &path)
         .arg("capability")
         .arg("verify")
-        .arg("elevenlabs-cli")
+        .arg("remote-voice-cli")
         .arg("--domain")
         .arg("voice")
         .output()
@@ -498,6 +498,67 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
     let verified = json_stdout(&verify);
     assert_eq!(verified["status"], "verified");
     assert!(verified["outcomes"].as_array().unwrap().len() >= 2);
+
+    let update = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("update")
+        .arg("remote-voice-cli")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--add-provides")
+        .arg("speech_synthesis")
+        .arg("--add-alias")
+        .arg("read aloud")
+        .arg("--add-preferred-for")
+        .arg("speech_synthesis")
+        .arg("--add-avoid-for")
+        .arg("voice_agent")
+        .arg("--priority")
+        .arg("35")
+        .arg("--add-tie")
+        .arg("latency=low")
+        .arg("--mark-unverified")
+        .output()
+        .unwrap();
+    assert_success(&update);
+    let updated = json_stdout(&update);
+    assert_eq!(updated["status"], "updated");
+    assert_eq!(updated["seed"]["command"], "voice-cli");
+    assert!(updated["seed"]["provides"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "text_to_speech"));
+    assert!(updated["seed"]["provides"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "speech_synthesis"));
+    assert!(updated["seed"]["aliases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|alias| alias == "voice message"));
+    assert!(updated["seed"]["aliases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|alias| alias == "read aloud"));
+    assert_eq!(updated["seed"]["rank"]["default_priority"], 35);
+    assert!(updated["seed"]["rank"]["preferred_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "speech_synthesis"));
+    assert!(updated["seed"]["rank"]["avoid_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "voice_agent"));
+    assert_eq!(updated["seed"]["rank"]["tie_breakers"]["quality"], "high");
+    assert_eq!(updated["seed"]["rank"]["tie_breakers"]["latency"], "low");
+    assert_eq!(updated["seed"]["verification"]["status"], "unverified");
 
     let search = Command::new(bin())
         .env("SKILLSPEC_HOME", &skillspec_home)
@@ -512,8 +573,8 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .unwrap();
     assert_success(&search);
     let ranked = json_stdout(&search);
-    assert_eq!(ranked["selected"], "elevenlabs-cli");
-    assert_eq!(ranked["candidates"][0]["id"], "elevenlabs-cli");
+    assert_eq!(ranked["selected"], "remote-voice-cli");
+    assert_eq!(ranked["candidates"][0]["id"], "remote-voice-cli");
     assert!(ranked["candidates"][0]["reasons"]
         .as_array()
         .unwrap()
@@ -534,7 +595,7 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .env("SKILLSPEC_HOME", &skillspec_home)
         .arg("capability")
         .arg("prefer")
-        .arg("elevenlabs-cli")
+        .arg("remote-voice-cli")
         .arg("--domain")
         .arg("voice")
         .arg("--for")
@@ -552,18 +613,50 @@ fn capability_add_inspect_verify_search_prefer_and_remove() {
         .iter()
         .any(|capability| capability == "realistic_voice"));
 
+    let mark_failed = Command::new(bin())
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("capability")
+        .arg("update")
+        .arg("remote-voice-cli")
+        .arg("--domain")
+        .arg("voice")
+        .arg("--remove-preferred-for")
+        .arg("text_to_speech")
+        .arg("--add-avoid-for")
+        .arg("text_to_speech")
+        .arg("--priority")
+        .arg("0")
+        .arg("--mark-failed")
+        .output()
+        .unwrap();
+    assert_success(&mark_failed);
+    let failed = json_stdout(&mark_failed);
+    assert_eq!(failed["seed"]["rank"]["default_priority"], 0);
+    assert!(!failed["seed"]["rank"]["preferred_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "text_to_speech"));
+    assert!(failed["seed"]["rank"]["avoid_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability == "text_to_speech"));
+    assert_eq!(failed["seed"]["verification"]["status"], "failed");
+    assert_eq!(failed["seed"]["command"], "voice-cli");
+
     let remove = Command::new(bin())
         .env("SKILLSPEC_HOME", &skillspec_home)
         .arg("capability")
         .arg("remove")
-        .arg("elevenlabs-cli")
+        .arg("remote-voice-cli")
         .arg("--domain")
         .arg("voice")
         .output()
         .unwrap();
     assert_success(&remove);
     assert!(!skillspec_home
-        .join("capabilities/voice/elevenlabs-cli.yml")
+        .join("capabilities/voice/remote-voice-cli.yml")
         .exists());
 }
 
@@ -575,8 +668,8 @@ fn capability_search_explains_close_candidates_and_local_only_filter() {
     let bin_dir = dir.path().join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
     write_executable(
-        &bin_dir.join("elevenlabs"),
-        "#!/bin/sh\nprintf 'ElevenLabs text to speech voice generation\\n'\n",
+        &bin_dir.join("voice-cli"),
+        "#!/bin/sh\nprintf 'remote voice text to speech voice generation\\n'\n",
     );
     write_executable(
         &bin_dir.join("say"),
@@ -589,7 +682,7 @@ fn capability_search_explains_close_candidates_and_local_only_filter() {
     );
 
     for (id, command, priority, external) in [
-        ("elevenlabs-cli", "elevenlabs", "80", true),
+        ("remote-voice-cli", "voice-cli", "80", true),
         ("macos-say", "say", "75", false),
     ] {
         let mut add = Command::new(bin());
