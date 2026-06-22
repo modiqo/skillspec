@@ -1,11 +1,18 @@
 ---
-name: examples-imports
-description: "Use for demonstrates always-loaded policy, on-demand procedure imports, section narrowing, and nested import requirements. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+name: anthropic-pdf
+description: "Use for any task involving PDF files, including reading, extracting text or tables, creating, transforming, filling forms, OCR, image extraction, and security operations. Use for pdf, .pdf, PDF file, extract PDF text, extract PDF tables, merge PDFs, split PDF, rotate PDF, watermark PDF, create PDF, fill PDF form and OCR PDF. Use when the task needs to read or extract content from a PDF, extract tables from a PDF, merge, split, rotate, crop, repair, optimize, watermark, encrypt, or decrypt PDFs, create a new PDF, fill a PDF form, OCR a scanned PDF into searchable text and extract embedded images from a PDF. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
-# imports example
+# PDF
 
-Demonstrates always-loaded policy, on-demand procedure imports, section narrowing, and nested import requirements.
+SkillSpec port of Anthropic's PDF skill for reading, extracting, merging, splitting, rotating, watermarking, creating, filling, encrypting, decrypting, image extraction, and OCR workflows.
+
+## Entry Gate
+
+- Before any task action, run `skillspec act ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the current-route action checklist.
+- Until that checklist is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.
+- Forbidden before the decision: execute_pdf_snippet_without_route, fill_form_without_checking_fillable_fields, overwrite_input_pdf, use_unicode_subscripts_superscripts_in_reportlab.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -105,5 +112,10 @@ Minimum final response shape when workspace evidence exists:
 
 ## Route Hints
 
-- `explain_imports`: Explain SkillSpec imports
-- `fill_pdf_form`: Follow a PDF form procedure
+- `inspect_or_extract_pdf`: Inspect or extract PDF content
+- `transform_pdf_pages`: Transform PDF pages
+- `create_pdf`: Create PDF
+- `fill_pdf_form`: Fill PDF form
+- `ocr_scanned_pdf`: OCR scanned PDF
+- `extract_pdf_images`: Extract PDF images
+- `advanced_pdf_workflow`: Advanced PDF workflow

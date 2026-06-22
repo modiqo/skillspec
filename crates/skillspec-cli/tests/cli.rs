@@ -1449,6 +1449,87 @@ fn decide_enforces_required_trace_and_trace_compaction() {
 }
 
 #[test]
+fn act_generates_current_route_ooda_checklist() {
+    let dir = TempDir::new("act");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+    let trace_dir = dir.path().join("traces");
+
+    let act = Command::new(bin())
+        .arg("act")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(&trace_dir)
+        .output()
+        .unwrap();
+    assert_success(&act);
+    assert!(stderr(&act).contains("trace: wrote"));
+    let text = stdout(&act);
+    assert!(text.contains("SkillSpec action checklist"));
+    assert!(text.contains("Selected route: browser"));
+    assert!(text.contains("Route authority: The selected route and matched rules override"));
+    assert!(text.contains("OODA loop:"));
+    assert!(text.contains("Current phase:"));
+    assert!(text.contains("collect_cli_evidence owned by durable-executor"));
+    assert!(text.contains("requires: run_cli_only_through_rote_exec"));
+    assert!(text.contains("Allowed now:"));
+    assert!(text.contains("rote flow search, a named rote workspace, and `rote exec --`"));
+    assert!(text.contains("Forbidden:"));
+    assert!(text.contains("native_search_as_answer"));
+    assert!(text.contains("direct_cli_without_rote_exec"));
+    assert!(text.contains("Required elicitations:"));
+    assert!(text.contains("mode"));
+    assert!(text.contains("Required transitions:"));
+    assert!(text
+        .contains("complete phase `collect_cli_evidence` before starting phase `browser_handoff`"));
+    assert!(text.contains(
+        "phase `browser_handoff` hands off to `rote-browse` with boundary `stop_current_skill`"
+    ));
+    assert!(text.contains(
+        "if `cli_evidence_missing`, jump from phase `collect_cli_evidence` to `browser_handoff`"
+    ));
+    assert!(text.contains("Before each tool call:"));
+    assert!(text.contains("[ ] Does this action violate any listed forbid?"));
+
+    let act_json = Command::new(bin())
+        .arg("act")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(dir.path().join("json-traces"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&act_json);
+    let report = json_stdout(&act_json);
+    assert_eq!(report["selected_route"], "browser");
+    assert_eq!(report["route_selection"]["basis"], "rule_prefer");
+    assert_eq!(report["current_phase"]["id"], "collect_cli_evidence");
+    assert_eq!(report["current_phase"]["owner_skill"], "durable-executor");
+    assert!(report["forbidden"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "native_search_as_answer"));
+    assert!(report["required_transitions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item
+            .as_str()
+            .unwrap()
+            .contains("phase `browser_handoff` hands off to `rote-browse`")));
+    assert!(report["before_tool_call"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item.as_str().unwrap().contains("lower-level default")));
+}
+
+#[test]
 fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     let dir = TempDir::new("align-execution");
     let spec = dir.path().join("skill.spec.yml");
@@ -1613,6 +1694,9 @@ fn compile_targets_render_loader_and_full_markdown() {
     ));
     assert!(loader_out.contains("thin loader"));
     assert!(loader_out.contains("## Entry Gate"));
+    assert!(loader_out.contains("skillspec act ./skill.spec.yml --input='<user task>'"));
+    assert!(loader_out.contains("current-route action checklist"));
+    assert!(loader_out.contains("selected route and matched rules in the checklist override"));
     assert!(loader_out.contains("## Authoring And Revision Contract"));
     assert!(loader_out.contains("skillspec grammar sensemake --view porting"));
     assert!(loader_out.contains("skillspec grammar checklist --for import-skill"));
@@ -1631,6 +1715,8 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert_success(&markdown);
     let markdown_out = stdout(&markdown);
     assert!(markdown_out.contains("## Authoring And Revision Contract"));
+    assert!(markdown_out.contains("skillspec act <skill-folder>/skill.spec.yml"));
+    assert!(markdown_out.contains("OODA loop for the selected route"));
     assert!(markdown_out.contains("## Rules"));
     assert!(markdown_out.contains("## Scenario Tests"));
     assert!(markdown_out.contains("browse_rule"));

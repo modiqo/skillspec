@@ -29,6 +29,17 @@ activation:
     - route through durable executor
     - browse Gmail or email web app through durable executor
     - browse a website with durable evidence
+    - browse the web with rote-browse
+    - search the web through rote-browse
+    - public web lookup through rote-browse
+    - public profile lookup through rote-browse
+    - public profile lookup through active rote-browse session
+    - social profile lookup through rote-browse
+    - social profile enrichment through headed active browser attach
+    - social profile extraction through rote-browse
+    - contributor profile browsing through rote-browse
+    - committer profile browsing through active browser
+    - no native web search for browser evidence
     - browser automation with trace and alignment
     - browser handoff to rote-browse
     - inspect logged-in web app state
@@ -48,6 +59,11 @@ applies_when:
       - hand off to a domain skill and return for closure
       - route browser work through durable executor before rote-browse
       - browse Gmail or an email web app with trace and alignment
+      - browse public web pages with trace and alignment through rote-browse
+      - search or open public websites only through rote-browse when browser evidence is required
+      - extract public profile or social profile evidence through rote-browse with headed active browser attach required
+      - enrich contributor profiles from public web pages through rote-browse
+      - enrich contributor or committer social profiles through headed active browser attach sessions, never anonymous headless sessions by default
       - extract browser page or email evidence for future recall
       - execute all CLI API shell and provider commands through rote exec
       - use durable-executor as the first hop for any tool-backed execution
@@ -273,17 +289,24 @@ routes:
         - id: browser_draft_handoff
           owner_skill: rote-browse
           route: browser_handoff
-          description: Pass the shell evidence summary and browser/email-draft intent to rote-browse; do not run browser tools inside durable-executor.
+          description: Pass the shell evidence summary, browser/email/profile intent, required headed active-browser attach session preference, and forbidden native substitutes to rote-browse; do not run browser tools inside durable-executor.
           requires:
             - handoff_browser_work_to_rote_browse_skill
             - pass_browser_context_to_rote_browse
             - resume_shell_work_after_browser_evidence
           forbid:
             - native_search_as_answer
+            - native_codex_web_search
+            - web_search_tool
+            - web_open_tool
+            - native_web_search_tool
+            - native_web_open_tool
             - raw_playwright
             - native_browser_tool_without_rote_browse
             - direct_browser_tool_without_rote_browse
             - browser_cli_commands_in_durable_executor
+            - anonymous_headless_browser_default
+            - public_read_only_headless_default
           handoff:
             to_skill: rote-browse
             boundary: stop_current_skill
@@ -293,11 +316,21 @@ routes:
               - evidence_context
               - shell_prerequisites
               - shell_phase_result
+              - browser_session_preference
+              - forbidden_native_web_substitutes
             forbid:
+              - native_search_as_answer
+              - native_codex_web_search
+              - web_search_tool
+              - web_open_tool
+              - native_web_search_tool
+              - native_web_open_tool
               - native_browser_tool_without_rote_browse
               - direct_browser_tool_without_rote_browse
               - browser_cli_commands_in_durable_executor
               - raw_playwright
+              - anonymous_headless_browser_default
+              - public_read_only_headless_default
             reason: Browser drafting is owned by rote-browse after shell evidence is captured.
 
   - id: adapter_first_cli_fallback
@@ -311,7 +344,9 @@ routes:
       Use when the user asks to browse, click, snapshot, attach to a browser, or extract from live page state.
       Defer the browser portion to the `rote-browse` skill. This shell skill should preserve the
       user's intent, workspace/evidence context, and any shell-side prerequisites, but it must not
-      prescribe browser command sequences itself.
+      prescribe browser command sequences itself. The default session context for browser, public-web,
+      profile, social-profile, contributor-profile, and committer-profile work is
+      `browser_session_preference=headed_existing_browser_attach_required`.
     handoff:
       to_skill: rote-browse
       boundary: stop_current_skill
@@ -320,11 +355,21 @@ routes:
         - workspace
         - evidence_context
         - shell_prerequisites
+        - browser_session_preference
+        - forbidden_native_web_substitutes
       forbid:
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - native_browser_tool_without_rote_browse
         - direct_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
         - raw_playwright
+        - anonymous_headless_browser_default
+        - public_read_only_headless_default
       reason: Browser execution is owned by rote-browse; durable-executor must stop browser execution and only pass declared context.
   - id: one_shot_process
     label: Capture a one-shot process
@@ -543,6 +588,10 @@ rules:
       - direct_mcp_tool_call
       - native_search_as_answer
       - native_codex_web_search
+      - web_search_tool
+      - web_open_tool
+      - native_web_search_tool
+      - native_web_open_tool
       - untracked_stdout_scrollback
     after_success:
       - identify_required_services_and_tools
@@ -565,12 +614,17 @@ rules:
         - use parallel
         - enrich their profile
         - enrich profiles
+    prefer: adapter_first_cli_fallback
     route_order:
       - adapter_first_cli_fallback
       - one_shot_process
     forbid:
       - native_search_as_answer
       - native_codex_web_search
+      - web_search_tool
+      - web_open_tool
+      - native_web_search_tool
+      - native_web_open_tool
       - web_search_tool_without_parallel_preflight
       - direct_parallelweb_tool_call
       - direct_cli_without_rote_exec
@@ -603,7 +657,20 @@ rules:
     when:
       user_says_any:
         - browse
+        - browse the web
+        - browse web
+        - web browse
+        - search the web
+        - web search
+        - open web page
+        - open website
         - open this site
+        - open this website
+        - look up online
+        - public web lookup
+        - public website
+        - public profile
+        - public profiles
         - attach to my browser
         - active browser
         - existing browser
@@ -612,31 +679,84 @@ rules:
         - type
         - snapshot
         - extract from page
+        - extract website
+        - extract public page
         - social profile
+        - social profiles
+        - social media profile
+        - linkedin profile
+        - x profile
+        - twitter profile
+        - substack profile
         - email web app
         - inbox in browser
     prefer: browser_handoff
     forbid:
       - native_search_as_answer
+      - native_codex_web_search
+      - web_search_tool
+      - web_open_tool
+      - native_web_search_tool
+      - native_web_open_tool
       - raw_playwright
       - native_browser_tool_without_rote_browse
       - direct_browser_tool_without_rote_browse
       - curl_as_browser_substitute
       - adapter_setup_before_browser_handoff
       - browser_cli_commands_in_durable_executor
-    allow:
-      native_search: url_discovery_only
+      - anonymous_headless_browser_default
+      - public_read_only_headless_default
     after_success:
       - handoff_browser_work_to_rote_browse_skill
       - pass_browser_context_to_rote_browse
+      - require_headed_active_browser_attach_for_browser_work
       - resume_shell_work_after_browser_evidence
-    reason: Browser intent must be satisfied by browser evidence owned by the rote-browse skill, not search summaries, raw browser automation, or shell-level browser command recipes.
+    reason: Browser and public web/profile lookup intent must be satisfied by browser evidence owned by the rote-browse skill with headed active-browser attach required by default, not native web.search/open, search summaries, raw browser automation, shell-level browser command recipes, or anonymous/headless public-page shortcuts.
+
+  - id: profile_lookup_requires_headed_active_browser_attach
+    when:
+      user_says_any:
+        - public profile
+        - public profiles
+        - social profile
+        - social profiles
+        - social media profile
+        - committer profile
+        - committer profiles
+        - beyond GitHub
+        - beyond gh
+        - linkedin profile
+        - x profile
+        - twitter profile
+        - substack profile
+    prefer: browser_handoff
+    forbid:
+      - native_search_as_answer
+      - native_codex_web_search
+      - web_search_tool
+      - web_open_tool
+      - native_web_search_tool
+      - native_web_open_tool
+      - raw_playwright
+      - native_browser_tool_without_rote_browse
+      - direct_browser_tool_without_rote_browse
+      - curl_as_browser_substitute
+      - browser_cli_commands_in_durable_executor
+      - anonymous_headless_browser_default
+      - public_read_only_headless_default
+    after_success:
+      - handoff_browser_work_to_rote_browse_skill
+      - pass_browser_context_to_rote_browse
+      - require_headed_active_browser_attach_for_profile_lookup
+      - forbid_native_web_search_fallback
+      - resume_shell_work_after_browser_evidence
+    reason: Profile and social enrichment is session-sensitive; pass `browser_session_preference=headed_existing_browser_attach_required` to rote-browse and do not substitute native web search, anonymous headless browsing, or a public-read-only headless default.
 
   - id: compound_shell_then_browser_uses_ordered_plan
     when:
       user_says_all_groups:
         - [gh, git, repo, branch, remote, pending checkins, pending check-ins]
-        - [browse, email draft, draft email, reminder, inbox in browser, logged-in inbox]
+        - [browse, browse the web, web search, search the web, open website, public web lookup, public profile, social profile, contributor profile, committer profile, email draft, draft email, reminder, inbox in browser, logged-in inbox]
     prefer: shell_then_browser_handoff
     forbid:
       - direct_cli_without_rote_exec
@@ -644,6 +764,11 @@ rules:
       - direct_harness_cli_call_without_rote_exec
       - untracked_stdout_scrollback
       - native_search_as_answer
+      - native_codex_web_search
+      - web_search_tool
+      - web_open_tool
+      - native_web_search_tool
+      - native_web_open_tool
       - raw_playwright
       - native_browser_tool_without_rote_browse
       - direct_browser_tool_without_rote_browse
@@ -1463,7 +1588,15 @@ closures:
   handoff_browser_work_to_rote_browse_skill:
     description: Defer all browser navigation, interaction, capture, auth/session, and cleanup decisions to the `rote-browse` skill instead of prescribing them in durable-executor.
   pass_browser_context_to_rote_browse:
-    description: Pass the user's browser goal, URLs or sites, workspace/evidence context, and any shell-derived inputs to `rote-browse` so it can own browser execution.
+    description: Pass the user's browser goal, URLs or sites, workspace/evidence context, any shell-derived inputs, required headed active-browser attach session preference, and forbidden native substitutes to `rote-browse` so it can own browser execution.
+  require_headed_active_browser_attach_for_browser_work:
+    description: For browser, public-web, profile, social-profile, contributor-profile, and committer-profile work, pass `browser_session_preference=headed_existing_browser_attach_required` to `rote-browse`; do not choose anonymous or headless browsing because the target page is public or read-only.
+  prefer_active_browser_session_for_profile_lookup:
+    description: Deprecated compatibility alias for `require_headed_active_browser_attach_for_profile_lookup`; do not treat "preferred" as weaker than required.
+  require_headed_active_browser_attach_for_profile_lookup:
+    description: For public/social/contributor/committer profile enrichment, pass `browser_session_preference=headed_existing_browser_attach_required` to `rote-browse`; anonymous or headless browsing is not a default fallback.
+  forbid_native_web_search_fallback:
+    description: Do not call native Codex web search/open, raw browser tools, curl, search summaries, anonymous headless browsing, or public-read-only headless shortcuts to discover or extract browser/profile evidence; if rote-browse cannot observe the page or lacks a URL, stop for headed active-browser attach, user-supplied URL, or explicit approval to switch substrates.
   resume_shell_work_after_browser_evidence:
     description: Resume durable-executor only after `rote-browse` has produced materialized browser evidence such as response handles, files, or a concise result.
   identify_required_services_and_tools:
@@ -1663,6 +1796,11 @@ tests:
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - raw_playwright
         - native_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
@@ -1677,6 +1815,11 @@ tests:
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - raw_playwright
         - native_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
@@ -1691,6 +1834,10 @@ tests:
         - resume_shell_work_after_browser_evidence
       forbid:
         - raw_playwright
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - direct_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
 
@@ -1709,6 +1856,12 @@ tests:
       forbid:
         - direct_cli_without_rote_exec
         - direct_harness_cli_call_without_rote_exec
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - raw_playwright
         - direct_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
@@ -1728,8 +1881,65 @@ tests:
         - resume_shell_work_after_browser_evidence
       forbid:
         - raw_playwright
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - direct_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
+
+  - name: public profile web lookup forbids native web tools
+    input: browse the web to extract the committer social profile beyond GitHub
+    expect:
+      route: browser_handoff
+      matched_rules:
+        - browser_words_handoff_to_browse
+        - profile_lookup_requires_headed_active_browser_attach
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_profile_lookup
+        - forbid_native_web_search_fallback
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
+        - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_durable_executor
+        - anonymous_headless_browser_default
+        - public_read_only_headless_default
+
+  - name: social profile enrichment requires headed active browser attach
+    input: extract LinkedIn and X social profiles for the primary committer beyond GitHub
+    expect:
+      route: browser_handoff
+      matched_rules:
+        - profile_lookup_requires_headed_active_browser_attach
+      after_success:
+        - handoff_browser_work_to_rote_browse_skill
+        - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_profile_lookup
+        - forbid_native_web_search_fallback
+        - resume_shell_work_after_browser_evidence
+      forbid:
+        - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
+        - raw_playwright
+        - native_browser_tool_without_rote_browse
+        - direct_browser_tool_without_rote_browse
+        - browser_cli_commands_in_durable_executor
+        - anonymous_headless_browser_default
+        - public_read_only_headless_default
 
   - name: browsing profiles does not trigger file io
     input: check whether ~/tulving/rote is in sync with remote using gh, then browse contributor profiles
@@ -1747,6 +1957,11 @@ tests:
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
+        - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - rote_exec_outside_workspace
         - native_browser_tool_without_rote_browse
         - browser_cli_commands_in_durable_executor
@@ -1840,6 +2055,10 @@ tests:
       forbid:
         - native_search_as_answer
         - native_codex_web_search
+        - web_search_tool
+        - web_open_tool
+        - native_web_search_tool
+        - native_web_open_tool
         - direct_cli_without_rote_exec
         - using_parallel_cli_without_rote_exec
         - adapter_only_parallel_check

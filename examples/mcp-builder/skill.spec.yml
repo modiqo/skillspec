@@ -1,0 +1,1047 @@
+schema: skillspec/v0
+id: mcp.builder
+title: MCP Builder
+description: SkillSpec port of the MCP server development guide for planning, implementing, testing, and evaluating high-quality MCP servers in TypeScript or Python.
+
+activation:
+  summary: Guide construction of MCP servers that expose external services through well-designed, documented, testable tools.
+  keywords:
+    - mcp-builder
+    - MCP server
+    - Model Context Protocol
+    - build MCP
+    - FastMCP
+    - TypeScript MCP SDK
+    - MCP SDK
+    - MCP tools
+    - MCP evaluations
+    - MCP Inspector
+    - streamable HTTP
+    - stdio transport
+  priority: domain
+
+applies_when:
+  - user_intent:
+      - build an MCP server for an external API or service
+      - design MCP tools, resources, prompts, transport, schemas, pagination, or error handling
+      - implement an MCP server in TypeScript with the MCP SDK
+      - implement an MCP server in Python with FastMCP
+      - review or test MCP server quality
+      - create or run MCP server evaluations
+
+entry:
+  prompt: Research the target service and MCP protocol first, choose TypeScript unless the user or repository strongly indicates Python, then implement, review, test, and evaluate with read-only verifiable tasks.
+  decision_required: true
+  forbid_before_decision:
+    - implement_without_research_plan
+    - skip_protocol_docs
+    - run_evaluation_without_approval
+    - execute_destructive_evaluation_tasks
+
+routes:
+  - id: build_mcp_server
+    label: Build MCP server
+    rank: 1
+    description: End-to-end planning, implementation, review, testing, and evaluation for a new MCP server.
+    execution_plan:
+      mode: ordered
+      reason: The source guide requires deep research and planning before implementation, then review/testing before evaluations.
+      phases:
+        - id: research_and_plan
+          owner_skill: mcp-builder
+          description: Understand MCP design, protocol docs, the target API, transport, tool coverage, schemas, and project structure.
+          requires:
+            - load_core_mcp_documentation
+            - load_mcp_best_practices
+            - inspect_target_api
+            - choose_language_and_transport
+            - produce_implementation_plan
+          forbid:
+            - implement_without_research_plan
+            - skip_protocol_docs
+        - id: implement_core
+          owner_skill: mcp-builder
+          description: Implement shared API client, auth, error handling, response formatting, pagination, and tool registrations.
+          requires:
+            - implement_core_infrastructure
+            - implement_tool_schemas
+            - implement_tool_annotations
+          forbid:
+            - unvalidated_tool_inputs
+            - vague_tool_names
+            - unactionable_errors
+        - id: review_and_test
+          owner_skill: mcp-builder
+          description: Review code quality, build or compile, and test with MCP Inspector.
+          requires:
+            - run_code_quality_review
+            - run_language_build_check
+            - test_with_mcp_inspector
+        - id: create_evaluations
+          owner_skill: mcp-builder
+          description: Create independent, read-only, complex, realistic, verifiable, stable evaluation questions.
+          requires:
+            - load_evaluation_guide
+            - create_read_only_evaluation_suite
+  - id: implement_typescript_mcp_server
+    label: Implement TypeScript MCP server
+    rank: 2
+    description: Use the TypeScript MCP SDK, Zod schemas, structured content, and streamable HTTP or stdio transport.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: load_typescript_guidance
+          owner_skill: mcp-builder
+          requires:
+            - load_typescript_sdk_docs
+            - load_typescript_implementation_guide
+        - id: implement_typescript_tools
+          owner_skill: mcp-builder
+          requires:
+            - implement_core_infrastructure
+            - implement_tool_schemas
+            - implement_tool_annotations
+        - id: build_typescript
+          owner_skill: mcp-builder
+          requires:
+            - typescript_build_check
+            - test_with_mcp_inspector
+  - id: implement_python_mcp_server
+    label: Implement Python MCP server
+    rank: 3
+    description: Use FastMCP, Pydantic schemas, async I/O, typed outputs where useful, and stdio or streamable HTTP transport.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: load_python_guidance
+          owner_skill: mcp-builder
+          requires:
+            - load_python_sdk_docs
+            - load_python_implementation_guide
+        - id: implement_python_tools
+          owner_skill: mcp-builder
+          requires:
+            - implement_core_infrastructure
+            - implement_tool_schemas
+            - implement_tool_annotations
+        - id: build_python
+          owner_skill: mcp-builder
+          requires:
+            - python_compile_check
+            - test_with_mcp_inspector
+  - id: review_and_test_mcp_server
+    label: Review and test MCP server
+    rank: 4
+    description: Review an existing MCP server for naming, schemas, annotations, context management, errors, type coverage, build health, and Inspector behavior.
+  - id: create_mcp_evaluations
+    label: Create MCP evaluations
+    rank: 5
+    description: Create a 10-question read-only evaluation suite with verifiable stable answers.
+  - id: run_mcp_evaluations
+    label: Run MCP evaluations
+    rank: 6
+    description: Run the bundled evaluation script against a stdio, SSE, or streamable HTTP MCP server after approval and required credentials.
+
+rules:
+  - id: route_build_requests_to_end_to_end_build
+    when:
+      user_says_any:
+        - build an MCP server
+        - create an MCP server
+        - make an MCP server
+        - implement an MCP server
+        - integrate an API with MCP
+    prefer: build_mcp_server
+    after_success:
+      - produce_implementation_plan
+      - run_code_quality_review
+      - create_read_only_evaluation_suite
+    reason: The source guide frames MCP server creation as a four-phase workflow from research through evaluations.
+  - id: route_typescript_requests_to_typescript
+    when:
+      user_says_any:
+        - TypeScript
+        - Node
+        - Zod
+        - MCP SDK
+        - package.json
+        - tsconfig
+    prefer: implement_typescript_mcp_server
+    after_success:
+      - load_typescript_implementation_guide
+      - typescript_build_check
+    reason: The source guide recommends TypeScript when no stronger project constraint exists.
+  - id: route_python_requests_to_python
+    when:
+      user_says_any:
+        - Python
+        - FastMCP
+        - Pydantic
+        - py_compile
+        - python server
+    prefer: implement_python_mcp_server
+    after_success:
+      - load_python_implementation_guide
+      - python_compile_check
+    reason: The source guide includes a Python/FastMCP implementation path when requested or locally appropriate.
+  - id: route_eval_requests_to_evaluations
+    when:
+      user_says_any:
+        - evaluation
+        - evaluations
+        - eval
+        - evals
+        - qa_pair
+        - evaluation.xml
+    prefer: create_mcp_evaluations
+    after_success:
+      - load_evaluation_guide
+      - create_read_only_evaluation_suite
+    reason: Evaluation work has its own read-only, verifiable-question process.
+  - id: route_compound_build_and_evaluation_requests_to_build
+    when:
+      user_says_all_groups:
+        - [build, implement, make]
+        - [evaluation, evaluations, eval, evals, qa_pair, evaluation.xml]
+    prefer: build_mcp_server
+    after_success:
+      - produce_implementation_plan
+      - create_read_only_evaluation_suite
+    reason: The source guide treats evaluations as phase 4 of the end-to-end MCP server build workflow when the same request also asks to build the server.
+  - id: run_eval_requests_require_approval
+    when:
+      user_says_any:
+        - run evaluations
+        - run evals
+        - execute evaluation
+        - evaluation.py
+    prefer: run_mcp_evaluations
+    elicit:
+      - approve_evaluation_run
+    forbid:
+      - run_evaluation_without_approval
+      - run_evaluation_without_anthropic_api_key
+    after_success:
+      - run_evaluation_script
+    reason: Running the bundled evaluator may call a model API and the target MCP server, so approval and credentials must be checked.
+  - id: default_to_typescript_when_unspecified
+    when:
+      user_says_any:
+        - MCP server
+        - Model Context Protocol
+        - MCP tools
+    after_success:
+      - choose_typescript_default
+    reason: The source guide recommends TypeScript for SDK quality, compatibility, static typing, linting, and model generation reliability.
+  - id: research_precedes_implementation
+    when:
+      user_says_any:
+        - build
+        - implement
+        - create
+        - integrate
+    forbid:
+      - implement_without_research_plan
+      - skip_protocol_docs
+      - skip_target_api_review
+    after_success:
+      - load_core_mcp_documentation
+      - inspect_target_api
+      - produce_implementation_plan
+    reason: The source guide requires deep research into MCP and the target API before implementation.
+  - id: comprehensive_coverage_is_default
+    when:
+      user_says_any:
+        - tools
+        - endpoints
+        - API coverage
+        - workflow tools
+    forbid:
+      - workflow_only_without_justification
+      - undocumented_endpoint_selection
+    after_success:
+      - comprehensive_api_coverage
+    reason: The source guide says to prioritize comprehensive API coverage when uncertain.
+  - id: tool_design_quality_required
+    when:
+      user_says_any:
+        - tool
+        - tools
+        - schema
+        - output
+        - annotations
+    forbid:
+      - vague_tool_names
+      - unvalidated_tool_inputs
+      - missing_output_schema_when_possible
+      - missing_tool_annotations
+      - unactionable_errors
+      - unbounded_context_results
+    after_success:
+      - implement_tool_schemas
+      - implement_tool_annotations
+      - implement_pagination
+      - implement_actionable_errors
+    reason: The source guide emphasizes discoverability, concise context, schemas, structured content, pagination, and actionable errors.
+  - id: transport_selection_follows_context
+    when:
+      user_says_any:
+        - transport
+        - streamable HTTP
+        - stdio
+        - remote server
+        - local server
+    elicit:
+      - choose_transport
+    after_success:
+      - select_streamable_http_for_remote
+      - select_stdio_for_local
+    reason: The source guide recommends streamable HTTP for remote servers and stdio for local servers.
+  - id: quality_review_and_build_are_required
+    when:
+      user_says_any:
+        - review
+        - test
+        - quality
+        - Inspector
+    prefer: review_and_test_mcp_server
+    forbid:
+      - skip_build_check
+      - skip_mcp_inspector_test
+      - ignore_type_coverage
+    after_success:
+      - run_code_quality_review
+      - run_language_build_check
+      - test_with_mcp_inspector
+    reason: The source guide requires code quality review, build checks, and MCP Inspector testing.
+  - id: evaluation_questions_must_be_read_only_and_verifiable
+    when:
+      user_says_any:
+        - evaluation questions
+        - evaluation suite
+        - qa_pair
+        - eval questions
+    forbid:
+      - destructive_evaluation_question
+      - dependent_evaluation_questions
+      - unverifiable_answers
+      - unstable_answers
+      - trivial_single_call_questions
+    after_success:
+      - create_ten_evaluation_questions
+      - verify_evaluation_answers
+    reason: The source guide requires independent, read-only, complex, realistic, verifiable, stable evaluation questions.
+  - id: referenced_guidance_loads_on_demand
+    when:
+      user_says_any:
+        - reference
+        - guide
+        - docs
+        - examples
+        - scripts
+    forbid:
+      - flatten_references_into_prompt_blob
+      - orphan_reference_files
+    after_success:
+      - load_relevant_reference_imports
+    reason: The port preserves reference files as package-local imports/resources and loads them only when the active route needs them.
+
+elicitations:
+  choose_language:
+    question: Which implementation language should this MCP server use?
+    required_when:
+      - route: build_mcp_server
+    choices:
+      - id: typescript_default
+        label: TypeScript
+        description: Use the recommended TypeScript MCP SDK path unless the repository strongly indicates Python.
+      - id: python_fastmcp
+        label: Python FastMCP
+        description: Use Python/FastMCP when the service integration or repository is Python-first.
+      - id: infer_from_repo
+        label: Infer from repo
+        description: Inspect the existing project files and follow the dominant stack.
+    default: typescript_default
+  choose_transport:
+    question: Which MCP transport should the server use?
+    required_when:
+      - route: build_mcp_server
+      - route: implement_typescript_mcp_server
+      - route: implement_python_mcp_server
+    choices:
+      - id: streamable_http_remote
+        label: Streamable HTTP
+        description: Use stateless streamable HTTP for remote hosted servers.
+      - id: stdio_local
+        label: stdio
+        description: Use stdio for local desktop or CLI integrations.
+      - id: both
+        label: Both
+        description: Implement both only when the target deployment needs both local and remote access.
+    default: streamable_http_remote
+  approve_external_research:
+    question: May I fetch public MCP, SDK, and target API documentation for planning?
+    required_when:
+      - route: build_mcp_server
+    choices:
+      - id: approve_public_docs
+        label: Public docs
+        description: Fetch public documentation only; do not use private credentials.
+      - id: local_docs_only
+        label: Local docs only
+        description: Use only files already present in the workspace.
+    default: approve_public_docs
+  approve_evaluation_run:
+    question: May I run the evaluation script against the target MCP server?
+    required_when:
+      - route: run_mcp_evaluations
+    choices:
+      - id: approve_read_only_eval
+        label: Read-only eval
+        description: Run only read-only evaluation questions after credentials and target connection are explicit.
+      - id: create_only
+        label: Create only
+        description: Write or review evaluation XML without executing it.
+    default: create_only
+
+dependencies:
+  curl_cli:
+    kind: cli
+    description: Optional helper for fetching public MCP and SDK markdown documentation when the harness has no WebFetch equivalent.
+    command: curl
+    check:
+      command: curl
+    permission:
+      required: true
+      reason: Fetches public network documentation.
+      safety: network_read
+  rg_cli:
+    kind: cli
+    description: Fast local inventory for existing projects and generated files.
+    command: rg
+    check:
+      command: rg
+    permission:
+      required: false
+      safety: local_read
+  npm_cli:
+    kind: cli
+    description: Required for TypeScript project build checks.
+    command: npm
+    check:
+      command: npm
+    permission:
+      required: false
+      safety: local_read
+  npx_cli:
+    kind: cli
+    description: Required for MCP Inspector invocation when it is not installed locally.
+    command: npx
+    check:
+      command: npx
+    permission:
+      required: true
+      reason: May download and run MCP Inspector if not cached.
+      safety: network_read
+  python_cli:
+    kind: cli
+    description: Required for Python syntax checks and the bundled evaluation script.
+    command: python3
+    check:
+      command: python3
+    permission:
+      required: false
+      safety: local_read
+imports:
+  mcp_best_practices:
+    path: source/reference/mcp_best_practices.md
+    role: reference
+    description: Server/tool naming, response formats, pagination, transport, security, annotations, error handling, testing, and documentation guidance.
+    load: on_demand
+    requires:
+      imports: []
+    used_by:
+      - kind: route
+        id: build_mcp_server
+      - kind: rule
+        id: tool_design_quality_required
+      - kind: recipe
+        id: plan_mcp_server
+    load_when:
+      - Load before choosing tool coverage, response formats, pagination, transport, security, or annotations.
+  typescript_guide:
+    path: source/reference/node_mcp_server.md
+    role: reference
+    description: TypeScript MCP SDK project structure, Zod schemas, tool registration, structured responses, transport, build, and quality checklist.
+    load: on_demand
+    requires:
+      imports:
+        - mcp_best_practices
+    used_by:
+      - kind: route
+        id: implement_typescript_mcp_server
+      - kind: recipe
+        id: implement_typescript_server
+    load_when:
+      - Load when implementing or reviewing a TypeScript MCP server.
+  python_guide:
+    path: source/reference/python_mcp_server.md
+    role: reference
+    description: Python/FastMCP project patterns, Pydantic schemas, async utilities, transport, structured output, and quality checklist.
+    load: on_demand
+    requires:
+      imports:
+        - mcp_best_practices
+    used_by:
+      - kind: route
+        id: implement_python_mcp_server
+      - kind: recipe
+        id: implement_python_server
+    load_when:
+      - Load when implementing or reviewing a Python/FastMCP server.
+  evaluation_guide:
+    path: source/reference/evaluation.md
+    role: procedure
+    description: Evaluation question design, XML format, verification workflow, evaluator setup, connection modes, output, and troubleshooting.
+    load: on_demand
+    requires:
+      imports: []
+    used_by:
+      - kind: route
+        id: create_mcp_evaluations
+      - kind: route
+        id: run_mcp_evaluations
+      - kind: recipe
+        id: create_evaluation_suite
+      - kind: recipe
+        id: run_evaluation_suite
+    load_when:
+      - Load before creating or running MCP server evaluations.
+
+resources:
+  source_skill_md:
+    path: source/SKILL.md
+    role: source_material
+    description: Preserved upstream MCP Builder prose skill.
+    used_by:
+      - kind: artifact
+        id: reviewed_spec
+      - kind: artifact
+        id: coverage_matrix
+  license_text:
+    path: source/LICENSE.txt
+    role: source_material
+    description: Upstream license text referenced by the original skill frontmatter.
+    used_by:
+      - kind: artifact
+        id: reviewed_spec
+  evaluation_script:
+    path: source/scripts/evaluation.py
+    role: script
+    description: Bundled evaluation runner for stdio, SSE, and streamable HTTP MCP servers.
+    used_by:
+      - kind: command
+        id: run_evaluation_script
+  connection_helpers:
+    path: source/scripts/connections.py
+    role: script
+    description: Evaluation helper classes for stdio, SSE, and HTTP MCP connections.
+    used_by:
+      - kind: command
+        id: run_evaluation_script
+  evaluation_requirements:
+    path: source/scripts/requirements.txt
+    role: reference
+    description: Python packages needed by the bundled evaluator.
+    used_by:
+      - kind: command
+        id: install_evaluation_requirements
+  example_evaluation_xml:
+    path: source/scripts/example_evaluation.xml
+    role: example
+    description: Example XML evaluation file from the upstream skill.
+    used_by:
+      - kind: recipe
+        id: create_evaluation_suite
+
+artifacts:
+  implementation_plan:
+    kind: report
+    path: .skillspec/artifacts/implementation-plan.md
+    description: Target API, transport, tool coverage, schemas, errors, pagination, auth, and test plan.
+    produced_by:
+      - kind: recipe
+        id: plan_mcp_server
+  reviewed_spec:
+    kind: file
+    path: skill.spec.yml
+    description: Reviewed SkillSpec contract generated from the upstream MCP Builder skill.
+    produced_by:
+      - kind: recipe
+        id: port_review_loop
+  coverage_matrix:
+    kind: report
+    path: .skillspec/reports/coverage-matrix.yml
+    description: Source prose spans mapped to SkillSpec constructs with confidence and review notes.
+    produced_by:
+      - kind: recipe
+        id: port_review_loop
+  server_source:
+    kind: directory
+    path: generated-server/
+    description: MCP server source files created in the user project, when this skill is used to implement a server.
+    produced_by:
+      - kind: recipe
+        id: implement_typescript_server
+      - kind: recipe
+        id: implement_python_server
+  evaluation_xml:
+    kind: file
+    path: evaluations/evaluation.xml
+    description: XML file containing 10 read-only, independent, complex, realistic, verifiable, stable evaluation questions.
+    produced_by:
+      - kind: recipe
+        id: create_evaluation_suite
+  evaluation_report:
+    kind: report
+    path: evaluation_report.md
+    description: Evaluator output report when the bundled evaluation script is run.
+    produced_by:
+      - kind: command
+        id: run_evaluation_script
+  value_report:
+    kind: report
+    path: .skillspec/reports/value-report.md
+    description: Port value report with coverage, QA, trace, alignment, and known gaps.
+    produced_by:
+      - kind: recipe
+        id: port_review_loop
+
+commands:
+  load_mcp_sitemap:
+    description: Fetch the public MCP documentation sitemap when documentation needs to be discovered.
+    template: curl -fsSL https://modelcontextprotocol.io/sitemap.xml
+    safety: network_read
+    requires:
+      dependencies:
+        - curl_cli
+  load_typescript_sdk_docs:
+    description: Fetch the public TypeScript SDK README when local docs are insufficient.
+    template: curl -fsSL https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/README.md
+    safety: network_read
+    requires:
+      dependencies:
+        - curl_cli
+  load_python_sdk_docs:
+    description: Fetch the public Python SDK README when local docs are insufficient.
+    template: curl -fsSL https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/README.md
+    safety: network_read
+    requires:
+      dependencies:
+        - curl_cli
+  inspect_project_files:
+    description: Inventory a project before choosing language, transport, and build commands.
+    template: rg --files <project-root>
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  typescript_build_check:
+    description: Build a TypeScript MCP server.
+    template: npm run build
+    safety: local_write
+    requires:
+      dependencies:
+        - npm_cli
+  test_with_mcp_inspector:
+    description: Test a server with MCP Inspector.
+    template: npx @modelcontextprotocol/inspector
+    safety: network_read
+    requires:
+      dependencies:
+        - npx_cli
+  python_compile_check:
+    description: Verify Python server syntax before runtime testing.
+    template: python3 -m py_compile <server-file>
+    safety: read_only
+    requires:
+      dependencies:
+        - python_cli
+  install_evaluation_requirements:
+    description: Install dependencies for the bundled evaluation script only after explicit approval.
+    template: python3 -m pip install -r source/scripts/requirements.txt
+    safety: network_write
+    requires:
+      dependencies:
+        - python_cli
+      resources:
+        - evaluation_requirements
+  run_evaluation_script:
+    description: Run the bundled evaluation script against an approved read-only MCP server target.
+    template: python3 source/scripts/evaluation.py <connection-args> <evaluation-file>
+    safety: network_read
+    requires:
+      dependencies:
+        - python_cli
+      env:
+        - ANTHROPIC_API_KEY
+      resources:
+        - evaluation_script
+        - connection_helpers
+
+recipes:
+  port_review_loop:
+    description: Preserve the remote source, run a mechanical import, then semantically promote the guide into a reviewed SkillSpec with QA.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - reviewed_spec
+        - coverage_matrix
+    steps:
+      - load_resource: source_skill_md
+      - note: Map the original four-phase guide, reference files, scripts, and evaluation process into typed SkillSpec constructs.
+      - produce_artifact: reviewed_spec
+      - produce_artifact: coverage_matrix
+  plan_mcp_server:
+    description: Research and plan the server before implementation.
+    ordered: true
+    requires:
+      imports:
+        - mcp_best_practices
+      artifacts:
+        - implementation_plan
+    steps:
+      - ask: approve_external_research
+      - run_command: load_mcp_sitemap
+      - note: Load the mcp_best_practices import before choosing tool coverage, response formats, pagination, transport, security, or annotations.
+      - ask: choose_language
+      - ask: choose_transport
+      - note: Inspect target API docs, auth, data models, endpoint list, and common user workflows.
+      - note: Prefer comprehensive endpoint coverage; add specialized workflow tools only when they materially improve common tasks.
+      - produce_artifact: implementation_plan
+  implement_typescript_server:
+    description: Implement the server with the TypeScript MCP SDK.
+    ordered: true
+    requires:
+      imports:
+        - typescript_guide
+      artifacts:
+        - server_source
+    steps:
+      - note: Load the typescript_guide import and apply the plan_mcp_server recipe before implementation.
+      - note: Build shared API client, auth, error helpers, response formatting, and pagination utilities.
+      - note: Register tools with Zod input schemas, outputSchema where possible, structuredContent, and annotations.
+      - run_command: typescript_build_check
+      - run_command: test_with_mcp_inspector
+  implement_python_server:
+    description: Implement the server with Python/FastMCP.
+    ordered: true
+    requires:
+      imports:
+        - python_guide
+      artifacts:
+        - server_source
+    steps:
+      - note: Load the python_guide import and apply the plan_mcp_server recipe before implementation.
+      - note: Build async API utilities, auth, error helpers, response formatting, and pagination utilities.
+      - note: Register tools with Pydantic input schemas, typed outputs where useful, and annotations.
+      - run_command: python_compile_check
+      - run_command: test_with_mcp_inspector
+  create_evaluation_suite:
+    description: Create 10 high-quality read-only evaluation questions and verified answers.
+    ordered: true
+    requires:
+      imports:
+        - evaluation_guide
+      artifacts:
+        - evaluation_xml
+    steps:
+      - note: Load the evaluation_guide import before writing evaluation XML.
+      - note: Inspect tool documentation and available capabilities.
+      - note: Use only read-only operations while exploring content to create questions.
+      - note: Create 10 independent, complex, realistic questions with stable, single, verifiable answers.
+      - note: Solve each question manually or with read-only tool calls to verify the answer.
+      - produce_artifact: evaluation_xml
+  run_evaluation_suite:
+    description: Run the bundled evaluator after approval, credentials, and target connection arguments are explicit.
+    ordered: true
+    requires:
+      imports:
+        - evaluation_guide
+      resources:
+        - evaluation_script
+        - connection_helpers
+      dependencies:
+        - python_cli
+      artifacts:
+        - evaluation_xml
+        - evaluation_report
+    steps:
+      - ask: approve_evaluation_run
+      - note: Load the evaluation_guide import before running the evaluator.
+      - run_command: run_evaluation_script
+      - produce_artifact: evaluation_report
+
+states:
+  start:
+    do:
+      - plan_mcp_server
+    next: implement
+  implement:
+    do:
+      - implement_typescript_server
+      - implement_python_server
+    next: review
+  review:
+    do:
+      - run_code_quality_review
+      - run_language_build_check
+      - test_with_mcp_inspector
+    next: evaluate
+  evaluate:
+    do:
+      - create_evaluation_suite
+    next: done
+  done:
+    do:
+      - produce_value_report
+
+closures:
+  load_core_mcp_documentation:
+    description: Review MCP architecture, transport, tools, resources, prompts, and relevant specification pages before implementation.
+  load_mcp_best_practices:
+    description: Load the package-local best-practices import before tool design and transport decisions.
+  inspect_target_api:
+    description: Inspect target service API docs, authentication, data models, and endpoint list.
+  choose_language_and_transport:
+    description: Choose TypeScript/Python and streamable HTTP/stdio with defaults tied to the source guide.
+  choose_typescript_default:
+    description: Use TypeScript by default unless user preference or project evidence favors Python.
+  select_streamable_http_for_remote:
+    description: Prefer stateless streamable HTTP for remote servers.
+  select_stdio_for_local:
+    description: Prefer stdio for local integrations.
+  produce_implementation_plan:
+    description: Record target API coverage, workflow tools, transport, auth, schemas, errors, pagination, and test strategy before coding.
+  comprehensive_api_coverage:
+    description: List endpoints to implement and prefer broad endpoint coverage when uncertain.
+  implement_core_infrastructure:
+    description: Create shared API client, authentication, error handling helpers, response formatting, and pagination support.
+  implement_tool_schemas:
+    description: Add Zod or Pydantic input schemas with constraints, descriptions, examples, and output schemas where possible.
+  implement_tool_annotations:
+    description: Set readOnlyHint, destructiveHint, idempotentHint, and openWorldHint for tools.
+  implement_pagination:
+    description: Add pagination or filtering so tools return focused, context-sized results.
+  implement_actionable_errors:
+    description: Return errors that include concrete causes, suggestions, and next steps.
+  load_typescript_implementation_guide:
+    description: Load TypeScript guide and SDK docs when implementing TypeScript.
+  load_python_implementation_guide:
+    description: Load Python guide and SDK docs when implementing Python.
+  run_code_quality_review:
+    description: Review duplication, error handling consistency, type coverage, and tool descriptions.
+  run_language_build_check:
+    description: Run npm build for TypeScript or py_compile for Python as appropriate.
+  load_evaluation_guide:
+    description: Load the package-local evaluation guide before creating or running evaluations.
+  create_read_only_evaluation_suite:
+    description: Create evaluation XML with read-only, independent, complex, realistic, verifiable, stable questions.
+  create_ten_evaluation_questions:
+    description: Produce exactly 10 evaluation questions unless the user asks for a different count.
+  verify_evaluation_answers:
+    description: Solve every evaluation question and record the single expected answer.
+  run_evaluation_script:
+    description: Execute the bundled evaluator only after approval, credentials, and target connection details are explicit.
+  load_relevant_reference_imports:
+    description: Load only the reference imports needed by the active route.
+  produce_value_report:
+    description: Report the ported triggers, routes, rules, dependencies, imports/resources, tests, QA status, and known unproven execution gaps.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+proof:
+  metrics:
+    - source SKILL.md staged and preserved with references and scripts
+    - grammar sensemake and checklist run before semantic promotion
+    - mechanical draft generated and inspected as scaffolding only
+    - reviewed spec validates, imports check, deps check, tests run
+    - realistic demo decision captured and trace aligned
+
+tests:
+  - name: build request routes to end to end build
+    input: Build an MCP server for the GitHub API
+    expect:
+      route: build_mcp_server
+      matched_rules:
+        - route_build_requests_to_end_to_end_build
+        - research_precedes_implementation
+      after_success:
+        - produce_implementation_plan
+      forbid:
+        - implement_without_research_plan
+        - skip_protocol_docs
+  - name: typescript request routes to typescript implementation
+    input: Implement a TypeScript MCP server using the MCP SDK and Zod
+    expect:
+      route: implement_typescript_mcp_server
+      matched_rules:
+        - route_typescript_requests_to_typescript
+      after_success:
+        - load_typescript_implementation_guide
+        - typescript_build_check
+  - name: python request routes to fastmcp implementation
+    input: Create a Python FastMCP server with Pydantic schemas
+    expect:
+      route: implement_python_mcp_server
+      matched_rules:
+        - route_python_requests_to_python
+      after_success:
+        - load_python_implementation_guide
+        - python_compile_check
+  - name: evaluation creation uses read only verifiable rules
+    input: Create MCP evaluation questions for this server
+    expect:
+      route: create_mcp_evaluations
+      matched_rules:
+        - route_eval_requests_to_evaluations
+        - evaluation_questions_must_be_read_only_and_verifiable
+      forbid:
+        - destructive_evaluation_question
+        - unverifiable_answers
+        - unstable_answers
+  - name: compound build and evaluation request stays end to end
+    input: Build a TypeScript MCP server for a ticketing API and create read-only evaluations
+    expect:
+      route: build_mcp_server
+      matched_rules:
+        - route_typescript_requests_to_typescript
+        - route_eval_requests_to_evaluations
+        - route_compound_build_and_evaluation_requests_to_build
+      after_success:
+        - produce_implementation_plan
+        - create_read_only_evaluation_suite
+  - name: running evaluations requires approval and api key
+    input: Run evaluations with source/scripts/evaluation.py
+    expect:
+      route: run_mcp_evaluations
+      matched_rules:
+        - run_eval_requests_require_approval
+      elicit:
+        - approve_evaluation_run
+      forbid:
+        - run_evaluation_without_approval
+        - run_evaluation_without_anthropic_api_key
+  - name: tool design requires schemas annotations pagination errors
+    input: Review the MCP tools, schemas, annotations, output and error handling
+    expect:
+      route: review_and_test_mcp_server
+      matched_rules:
+        - tool_design_quality_required
+        - quality_review_and_build_are_required
+      forbid:
+        - vague_tool_names
+        - unvalidated_tool_inputs
+        - missing_tool_annotations
+        - unactionable_errors
+
+review_required:
+  - External MCP and SDK documentation URLs are preserved as command templates; use WebFetch or curl according to the active harness and user approval.
+  - The bundled evaluator requires ANTHROPIC_API_KEY and target MCP server connection details before execution.
+  - MCP Inspector may download packages through npx; ask before network/package execution when not already installed.
+  - Generated server source is not included in this port; this SkillSpec governs future MCP server build tasks.
+
+metadata:
+  source:
+    imported_from: https://github.com/anthropics/skills/blob/main/skills/mcp-builder/SKILL.md
+    staged_source: source/SKILL.md
+    source_lines: 236
+    license: source/LICENSE.txt
+  mechanical_import_observation:
+    draft_path: draft/skill.spec.yml
+    review_notes: 5
+    routes: 0
+    rules: 0
+    imports: 4
+    note: The mechanical draft preserved reference imports but inferred noisy dependencies from examples, so semantic promotion replaced the dependency surface.
+  extracted_value_targets:
+    activation_triggers: 12
+    routes: 6
+    rules: 12
+    elicitations: 4
+    dependency_checks: 5
+    imports: 4
+    resources: 6
+    commands: 9
+    recipes: 6
+    tests: 7
+  contract_quality:
+    activation: strong
+    dependencies: good_with_guarded_optional_network
+    route_coverage: strong
+    execution_evidence: unproven_until_qa_runs
+    tests: reviewed_behavior_tests
+    hallucination_risk: low_medium
+  coverage_matrix:
+    - prose_span: Frontmatter and overview
+      obligation: Trigger when building MCP servers for external APIs or services in TypeScript or Python.
+      skillspec_construct: activation, applies_when, routes.build_mcp_server
+      confidence: high
+      status: reviewed
+      review_note: Directly mapped from name, description, and overview.
+    - prose_span: Phase 1 research and planning
+      obligation: Understand MCP design, protocol docs, SDK docs, target API, auth, data models, endpoint coverage, and transport before implementation.
+      skillspec_construct: route.build_mcp_server, recipe.plan_mcp_server, rules.research_precedes_implementation, imports.mcp_best_practices
+      confidence: high
+      status: reviewed
+      review_note: Public doc fetch is guarded by approve_external_research and curl_cli permission.
+    - prose_span: TypeScript recommendation and guide
+      obligation: Prefer TypeScript by default and load TypeScript SDK/guide for TypeScript implementations.
+      skillspec_construct: route.implement_typescript_mcp_server, rule.route_typescript_requests_to_typescript, import.typescript_guide
+      confidence: high
+      status: reviewed
+      review_note: The default remains advisory and repo evidence may override through choose_language.
+    - prose_span: Python guide
+      obligation: Support Python/FastMCP implementations with Pydantic and async patterns.
+      skillspec_construct: route.implement_python_mcp_server, rule.route_python_requests_to_python, import.python_guide
+      confidence: high
+      status: reviewed
+      review_note: The source offers Python as a supported path rather than the default.
+    - prose_span: Phase 2 tool implementation
+      obligation: Implement API client, auth, errors, response formatting, pagination, schemas, structured output, and annotations.
+      skillspec_construct: rule.tool_design_quality_required, closures.implement_core_infrastructure, closures.implement_tool_schemas, closures.implement_tool_annotations
+      confidence: high
+      status: reviewed
+      review_note: Hard quality requirements are represented as forbids and after-success closures.
+    - prose_span: Phase 3 review and test
+      obligation: Review DRY, error consistency, type coverage, tool descriptions, build checks, and MCP Inspector behavior.
+      skillspec_construct: route.review_and_test_mcp_server, rule.quality_review_and_build_are_required, commands.typescript_build_check, commands.python_compile_check, commands.test_with_mcp_inspector
+      confidence: high
+      status: reviewed
+      review_note: Network-sensitive npx Inspector use is permission-marked.
+    - prose_span: Phase 4 evaluations and reference/evaluation.md
+      obligation: Create 10 independent, read-only, complex, realistic, verifiable, stable evaluation questions and verify answers.
+      skillspec_construct: route.create_mcp_evaluations, rule.evaluation_questions_must_be_read_only_and_verifiable, recipe.create_evaluation_suite, import.evaluation_guide
+      confidence: high
+      status: reviewed
+      review_note: Running the evaluator is separated from creating XML and requires approval/API key.
+    - prose_span: Reference files and scripts
+      obligation: Keep guidance, license, evaluator, connection helpers, requirements, and examples package-local and connected.
+      skillspec_construct: imports, resources, rule.referenced_guidance_loads_on_demand
+      confidence: high
+      status: reviewed
+      review_note: Reference files remain on-demand imports instead of being flattened into the prompt.

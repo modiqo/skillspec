@@ -1,0 +1,942 @@
+schema: skillspec/v0
+id: anthropic.pdf
+title: PDF
+description: SkillSpec port of Anthropic's PDF skill for reading, extracting, merging, splitting, rotating, watermarking, creating, filling, encrypting, decrypting, image extraction, and OCR workflows.
+
+activation:
+  summary: Use for any task involving PDF files, including reading, extracting text or tables, creating, transforming, filling forms, OCR, image extraction, and security operations.
+  keywords:
+    - pdf
+    - .pdf
+    - PDF file
+    - extract PDF text
+    - extract PDF tables
+    - merge PDFs
+    - split PDF
+    - rotate PDF
+    - watermark PDF
+    - create PDF
+    - fill PDF form
+    - OCR PDF
+    - scanned PDF
+    - extract PDF images
+    - encrypt PDF
+    - decrypt PDF
+  priority: domain
+
+applies_when:
+  - user_intent:
+      - read or extract content from a PDF
+      - extract tables from a PDF
+      - merge, split, rotate, crop, repair, optimize, watermark, encrypt, or decrypt PDFs
+      - create a new PDF
+      - fill a PDF form
+      - OCR a scanned PDF into searchable text
+      - extract embedded images from a PDF
+      - convert PDF pages to images
+
+entry:
+  prompt: Choose the narrowest PDF route, load the required source guidance, prove tool/package readiness, and never execute form-filling snippets before the ordered form procedure has selected the correct branch.
+  decision_required: true
+  forbid_before_decision:
+    - execute_pdf_snippet_without_route
+    - fill_form_without_checking_fillable_fields
+    - overwrite_input_pdf
+    - use_unicode_subscripts_superscripts_in_reportlab
+
+routes:
+  - id: inspect_or_extract_pdf
+    label: Inspect or extract PDF content
+    rank: 1
+    description: Read metadata, count pages, extract text, preserve layout, or extract tables from a PDF.
+  - id: transform_pdf_pages
+    label: Transform PDF pages
+    rank: 2
+    description: Merge, split, rotate, crop, optimize, repair, watermark, encrypt, or decrypt PDFs.
+  - id: create_pdf
+    label: Create PDF
+    rank: 3
+    description: Create a new PDF with ReportLab or advanced reference techniques.
+  - id: fill_pdf_form
+    label: Fill PDF form
+    rank: 4
+    description: Fill PDFs by first checking whether fields are fillable, then using either field values or validated overlay annotations.
+    execution_plan:
+      mode: ordered
+      reason: The upstream forms guide explicitly requires a probe-then-branch workflow and warns not to skip ahead to writing code.
+      phases:
+        - id: detect_fillability
+          owner_skill: pdf
+          description: Check whether the PDF has fillable form fields before choosing a fill strategy.
+          requires:
+            - check_fillable_fields
+          forbid:
+            - fill_form_without_checking_fillable_fields
+        - id: fillable_fields_branch
+          owner_skill: pdf
+          description: Extract field metadata, inspect page images, create field values, and run the fillable-field script.
+          requires:
+            - extract_form_field_info
+            - convert_pdf_to_images
+            - fill_fillable_fields
+        - id: non_fillable_branch
+          owner_skill: pdf
+          description: Extract structure first, fall back to visual coordinate estimation, validate boxes, fill annotations, and verify output images.
+          requires:
+            - extract_form_structure
+            - validate_bounding_boxes
+            - fill_pdf_form_with_annotations
+            - verify_filled_pdf_images
+  - id: ocr_scanned_pdf
+    label: OCR scanned PDF
+    rank: 5
+    description: Convert scanned PDF pages to images and OCR them to searchable text.
+  - id: extract_pdf_images
+    label: Extract PDF images
+    rank: 6
+    description: Extract embedded images or render pages to images.
+  - id: advanced_pdf_workflow
+    label: Advanced PDF workflow
+    rank: 7
+    description: Use advanced pypdfium2, pdf-lib, pdfjs-dist, qpdf, poppler, performance, or troubleshooting guidance.
+
+rules:
+  - id: pdf_mentions_activate_inspection
+    when:
+      user_says_any:
+        - read this PDF
+        - inspect PDF
+        - PDF metadata
+    prefer: inspect_or_extract_pdf
+    after_success:
+      - inspect_pdf_before_transform
+    reason: The source frontmatter says any mention of a PDF file should use this skill.
+  - id: text_and_table_requests_extract_content
+    when:
+      user_says_any:
+        - extract text
+        - read text
+        - preserve layout
+        - extract table
+        - extract tables
+        - pdfplumber
+    prefer: inspect_or_extract_pdf
+    after_success:
+      - use_pdfplumber_for_tables
+      - use_pdftotext_for_plain_text_when_available
+    reason: The source quick reference maps text/table extraction to pdfplumber and pdftotext depending on layout needs.
+  - id: page_transform_requests_transform_pages
+    when:
+      user_says_any:
+        - merge PDFs
+        - merge these PDFs
+        - combine PDFs
+        - combine these PDFs
+        - split PDF
+        - rotate PDF
+        - crop PDF
+        - watermark PDF
+        - optimize PDF
+        - repair PDF
+    prefer: transform_pdf_pages
+    forbid:
+      - overwrite_input_pdf
+    after_success:
+      - produce_output_pdf_separate_from_input
+    reason: The source examples always write transformed output files rather than mutating the input PDF in place.
+  - id: create_pdf_requests_use_reportlab
+    when:
+      user_says_any:
+        - create PDF
+        - generate PDF
+        - make a PDF
+        - reportlab
+    prefer: create_pdf
+    forbid:
+      - use_unicode_subscripts_superscripts_in_reportlab
+    after_success:
+      - use_reportlab_markup_for_subscripts_superscripts
+    reason: The source guide calls out ReportLab creation and explicitly forbids Unicode subscript/superscript glyphs.
+  - id: form_requests_use_ordered_form_recipe
+    when:
+      user_says_any:
+        - fill PDF form
+        - fill this PDF form
+        - fill this form
+        - complete this PDF
+        - populate form fields
+        - form fields
+    prefer: fill_pdf_form
+    forbid:
+      - fill_form_without_checking_fillable_fields
+      - skip_form_bounding_box_validation
+      - skip_filled_form_visual_verification
+    after_success:
+      - fill_pdf_form_recipe
+    reason: forms.md says to check fillability first and follow the fillable or non-fillable branch in order.
+  - id: scanned_pdf_requests_use_ocr
+    when:
+      user_says_any:
+        - scanned PDF
+        - OCR
+        - make searchable
+        - searchable PDF
+        - pytesseract
+    prefer: ocr_scanned_pdf
+    after_success:
+      - convert_pages_before_ocr
+    reason: The source guide maps scanned PDF extraction to pdf2image followed by pytesseract.
+  - id: image_extraction_requests_use_images_route
+    when:
+      user_says_any:
+        - extract images
+        - embedded images
+        - pdfimages
+        - render pages
+        - convert PDF to images
+    prefer: extract_pdf_images
+    after_success:
+      - prefer_pdfimages_for_embedded_images
+      - use_rendering_for_page_images
+    reason: The source distinguishes extracting embedded images from rendering pages.
+  - id: security_requests_use_transform_route
+    when:
+      user_says_any:
+        - encrypt PDF
+        - decrypt PDF
+        - password protect
+        - remove password
+        - password-protected PDF
+    prefer: transform_pdf_pages
+    after_success:
+      - handle_encrypted_pdfs_explicitly
+    reason: The source includes password protection and decryption examples under transformations and troubleshooting.
+  - id: advanced_requests_load_reference
+    when:
+      user_says_any:
+        - advanced
+        - pypdfium2
+        - pdf-lib
+        - pdfjs
+        - qpdf advanced
+        - troubleshooting
+        - corrupted PDF
+        - performance
+    prefer: advanced_pdf_workflow
+    after_success:
+      - load_advanced_reference
+    reason: The source sends advanced features, JavaScript libraries, and troubleshooting to reference.md.
+  - id: command_snippets_require_readiness
+    when:
+      user_says_any:
+        - run
+        - command
+        - script
+        - pdftotext
+        - qpdf
+        - magick
+        - python scripts
+    forbid:
+      - execute_pdf_snippet_without_dependency_check
+      - execute_imported_snippets_during_staging
+    after_success:
+      - check_command_dependencies_before_run
+    reason: Imported snippets are examples or templates and must not be run unless the active route requires them and dependencies are proven.
+
+dependencies:
+  python3:
+    kind: cli
+    description: Python runtime used by preserved PDF snippets and form helper scripts.
+    command: python3
+    check:
+      command: python3
+    permission:
+      required: false
+      safety: local_read
+  pypdf:
+    kind: package
+    description: Python package for reading, writing, merging, rotating, encrypting, and filling PDFs.
+  pdfplumber:
+    kind: package
+    description: Python package for layout-aware text extraction, table extraction, and form structure probing.
+  reportlab:
+    kind: package
+    description: Python package for creating PDFs and overlay annotations.
+  pdf2image:
+    kind: package
+    description: Python package used to convert PDFs to page images for OCR and form analysis.
+  pillow:
+    kind: package
+    description: Python imaging package used by validation image helpers.
+  pytesseract:
+    kind: package
+    description: Python OCR binding used for scanned PDFs.
+  poppler_utils:
+    kind: package
+    description: External utilities such as pdftotext, pdftoppm, and pdfimages.
+  qpdf_tool:
+    kind: package
+    description: External qpdf command-line utility for page manipulation, optimization, repair, encryption, and decryption.
+  imagemagick:
+    kind: package
+    description: Optional magick or convert command for visual crop refinement in non-fillable forms.
+  pdftk_tool:
+    kind: package
+    description: Optional pdftk command used only when available.
+
+imports:
+  advanced_reference:
+    path: source/reference.md
+    role: reference
+    description: Advanced pypdfium2, JavaScript, command-line, performance, troubleshooting, and license reference.
+    load: on_demand
+    requires:
+      imports: []
+    used_by:
+      - kind: route
+        id: advanced_pdf_workflow
+      - kind: rule
+        id: advanced_requests_load_reference
+      - kind: recipe
+        id: advanced_pdf_recipe
+    load_when:
+      - Load for advanced pypdfium2, pdf-lib, pdfjs, qpdf, poppler, performance, or troubleshooting work.
+  forms_guide:
+    path: source/forms.md
+    role: procedure
+    description: Required ordered procedure for fillable and non-fillable PDF forms.
+    load: on_demand
+    requires:
+      imports: []
+    used_by:
+      - kind: route
+        id: fill_pdf_form
+      - kind: rule
+        id: form_requests_use_ordered_form_recipe
+      - kind: recipe
+        id: fill_pdf_form_recipe
+    load_when:
+      - Load before any PDF form-filling work.
+
+resources:
+  source_skill_md:
+    path: source/SKILL.md
+    role: source_material
+    description: Preserved upstream PDF skill source.
+    used_by:
+      - kind: artifact
+        id: reviewed_spec
+  license_text:
+    path: source/LICENSE.txt
+    role: source_material
+    description: Upstream proprietary license text.
+    used_by:
+      - kind: artifact
+        id: reviewed_spec
+  check_fillable_fields_script:
+    path: source/scripts/check_fillable_fields.py
+    role: script
+    description: Probe whether a PDF has fillable fields.
+    used_by:
+      - kind: command
+        id: check_fillable_fields
+  extract_form_field_info_script:
+    path: source/scripts/extract_form_field_info.py
+    role: script
+    description: Extract AcroForm field IDs, pages, rectangles, and options.
+    used_by:
+      - kind: command
+        id: extract_form_field_info
+  fill_fillable_fields_script:
+    path: source/scripts/fill_fillable_fields.py
+    role: script
+    description: Fill existing AcroForm fields from field values JSON.
+    used_by:
+      - kind: command
+        id: fill_fillable_fields
+  convert_pdf_to_images_script:
+    path: source/scripts/convert_pdf_to_images.py
+    role: script
+    description: Convert PDF pages to PNG images for analysis or verification.
+    used_by:
+      - kind: command
+        id: convert_pdf_to_images
+      - kind: command
+        id: verify_filled_pdf_images
+  extract_form_structure_script:
+    path: source/scripts/extract_form_structure.py
+    role: script
+    description: Extract text labels, lines, checkboxes, and row boundaries for non-fillable forms.
+    used_by:
+      - kind: command
+        id: extract_form_structure
+  check_bounding_boxes_script:
+    path: source/scripts/check_bounding_boxes.py
+    role: script
+    description: Validate field bounding boxes before overlay-based filling.
+    used_by:
+      - kind: command
+        id: validate_bounding_boxes
+  fill_pdf_form_with_annotations_script:
+    path: source/scripts/fill_pdf_form_with_annotations.py
+    role: script
+    description: Fill non-fillable forms with text annotations.
+    used_by:
+      - kind: command
+        id: fill_pdf_form_with_annotations
+  create_validation_image_script:
+    path: source/scripts/create_validation_image.py
+    role: script
+    description: Draw bounding boxes over page images for form-field validation.
+    used_by:
+      - kind: command
+        id: create_validation_image
+
+artifacts:
+  reviewed_spec:
+    kind: file
+    path: skill.spec.yml
+    description: Reviewed SkillSpec contract for the upstream PDF skill.
+    produced_by:
+      - kind: recipe
+        id: port_review_loop
+  coverage_matrix:
+    kind: report
+    path: .skillspec/reports/coverage-matrix.yml
+    description: Source prose spans mapped to SkillSpec constructs.
+    produced_by:
+      - kind: recipe
+        id: port_review_loop
+  input_pdf:
+    kind: pdf
+    description: User-provided PDF to inspect, transform, fill, OCR, or extract images from.
+    consumed_by:
+      - kind: recipe
+        id: inspect_extract_recipe
+      - kind: recipe
+        id: fill_pdf_form_recipe
+  output_pdf:
+    kind: pdf
+    description: Transformed, created, filled, encrypted, decrypted, or watermarked PDF output.
+    produced_by:
+      - kind: recipe
+        id: transform_pdf_recipe
+      - kind: recipe
+        id: create_pdf_recipe
+      - kind: recipe
+        id: fill_pdf_form_recipe
+  extracted_text:
+    kind: file
+    description: Extracted text or layout-preserving text output.
+    produced_by:
+      - kind: recipe
+        id: inspect_extract_recipe
+  extracted_tables:
+    kind: file
+    description: Tables extracted from a PDF, optionally exported to spreadsheet format.
+    produced_by:
+      - kind: recipe
+        id: inspect_extract_recipe
+  field_info_json:
+    kind: json
+    description: Fillable-field metadata from the input PDF.
+    produced_by:
+      - kind: command
+        id: extract_form_field_info
+  field_values_json:
+    kind: json
+    description: Reviewed field values to insert into a fillable PDF form.
+    consumed_by:
+      - kind: command
+        id: fill_fillable_fields
+  fields_json:
+    kind: json
+    description: Bounding boxes and entry text for annotation-based form filling.
+    consumed_by:
+      - kind: command
+        id: validate_bounding_boxes
+      - kind: command
+        id: fill_pdf_form_with_annotations
+  page_images:
+    kind: directory
+    description: Rendered page images used for OCR, visual field analysis, and output verification.
+    produced_by:
+      - kind: command
+        id: convert_pdf_to_images
+  extracted_images:
+    kind: directory
+    description: Embedded images extracted from a PDF.
+    produced_by:
+      - kind: recipe
+        id: extract_images_recipe
+
+commands:
+  check_fillable_fields:
+    description: Check whether a PDF contains fillable form fields.
+    template: python3 source/scripts/check_fillable_fields.py <file.pdf>
+    safety: local_read
+    requires:
+      dependencies:
+        - python3
+        - pypdf
+      resources:
+        - check_fillable_fields_script
+  extract_form_field_info:
+    description: Extract fillable field metadata to JSON.
+    template: python3 source/scripts/extract_form_field_info.py <input.pdf> <field_info.json>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pypdf
+      resources:
+        - extract_form_field_info_script
+  convert_pdf_to_images:
+    description: Convert PDF pages to PNG images for analysis.
+    template: python3 source/scripts/convert_pdf_to_images.py <input.pdf> <output_directory>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pdf2image
+      resources:
+        - convert_pdf_to_images_script
+  extract_form_structure:
+    description: Extract labels, lines, checkboxes, and row boundaries from a non-fillable PDF.
+    template: python3 source/scripts/extract_form_structure.py <input.pdf> form_structure.json
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pdfplumber
+      resources:
+        - extract_form_structure_script
+  validate_bounding_boxes:
+    description: Validate fields.json before annotation-based form filling.
+    template: python3 source/scripts/check_bounding_boxes.py fields.json
+    safety: local_read
+    requires:
+      dependencies:
+        - python3
+      resources:
+        - check_bounding_boxes_script
+  fill_fillable_fields:
+    description: Fill existing PDF form fields using reviewed field values JSON.
+    template: python3 source/scripts/fill_fillable_fields.py <input.pdf> <field_values.json> <output.pdf>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pypdf
+      resources:
+        - fill_fillable_fields_script
+  fill_pdf_form_with_annotations:
+    description: Fill a non-fillable PDF using annotation boxes from fields.json.
+    template: python3 source/scripts/fill_pdf_form_with_annotations.py <input.pdf> fields.json <output.pdf>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pypdf
+      resources:
+        - fill_pdf_form_with_annotations_script
+  create_validation_image:
+    description: Draw field boxes onto a page image for visual validation.
+    template: python3 source/scripts/create_validation_image.py <page_number> fields.json <input_image> <output_image>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pillow
+      resources:
+        - create_validation_image_script
+  verify_filled_pdf_images:
+    description: Render the filled output PDF to images for placement verification.
+    template: python3 source/scripts/convert_pdf_to_images.py <output.pdf> <verify_images>
+    safety: local_write
+    requires:
+      dependencies:
+        - python3
+        - pdf2image
+      resources:
+        - convert_pdf_to_images_script
+  pdftotext_extract:
+    description: Extract text from PDF with optional layout preservation using poppler-utils.
+    template: pdftotext -layout <input.pdf> <output.txt>
+    safety: local_write
+    requires:
+      dependencies:
+        - poppler_utils
+  qpdf_transform:
+    description: Merge, split, rotate, repair, optimize, encrypt, or decrypt PDFs with qpdf.
+    template: qpdf <qpdf-args>
+    safety: local_write
+    requires:
+      dependencies:
+        - qpdf_tool
+  pdfimages_extract:
+    description: Extract embedded images from a PDF using poppler-utils.
+    template: pdfimages -all <input.pdf> <output_prefix>
+    safety: local_write
+    requires:
+      dependencies:
+        - poppler_utils
+  imagemagick_crop:
+    description: Crop page images during visual coordinate refinement.
+    template: magick <page_image> -crop <width>x<height>+<x>+<y> +repage <crop_output.png>
+    safety: local_write
+    requires:
+      dependencies:
+        - imagemagick
+
+recipes:
+  port_review_loop:
+    description: Preserve upstream source and promote the mechanical draft into a reviewed SkillSpec example.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - reviewed_spec
+        - coverage_matrix
+    steps:
+      - load_resource: source_skill_md
+      - note: Keep reference.md, forms.md, scripts, and license package-local and connected to imports/resources.
+      - produce_artifact: reviewed_spec
+      - produce_artifact: coverage_matrix
+  inspect_extract_recipe:
+    description: Inspect or extract text, metadata, and tables from PDFs using the simplest suitable tool.
+    ordered: true
+    requires:
+      artifacts:
+        - input_pdf
+    steps:
+      - note: Use pypdf for page count, metadata, simple text, merge/split/rotate/encrypt tasks.
+      - note: Use pdfplumber for layout-aware text and table extraction.
+      - note: Use pdftotext when a fast command-line text extraction path is available.
+      - produce_artifact: extracted_text
+      - produce_artifact: extracted_tables
+  transform_pdf_recipe:
+    description: Transform pages or security settings while writing a separate output PDF.
+    ordered: true
+    requires:
+      artifacts:
+        - input_pdf
+        - output_pdf
+    steps:
+      - note: Choose pypdf for Python transformations or qpdf for command-line merge, split, rotate, optimize, repair, encrypt, or decrypt operations.
+      - note: Never overwrite the input PDF unless the user explicitly asks and the active command supports it safely.
+      - produce_artifact: output_pdf
+  create_pdf_recipe:
+    description: Create PDFs with ReportLab while avoiding unsupported Unicode subscript and superscript glyphs.
+    ordered: true
+    requires:
+      dependencies:
+        - reportlab
+      artifacts:
+        - output_pdf
+    steps:
+      - note: Use ReportLab Canvas or Platypus according to document complexity.
+      - note: Use Paragraph XML markup or manual font positioning for subscripts and superscripts.
+      - produce_artifact: output_pdf
+  fill_pdf_form_recipe:
+    description: Ordered form-filling workflow from forms.md.
+    ordered: true
+    requires:
+      imports:
+        - forms_guide
+      dependencies:
+        - python3
+      artifacts:
+        - input_pdf
+        - output_pdf
+    steps:
+      - load_import: forms_guide
+      - run_command: check_fillable_fields
+      - branch:
+          if: PDF has fillable form fields
+          then: fillable_form_recipe
+          otherwise: non_fillable_form_recipe
+      - produce_artifact: output_pdf
+  fillable_form_recipe:
+    description: Fill AcroForm fields using extracted field metadata and reviewed field values.
+    ordered: true
+    requires:
+      imports:
+        - forms_guide
+      artifacts:
+        - input_pdf
+        - field_info_json
+        - field_values_json
+        - output_pdf
+    steps:
+      - run_command: extract_form_field_info
+      - run_command: convert_pdf_to_images
+      - note: Analyze page images to map field IDs to user-facing purposes and create field_values_json.
+      - run_command: fill_fillable_fields
+      - run_command: verify_filled_pdf_images
+  non_fillable_form_recipe:
+    description: Fill non-fillable forms with validated annotations after structure extraction or visual coordinate refinement.
+    ordered: true
+    requires:
+      imports:
+        - forms_guide
+      artifacts:
+        - input_pdf
+        - fields_json
+        - output_pdf
+    steps:
+      - run_command: extract_form_structure
+      - note: If structure has meaningful labels, create fields_json using PDF coordinates with pdf_width and pdf_height.
+      - note: If structure lacks usable labels, render page images and use visual estimation with refined crop coordinates.
+      - run_command: convert_pdf_to_images
+      - note: For visual estimation, refine coordinates with zoomed crops and convert to one coordinate system.
+      - run_command: validate_bounding_boxes
+      - run_command: fill_pdf_form_with_annotations
+      - run_command: verify_filled_pdf_images
+  ocr_scanned_pdf_recipe:
+    description: Convert pages to images and OCR scanned content.
+    ordered: true
+    requires:
+      dependencies:
+        - pdf2image
+        - pytesseract
+      artifacts:
+        - input_pdf
+        - page_images
+        - extracted_text
+    steps:
+      - run_command: convert_pdf_to_images
+      - note: OCR each rendered page with pytesseract and combine page-labeled text.
+      - produce_artifact: extracted_text
+  extract_images_recipe:
+    description: Extract embedded images or render page images according to the user request.
+    ordered: true
+    requires:
+      artifacts:
+        - input_pdf
+        - extracted_images
+    steps:
+      - note: Use pdfimages for embedded images when available; render pages only when page images are requested.
+      - run_command: pdfimages_extract
+      - produce_artifact: extracted_images
+  advanced_pdf_recipe:
+    description: Load advanced reference guidance for pypdfium2, JavaScript libraries, qpdf, poppler, performance, and troubleshooting.
+    ordered: true
+    requires:
+      imports:
+        - advanced_reference
+    steps:
+      - load_import: advanced_reference
+      - note: Select the smallest advanced technique that matches the PDF task.
+
+states:
+  start:
+    do:
+      - inspect_pdf_before_transform
+    next: route_task
+  route_task:
+    do:
+      - inspect_extract_recipe
+      - transform_pdf_recipe
+      - create_pdf_recipe
+      - fill_pdf_form_recipe
+      - ocr_scanned_pdf_recipe
+      - extract_images_recipe
+      - advanced_pdf_recipe
+    next: verify
+  verify:
+    do:
+      - verify_output_artifact
+    next: done
+  done:
+    do:
+      - report_pdf_result
+
+closures:
+  inspect_pdf_before_transform:
+    description: Understand page count, metadata, encryption, form field presence, and requested output before selecting a destructive-looking operation.
+  use_pdfplumber_for_tables:
+    description: Prefer pdfplumber for table extraction and structured layout-sensitive text work.
+  use_pdftotext_for_plain_text_when_available:
+    description: Prefer pdftotext for fast plain text extraction when the command is available and layout needs are simple.
+  produce_output_pdf_separate_from_input:
+    description: Write transformed PDFs to a separate output path instead of overwriting the input.
+  use_reportlab_markup_for_subscripts_superscripts:
+    description: Use ReportLab Paragraph XML tags or manual font positioning rather than Unicode subscript/superscript glyphs.
+  fill_pdf_form_recipe:
+    description: "Follow forms.md in order: check fillability, branch, validate coordinates, fill, and verify rendered output."
+  convert_pages_before_ocr:
+    description: Render scanned PDF pages to images before OCR.
+  prefer_pdfimages_for_embedded_images:
+    description: Use pdfimages for embedded image extraction when available.
+  use_rendering_for_page_images:
+    description: Render pages when the user needs page images rather than embedded image assets.
+  handle_encrypted_pdfs_explicitly:
+    description: Ask for required passwords or use supplied passwords before attempting decryption or encryption changes.
+  load_advanced_reference:
+    description: Load source/reference.md for advanced pypdfium2, JavaScript, poppler, qpdf, performance, or troubleshooting guidance.
+  check_command_dependencies_before_run:
+    description: Check command or package readiness before executing imported snippets or helper scripts.
+  verify_output_artifact:
+    description: Verify that the requested PDF/text/image artifact exists and matches the requested operation.
+  report_pdf_result:
+    description: Report output artifact paths, tools used, and any deferred dependency or verification gaps.
+
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - after_success_scheduled
+    - outcome_recorded
+proof:
+  metrics:
+    - source SKILL.md, reference.md, forms.md, scripts, and license preserved
+    - mechanical draft inspected before semantic promotion
+    - form workflow keeps required ordered branch
+    - validate/imports/deps/test pass in examples location
+    - demo decision trace captured and aligned
+
+tests:
+  - name: pdf mention routes to inspection
+    input: Read this PDF and tell me its metadata
+    expect:
+      route: inspect_or_extract_pdf
+      matched_rules:
+        - pdf_mentions_activate_inspection
+      after_success:
+        - inspect_pdf_before_transform
+  - name: table extraction routes to content extraction
+    input: Extract tables from this PDF into a spreadsheet
+    expect:
+      route: inspect_or_extract_pdf
+      matched_rules:
+        - text_and_table_requests_extract_content
+      after_success:
+        - use_pdfplumber_for_tables
+  - name: merge request routes to transform
+    input: Merge these PDFs into one output PDF
+    expect:
+      route: transform_pdf_pages
+      matched_rules:
+        - page_transform_requests_transform_pages
+      forbid:
+        - overwrite_input_pdf
+  - name: create pdf forbids unicode subscripts
+    input: Create a PDF report with H2O and x squared using reportlab
+    expect:
+      route: create_pdf
+      matched_rules:
+        - create_pdf_requests_use_reportlab
+      forbid:
+        - use_unicode_subscripts_superscripts_in_reportlab
+  - name: form request uses ordered form recipe
+    input: Fill this PDF form with the provided values
+    expect:
+      route: fill_pdf_form
+      matched_rules:
+        - form_requests_use_ordered_form_recipe
+      after_success:
+        - fill_pdf_form_recipe
+      forbid:
+        - fill_form_without_checking_fillable_fields
+        - skip_form_bounding_box_validation
+  - name: scanned pdf routes to ocr
+    input: OCR this scanned PDF and make the text searchable
+    expect:
+      route: ocr_scanned_pdf
+      matched_rules:
+        - scanned_pdf_requests_use_ocr
+      after_success:
+        - convert_pages_before_ocr
+  - name: advanced troubleshooting loads reference
+    input: Troubleshoot a corrupted PDF with qpdf advanced options
+    expect:
+      route: advanced_pdf_workflow
+      matched_rules:
+        - advanced_requests_load_reference
+      after_success:
+        - load_advanced_reference
+
+review_required:
+  - Imported PDF snippets and helper scripts are command templates; do not run them until a real PDF task supplies input and output paths.
+  - Optional utilities such as qpdf, poppler-utils, ImageMagick, pdftk, and JavaScript libraries are deferred dependencies and must be checked or installed before use.
+  - Form-filling output needs visual verification because coordinate extraction and overlay placement can be document-specific.
+  - Proprietary upstream license is preserved in source/LICENSE.txt.
+
+metadata:
+  source:
+    imported_from: https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md
+    staged_source: source/SKILL.md
+    source_lines: 314
+    license: source/LICENSE.txt
+  mechanical_import_observation:
+    draft_path: draft/skill.spec.yml
+    review_notes: 5
+    routes: 0
+    rules: 0
+    imports: 2
+    dependencies: 8
+    commands: 14
+    note: The mechanical draft preserved forms/reference imports and command snippets but needed semantic routes, ordered recipes, tests, and a reviewed dependency surface.
+  extracted_value_targets:
+    activation_triggers: 15
+    routes: 7
+    rules: 10
+    dependency_checks: 11
+    imports: 2
+    resources: 11
+    commands: 13
+    recipes: 9
+    tests: 7
+  contract_quality:
+    activation: strong
+    dependencies: good_with_deferred_optional_tools
+    route_coverage: strong
+    execution_evidence: unproven_until_real_pdf_task
+    tests: reviewed_behavior_tests
+    hallucination_risk: low_medium
+  coverage_matrix:
+    - prose_span: Frontmatter and overview
+      obligation: Activate for any PDF task and preserve broad task coverage.
+      skillspec_construct: activation, applies_when, routes
+      confidence: high
+      status: reviewed
+      review_note: Directly mapped from the source description.
+    - prose_span: Python libraries and quick reference
+      obligation: Route reading, metadata, text, tables, merge/split/rotate, creation, watermark, image extraction, encryption, and OCR to appropriate tools.
+      skillspec_construct: routes.inspect_or_extract_pdf, transform_pdf_pages, create_pdf, ocr_scanned_pdf, extract_pdf_images; rules.text_and_table_requests_extract_content
+      confidence: high
+      status: reviewed
+      review_note: Tool selection is modeled as closures and recipes instead of runnable code blocks.
+    - prose_span: ReportLab subscripts and superscripts warning
+      obligation: Never use Unicode subscript/superscript glyphs in ReportLab PDFs.
+      skillspec_construct: rule.create_pdf_requests_use_reportlab.forbid, closure.use_reportlab_markup_for_subscripts_superscripts
+      confidence: high
+      status: reviewed
+      review_note: Preserves the source's explicit IMPORTANT warning.
+    - prose_span: Command-line tools and advanced reference
+      obligation: Preserve pdftotext, qpdf, pdftk, poppler, pypdfium2, pdf-lib, pdfjs, performance, and troubleshooting guidance as on-demand advanced reference.
+      skillspec_construct: import.advanced_reference, route.advanced_pdf_workflow, commands.pdftotext_extract, qpdf_transform, pdfimages_extract
+      confidence: high
+      status: reviewed
+      review_note: Optional tool dependencies are deferred so examples validate on machines without those binaries.
+    - prose_span: forms.md
+      obligation: Check fillability first, branch to fillable/non-fillable workflow, validate boxes, fill, and verify rendered output.
+      skillspec_construct: route.fill_pdf_form, rule.form_requests_use_ordered_form_recipe, import.forms_guide, recipes.fill_pdf_form_recipe, fillable_form_recipe, non_fillable_form_recipe
+      confidence: high
+      status: reviewed
+      review_note: Preserves the source's critical ordered workflow.
+    - prose_span: scripts/
+      obligation: Preserve helper scripts as resources and expose safe command templates without executing them during staging.
+      skillspec_construct: resources.*_script, commands.check_fillable_fields, extract_form_field_info, convert_pdf_to_images, extract_form_structure, validate_bounding_boxes, fill_fillable_fields, fill_pdf_form_with_annotations
+      confidence: high
+      status: reviewed
+      review_note: Commands require dependencies and concrete task inputs before use.

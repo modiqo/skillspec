@@ -1,11 +1,18 @@
 ---
-name: examples-imports
-description: "Use for demonstrates always-loaded policy, on-demand procedure imports, section narrowing, and nested import requirements. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+name: mcp-builder
+description: "Guide construction of MCP servers that expose external services through well-designed, documented, testable tools. Use for mcp-builder, MCP server, Model Context Protocol, build MCP, FastMCP, TypeScript MCP SDK, MCP SDK, MCP tools, MCP evaluations, MCP Inspector, streamable HTTP and stdio transport. Use when the task needs to build an MCP server for an external API or service, design MCP tools, resources, prompts, transport, schemas, pagination, or error handling, implement an MCP server in TypeScript with the MCP SDK, implement an MCP server in Python with FastMCP, review or test MCP server quality and create or run MCP server evaluations. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
-# imports example
+# MCP Builder
 
-Demonstrates always-loaded policy, on-demand procedure imports, section narrowing, and nested import requirements.
+SkillSpec port of the MCP server development guide for planning, implementing, testing, and evaluating high-quality MCP servers in TypeScript or Python.
+
+## Entry Gate
+
+- Before any task action, run `skillspec act ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the current-route action checklist.
+- Until that checklist is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.
+- Forbidden before the decision: implement_without_research_plan, skip_protocol_docs, run_evaluation_without_approval, execute_destructive_evaluation_tasks.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -105,5 +112,9 @@ Minimum final response shape when workspace evidence exists:
 
 ## Route Hints
 
-- `explain_imports`: Explain SkillSpec imports
-- `fill_pdf_form`: Follow a PDF form procedure
+- `build_mcp_server`: Build MCP server
+- `implement_typescript_mcp_server`: Implement TypeScript MCP server
+- `implement_python_mcp_server`: Implement Python MCP server
+- `review_and_test_mcp_server`: Review and test MCP server
+- `create_mcp_evaluations`: Create MCP evaluations
+- `run_mcp_evaluations`: Run MCP evaluations

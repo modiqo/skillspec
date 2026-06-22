@@ -1,3 +1,4 @@
+mod act;
 mod align;
 mod capability;
 mod compiler;
@@ -51,6 +52,20 @@ enum Command {
         /// Directory where append-only decision trace events should be written.
         #[arg(long)]
         trace_dir: Option<PathBuf>,
+    },
+    #[command(about = "Turn a SkillSpec decision into a current-route action checklist")]
+    Act {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// User task text to route. Strip skill invocation prefixes before passing it.
+        #[arg(long, allow_hyphen_values = true)]
+        input: String,
+        /// Directory where append-only decision trace events should be written.
+        #[arg(long)]
+        trace_dir: Option<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
     },
     #[command(about = "Explain routing decisions for a user task")]
     Explain {
@@ -545,6 +560,29 @@ fn run() -> Result<()> {
                 report::trace_written(&trace)?;
             }
             report::json(&decision.decision)?;
+        }
+        Command::Act {
+            path,
+            input,
+            trace_dir,
+            json,
+        } => {
+            let spec = parser::load_spec(&path)?;
+            ensure_trace_available(&spec, trace_dir.as_ref())?;
+            let decision = decision::decide_with_events(&spec, &input);
+            let trace = if let Some(trace_dir) = trace_dir {
+                let trace = trace::write_decision_trace(&trace_dir, &path, &spec, &decision)?;
+                report::trace_written(&trace)?;
+                Some(trace)
+            } else {
+                None
+            };
+            let act_report = act::build_report(&spec, &decision.decision, trace.as_ref());
+            if json {
+                report::json(&act_report)?;
+            } else {
+                report::text(&act::render(&act_report))?;
+            }
         }
         Command::Explain {
             path,
