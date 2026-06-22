@@ -1,4 +1,4 @@
 /target/
 **/*.rs.bk
 .DS_Store
-
+.skillspec/traces/
