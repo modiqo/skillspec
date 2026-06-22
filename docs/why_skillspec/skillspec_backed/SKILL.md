@@ -13,19 +13,36 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
 
 1. Load `./skill.spec.yml` from this skill folder before taking task actions.
 2. When the `skillspec` CLI is available and the spec shape is unfamiliar, run `skillspec sensemake ./skill.spec.yml --view index` to learn the section roles, counts, query handles, and navigation grammar without dumping the full YAML.
-3. Then run the current-route action checklist:
+3. Then create the ordered phase plan and current-route action checklist:
 
    ```bash
-   skillspec act ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+   skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+   skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>
    ```
 
 4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/durable-executor-spec` before passing `--input`.
 5. Preserve the emitted trace `run_dir`.
-6. Read the full action checklist before using tools. Treat it as the active execution SOP, not as advice.
-7. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.
-8. Before every substrate/tool call, apply the checklist's allow/deny questions. The selected route and matched rules override lower-level skill defaults and generic tool preferences.
-9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
-10. If `skillspec act` is unavailable, fall back to `skillspec decide`, then manually construct the same current-route checklist before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+6. Read the full phase plan and action checklist before using tools. Treat them as the active execution SOP, not as advice.
+7. For each execution phase, run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show ./skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.
+8. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.
+9. Before every substrate/tool call, apply the checklist's allow/deny questions. The selected route and matched rules override lower-level skill defaults and generic tool preferences.
+10. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
+11. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+
+## Authoring And Revision Contract
+
+When importing, creating, revising, or extending this SkillSpec-backed skill, use the embedded grammar teacher before editing `skill.spec.yml`:
+
+```bash
+skillspec grammar sensemake --view index
+skillspec grammar sensemake --view porting
+skillspec grammar checklist --for import-skill
+```
+
+- Treat the checklist as the review gate for semantic edits: activation, routes, rules, elicitations, imports/resources, commands/deps, procedures, tests, proof, and contract quality.
+- Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
+- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
+- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
 
 ## Durable Handoff Contract
 
@@ -41,7 +58,7 @@ This skill participates in agent-mediated durable execution. There is no runtime
 
 ## How To Execute The Structure
 
-Before the first task action, convert the decision output and relevant spec sections into a checklist:
+Before the first task action, use `skillspec plan` and `skillspec act` to convert the decision output and relevant spec sections into an ordered phase plan plus a current-route OODA checklist:
 
 - `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
 - execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.
@@ -56,12 +73,18 @@ Before the first task action, convert the decision output and relevant spec sect
 - `commands`, `recipes`, and `code`: use declared templates and ordered steps as the allowed execution surface. Check their `requires` fields first, preserve outputs as evidence, and do not replace them with unrelated tools unless the active contract allows that substitution.
 - `after_success` and closures: these are completion obligations. Do them before the final response, or report why they remain unproven.
 
+Repeat the checklist before every tool call. If a lower-level skill or generic tool default conflicts with the selected route, follow the selected route. If the next tool is forbidden, stop and report that the SkillSpec blocks it.
+
 If every allowed route is blocked by missing dependencies, auth, permissions, or a forbid, report the blocker and ask how to proceed. Do not switch to native search, raw shell, browser automation, direct API calls, or installs just because they are available in the harness.
 
 ## Quick Commands
 
 ```bash
 skillspec sensemake ./skill.spec.yml --view index
+skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>
+skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>
+skillspec progress show ./skill.spec.yml --run "${PWD}/.skillspec/traces/<run-id>"
 skillspec validate ./skill.spec.yml
 skillspec imports check ./skill.spec.yml
 skillspec test ./skill.spec.yml
@@ -69,8 +92,9 @@ skillspec deps check ./skill.spec.yml
 skillspec query ./skill.spec.yml rule:<id> --view summary
 skillspec refs ./skill.spec.yml rule:<id> --view summary
 skillspec query ./skill.spec.yml command:<id>.requires
+skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
-skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>" --execution-trace <execution-ledger.jsonl>
+skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>" --execution-trace "${PWD}/.skillspec/traces/<run-id>/execution.jsonl"
 ```
 
 ## Completion Report

@@ -101,8 +101,15 @@ skillspec validate skill.spec.yml
 skillspec imports check skill.spec.yml
 skillspec deps check skill.spec.yml
 skillspec test skill.spec.yml
-skillspec decide skill.spec.yml --input '<realistic task>' --trace-dir .skillspec/traces
-skillspec trace align skill.spec.yml --decision-trace <run-dir>
+skillspec plan skill.spec.yml --input '<realistic task>' --trace-dir .skillspec/traces
+skillspec act skill.spec.yml \
+  --input '<realistic task>' \
+  --run .skillspec/traces/<run-id> \
+  --phase <phase-id>
+skillspec progress show skill.spec.yml --run .skillspec/traces/<run-id>
+skillspec trace align skill.spec.yml \
+  --decision-trace .skillspec/traces/<run-id> \
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
 ```
 
 `import-skill` preserves source material; it does not pretend to understand the
@@ -256,22 +263,55 @@ In a harness session, invoke the generated skill normally:
 ```
 
 The generated `SKILL.md` should tell the agent to use the sibling
-`skill.spec.yml`. The runtime flow is:
+`skill.spec.yml`. The runtime flow is a visible loop:
 
 ```sh
 skillspec sensemake path/to/skill.spec.yml --view index
 skillspec validate path/to/skill.spec.yml
 skillspec imports check path/to/skill.spec.yml
 skillspec deps check path/to/skill.spec.yml
-skillspec decide path/to/skill.spec.yml \
+skillspec plan path/to/skill.spec.yml \
   --input='the user task text' \
   --trace-dir .skillspec/traces
+skillspec act path/to/skill.spec.yml \
+  --input='the user task text' \
+  --run .skillspec/traces/<run-id> \
+  --phase <phase-id>
+skillspec progress record .skillspec/traces/<run-id> phase-started \
+  <phase-id> \
+  --evidence-kind checklist \
+  --evidence-ref skillspec-act
+skillspec progress record .skillspec/traces/<run-id> requirement-satisfied \
+  <phase-id> <requirement-id> \
+  --evidence-kind <kind> \
+  --evidence-ref <ref>
+skillspec progress record .skillspec/traces/<run-id> phase-completed \
+  <phase-id> \
+  --evidence-kind <kind> \
+  --evidence-ref <ref>
+skillspec progress show path/to/skill.spec.yml \
+  --run .skillspec/traces/<run-id>
 ```
 
 `sensemake` is the progressive orientation step. It returns the SkillSpec map,
 section roles, counts, ids, and query handles without dumping the whole YAML.
-Use it when the spec shape is unfamiliar, then let `decide` fit the actual task.
-After `decide`, pull only the active slices and relationships you need:
+Use it when the spec shape is unfamiliar.
+
+`plan` fits the actual task to a selected route, writes the decision trace, and
+prints the ordered phase names before any substrate tool is used. Reuse the
+`run_dir` printed by `plan` for the rest of the loop. `act` expands the current
+phase into an OODA checklist: route authority, matched rules, allowed actions, forbids,
+handoff boundaries, dependencies, evidence expectations, and before-tool-call
+checks. After each phase action, `progress record` appends structured execution
+evidence to `.skillspec/traces/<run-id>/execution.jsonl`, and `progress show`
+derives `.skillspec/traces/<run-id>/progress.json` with completed, current,
+blocked, and remaining phases.
+
+The agent remains the executor. SkillSpec supplies the contract and the phase
+tracker so the harness can ask "what is the current phase?" and "what remains?"
+without rereading the whole YAML.
+
+During the loop, pull only the active slices and relationships you need:
 
 ```sh
 skillspec query path/to/skill.spec.yml rule:<matched-rule> --view summary
@@ -297,17 +337,20 @@ skillspec explain path/to/skill.spec.yml \
 skillspec trace compact .skillspec/traces/<run-id>
 
 skillspec trace align path/to/skill.spec.yml \
-  --decision-trace .skillspec/traces/<run-id>
+  --decision-trace .skillspec/traces/<run-id> \
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
 ```
 
 `trace align` replays the captured input against the current spec and compares
-the decision facts deterministically. Without structured execution evidence it
-reports execution obligations as `unproven`, not as guessed pass/fail results.
+the decision facts deterministically. With `execution.jsonl`, it can also check
+whether the selected route, phase obligations, forbids, and after-success
+closures were actually proven. Without structured execution evidence it reports
+the specific missing proof rows as `unproven`, not as guessed pass/fail results.
 
 The runtime skill [skills/skillspec-runtime/SKILL.md](skills/skillspec-runtime/SKILL.md)
 teaches agents how to use an existing `skill.spec.yml`: validate first, check
-dependencies, decide with a trace, obey forbids and elicitations, execute with
-the right harness tools, then report trace and evidence.
+dependencies, create the phase plan, act on the current phase, obey forbids and
+elicitations, record progress evidence, then report trace and alignment.
 
 ## Compile A SkillSpec Into Harness Guidance
 
@@ -321,9 +364,9 @@ skillspec compile skill.spec.yml --target markdown > skill.spec.md
 
 For harness skill targets, compilation emits a minimal loader by default. The
 loader points the agent at the colocated `skill.spec.yml`, tells it to run
-`skillspec decide ... --trace-dir`, preserve the emitted `run_dir`, and follow
-the spec. This keeps `SKILL.md` small and prevents it from becoming a second
-source of truth.
+`skillspec plan ... --trace-dir`, `skillspec act ...`, preserve the emitted
+`run_dir`, record phase progress, and follow the spec. This keeps `SKILL.md`
+small and prevents it from becoming a second source of truth.
 
 Use the Markdown target when you want a full human-readable rendering of the
 contract. `--target markdown` includes routes, rules, dependencies, imports,
@@ -393,6 +436,7 @@ Useful examples:
 
 - [examples/rote-computer/skill.spec.yml](examples/rote-computer/skill.spec.yml)
 - [examples/durable-executor/skill.spec.yml](examples/durable-executor/skill.spec.yml)
+- [examples/generic-skill-creator/skill.spec.yml](examples/generic-skill-creator/skill.spec.yml)
 - [examples/local-csv-report/skill.spec.yml](examples/local-csv-report/skill.spec.yml)
 - [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
 - [examples/before-after/](examples/before-after/) shows a prose skill before

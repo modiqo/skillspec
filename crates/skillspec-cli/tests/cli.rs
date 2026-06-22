@@ -1530,6 +1530,165 @@ fn act_generates_current_route_ooda_checklist() {
 }
 
 #[test]
+fn plan_lists_ordered_execution_phases() {
+    let dir = TempDir::new("plan");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+    let trace_dir = dir.path().join("traces");
+
+    let plan = Command::new(bin())
+        .arg("plan")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(&trace_dir)
+        .output()
+        .unwrap();
+    assert_success(&plan);
+    assert!(stderr(&plan).contains("trace: wrote"));
+    let text = stdout(&plan);
+    assert!(text.contains("SkillSpec phase plan"));
+    assert!(text.contains("Selected route: browser"));
+    assert!(text.contains("1. collect_cli_evidence owned by durable-executor"));
+    assert!(text.contains("2. browser_handoff owned by rote-browse"));
+    assert!(text.contains("Current phase: collect_cli_evidence"));
+    assert!(text
+        .contains("complete phase `collect_cli_evidence` before starting phase `browser_handoff`"));
+
+    let plan_json = Command::new(bin())
+        .arg("plan")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(dir.path().join("json-traces"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&plan_json);
+    let report = json_stdout(&plan_json);
+    assert_eq!(report["selected_route"], "browser");
+    assert_eq!(report["phases"][0]["id"], "collect_cli_evidence");
+    assert_eq!(report["phases"][1]["id"], "browser_handoff");
+}
+
+#[test]
+fn act_can_expand_a_named_phase() {
+    let dir = TempDir::new("act-phase");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+    let trace_dir = dir.path().join("traces");
+
+    let act = Command::new(bin())
+        .arg("act")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(&trace_dir)
+        .arg("--phase")
+        .arg("browser_handoff")
+        .output()
+        .unwrap();
+    assert_success(&act);
+    let text = stdout(&act);
+    assert!(text.contains("Current phase:"));
+    assert!(text.contains("browser_handoff owned by rote-browse"));
+    assert!(text.contains("direct_browser_tool_without_rote_browse"));
+
+    let missing = Command::new(bin())
+        .arg("act")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(dir.path().join("missing-traces"))
+        .arg("--phase")
+        .arg("missing_phase")
+        .output()
+        .unwrap();
+    assert_failure(&missing);
+    assert!(stderr(&missing).contains("unknown execution phase"));
+}
+
+#[test]
+fn progress_records_phase_completion_and_lists_remaining_work() {
+    let dir = TempDir::new("progress");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+    let trace_dir = dir.path().join("traces");
+
+    let plan = Command::new(bin())
+        .arg("plan")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the profile and collect evidence")
+        .arg("--trace-dir")
+        .arg(&trace_dir)
+        .output()
+        .unwrap();
+    assert_success(&plan);
+
+    let run_dir = fs::read_dir(&trace_dir)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    let initial = Command::new(bin())
+        .arg("progress")
+        .arg("show")
+        .arg(&spec)
+        .arg("--run")
+        .arg(&run_dir)
+        .output()
+        .unwrap();
+    assert_success(&initial);
+    let initial_text = stdout(&initial);
+    assert!(initial_text.contains("SkillSpec progress"));
+    assert!(initial_text.contains("Current:"));
+    assert!(initial_text.contains("- collect_cli_evidence"));
+    assert!(initial_text.contains("execution ledger: missing"));
+
+    let record = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("phase-completed")
+        .arg("collect_cli_evidence")
+        .arg("--evidence-kind")
+        .arg("rote_response")
+        .arg("--evidence-ref")
+        .arg("@7")
+        .output()
+        .unwrap();
+    assert_success(&record);
+    let event = json_stdout(&record);
+    assert_eq!(event["event"], "phase_completed");
+    assert_eq!(event["phase"], "collect_cli_evidence");
+
+    let progressed = Command::new(bin())
+        .arg("progress")
+        .arg("show")
+        .arg(&spec)
+        .arg("--run")
+        .arg(&run_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&progressed);
+    let report = json_stdout(&progressed);
+    assert_eq!(report["completed_phases"][0], "collect_cli_evidence");
+    assert_eq!(report["current_phase"], "browser_handoff");
+    assert_eq!(report["execution_proof"]["event_count"], 1);
+    assert!(run_dir.join("execution.jsonl").exists());
+    assert!(run_dir.join("progress.json").exists());
+}
+
+#[test]
 fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     let dir = TempDir::new("align-execution");
     let spec = dir.path().join("skill.spec.yml");

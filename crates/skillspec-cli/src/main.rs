@@ -11,6 +11,7 @@ mod imports;
 mod install;
 mod model;
 mod parser;
+mod progress;
 mod report;
 mod sensemake;
 mod trace;
@@ -55,6 +56,26 @@ enum Command {
     },
     #[command(about = "Turn a SkillSpec decision into a current-route action checklist")]
     Act {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// User task text to route. Strip skill invocation prefixes before passing it.
+        #[arg(long, allow_hyphen_values = true)]
+        input: String,
+        /// Directory where append-only decision trace events should be written.
+        #[arg(long, conflicts_with = "run")]
+        trace_dir: Option<PathBuf>,
+        /// Existing trace run directory to associate with this action checklist.
+        #[arg(long)]
+        run: Option<PathBuf>,
+        /// Expand this execution phase instead of the first pending phase.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "List selected-route execution phases in order")]
+    Plan {
         /// Path to a skill.spec.yml file.
         path: PathBuf,
         /// User task text to route. Strip skill invocation prefixes before passing it.
@@ -124,6 +145,11 @@ enum Command {
     Trace {
         #[command(subcommand)]
         command: TraceCommand,
+    },
+    #[command(about = "Show or record SkillSpec execution progress for a trace run")]
+    Progress {
+        #[command(subcommand)]
+        command: ProgressCommand,
     },
     #[command(about = "Check declared SkillSpec dependencies")]
     Deps {
@@ -216,6 +242,51 @@ enum TraceCommand {
         #[arg(long)]
         execution_trace: Vec<PathBuf>,
         /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ProgressCommand {
+    #[command(about = "Show completed, current, blocked, and remaining phases")]
+    Show {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Trace run directory produced by plan/decide/explain --trace-dir.
+        #[arg(long)]
+        run: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Append one structured execution/progress event to a run ledger")]
+    Record {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Event type to append.
+        #[arg(value_enum)]
+        event: ProgressEventArg,
+        /// Phase id for phase or requirement events.
+        phase: Option<String>,
+        /// Requirement id for requirement events.
+        requirement: Option<String>,
+        /// Event status, such as pass, fail, blocked, or pending.
+        #[arg(long)]
+        status: Option<String>,
+        /// Evidence kind, such as rote_response, file, trace, or command.
+        #[arg(long)]
+        evidence_kind: Option<String>,
+        /// Evidence reference, such as @7 or a relative file path.
+        #[arg(long)]
+        evidence_ref: Option<String>,
+        /// Skill that emitted this progress event.
+        #[arg(long)]
+        source_skill: Option<String>,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
     },
@@ -524,6 +595,19 @@ enum GrammarChecklistForArg {
     ImportSkill,
 }
 
+#[derive(Clone, Debug, ValueEnum)]
+enum ProgressEventArg {
+    PhaseStarted,
+    RequirementStarted,
+    RequirementSatisfied,
+    RequirementFailed,
+    EvidenceAttached,
+    HandoffStarted,
+    HandoffCompleted,
+    PhaseCompleted,
+    PhaseBlocked,
+}
+
 fn main() {
     if let Err(error) = run() {
         report::error(error);
@@ -565,6 +649,39 @@ fn run() -> Result<()> {
             path,
             input,
             trace_dir,
+            run,
+            phase,
+            json,
+        } => {
+            let spec = parser::load_spec(&path)?;
+            ensure_trace_available(&spec, trace_dir.as_ref().or(run.as_ref()))?;
+            let decision = decision::decide_with_events(&spec, &input);
+            let trace = if let Some(trace_dir) = trace_dir {
+                let trace = trace::write_decision_trace(&trace_dir, &path, &spec, &decision)?;
+                report::trace_written(&trace)?;
+                Some(trace)
+            } else {
+                None
+            };
+            let mut act_report = act::build_report_for_phase(
+                &spec,
+                &decision.decision,
+                trace.as_ref(),
+                phase.as_deref(),
+            )?;
+            if let Some(run) = run {
+                act_report.trace = Some(act::trace_for_run(&run));
+            }
+            if json {
+                report::json(&act_report)?;
+            } else {
+                report::text(&act::render(&act_report))?;
+            }
+        }
+        Command::Plan {
+            path,
+            input,
+            trace_dir,
             json,
         } => {
             let spec = parser::load_spec(&path)?;
@@ -581,7 +698,7 @@ fn run() -> Result<()> {
             if json {
                 report::json(&act_report)?;
             } else {
-                report::text(&act::render(&act_report))?;
+                report::text(&act::render_plan(&act_report))?;
             }
         }
         Command::Explain {
@@ -682,6 +799,42 @@ fn run() -> Result<()> {
                 if report.has_failures() {
                     std::process::exit(1);
                 }
+            }
+        },
+        Command::Progress { command } => match command {
+            ProgressCommand::Show { path, run, json } => {
+                let spec = parser::load_spec(&path)?;
+                let report = progress::show(&spec, &run)?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&progress::render(&report))?;
+                }
+            }
+            ProgressCommand::Record {
+                run,
+                event,
+                phase,
+                requirement,
+                status,
+                evidence_kind,
+                evidence_ref,
+                source_skill,
+                message,
+                json: _,
+            } => {
+                let event = progress::record(progress::RecordOptions {
+                    run_dir: run,
+                    event: event.into(),
+                    phase,
+                    requirement,
+                    status,
+                    evidence_kind,
+                    evidence_ref,
+                    source_skill,
+                    message,
+                })?;
+                report::json(&event)?;
             }
         },
         Command::Deps { command } => match command {
@@ -980,6 +1133,23 @@ impl From<GrammarChecklistForArg> for grammar::ChecklistSubject {
         match value {
             GrammarChecklistForArg::ImportSkill => Self::ImportSkill,
         }
+    }
+}
+
+impl From<ProgressEventArg> for String {
+    fn from(value: ProgressEventArg) -> Self {
+        match value {
+            ProgressEventArg::PhaseStarted => "phase_started",
+            ProgressEventArg::RequirementStarted => "requirement_started",
+            ProgressEventArg::RequirementSatisfied => "requirement_satisfied",
+            ProgressEventArg::RequirementFailed => "requirement_failed",
+            ProgressEventArg::EvidenceAttached => "evidence_attached",
+            ProgressEventArg::HandoffStarted => "handoff_started",
+            ProgressEventArg::HandoffCompleted => "handoff_completed",
+            ProgressEventArg::PhaseCompleted => "phase_completed",
+            ProgressEventArg::PhaseBlocked => "phase_blocked",
+        }
+        .to_owned()
     }
 }
 

@@ -23,8 +23,11 @@ skillspec <COMMAND>
 | `validate <path>` | Validate a `skill.spec.yml` file. |
 | `test <path>` | Run scenario tests declared in a SkillSpec. |
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
+| `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
+| `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
+| `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
 | `deps <COMMAND>` | Check declared SkillSpec dependencies. |
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
@@ -71,6 +74,54 @@ Options:
 - `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
   should be written.
 
+## `plan`
+
+```text
+skillspec plan [OPTIONS] <PATH> --input <INPUT>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+
+Options:
+
+- `--input <INPUT>`: user task text to route. Strip skill invocation prefixes
+  before passing it.
+- `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
+  should be written.
+- `--json`: emit JSON instead of a concise human report.
+
+`plan` emits the selected route, ordered execution phase ids, current phase,
+and transition obligations. It is the pre-action view a harness can use to
+know which phase names exist and in what order they should run.
+
+## `act`
+
+```text
+skillspec act [OPTIONS] <PATH> --input <INPUT>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+
+Options:
+
+- `--input <INPUT>`: user task text to route. Strip skill invocation prefixes
+  before passing it.
+- `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
+  should be written.
+- `--run <RUN>`: existing trace run directory to associate with this action
+  checklist.
+- `--phase <PHASE>`: expand this execution phase instead of the first pending
+  phase.
+- `--json`: emit JSON instead of a concise human report.
+
+`act` emits the current-route OODA checklist: selected route, matched rules,
+current phase, allowed actions, forbids, handoffs, dependencies, and the
+before-tool-call allow/deny checks.
+
 ## `explain`
 
 ```text
@@ -97,7 +148,7 @@ skillspec trace <COMMAND>
 Subcommands:
 
 - `compact <run-dir>`
-- `align <path> --decision-trace <run-dir> [--json]`
+- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--json]`
 
 ### `trace compact`
 
@@ -124,6 +175,8 @@ Options:
 
 - `--decision-trace <DECISION_TRACE>`: trace run directory produced by
   `decide` or `explain` `--trace-dir`.
+- `--execution-trace <EXECUTION_TRACE>`: JSONL execution ledger with sanitized
+  action evidence. Repeat for multiple ledgers.
 - `--json`: emit JSON instead of a concise human report.
 
 Current alignment compares deterministic decision-trace facts and emits a
@@ -133,6 +186,65 @@ deterministic checks, and pass/fail/unproven counts for execution obligations.
 `unproven` means no deterministic drift was found but one or more required
 facts or execution obligations still lack structured proof. Execution
 obligations remain `unproven` until structured execution evidence is supplied.
+
+## `progress`
+
+```text
+skillspec progress <COMMAND>
+```
+
+Subcommands:
+
+- `show <path> --run <run-dir> [--json]`
+- `record <run-dir> <event> [phase] [requirement] [--status <status>] [--evidence-kind <kind>] [--evidence-ref <ref>]`
+
+### `progress show`
+
+```text
+skillspec progress show [OPTIONS] --run <RUN> <PATH>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+
+Options:
+
+- `--run <RUN>`: trace run directory produced by `plan`, `decide`, or
+  `explain` with `--trace-dir`.
+- `--json`: emit JSON instead of a concise human report.
+
+`progress show` reads the decision trace and the run's `execution.jsonl`,
+then writes a derived `progress.json`. It reports completed, current, blocked,
+and remaining phases plus open requirements for the current phase.
+
+### `progress record`
+
+```text
+skillspec progress record [OPTIONS] <RUN> <EVENT> [PHASE] [REQUIREMENT]
+```
+
+Arguments:
+
+- `<RUN>`: trace run directory containing `execution.jsonl`.
+- `<EVENT>`: one of `phase-started`, `requirement-started`,
+  `requirement-satisfied`, `requirement-failed`, `evidence-attached`,
+  `handoff-started`, `handoff-completed`, `phase-completed`, or
+  `phase-blocked`.
+- `[PHASE]`: phase id for phase or requirement events.
+- `[REQUIREMENT]`: requirement id for requirement events.
+
+Options:
+
+- `--status <STATUS>`: event status, such as `pass`, `fail`, `blocked`, or
+  `pending`.
+- `--evidence-kind <EVIDENCE_KIND>`: evidence kind, such as `rote_response`,
+  `file`, `trace`, or `command`.
+- `--evidence-ref <EVIDENCE_REF>`: evidence reference, such as a rote response
+  id or relative file path.
+- `--source-skill <SOURCE_SKILL>`: skill that emitted this progress event.
+- `--message <MESSAGE>`: human-readable event note.
+- `--json`: emit JSON for the appended event.
 
 ## `deps`
 

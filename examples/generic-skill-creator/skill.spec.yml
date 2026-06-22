@@ -1,10 +1,11 @@
 schema: skillspec/v0
-id: skill.creator
-title: Skill Creator
-description: SkillSpec-backed contract for creating, updating, validating, and forward-testing Codex skills.
+id: generic.skill.creator
+title: Generic Skill Creator
+description: Example SkillSpec-backed contract for creating, updating, validating, and forward-testing Codex skills without colliding with the canonical skillspec-creator skill.
 activation:
-  summary: Create or update a Codex skill with appropriate resources, metadata, validation, and forward-testing.
+  summary: Generic example for creating or updating a Codex skill with appropriate resources, metadata, validation, and forward-testing.
   keywords:
+    - generic skill creator
     - create a skill
     - update a skill
     - skill creator
@@ -43,14 +44,14 @@ routes:
       reason: New skills need concrete examples and resource planning before files are initialized.
       phases:
         - id: understand_examples
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Gather or infer concrete task examples, trigger phrases, and expected skill behavior.
           requires:
             - understand_skill_with_concrete_examples
           forbid:
             - create_skill_files_before_understanding_examples
         - id: plan_reusable_contents
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Decide which scripts, references, and assets are actually needed.
           requires:
             - plan_reusable_resources
@@ -58,7 +59,7 @@ routes:
             - create_unused_resource_directories
             - duplicate_reference_material_in_skill_body
         - id: initialize_skill
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Run the bundled initializer only after the destination and name are known.
           requires:
             - choose_skill_location
@@ -66,18 +67,18 @@ routes:
           forbid:
             - run_init_skill_without_user_location_or_default
         - id: implement_skill
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Write concise SKILL.md guidance and implement required resources.
           requires:
             - write_concise_skill_body
             - generate_agents_metadata
         - id: validate_skill
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Run quick validation and fix reported failures.
           requires:
             - validate_skill_folder
         - id: iterate_skill
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           description: Forward-test complex skills and tighten the skill based on fresh evidence.
           requires:
             - consider_forward_testing
@@ -89,22 +90,22 @@ routes:
       mode: ordered
       phases:
         - id: inspect_existing_skill
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           requires:
             - read_existing_skill
             - rebuild_context_from_source_artifacts
         - id: revise_resources
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           requires:
             - plan_reusable_resources
             - remove_placeholder_files
         - id: validate_update
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           requires:
             - validate_skill_folder
             - verify_agents_metadata_matches_skill
         - id: iterate_update
-          owner_skill: skill-creator
+          owner_skill: generic-skill-creator
           requires:
             - consider_forward_testing
   - id: generate_agents_metadata
@@ -780,6 +781,8 @@ review_required:
   - "Script test evidence is modeled as an obligation; this dogfood example does not execute source skill scripts as part of import."
 metadata:
   source: /Users/chetanconikee/.codex/skills/.system/skill-creator
+  example_name: generic-skill-creator
+  renamed_from: examples/skill-creator
   dogfood_status: reviewed_example
   mechanical_import:
     routes: 0

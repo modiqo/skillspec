@@ -1,16 +1,22 @@
 schema: skillspec/v0
 id: skillspec.creator
 title: SkillSpec Creator
-description: SkillSpec-backed contract for porting prose SKILL.md folders into reviewed, tested SkillSpec packages with grammar-first sensemaking, dependency review, compilation, optional install, and value reporting.
+description: SkillSpec-backed contract for porting prose SKILL.md folders and revising existing SkillSpec-backed skills into reviewed, tested packages with grammar-first sensemaking, phase planning, progress evidence, dependency review, compilation, optional install, and value reporting.
 activation:
-  summary: Convert prose SKILL.md skills into reviewed SkillSpec packages, using grammar sensemaking before import and proving value before install or release.
+  summary: Convert prose SKILL.md skills or revise existing SkillSpec YAML into reviewed SkillSpec packages, using grammar sensemaking, phase plans, progress ledgers, and value proof before install or release.
   keywords:
     - skillspec creator
     - import SKILL.md
     - port skill
+    - revise existing SkillSpec
+    - update skill.spec.yml
     - prose skill to skillspec
     - skill.spec.yml
     - skillspec import-skill
+    - skillspec plan
+    - skillspec act
+    - skillspec progress
+    - phase progress
     - grammar sensemake
     - grammar checklist
     - compile skill
@@ -24,10 +30,11 @@ applies_when:
       - port a local skill folder into SkillSpec
       - import a public GitHub skill into SkillSpec
       - revise an existing SkillSpec-backed skill
+      - add phase planning and progress tracking to a SkillSpec-backed skill
       - compile and optionally install a reviewed SkillSpec-backed skill
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Teach the harness the current SkillSpec grammar, stage the source, import a draft, then semantically review and prove it before install.
+  prompt: Teach the harness the current SkillSpec grammar, stage or map the source, import a draft only for prose ports, then semantically review, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -77,9 +84,12 @@ routes:
             - produce_reviewed_spec
         - id: qa_and_proof
           owner_skill: skillspec-creator
-          description: Validate, test, check imports and dependencies, run a demo decision, and align the trace.
+          description: Validate, test, check imports and dependencies, run a demo phase plan/action checklist, record progress evidence, and align the trace.
           requires:
             - run_structural_qa
+            - plan_phase_order
+            - act_named_phase
+            - progress_show
             - prove_value
         - id: report_value
           owner_skill: skillspec-creator
@@ -119,7 +129,9 @@ routes:
       phases:
         - id: grammar_and_current_map
           owner_skill: skillspec-creator
+          description: Learn the current grammar and summarize the existing SkillSpec before editing it.
           requires:
+            - grammar_sensemake_index
             - grammar_sensemake_porting
             - sensemake_current_spec
             - grammar_checklist_import
@@ -127,18 +139,24 @@ routes:
             - patch_yaml_from_memory
         - id: inspect_active_handles
           owner_skill: skillspec-creator
+          description: Use query/refs plus the phase plan to inspect only active handles and execution order.
           requires:
+            - plan_phase_order
+            - act_named_phase
             - query_active_handles
             - refs_active_handles
         - id: revise_reviewed_spec
           owner_skill: skillspec-creator
+          description: Patch only the reviewed SkillSpec constructs required by the requested change.
           requires:
             - fill_coverage_matrix
             - produce_reviewed_spec
         - id: rerun_qa
           owner_skill: skillspec-creator
+          description: Re-run structural QA, phase progress, proof, compile, and value reporting after revision.
           requires:
             - run_structural_qa
+            - progress_show
             - prove_value
   - id: compile_and_install_reviewed_skill
     label: Compile and install reviewed skill
@@ -178,11 +196,14 @@ routes:
         - id: run_demo_decision
           owner_skill: skillspec-creator
           requires:
+            - plan_phase_order
+            - act_named_phase
             - decide_demo
             - produce_decision_trace
         - id: align_trace
           owner_skill: skillspec-creator
           requires:
+            - progress_show
             - trace_align
             - report_alignment_status
         - id: print_value
@@ -320,6 +341,10 @@ rules:
         - alignment
         - trace align
         - value report
+        - skillspec plan
+        - skillspec act
+        - skillspec progress
+        - progress report
     prefer: prove_skill_value
     after_success:
       - decide_demo
@@ -332,17 +357,28 @@ rules:
     when:
       user_says_any:
         - revise existing SkillSpec
+        - existing SkillSpec
+        - existing SkillSpec-backed
+        - existing skillspec yaml
+        - skillspec yaml
+        - update skillspec creator
+        - skillspec-creator
         - route coverage
         - improve this spec
         - update skill.spec.yml
+        - update the spec
+        - update existing spec
         - patch the YAML
+        - plan act progress
+        - phase progress
+        - progress ledger
     prefer: revise_existing_skillspec
     forbid:
       - patch_yaml_from_memory
       - skip_current_spec_sensemake
     after_success:
       - run_structural_qa
-    reason: Existing SkillSpecs must be revised from the current grammar and active handles, not broad YAML edits.
+    reason: Existing SkillSpecs, including skillspec-creator itself, must be revised from the current grammar, active handles, phase plan, and progress contract, not broad YAML edits or prose import.
   - id: durable_tool_work_uses_durable_substrate
     when:
       user_says_any:
@@ -436,7 +472,7 @@ elicitations:
 dependencies:
   skillspec_cli:
     kind: cli
-    description: SkillSpec CLI with grammar, import, validate, imports, deps, test, compile, decide, and trace commands.
+    description: SkillSpec CLI with grammar, import, validate, imports, deps, test, compile, plan, act, progress, decide, and trace commands.
     command: skillspec
     check:
       command: skillspec
@@ -566,6 +602,30 @@ artifacts:
     consumed_by:
       - kind: command
         id: trace_align
+  execution_ledger:
+    kind: file
+    path: .skillspec/traces/<run-id>/execution.jsonl
+    description: Structured progress and action evidence ledger for phase completion, requirement proof, handoffs, and evidence references.
+    produced_by:
+      - kind: command
+        id: progress_record_phase
+      - kind: command
+        id: progress_record_requirement
+    consumed_by:
+      - kind: command
+        id: progress_show
+      - kind: command
+        id: trace_align
+  progress_report:
+    kind: file
+    path: .skillspec/traces/<run-id>/progress.json
+    description: Derived view of completed, current, blocked, and remaining phases for the selected route.
+    produced_by:
+      - kind: command
+        id: progress_show
+    consumed_by:
+      - kind: command
+        id: value_report
 commands:
   grammar_sensemake_index:
     description: Learn the available grammar affordances without reading compiler source.
@@ -642,6 +702,41 @@ commands:
     description: Summarize the current reviewed spec before revising it.
     template: skillspec sensemake <skill-folder>/skill.spec.yml --view index
     safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  plan_phase_order:
+    description: List the selected route and ordered phase names before acting so the harness knows the task order.
+    template: skillspec plan <skill-folder>/skill.spec.yml --input '<task>' --trace-dir <skill-folder>/.skillspec/traces
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  act_named_phase:
+    description: Expand one named phase into the active OODA checklist, allowed actions, forbids, handoffs, dependencies, and evidence expectations.
+    template: skillspec act <skill-folder>/skill.spec.yml --input '<task>' --run <trace-dir> --phase <phase-id>
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_record_phase:
+    description: Append structured evidence that a phase started, completed, or blocked.
+    template: skillspec progress record <trace-dir> phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_record_requirement:
+    description: Append structured evidence that a phase requirement was satisfied or failed.
+    template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_show:
+    description: Show completed, current, blocked, and remaining phases from the run execution ledger and write progress.json.
+    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
+    safety: local_write
     requires:
       dependencies:
         - skillspec_cli
@@ -737,8 +832,8 @@ commands:
       dependencies:
         - skillspec_cli
   trace_align:
-    description: Replay and align a captured decision trace, reporting pass, unproven, or fail.
-    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir>
+    description: Replay and align a captured decision trace plus execution ledger, reporting pass, unproven, or fail with specific evidence gaps.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl
     safety: read_only
     requires:
       dependencies:
@@ -804,6 +899,11 @@ recipes:
       - run_command: deps_check_all
       - run_command: test_spec
       - run_command: compile_codex_skill
+      - run_command: plan_phase_order
+      - run_command: act_named_phase
+      - run_command: progress_record_requirement
+      - run_command: progress_record_phase
+      - run_command: progress_show
       - run_command: decide_demo
       - run_command: trace_align
       - run_command: value_report
@@ -838,6 +938,9 @@ recipes:
       - run_command: validate_spec
       - run_command: imports_check
       - run_command: deps_check_all
+      - run_command: plan_phase_order
+      - run_command: act_named_phase
+      - run_command: progress_show
       - ask: approve_dependency_surface
       - run_command: compile_codex_skill
       - run_command: list_install_targets
@@ -919,20 +1022,27 @@ closures:
   produce_reviewed_spec:
     description: Write a reviewed skill.spec.yml that connects source obligations to typed constructs.
   run_structural_qa:
-    description: Run validate, imports check, deps check, command-level deps check, and scenario tests.
+    description: Run validate, imports check, deps check, command-level deps check, scenario tests, phase plan, and current-phase action checklist.
     commands:
       - validate_spec
       - imports_check
       - deps_check_all
       - deps_check_command
       - test_spec
+      - plan_phase_order
+      - act_named_phase
   prove_value:
-    description: Run a realistic decision, align the trace, and grade unproven execution evidence honestly.
+    description: Run a realistic phase plan, action checklist, progress ledger update, decision, align the trace, and grade unproven execution evidence honestly.
     commands:
+      - plan_phase_order
+      - act_named_phase
+      - progress_record_requirement
+      - progress_record_phase
+      - progress_show
       - decide_demo
       - trace_align
   generate_value_report:
-    description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, context savings, decision trace, alignment, and contract-quality grades.
+    description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, context savings, decision trace, alignment, and contract-quality grades.
   show_dependency_surface:
     description: Show dependency ids, status, permission sensitivity, and provision choices before compile/install approval.
   report_alignment_status:
@@ -940,7 +1050,7 @@ closures:
   report_degraded_status:
     description: Mark the generated skill draft-only when grammar, imports, deps, validate, test, or compile capability is missing.
   produce_decision_trace:
-    description: Preserve the trace directory from the demo decision as evidence.
+    description: Preserve the trace directory from the demo decision, including trace.jsonl, execution.jsonl, and progress.json when present.
   produce_return_packet:
     description: Return status, selected route, artifacts, evidence handles, blockers, and trace paths to durable-executor when invoked through a durable handoff.
 trace:
@@ -964,6 +1074,8 @@ proof:
     - mechanical draft sensemade before semantic edits
     - coverage matrix completed before install
     - validate/imports/deps/test pass
+    - phase plan and current-phase action checklist produced
+    - progress ledger and progress report generated when proving value
     - demo decision trace captured
     - trace alignment status reported as pass, unproven, or fail
 tests:
@@ -1046,6 +1158,27 @@ tests:
       forbid:
         - patch_yaml_from_memory
         - skip_current_spec_sensemake
+  - name: update existing skillspec creator routes to revision
+    input: Update skillspec-creator existing skillspec yaml with plan act progress command goodness
+    expect:
+      route: revise_existing_skillspec
+      matched_rules:
+        - revision_starts_with_grammar_and_current_spec
+      forbid:
+        - patch_yaml_from_memory
+        - skip_current_spec_sensemake
+  - name: phase progress commands route to value proof
+    input: Prove the ported skill with skillspec plan, skillspec act, skillspec progress, and value report
+    expect:
+      route: prove_skill_value
+      matched_rules:
+        - prove_requests_route_to_value
+      after_success:
+        - decide_demo
+        - trace_align
+        - value_report
+      forbid:
+        - claim_unproven_execution_evidence
   - name: imports and resources stay connected
     input: This skill has references, resources, scripts, and assets to extract
     expect:
@@ -1103,9 +1236,9 @@ metadata:
     routes: 5
     rules: 11
     dependency_checks: 4
-    command_templates: 27
+    command_templates: 32
     recipes: 5
-    tests: 10
+    tests: 12
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:
@@ -1147,8 +1280,8 @@ metadata:
       status: reviewed
       review_note: Source examples are represented as command templates rather than executable snippets.
     - prose_span: Revising Existing SkillSpecs and Done Definition
-      obligation: For revisions use grammar/current spec handles, then validate, imports check, deps check, test, decide, align, compile, and report value.
-      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
+      obligation: For revisions use grammar/current spec handles, plan ordered phases, act on the current phase, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value.
+      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
       confidence: high
       status: proven_by_tests
       review_note: Execution alignment can remain unproven if no real execution ledger is available.

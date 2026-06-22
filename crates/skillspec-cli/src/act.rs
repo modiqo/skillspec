@@ -1,8 +1,10 @@
 use crate::decision::{Decision, RouteSelectionBasis};
+use crate::error::{Error, Result};
 use crate::model::{ExecutionPhase, HandoffBoundary, RouteHandoff, RouteId, SkillSpec};
 use crate::trace::TraceWriteResult;
 use serde::Serialize;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ActReport {
@@ -88,12 +90,32 @@ pub fn build_report(
     decision: &Decision,
     trace: Option<&TraceWriteResult>,
 ) -> ActReport {
+    build_report_for_phase(spec, decision, trace, None).expect("phase is not specified")
+}
+
+pub fn build_report_for_phase(
+    spec: &SkillSpec,
+    decision: &Decision,
+    trace: Option<&TraceWriteResult>,
+    phase_id: Option<&str>,
+) -> Result<ActReport> {
     let phases = decision
         .execution_plan
         .as_ref()
         .map(|plan| plan.phases.iter().map(phase_report).collect::<Vec<_>>())
         .unwrap_or_default();
-    let current_phase = phases.first().cloned();
+    let current_phase = match phase_id {
+        Some(phase_id) => Some(
+            phases
+                .iter()
+                .find(|phase| phase.id == phase_id)
+                .cloned()
+                .ok_or_else(|| Error::InvalidInput {
+                    message: format!("unknown execution phase {phase_id:?}"),
+                })?,
+        ),
+        None => phases.first().cloned(),
+    };
     let selected_route = decision.route.as_ref().map(|route| route.0.clone());
     let selected_route_model = selected_route_ref(spec, decision.route.as_ref());
     let forbidden = forbidden_items(decision, current_phase.as_ref(), selected_route_model);
@@ -107,7 +129,7 @@ pub fn build_report(
     );
     let before_tool_call = before_tool_call(&forbidden, !decision.elicit.is_empty());
 
-    ActReport {
+    Ok(ActReport {
         input: decision.input.clone(),
         selected_route,
         route_selection: decision
@@ -151,6 +173,20 @@ pub fn build_report(
             trace_jsonl: trace.trace_jsonl.display().to_string(),
             summary_json: trace.summary_json.display().to_string(),
         }),
+    })
+}
+
+pub fn trace_for_run(run_dir: &Path) -> ActTrace {
+    let run_id = run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    ActTrace {
+        run_id,
+        run_dir: run_dir.display().to_string(),
+        trace_jsonl: run_dir.join("trace.jsonl").display().to_string(),
+        summary_json: run_dir.join("summary.json").display().to_string(),
     }
 }
 
@@ -244,6 +280,58 @@ pub fn render(report: &ActReport) -> String {
         output.push_str(&format!("[ ] {item}\n"));
     }
 
+    output.trim_end().to_owned()
+}
+
+pub fn render_plan(report: &ActReport) -> String {
+    let mut output = String::new();
+    output.push_str("SkillSpec phase plan\n\n");
+    output.push_str(&format!("Input: {}\n", report.input));
+    match &report.selected_route {
+        Some(route) => output.push_str(&format!("Selected route: {route}\n")),
+        None => output.push_str("Selected route: none\n"),
+    }
+    if let Some(selection) = &report.route_selection {
+        output.push_str(&format!("Route selection: {}\n", selection.basis));
+    }
+    if let Some(trace) = &report.trace {
+        output.push_str(&format!("Run: {}\n", trace.run_dir));
+    }
+
+    output.push_str("\nPhases:\n");
+    if report.phases.is_empty() {
+        output.push_str("- no execution plan; selected route is the active scope\n");
+    } else {
+        for (index, phase) in report.phases.iter().enumerate() {
+            output.push_str(&format!(
+                "{}. {} owned by {}\n",
+                index + 1,
+                phase.id,
+                phase.owner_skill
+            ));
+            if let Some(description) = &phase.description {
+                output.push_str(&format!("   description: {description}\n"));
+            }
+            if !phase.requires.is_empty() {
+                output.push_str(&format!("   requires: {}\n", phase.requires.join(", ")));
+            }
+            if !phase.forbid.is_empty() {
+                output.push_str(&format!("   forbids: {}\n", phase.forbid.join(", ")));
+            }
+        }
+    }
+
+    if let Some(phase) = &report.current_phase {
+        output.push_str(&format!("\nCurrent phase: {}\n", phase.id));
+        output.push_str(&format!(
+            "Next: skillspec act <skill.spec.yml> --input '<task>' --phase {}\n",
+            phase.id
+        ));
+    }
+    if !report.required_transitions.is_empty() {
+        output.push_str("\nTransitions:\n");
+        write_bullets(&mut output, &report.required_transitions);
+    }
     output.trim_end().to_owned()
 }
 

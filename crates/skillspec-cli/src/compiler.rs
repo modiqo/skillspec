@@ -69,23 +69,26 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
         "1. Load `./skill.spec.yml` from this skill folder before taking task actions.\n",
     );
     output.push_str("2. When the `skillspec` CLI is available and the spec shape is unfamiliar, run `skillspec sensemake ./skill.spec.yml --view index` to learn the section roles, counts, query handles, and navigation grammar without dumping the full YAML.\n");
-    output.push_str("3. Then run the current-route action checklist:\n\n");
+    output
+        .push_str("3. Then create the ordered phase plan and current-route action checklist:\n\n");
     output.push_str("   ```bash\n");
-    output.push_str("   skillspec act ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("   skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("   skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>\n");
     output.push_str("   ```\n\n");
     output.push_str("4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/durable-executor-spec` before passing `--input`.\n");
     output.push_str("5. Preserve the emitted trace `run_dir`.\n");
     output.push_str(
-        "6. Read the full action checklist before using tools. Treat it as the active execution SOP, not as advice.\n",
+        "6. Read the full phase plan and action checklist before using tools. Treat them as the active execution SOP, not as advice.\n",
     );
-    output.push_str("7. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.\n");
-    output.push_str("8. Before every substrate/tool call, apply the checklist's allow/deny questions. The selected route and matched rules override lower-level skill defaults and generic tool preferences.\n");
-    output.push_str("9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
-    output.push_str("10. If `skillspec act` is unavailable, fall back to `skillspec decide`, then manually construct the same current-route checklist before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    output.push_str("7. For each execution phase, run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show ./skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.\n");
+    output.push_str("8. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.\n");
+    output.push_str("9. Before every substrate/tool call, apply the checklist's allow/deny questions. The selected route and matched rules override lower-level skill defaults and generic tool preferences.\n");
+    output.push_str("10. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
+    output.push_str("11. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
     write_authoring_contract(output);
     write_durable_handoff_contract(output);
     output.push_str("## How To Execute The Structure\n\n");
-    output.push_str("Before the first task action, use `skillspec act` to convert the decision output and relevant spec sections into a current-route OODA checklist:\n\n");
+    output.push_str("Before the first task action, use `skillspec plan` and `skillspec act` to convert the decision output and relevant spec sections into an ordered phase plan plus a current-route OODA checklist:\n\n");
     output.push_str("- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.\n");
     output.push_str("- execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.\n");
     output.push_str("- route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.\n");
@@ -103,7 +106,12 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("## Quick Commands\n\n");
     output.push_str("```bash\n");
     output.push_str("skillspec sensemake ./skill.spec.yml --view index\n");
-    output.push_str("skillspec act ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
+    output.push_str("skillspec act ./skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n");
+    output.push_str("skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n");
+    output.push_str(
+        "skillspec progress show ./skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
+    );
     output.push_str("skillspec validate ./skill.spec.yml\n");
     output.push_str("skillspec imports check ./skill.spec.yml\n");
     output.push_str("skillspec test ./skill.spec.yml\n");
@@ -113,7 +121,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec query ./skill.spec.yml command:<id>.requires\n");
     output.push_str("skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
-    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace <execution-ledger.jsonl>\n");
+    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\"\n");
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
     output.push_str("When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the user-facing alignment proof rows. Command proof must name only the command basename, never raw args. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.\n\n");
@@ -761,18 +769,19 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- `elicit` entries require bounded user questions before guessing.\n");
     output.push_str("- Use the scenario tests as examples of expected behavior.\n");
     output.push_str("- When unfamiliar with the spec shape, run `skillspec sensemake <skill-folder>/skill.spec.yml --view index` to get section roles, counts, ids, and query commands without consuming the whole spec.\n");
-    output.push_str("- When the `skillspec` CLI is available, run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --trace-dir \"${PWD}/.skillspec/traces\"` before substrate tools. Treat its current-route checklist as the active execution SOP.\n");
+    output.push_str("- When the `skillspec` CLI is available, run `skillspec plan <skill-folder>/skill.spec.yml --input='<task>' --trace-dir \"${PWD}/.skillspec/traces\"`, preserve the printed `run_dir`, then run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before substrate tools. Treat the phase plan and current-route checklist as the active execution SOP.\n");
     output.push_str("- The `skillspec act` checklist is an OODA loop for the selected route: observe the task and trace, orient with matched rules and current phase, decide the next allowed action, act with evidence capture, then repeat before the next tool call.\n");
     output.push_str("- The selected route and matched rules override lower-level skill defaults and generic tool preferences. If a lower-level skill suggests a forbidden tool, stop and follow the SkillSpec route.\n");
-    output.push_str("- If `skillspec act` is unavailable, fall back to `skillspec decide` plus a manually constructed allow/deny checklist before tool use. Prefer `skillspec explain` for human-facing route rationale.\n");
+    output.push_str("- For each execution phase, run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show <skill-folder>/skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.\n");
+    output.push_str("- If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide` plus a manually constructed allow/deny checklist and progress notes before tool use. Prefer `skillspec explain` for human-facing route rationale.\n");
     output.push_str("- After `skillspec act`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.\n");
     output.push_str("- Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.\n");
-    output.push_str("- When invoking `skillspec act` or `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/durable-executor-spec`, `$durable-executor-spec`, or `/my-skill` before setting `--input`.\n");
+    output.push_str("- When invoking `skillspec plan`, `skillspec act`, or `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/durable-executor-spec`, `$durable-executor-spec`, or `/my-skill` before setting `--input`.\n");
     output.push_str("- Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.\n");
     output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
-    output.push_str("- After `skillspec act` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
-    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <jsonl>` when structured action evidence exists. Include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, summary, and any failed/unproven checks in the completion report.\n");
+    output.push_str("- After `skillspec plan` or `skillspec act` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
+    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <run_dir>/execution.jsonl` when structured action evidence exists. Include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, summary, and any failed/unproven checks in the completion report.\n");
     output.push_str("- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.\n");
     output.push_str("- Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.\n\n");
     output.push_str("Minimum final response shape when workspace evidence exists:\n\n");
@@ -828,9 +837,10 @@ fn write_entry_gate(output: &mut String, spec: &SkillSpec) {
 
     output.push_str("## Entry Gate\n\n");
     if entry.decision_required {
-        output.push_str("- Before any task action, run `skillspec act ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"` and read the current-route action checklist.\n");
-        output.push_str("- Until that checklist is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.\n");
+        output.push_str("- Before any task action, run `skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"`, preserve the printed `run_dir`, then run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>`, and read the ordered phase plan plus current-route action checklist.\n");
+        output.push_str("- Until that plan and checklist are read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.\n");
         output.push_str("- The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.\n");
+        output.push_str("- After each phase action, record structured progress in `<run_dir>/execution.jsonl` and run `skillspec progress show ./skill.spec.yml --run <run_dir>` before moving to the next phase.\n");
     }
     if !entry.supersedes_skills.is_empty() {
         let _ = writeln!(
@@ -1345,14 +1355,23 @@ fn write_runtime_commands(output: &mut String) {
     output
         .push_str("skillspec query <skill-folder>/skill.spec.yml command:<command-id>.requires\n");
     output.push_str(
-        "skillspec act <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
+        "skillspec plan <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
+    );
+    output.push_str(
+        "skillspec act <skill-folder>/skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n",
+    );
+    output.push_str(
+        "skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n",
+    );
+    output.push_str(
+        "skillspec progress show <skill-folder>/skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
     );
     output.push_str(
         "skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
     );
     output.push_str("skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec trace compact \"${PWD}/.skillspec/traces/<run-id>\"\n");
-    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace <execution-ledger.jsonl>\n");
+    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\"\n");
     output.push_str("```\n");
 }
 
