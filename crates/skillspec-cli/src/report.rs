@@ -24,6 +24,19 @@ pub fn import_ok(path: &Path, out: &Path, spec: &SkillSpec) -> Result<()> {
         out.display(),
         spec.review_required.len()
     )?;
+    writeln!(
+        stdout,
+        "next: run `skillspec grammar sensemake --view porting` before semantic review"
+    )?;
+    writeln!(
+        stdout,
+        "next: run `skillspec sensemake {} --view index` to inspect draft coverage",
+        out.display()
+    )?;
+    writeln!(
+        stdout,
+        "next: run `skillspec grammar checklist --for import-skill` and fill the coverage matrix before install"
+    )?;
     if spec.imports.is_empty() {
         writeln!(stdout, "imports: none inferred")?;
     } else {
@@ -147,6 +160,17 @@ pub fn trace_written(trace: &TraceWriteResult) -> Result<()> {
 
 pub fn align(report: &AlignReport) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
+    let execution_not_evaluated = matches!(
+        report.summary.execution_alignment,
+        crate::align::AlignLayerStatus::NotEvaluated
+    );
+    writeln!(
+        stdout,
+        "alignment: decision={}, execution={}",
+        align_layer_status_name(report.summary.decision_alignment),
+        align_layer_status_name(report.summary.execution_alignment)
+    )?;
+    writeln!(stdout, "scope: {}", align_scope_name(report.summary.scope))?;
     writeln!(stdout, "status: {}", align_status_name(report.status))?;
     writeln!(stdout, "spec: {}", report.spec)?;
     writeln!(stdout, "decision_trace: {}", report.decision_trace)?;
@@ -196,14 +220,22 @@ pub fn align(report: &AlignReport) -> Result<()> {
         report.summary.decision_checks.unproven,
         report.summary.decision_checks.total
     )?;
-    writeln!(
-        stdout,
-        "proof: execution obligations {} pass, {} fail, {} unproven ({} total)",
-        report.summary.execution_obligations.pass,
-        report.summary.execution_obligations.fail,
-        report.summary.execution_obligations.unproven,
-        report.summary.execution_obligations.total
-    )?;
+    if execution_not_evaluated {
+        writeln!(
+            stdout,
+            "proof: execution obligations not evaluated because no execution trace was supplied ({} obligation(s) require execution evidence)",
+            report.summary.execution_obligations.total
+        )?;
+    } else {
+        writeln!(
+            stdout,
+            "proof: execution obligations {} pass, {} fail, {} unproven ({} total)",
+            report.summary.execution_obligations.pass,
+            report.summary.execution_obligations.fail,
+            report.summary.execution_obligations.unproven,
+            report.summary.execution_obligations.total
+        )?;
+    }
     if !report.summary.unproven_obligation_kinds.is_empty() {
         let groups = report
             .summary
@@ -219,10 +251,20 @@ pub fn align(report: &AlignReport) -> Result<()> {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        writeln!(stdout, "unproven_by_kind: {groups}")?;
+        let label = if execution_not_evaluated {
+            "execution_requirements_by_kind"
+        } else {
+            "unproven_by_kind"
+        };
+        writeln!(stdout, "{label}: {groups}")?;
     }
     if !report.summary.evidence_gaps.is_empty() {
-        writeln!(stdout, "evidence_gaps:")?;
+        let label = if execution_not_evaluated {
+            "evidence_needed_for_execution_trace"
+        } else {
+            "evidence_gaps"
+        };
+        writeln!(stdout, "{label}:")?;
         for gap in &report.summary.evidence_gaps {
             match gap.obligation_kind {
                 Some(kind) => writeln!(
@@ -246,13 +288,23 @@ pub fn align(report: &AlignReport) -> Result<()> {
         }
     }
     if !report.proof_rows.is_empty() {
-        writeln!(stdout, "alignment_evidence:")?;
+        let label = if execution_not_evaluated {
+            "execution_evidence_needed"
+        } else {
+            "alignment_evidence"
+        };
+        writeln!(stdout, "{label}:")?;
         for row in &report.proof_rows {
             writeln!(stdout, "  - requirement: {}", row.requirement)?;
             writeln!(stdout, "    obligation: {}", row.obligation)?;
             writeln!(stdout, "    expected: {}", row.expected_evidence)?;
             writeln!(stdout, "    observed: {}", row.observed_evidence)?;
-            writeln!(stdout, "    status: {}", proof_status_name(row.status))?;
+            let status = if execution_not_evaluated && row.status == AlignProofStatus::Unproven {
+                "not_evaluated"
+            } else {
+                proof_status_name(row.status)
+            };
+            writeln!(stdout, "    status: {status}")?;
             writeln!(stdout, "    explanation: {}", row.explanation)?;
         }
     }
@@ -267,14 +319,23 @@ pub fn align(report: &AlignReport) -> Result<()> {
         )?;
     }
     if !report.obligations.is_empty() {
-        writeln!(stdout, "obligations:")?;
+        let label = if execution_not_evaluated {
+            "execution_obligations_not_evaluated"
+        } else {
+            "obligations"
+        };
+        writeln!(stdout, "{label}:")?;
         for obligation in &report.obligations {
+            let status =
+                if execution_not_evaluated && obligation.status == AlignCheckStatus::Unproven {
+                    "not_evaluated"
+                } else {
+                    check_status_name(obligation.status)
+                };
             writeln!(
                 stdout,
                 "  - {}: {} ({})",
-                obligation.id,
-                check_status_name(obligation.status),
-                obligation.message
+                obligation.id, status, obligation.message
             )?;
         }
     }
@@ -310,6 +371,22 @@ fn align_layer_name(kind: crate::align::AlignLayerKind) -> &'static str {
     match kind {
         crate::align::AlignLayerKind::DecisionReplay => "decision_replay",
         crate::align::AlignLayerKind::ExecutionProof => "execution_proof",
+    }
+}
+
+fn align_scope_name(scope: crate::align::AlignScope) -> &'static str {
+    match scope {
+        crate::align::AlignScope::DecisionTraceOnly => "decision_trace_only",
+        crate::align::AlignScope::DecisionAndExecutionTrace => "decision_and_execution_trace",
+    }
+}
+
+fn align_layer_status_name(status: crate::align::AlignLayerStatus) -> &'static str {
+    match status {
+        crate::align::AlignLayerStatus::Pass => "pass",
+        crate::align::AlignLayerStatus::Fail => "fail",
+        crate::align::AlignLayerStatus::Incomplete => "incomplete",
+        crate::align::AlignLayerStatus::NotEvaluated => "not_evaluated",
     }
 }
 

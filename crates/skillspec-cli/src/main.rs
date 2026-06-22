@@ -4,6 +4,7 @@ mod compiler;
 mod decision;
 mod deps;
 mod error;
+mod grammar;
 mod importer;
 mod imports;
 mod install;
@@ -99,6 +100,11 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Teach the embedded SkillSpec grammar and porting coverage workflow")]
+    Grammar {
+        #[command(subcommand)]
+        command: GrammarCommand,
+    },
     #[command(about = "Inspect, compact, or align SkillSpec decision traces")]
     Trace {
         #[command(subcommand)]
@@ -147,6 +153,34 @@ enum CompileTarget {
     CodexSkill,
     ClaudeSkill,
     Markdown,
+}
+
+#[derive(Debug, Subcommand)]
+enum GrammarCommand {
+    #[command(about = "Explain embedded grammar affordances progressively")]
+    Sensemake {
+        /// Output detail level.
+        #[arg(long, value_enum, default_value_t = GrammarViewArg::Index)]
+        view: GrammarViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Show a coverage checklist for semantic skill porting")]
+    Checklist {
+        /// Checklist workflow to show.
+        #[arg(long = "for", value_enum, default_value_t = GrammarChecklistForArg::ImportSkill)]
+        for_subject: GrammarChecklistForArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Print or describe the embedded SkillSpec JSON schema")]
+    Schema {
+        /// Emit the embedded JSON schema.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -462,6 +496,19 @@ enum SenseViewArg {
     Full,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum GrammarViewArg {
+    Index,
+    Summary,
+    Porting,
+    Full,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum GrammarChecklistForArg {
+    ImportSkill,
+}
+
 fn main() {
     if let Err(error) = run() {
         report::error(error);
@@ -550,6 +597,31 @@ fn run() -> Result<()> {
                 report::text(&sensemake::render_refs(&report))?;
             }
         }
+        Command::Grammar { command } => match command {
+            GrammarCommand::Sensemake { view, json } => {
+                let report = grammar::sensemake(view.into());
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&grammar::render_sensemake(&report))?;
+                }
+            }
+            GrammarCommand::Checklist { for_subject, json } => {
+                let report = grammar::checklist(for_subject.into());
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&grammar::render_checklist(&report))?;
+                }
+            }
+            GrammarCommand::Schema { json } => {
+                if json {
+                    report::json(&grammar::schema_json()?)?;
+                } else {
+                    report::text(&grammar::render_schema_summary())?;
+                }
+            }
+        },
         Command::Trace { command } => match command {
             TraceCommand::Compact { run_dir } => {
                 let trace = trace::compact(&run_dir)?;
@@ -850,6 +922,25 @@ impl From<SenseViewArg> for sensemake::View {
             SenseViewArg::Index => Self::Index,
             SenseViewArg::Summary => Self::Summary,
             SenseViewArg::Full => Self::Full,
+        }
+    }
+}
+
+impl From<GrammarViewArg> for grammar::GrammarView {
+    fn from(value: GrammarViewArg) -> Self {
+        match value {
+            GrammarViewArg::Index => Self::Index,
+            GrammarViewArg::Summary => Self::Summary,
+            GrammarViewArg::Porting => Self::Porting,
+            GrammarViewArg::Full => Self::Full,
+        }
+    }
+}
+
+impl From<GrammarChecklistForArg> for grammar::ChecklistSubject {
+    fn from(value: GrammarChecklistForArg) -> Self {
+        match value {
+            GrammarChecklistForArg::ImportSkill => Self::ImportSkill,
         }
     }
 }

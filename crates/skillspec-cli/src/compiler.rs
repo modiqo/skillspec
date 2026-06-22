@@ -26,6 +26,7 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
 
     write_overview(&mut output, spec, target);
     write_runtime_contract(&mut output);
+    write_authoring_contract(&mut output);
     write_entry(&mut output, spec);
     write_activation(&mut output, spec);
     write_routes(&mut output, spec);
@@ -81,6 +82,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("8. Materialize the active contract described below, then execute only actions that satisfy it.\n");
     output.push_str("9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
     output.push_str("10. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    write_authoring_contract(output);
     write_durable_handoff_contract(output);
     output.push_str("## How To Execute The Structure\n\n");
     output.push_str("Before the first task action, convert the decision output and relevant spec sections into a checklist:\n\n");
@@ -137,6 +139,49 @@ fn write_durable_handoff_contract(output: &mut String) {
     output.push_str("- Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.\n");
     output.push_str("- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.\n");
     output.push_str("- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.\n\n");
+}
+
+fn write_authoring_contract(output: &mut String) {
+    output.push_str(
+        "## Authoring And Revision Contract
+
+",
+    );
+    output.push_str(
+        "When importing, creating, revising, or extending this SkillSpec-backed skill, use the embedded grammar teacher before editing `skill.spec.yml`:
+
+",
+    );
+    output.push_str(
+        "```bash
+",
+    );
+    output.push_str(
+        "skillspec grammar sensemake --view index
+",
+    );
+    output.push_str(
+        "skillspec grammar sensemake --view porting
+",
+    );
+    output.push_str(
+        "skillspec grammar checklist --for import-skill
+",
+    );
+    output.push_str(
+        "```
+
+",
+    );
+    output.push_str("- Treat the checklist as the review gate for semantic edits: activation, routes, rules, elicitations, imports/resources, commands/deps, procedures, tests, proof, and contract quality.
+");
+    output.push_str("- Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
+");
+    output.push_str("- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
+");
+    output.push_str("- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
+
+");
 }
 
 fn write_imports(output: &mut String, spec: &SkillSpec) {
@@ -1556,6 +1601,10 @@ mod tests {
         assert!(output.contains("--trace-dir"));
         assert!(output.contains("trace align"));
         assert!(output.contains("Completion Report"));
+        assert!(output.contains("Authoring And Revision Contract"));
+        assert!(output.contains("skillspec grammar sensemake --view porting"));
+        assert!(output.contains("skillspec grammar checklist --for import-skill"));
+        assert!(output.contains("coverage matrix"));
         assert!(output.contains("run_dir"));
         assert!(output.contains("status meaning"));
         assert!(output.contains("decision-replay and execution-proof layer results"));

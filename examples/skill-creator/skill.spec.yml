@@ -1,0 +1,842 @@
+schema: skillspec/v0
+id: skill.creator
+title: Skill Creator
+description: SkillSpec-backed contract for creating, updating, validating, and forward-testing Codex skills.
+activation:
+  summary: Create or update a Codex skill with appropriate resources, metadata, validation, and forward-testing.
+  keywords:
+    - create a skill
+    - update a skill
+    - skill creator
+    - skill authoring
+    - SKILL.md
+    - agents/openai.yaml
+    - init_skill.py
+    - quick_validate.py
+    - forward-test a skill
+    - progressive disclosure
+    - bundled resources
+    - skill frontmatter
+    - validation integrity
+  priority: domain
+applies_when:
+  - user_intent:
+      - create a new Codex skill
+      - update an existing skill
+      - validate a skill folder
+      - generate agents/openai.yaml metadata
+      - forward-test a skill with subagents
+entry:
+  prompt: Choose the skill-authoring route before creating files or running bundled scripts.
+  decision_required: true
+  forbid_before_decision:
+    - create_skill_files_before_understanding_examples
+    - run_init_skill_without_user_location_or_default
+    - forward_test_with_leaked_expected_answer
+routes:
+  - id: create_new_skill
+    label: Create a new skill
+    rank: 1
+    description: Use when the user wants a new skill folder and SKILL.md from examples, requirements, or a requested capability.
+    execution_plan:
+      mode: ordered
+      reason: New skills need concrete examples and resource planning before files are initialized.
+      phases:
+        - id: understand_examples
+          owner_skill: skill-creator
+          description: Gather or infer concrete task examples, trigger phrases, and expected skill behavior.
+          requires:
+            - understand_skill_with_concrete_examples
+          forbid:
+            - create_skill_files_before_understanding_examples
+        - id: plan_reusable_contents
+          owner_skill: skill-creator
+          description: Decide which scripts, references, and assets are actually needed.
+          requires:
+            - plan_reusable_resources
+          forbid:
+            - create_unused_resource_directories
+            - duplicate_reference_material_in_skill_body
+        - id: initialize_skill
+          owner_skill: skill-creator
+          description: Run the bundled initializer only after the destination and name are known.
+          requires:
+            - choose_skill_location
+            - run_init_skill
+          forbid:
+            - run_init_skill_without_user_location_or_default
+        - id: implement_skill
+          owner_skill: skill-creator
+          description: Write concise SKILL.md guidance and implement required resources.
+          requires:
+            - write_concise_skill_body
+            - generate_agents_metadata
+        - id: validate_skill
+          owner_skill: skill-creator
+          description: Run quick validation and fix reported failures.
+          requires:
+            - validate_skill_folder
+        - id: iterate_skill
+          owner_skill: skill-creator
+          description: Forward-test complex skills and tighten the skill based on fresh evidence.
+          requires:
+            - consider_forward_testing
+  - id: update_existing_skill
+    label: Update an existing skill
+    rank: 2
+    description: Use when a skill folder already exists and the user wants to revise SKILL.md, resources, metadata, or tests.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: inspect_existing_skill
+          owner_skill: skill-creator
+          requires:
+            - read_existing_skill
+            - rebuild_context_from_source_artifacts
+        - id: revise_resources
+          owner_skill: skill-creator
+          requires:
+            - plan_reusable_resources
+            - remove_placeholder_files
+        - id: validate_update
+          owner_skill: skill-creator
+          requires:
+            - validate_skill_folder
+            - verify_agents_metadata_matches_skill
+        - id: iterate_update
+          owner_skill: skill-creator
+          requires:
+            - consider_forward_testing
+  - id: generate_agents_metadata
+    label: Generate agents metadata
+    rank: 3
+    description: Use when the task is specifically about creating or refreshing agents/openai.yaml values.
+    checks:
+      - load_openai_yaml_reference
+      - verify_agents_metadata_matches_skill
+  - id: validate_skill
+    label: Validate a skill folder
+    rank: 4
+    description: Use when the task is to run or explain quick validation for a skill folder.
+    checks:
+      - validate_skill_folder
+  - id: forward_test_skill
+    label: Forward-test a skill
+    rank: 5
+    description: Use when the user asks to stress-test a skill with fresh subagent-style tasks.
+    checks:
+      - protect_validation_integrity
+      - review_forward_test_evidence
+rules:
+  - id: route_create_skill_requests
+    when:
+      user_says_any:
+        - create a skill
+        - create a new skill
+        - create a new Codex skill
+        - create new skill
+        - new skill
+        - build a skill
+        - make a skill
+    prefer: create_new_skill
+    elicit:
+      - choose_skill_location
+      - choose_resource_kinds
+    forbid:
+      - create_skill_files_before_understanding_examples
+      - run_init_skill_without_user_location_or_default
+      - create_auxiliary_docs
+    after_success:
+      - validate_skill_folder
+      - consider_forward_testing
+    reason: The source skill requires examples, resource planning, initialization, validation, and iteration in order.
+  - id: route_update_skill_requests
+    when:
+      user_says_any:
+        - update a skill
+        - revise a skill
+        - improve existing skill
+        - existing skill
+    prefer: update_existing_skill
+    forbid:
+      - overwrite_user_skill_changes_without_review
+      - duplicate_reference_material_in_skill_body
+      - leave_stale_agents_metadata
+    after_success:
+      - validate_skill_folder
+      - verify_agents_metadata_matches_skill
+    reason: Existing skills should be read and revised in place, not reinitialized blindly.
+  - id: route_agents_metadata_requests
+    when:
+      user_says_any:
+        - agents/openai.yaml
+        - openai.yaml
+        - display_name
+        - short_description
+        - default_prompt
+        - generate metadata
+    prefer: generate_agents_metadata
+    forbid:
+      - invent_optional_interface_fields
+      - skip_openai_yaml_reference
+      - leave_stale_agents_metadata
+    after_success:
+      - verify_agents_metadata_matches_skill
+    reason: The prose requires reading the reference before generating UI metadata.
+  - id: route_validation_requests
+    when:
+      user_says_any:
+        - validate skill
+        - quick_validate.py
+        - check skill folder
+        - validate the skill folder
+    prefer: validate_skill
+    after_success:
+      - fix_validation_failures
+    reason: Validation catches YAML frontmatter, required fields, and naming issues early.
+  - id: route_forward_testing_requests
+    when:
+      user_says_any:
+        - forward-test
+        - forward testing
+        - subagent
+        - stress test
+    prefer: forward_test_skill
+    forbid:
+      - leak_expected_answer_to_subagent
+      - pass_prior_conclusions_to_validator
+      - leave_subagent_artifacts_between_iterations
+    after_success:
+      - review_forward_test_evidence
+    reason: Forward-testing is an evaluation surface and must not leak the intended answer or prior diagnosis.
+  - id: risky_forward_testing_requires_approval
+    when:
+      user_says_any:
+        - production
+        - live system
+        - long time
+        - additional approval
+    elicit:
+      - approve_forward_testing_risk
+    forbid:
+      - start_risky_forward_test_without_approval
+    reason: The source skill requires approval when forward-testing may be slow, approval-gated, or affect live systems.
+  - id: keep_skill_concise
+    when:
+      user_says_any:
+        - SKILL.md
+        - skill body
+        - instructions
+        - references
+    forbid:
+      - duplicate_reference_material_in_skill_body
+      - write_verbose_generic_explanations
+      - create_auxiliary_docs
+      - oversized_skill_body
+    reason: The prose treats context as scarce and keeps detailed material in references when possible.
+  - id: frontmatter_controls_activation
+    when:
+      user_says_any:
+        - frontmatter
+        - description
+        - trigger
+        - when to use
+        - skill gets used
+    forbid:
+      - put_when_to_use_only_in_body
+      - include_non_name_description_frontmatter_fields
+    after_success:
+      - verify_frontmatter_trigger_surface
+      - verify_frontmatter_only_name_description
+    reason: The source prose says Codex selects skills from frontmatter name and description; trigger guidance must live there, not only in the body.
+  - id: progressive_disclosure_preserves_context
+    when:
+      user_says_any:
+        - progressive disclosure
+        - long examples
+        - references
+        - reference examples
+        - framework reference
+        - long framework
+        - multiple frameworks
+        - variants
+        - split content
+    forbid:
+      - duplicate_reference_material_in_skill_body
+      - deeply_nested_references
+      - oversized_skill_body
+      - create_auxiliary_docs
+    after_success:
+      - enforce_progressive_disclosure
+      - keep_references_one_level
+    reason: Long or variant-specific material belongs in directly linked references, not in a large monolithic SKILL.md.
+  - id: resources_must_be_reusable_and_needed
+    when:
+      user_says_any:
+        - scripts
+        - references
+        - assets
+        - bundled resources
+        - examples
+        - placeholder
+    forbid:
+      - create_unused_resource_directories
+      - keep_placeholder_examples
+      - create_auxiliary_docs
+    after_success:
+      - verify_no_unused_resources
+      - remove_placeholder_files
+    reason: The source prose says bundled resources should directly support the skill and placeholder/example files should be replaced or removed.
+  - id: scripts_require_execution_evidence
+    when:
+      user_says_any:
+        - scripts
+        - deterministic reliability
+        - repeated code
+        - executable code
+    after_success:
+      - test_added_scripts
+    forbid:
+      - trust_unrun_script_changes
+    reason: Added scripts must be tested by running them, with representative sampling when many similar scripts exist.
+  - id: forward_testing_uses_user_shaped_prompts
+    when:
+      user_says_any:
+        - forward-test
+        - forward testing
+        - subagent
+        - stress test
+        - validate whether a skill works
+    forbid:
+      - leak_expected_answer_to_subagent
+      - pass_prior_conclusions_to_validator
+      - review_skill_instead_of_user_task_prompt
+      - leave_subagent_artifacts_between_iterations
+    after_success:
+      - pass_raw_artifacts_to_forward_test
+      - cleanup_forward_test_artifacts
+      - review_forward_test_evidence
+    reason: Forward-testing should mimic a user task with raw artifacts and fresh context; it should not ask a subagent to review the intended fix.
+elicitations:
+  choose_skill_location:
+    question: Where should the skill be created?
+    required_when:
+      - route: create_new_skill
+    choices:
+      - id: codex_home
+        label: $CODEX_HOME/skills
+        description: Use the default auto-discovered Codex skill root, falling back to ~/.codex/skills.
+        sets:
+          output_root: "${CODEX_HOME:-$HOME/.codex}/skills"
+      - id: custom_path
+        label: Custom path
+        description: Use a user-provided folder when the skill should live outside the default root.
+        sets:
+          output_root: user_provided
+    default: codex_home
+  choose_resource_kinds:
+    question: Which bundled resource kinds are needed?
+    required_when:
+      - route: create_new_skill
+    choices:
+      - id: scripts
+        label: Scripts
+        description: Deterministic code for repeated or fragile operations.
+        sets:
+          resource_kind: scripts
+      - id: references
+        label: References
+        description: On-demand documentation, schemas, procedures, or domain guidance.
+        sets:
+          resource_kind: references
+      - id: assets
+        label: Assets
+        description: Files used as output inputs, templates, images, fonts, or boilerplate.
+        sets:
+          resource_kind: assets
+    max_choices: 3
+  approve_forward_testing_risk:
+    question: Should forward-testing proceed despite time, approval, or live-system risk?
+    required_when:
+      - route: forward_test_skill
+    choices:
+      - id: yes
+        label: Proceed
+        description: Run the proposed forward-test prompt after showing it to the user.
+        sets:
+          approval: true
+      - id: no
+        label: Stop
+        description: Do not launch the risky forward-test.
+        sets:
+          approval: false
+    default: no
+states:
+  start:
+    do:
+      - decide_route
+    next: understand
+  understand:
+    do:
+      - understand_skill_with_concrete_examples
+    next: plan
+  plan:
+    do:
+      - plan_reusable_resources
+    next: initialize_or_update
+  initialize_or_update:
+    do:
+      - run_init_skill_when_needed
+      - edit_existing_skill_when_present
+    next: implement
+  implement:
+    do:
+      - write_concise_skill_body
+      - implement_scripts_references_assets
+      - generate_agents_metadata
+    next: validate
+  validate:
+    do:
+      - validate_skill_folder
+    next: iterate
+  iterate:
+    do:
+      - consider_forward_testing
+      - revise_from_evidence
+    next: done
+  done:
+    do:
+      - report_skill_artifacts_and_remaining_risk
+dependencies:
+  init_skill_script:
+    kind: file
+    description: Bundled initializer script copied from the source skill.
+    path: scripts/init_skill.py
+    check:
+      path: scripts/init_skill.py
+  generate_openai_yaml_script:
+    kind: file
+    description: Bundled metadata generator script copied from the source skill.
+    path: scripts/generate_openai_yaml.py
+    check:
+      path: scripts/generate_openai_yaml.py
+  quick_validate_script:
+    kind: file
+    description: Bundled quick validation script copied from the source skill.
+    path: scripts/quick_validate.py
+    check:
+      path: scripts/quick_validate.py
+imports:
+  openai_yaml_reference:
+    path: references/openai_yaml.md
+    role: reference
+    description: Field definitions and examples for agents/openai.yaml.
+    load: on_demand
+    used_by:
+      - kind: route
+        id: generate_agents_metadata
+      - kind: command
+        id: generate_openai_yaml
+    load_when:
+      - Load before generating display_name, short_description, default_prompt, or optional interface fields.
+resources:
+  source_skill:
+    path: source/SKILL.md
+    role: source_material
+    description: Original prose skill used as provenance for this dogfood port.
+    used_by:
+      - kind: snippet
+        id: port_quality
+  init_skill_py:
+    path: scripts/init_skill.py
+    role: script
+    description: Creates a template skill folder with required files and optional resources.
+    used_by:
+      - kind: command
+        id: init_skill
+  generate_openai_yaml_py:
+    path: scripts/generate_openai_yaml.py
+    role: script
+    description: Generates agents/openai.yaml from deterministic interface values.
+    used_by:
+      - kind: command
+        id: generate_openai_yaml
+  quick_validate_py:
+    path: scripts/quick_validate.py
+    role: script
+    description: Validates frontmatter, required fields, and naming rules.
+    used_by:
+      - kind: command
+        id: quick_validate
+artifacts:
+  skill_folder:
+    kind: directory
+    description: Created or updated skill directory.
+    produced_by:
+      - kind: command
+        id: init_skill
+    consumed_by:
+      - kind: command
+        id: quick_validate
+      - kind: command
+        id: generate_openai_yaml
+  agents_metadata:
+    kind: file
+    path: agents/openai.yaml
+    description: Optional UI metadata generated from reviewed SKILL.md content.
+    produced_by:
+      - kind: command
+        id: generate_openai_yaml
+  validation_evidence:
+    kind: report
+    description: quick_validate.py output, script test output, and any failures fixed during iteration.
+    produced_by:
+      - kind: command
+        id: quick_validate
+    consumed_by:
+      - kind: recipe
+        id: skill_creation_lifecycle
+  forward_test_evidence:
+    kind: report
+    description: Raw subagent prompts, outputs, diffs, logs, traces, and contamination review from forward-testing.
+    produced_by:
+      - kind: recipe
+        id: skill_creation_lifecycle
+    consumed_by:
+      - kind: recipe
+        id: skill_creation_lifecycle
+commands:
+  init_skill:
+    description: Initialize a new skill folder after name, destination, resources, and interface values are known.
+    template: scripts/init_skill.py {{skill_name}} --path {{output_directory}} {{resources_arg}} {{examples_flag}} {{interface_args}}
+    safety: local_write
+    requires:
+      dependencies:
+        - init_skill_script
+      resources:
+        - init_skill_py
+    success_when:
+      creates_skill_folder: true
+      creates_required_skill_md: true
+  generate_openai_yaml:
+    description: Generate or refresh agents/openai.yaml from reviewed interface values.
+    template: scripts/generate_openai_yaml.py {{skill_folder}} {{interface_args}}
+    safety: local_write
+    requires:
+      dependencies:
+        - generate_openai_yaml_script
+      resources:
+        - generate_openai_yaml_py
+    success_when:
+      writes_agents_openai_yaml: true
+  quick_validate:
+    description: Validate a completed skill folder and fix any reported errors.
+    template: scripts/quick_validate.py {{skill_folder}}
+    safety: local_read
+    requires:
+      dependencies:
+        - quick_validate_script
+      resources:
+        - quick_validate_py
+    success_when:
+      validation_passes: true
+recipes:
+  skill_creation_lifecycle:
+    description: "Source prose lifecycle: understand, plan, initialize, edit, validate, and iterate."
+    ordered: true
+    requires:
+      imports:
+        - openai_yaml_reference
+      resources:
+        - init_skill_py
+        - generate_openai_yaml_py
+        - quick_validate_py
+      dependencies:
+        - init_skill_script
+        - generate_openai_yaml_script
+        - quick_validate_script
+    steps:
+      - note: Understand concrete examples and trigger phrases.
+      - note: Choose the degree of freedom for the skill guidance based on task fragility.
+      - ask: choose_skill_location
+      - ask: choose_resource_kinds
+      - run_command: init_skill
+      - note: Keep trigger and when-to-use language in frontmatter description.
+      - note: Move long examples, framework variants, schemas, and detailed policy into directly linked references.
+      - note: Add only scripts, references, and assets that directly support repeated use.
+      - load_import: openai_yaml_reference
+      - run_command: generate_openai_yaml
+      - note: Test any added scripts before trusting them.
+      - run_command: quick_validate
+      - note: Remove placeholder examples and auxiliary docs that do not directly support the skill.
+      - note: Forward-test complex skills with fresh user-shaped context, raw artifacts, and cleanup between iterations.
+snippets:
+  port_quality:
+    text: Reviewed dogfood port. Mechanical extraction found commands, deps, one reference, and review notes; semantic pass added routes, rules, elicitations, states, recipes, closures, and tests.
+closures:
+  decide_route:
+    description: Run SkillSpec decision before taking route-specific action.
+  understand_skill_with_concrete_examples:
+    description: Conclude only when concrete examples and triggering language are clear.
+  plan_reusable_resources:
+    description: Decide scripts, references, and assets from repeated workflow needs.
+  run_init_skill:
+    description: Run the initializer after name, destination, resource choices, and interface values are known.
+  run_init_skill_when_needed:
+    description: Initialize only new skills; do not reinitialize existing skill folders.
+  edit_existing_skill_when_present:
+    description: Patch existing skill files after reading current contents and preserving user changes.
+  read_existing_skill:
+    description: Inspect SKILL.md, agents/openai.yaml, and bundled resources before updating a skill.
+  rebuild_context_from_source_artifacts:
+    description: Rebuild context from source files rather than stale conclusions between iterations.
+  remove_placeholder_files:
+    description: Delete generated placeholder examples that are not needed by the actual skill.
+  write_concise_skill_body:
+    description: Keep SKILL.md focused on non-obvious procedural guidance and navigation.
+  choose_freedom_level:
+    description: Match text, pseudocode, or scripts to the task's fragility and variability.
+  verify_skill_anatomy:
+    description: Ensure the skill has required SKILL.md frontmatter/body and only directly useful optional agents metadata, scripts, references, or assets.
+  verify_frontmatter_trigger_surface:
+    description: Ensure all when-to-use and trigger language lives in the frontmatter description.
+  verify_frontmatter_only_name_description:
+    description: Keep SKILL.md frontmatter limited to name and description.
+  enforce_progressive_disclosure:
+    description: Keep the body concise and move variant-specific or long detailed material to directly linked references.
+  keep_references_one_level:
+    description: Avoid deeply nested references; link relevant references directly from SKILL.md and add a table of contents for longer files.
+  verify_no_unused_resources:
+    description: Ensure every scripts, references, or assets entry directly supports the skill and remove unused directories.
+  test_added_scripts:
+    description: Run added scripts or a representative sample and preserve the result as validation evidence.
+  implement_scripts_references_assets:
+    description: Add only scripts, references, and assets that directly support repeated skill use.
+  generate_agents_metadata:
+    description: Generate deterministic agents/openai.yaml interface values from the current skill.
+  load_openai_yaml_reference:
+    description: Read references/openai_yaml.md before creating agents metadata.
+  validate_skill_folder:
+    description: Run quick_validate.py and fix reported failures.
+  consider_forward_testing:
+    description: Use forward-testing for tricky skills when safe and useful.
+  revise_from_evidence:
+    description: Update the skill based on raw validation or forward-test evidence.
+  verify_agents_metadata_matches_skill:
+    description: Ensure agents/openai.yaml still reflects the current SKILL.md.
+  protect_validation_integrity:
+    description: Forward-test with raw artifacts and without leaked expected answers.
+  pass_raw_artifacts_to_forward_test:
+    description: Give validation subagents the skill, a realistic user-shaped request, and raw artifacts rather than the intended fix or prior conclusions.
+  cleanup_forward_test_artifacts:
+    description: Remove or isolate subagent artifacts between iterations so later passes cannot rely on contaminated disk state.
+  show_forward_test_prompt_for_risky_cases:
+    description: When forward-testing may be slow, approval-gated, or production-sensitive, show the proposed prompt and ask for yes/no approval and modifications.
+  review_forward_test_evidence:
+    description: Review subagent outputs, reasoning, artifacts, and contamination risk.
+  fix_validation_failures:
+    description: Repair validation issues and rerun validation.
+  report_skill_artifacts_and_remaining_risk:
+    description: Report changed files, validation status, forward-test evidence, and residual review risk.
+proof:
+  metrics:
+    - route coverage for create, update, metadata, validation, and forward-testing tasks
+    - bundled dependency checks use file existence instead of PATH lookup for copied scripts
+    - imports check proves references/openai_yaml.md is package-local
+    - tests prove active elicitations, forbids, and after-success obligations
+    - coverage matrix records source-derived obligations from anatomy, progressive disclosure, frontmatter, resource policy, validation, and forward-testing sections
+tests:
+  - name: create request asks for location and resources
+    input: create a skill for editing PDFs
+    expect:
+      route: create_new_skill
+      elicit:
+        - choose_skill_location
+        - choose_resource_kinds
+      forbid:
+        - create_skill_files_before_understanding_examples
+        - run_init_skill_without_user_location_or_default
+      after_success:
+        - validate_skill_folder
+        - consider_forward_testing
+      matched_rules:
+        - route_create_skill_requests
+  - name: existing skill update does not reinitialize blindly
+    input: update an existing skill to move long examples into references
+    expect:
+      route: update_existing_skill
+      forbid:
+        - overwrite_user_skill_changes_without_review
+        - duplicate_reference_material_in_skill_body
+      after_success:
+        - validate_skill_folder
+        - verify_agents_metadata_matches_skill
+      matched_rules:
+        - route_update_skill_requests
+  - name: agents metadata loads reference
+    input: regenerate agents/openai.yaml default_prompt and short_description
+    expect:
+      route: generate_agents_metadata
+      forbid:
+        - invent_optional_interface_fields
+        - skip_openai_yaml_reference
+      after_success:
+        - verify_agents_metadata_matches_skill
+      matched_rules:
+        - route_agents_metadata_requests
+  - name: forward testing protects validation integrity
+    input: forward-test this skill with a subagent
+    expect:
+      route: forward_test_skill
+      forbid:
+        - leak_expected_answer_to_subagent
+        - pass_prior_conclusions_to_validator
+      after_success:
+        - review_forward_test_evidence
+      matched_rules:
+        - route_forward_testing_requests
+  - name: risky forward testing asks for approval
+    input: forward-test this skill against a live production system
+    expect:
+      route: forward_test_skill
+      elicit:
+        - approve_forward_testing_risk
+      forbid:
+        - start_risky_forward_test_without_approval
+        - leak_expected_answer_to_subagent
+      matched_rules:
+        - route_forward_testing_requests
+        - risky_forward_testing_requires_approval
+  - name: frontmatter carries trigger guidance
+    input: update a skill frontmatter description and when to use triggers
+    expect:
+      route: update_existing_skill
+      forbid:
+        - put_when_to_use_only_in_body
+        - include_non_name_description_frontmatter_fields
+      after_success:
+        - verify_frontmatter_trigger_surface
+        - verify_frontmatter_only_name_description
+      matched_rules:
+        - route_update_skill_requests
+        - frontmatter_controls_activation
+  - name: long variants move to references
+    input: create a skill with long examples, references, and multiple frameworks
+    expect:
+      route: create_new_skill
+      forbid:
+        - duplicate_reference_material_in_skill_body
+        - deeply_nested_references
+        - oversized_skill_body
+        - create_auxiliary_docs
+      after_success:
+        - enforce_progressive_disclosure
+        - keep_references_one_level
+      matched_rules:
+        - route_create_skill_requests
+        - progressive_disclosure_preserves_context
+  - name: script resources require test evidence
+    input: create a skill with scripts for repeated PDF rotation
+    expect:
+      route: create_new_skill
+      forbid:
+        - trust_unrun_script_changes
+      after_success:
+        - test_added_scripts
+      matched_rules:
+        - route_create_skill_requests
+        - scripts_require_execution_evidence
+  - name: unused placeholders and resources are removed
+    input: update a skill to remove placeholder examples and unused bundled resources
+    expect:
+      route: update_existing_skill
+      forbid:
+        - keep_placeholder_examples
+        - create_unused_resource_directories
+      after_success:
+        - verify_no_unused_resources
+        - remove_placeholder_files
+      matched_rules:
+        - route_update_skill_requests
+        - resources_must_be_reusable_and_needed
+  - name: forward test prompt avoids contamination
+    input: forward-test this skill with raw artifacts and clean up outputs
+    expect:
+      route: forward_test_skill
+      forbid:
+        - leak_expected_answer_to_subagent
+        - pass_prior_conclusions_to_validator
+        - review_skill_instead_of_user_task_prompt
+        - leave_subagent_artifacts_between_iterations
+      after_success:
+        - pass_raw_artifacts_to_forward_test
+        - cleanup_forward_test_artifacts
+        - review_forward_test_evidence
+      matched_rules:
+        - route_forward_testing_requests
+        - forward_testing_uses_user_shaped_prompts
+review_required:
+  - "Forward-testing execution evidence is intentionally unproven until real subagent runs produce raw prompts, outputs, diffs, logs, or traces."
+  - "Script test evidence is modeled as an obligation; this dogfood example does not execute source skill scripts as part of import."
+metadata:
+  source: /Users/chetanconikee/.codex/skills/.system/skill-creator
+  dogfood_status: reviewed_example
+  mechanical_import:
+    routes: 0
+    rules: 0
+    states: 0
+    dependencies: 3
+    commands: 4
+    imports: 1
+    tests: 0
+    review_notes: 5
+  coverage_matrix:
+    - prose_span: "frontmatter and SKILL.md required sections"
+      obligation: "Skill selection depends on frontmatter name and description; body is loaded only after trigger."
+      skillspec_construct: "activation, applies_when, frontmatter_controls_activation, verify_frontmatter_trigger_surface"
+      confidence: high
+      status: reviewed
+      review_note: "Source lines 75-80 and 342-356 mapped to activation and frontmatter rules."
+    - prose_span: "Core Principles: Concise is Key / Set Appropriate Degrees of Freedom"
+      obligation: "Keep SKILL.md concise and choose text, pseudocode, or scripts based on fragility."
+      skillspec_construct: "keep_skill_concise, choose_freedom_level, write_concise_skill_body"
+      confidence: high
+      status: reviewed
+      review_note: "Concision and freedom-level guidance applies across create and update routes."
+    - prose_span: "Agents metadata"
+      obligation: "Read references/openai_yaml.md before deterministic agents/openai.yaml generation and include optional fields only when explicit."
+      skillspec_construct: "imports.openai_yaml_reference, generate_agents_metadata route, generate_openai_yaml command"
+      confidence: high
+      status: proven_by_imports_check
+      review_note: "Import check proves package-local reference path; behavior covered by metadata test."
+    - prose_span: "Bundled Resources and What to Not Include"
+      obligation: "Create only useful scripts, references, assets; remove placeholders and avoid auxiliary docs."
+      skillspec_construct: "choose_resource_kinds, resources_must_be_reusable_and_needed, verify_no_unused_resources, remove_placeholder_files"
+      confidence: high
+      status: reviewed
+      review_note: "Resource policy is represented as elicitations, rules, closures, and tests."
+    - prose_span: "Progressive Disclosure"
+      obligation: "Move long or variant-specific material into directly linked references and avoid deep nesting."
+      skillspec_construct: "progressive_disclosure_preserves_context, enforce_progressive_disclosure, keep_references_one_level"
+      confidence: high
+      status: reviewed
+      review_note: "Mapped to rules/closures because it is a cross-route authoring constraint."
+    - prose_span: "Skill Creation Process steps 1-6"
+      obligation: "Understand examples, plan resources, initialize, edit, validate, iterate in order."
+      skillspec_construct: "routes.create_new_skill.execution_plan, recipes.skill_creation_lifecycle, states"
+      confidence: high
+      status: reviewed
+      review_note: "Lifecycle represented in both route execution plan and state machine."
+    - prose_span: "Forward-testing"
+      obligation: "Use fresh user-shaped subagent prompts, raw artifacts, no leaked conclusions, cleanup, and approval for risky runs."
+      skillspec_construct: "forward_test_skill route, forward_testing_uses_user_shaped_prompts, risky_forward_testing_requires_approval"
+      confidence: high
+      status: execution_unproven
+      review_note: "Decision semantics are tested; real subagent execution evidence remains review_required."
+  contract_quality:
+    activation: strong
+    dependencies: good
+    route_coverage: strong
+    execution_evidence: unproven
+    tests: reviewed_behavior_tests
+    hallucination_risk: low_medium

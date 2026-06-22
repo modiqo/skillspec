@@ -1,0 +1,19 @@
+{
+  "schema": "skillspec.trace/v0",
+  "run_id": "run-1782111280403-87123",
+  "skill_id": "skill.creator",
+  "spec_fingerprint": "sha256:1f2acaf5533801d43838558ce0946816e55b9c051a1788de73b1c71809e4839a",
+  "input_sha256": "sha256:87457fe328bc201561cf7b1c274b344b22941a0168a8f5df2fbc1792afde3b2d",
+  "event_count": 15,
+  "events": {
+    "input_received": 1,
+    "spec_loaded": 1,
+    "rule_evaluated": 7,
+    "rule_matched": 1,
+    "route_selected": 1,
+    "forbid_added": 1,
+    "elicitation_requested": 1,
+    "after_success_scheduled": 1,
+    "outcome_recorded": 1
+  }
+}

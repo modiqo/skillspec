@@ -34,6 +34,21 @@ Minimum final response shape when workspace evidence exists:
 - `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
 - `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.
 
+## Authoring And Revision Contract
+
+When importing, creating, revising, or extending this SkillSpec-backed skill, use the embedded grammar teacher before editing `skill.spec.yml`:
+
+```bash
+skillspec grammar sensemake --view index
+skillspec grammar sensemake --view porting
+skillspec grammar checklist --for import-skill
+```
+
+- Treat the checklist as the review gate for semantic edits: activation, routes, rules, elicitations, imports/resources, commands/deps, procedures, tests, proof, and contract quality.
+- Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
+- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
+- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
+
 ## Routes
 
 Try lower-rank routes first unless matching rules override the route or route order.

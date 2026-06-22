@@ -42,6 +42,12 @@ pub struct AlignReport {
 /// Condensed alignment explanation for humans and JSON consumers.
 #[derive(Clone, Debug, Serialize)]
 pub struct AlignSummary {
+    /// Evidence scope used for this alignment run.
+    pub scope: AlignScope,
+    /// Result of replaying the decision trace against the current spec.
+    pub decision_alignment: AlignLayerStatus,
+    /// Result of checking action evidence, or `not_evaluated` when no execution trace was supplied.
+    pub execution_alignment: AlignLayerStatus,
     /// One-sentence interpretation of the report status.
     pub conclusion: String,
     /// What the overall status means for a human reader.
@@ -87,6 +93,30 @@ pub enum AlignLayerKind {
     DecisionReplay,
     /// Checks structured evidence for obligations implied by the active decision.
     ExecutionProof,
+}
+
+/// Evidence scope available to this alignment run.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlignScope {
+    /// Only the SkillSpec decision/reasoning trace was supplied.
+    DecisionTraceOnly,
+    /// A decision trace and at least one execution evidence file were supplied.
+    DecisionAndExecutionTrace,
+}
+
+/// Per-layer alignment result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlignLayerStatus {
+    /// All checks in this layer passed.
+    Pass,
+    /// At least one check in this layer failed.
+    Fail,
+    /// No check failed, but required evidence in this layer is incomplete.
+    Incomplete,
+    /// This layer was not evaluated because the required evidence source was not supplied.
+    NotEvaluated,
 }
 
 /// One missing proof item that prevents a full `pass`.
@@ -791,7 +821,13 @@ pub fn align_decision_trace(
     add_user_requirement_obligations(&mut obligations, &input);
     let proof_rows = apply_execution_evidence(&mut obligations, &execution_ledger);
     let status = report_status(&checks, &obligations);
-    let summary = summary_for(status, &checks, &obligations, &expected_decision);
+    let summary = summary_for(
+        status,
+        &checks,
+        &obligations,
+        &expected_decision,
+        execution_ledger.has_events(),
+    );
 
     Ok(AlignReport {
         schema: ALIGN_SCHEMA.to_owned(),
@@ -812,17 +848,46 @@ fn summary_for(
     checks: &[AlignCheck],
     obligations: &[AlignObligation],
     decision: &decision::Decision,
+    has_execution_trace: bool,
 ) -> AlignSummary {
     let decision_checks = status_counts(checks.iter().map(|check| check.status));
     let execution_obligations =
         status_counts(obligations.iter().map(|obligation| obligation.status));
     let unproven_obligation_kinds = unproven_obligation_kinds(obligations);
-    let conclusion = align_conclusion(status, &decision_checks, &execution_obligations);
-    let status_meaning = align_status_meaning(status).to_owned();
-    let layers = align_layers(&decision_checks, &execution_obligations);
+    let scope = if has_execution_trace {
+        AlignScope::DecisionAndExecutionTrace
+    } else {
+        AlignScope::DecisionTraceOnly
+    };
+    let decision_alignment = layer_status(&decision_checks);
+    let execution_alignment = if has_execution_trace {
+        layer_status(&execution_obligations)
+    } else {
+        AlignLayerStatus::NotEvaluated
+    };
+    let conclusion = align_conclusion(
+        status,
+        &decision_checks,
+        &execution_obligations,
+        has_execution_trace,
+    );
+    let status_meaning = align_status_meaning(
+        status,
+        &decision_checks,
+        &execution_obligations,
+        has_execution_trace,
+    );
+    let layers = align_layers(
+        &decision_checks,
+        &execution_obligations,
+        has_execution_trace,
+    );
     let evidence_gaps = evidence_gaps(checks, obligations);
 
     AlignSummary {
+        scope,
+        decision_alignment,
+        execution_alignment,
         conclusion,
         status_meaning,
         layers,
@@ -848,16 +913,31 @@ fn summary_for(
     }
 }
 
-fn align_status_meaning(status: AlignStatus) -> &'static str {
+fn align_status_meaning(
+    status: AlignStatus,
+    decision_checks: &AlignStatusCounts,
+    execution_obligations: &AlignStatusCounts,
+    has_execution_trace: bool,
+) -> String {
     match status {
-        AlignStatus::Pass => {
-            "pass means the current spec reproduced the trace decision and every active execution obligation has structured proof"
+        AlignStatus::Pass => "pass means the current spec reproduced the decision trace and the supplied execution evidence proves every active obligation".to_owned(),
+        AlignStatus::Fail if decision_checks.fail > 0 => {
+            "fail means the current spec no longer reproduces the recorded decision trace; treat this as spec drift or a trace/spec mismatch".to_owned()
         }
         AlignStatus::Fail => {
-            "fail means the current spec contradicts the recorded decision trace; treat this as spec drift or a trace/spec mismatch"
+            "fail means supplied execution evidence contradicts at least one active obligation from the decision".to_owned()
+        }
+        AlignStatus::Unproven if !has_execution_trace && decision_checks.unproven == 0 => {
+            "decision alignment passed; execution was not evaluated because no execution trace was supplied".to_owned()
+        }
+        AlignStatus::Unproven if !has_execution_trace => {
+            "decision alignment is incomplete because the reasoning trace is missing deterministic facts; execution was not evaluated because no execution trace was supplied".to_owned()
+        }
+        AlignStatus::Unproven if execution_obligations.unproven > 0 => {
+            "decision alignment passed or had no failures; supplied execution evidence is incomplete for one or more active obligations".to_owned()
         }
         AlignStatus::Unproven => {
-            "unproven means no contradiction was found, but the trace lacks structured evidence for every fact alignment needs to prove"
+            "alignment is incomplete because required evidence is missing, but no contradiction was found".to_owned()
         }
     }
 }
@@ -865,6 +945,7 @@ fn align_status_meaning(status: AlignStatus) -> &'static str {
 fn align_layers(
     decision_checks: &AlignStatusCounts,
     execution_obligations: &AlignStatusCounts,
+    has_execution_trace: bool,
 ) -> Vec<AlignLayerSummary> {
     vec![
         AlignLayerSummary {
@@ -883,17 +964,31 @@ fn align_layers(
         AlignLayerSummary {
             id: AlignLayerKind::ExecutionProof,
             label: "execution proof".to_owned(),
-            measures: "Derive obligations from the selected route and matched rules, then require structured evidence that the route/checks/closures were fulfilled and forbids were not violated.".to_owned(),
-            interpretation: layer_interpretation(
-                execution_obligations,
-                "execution proof",
-                "every active execution obligation has structured proof",
-                "the decision is known, but execution evidence is incomplete",
-                "structured execution evidence contradicts the active contract",
-            ),
+            measures: "When an execution trace is supplied, derive obligations from the selected route and matched rules, then check structured evidence that the route/checks/closures were fulfilled and forbids were not violated.".to_owned(),
+            interpretation: if has_execution_trace {
+                layer_interpretation(
+                    execution_obligations,
+                    "execution proof",
+                    "every active execution obligation has structured proof",
+                    "the supplied execution evidence is incomplete",
+                    "structured execution evidence contradicts the active contract",
+                )
+            } else {
+                "execution proof: not evaluated because no execution trace was supplied".to_owned()
+            },
             counts: execution_obligations.clone(),
         },
     ]
+}
+
+fn layer_status(counts: &AlignStatusCounts) -> AlignLayerStatus {
+    if counts.fail > 0 {
+        AlignLayerStatus::Fail
+    } else if counts.unproven > 0 {
+        AlignLayerStatus::Incomplete
+    } else {
+        AlignLayerStatus::Pass
+    }
 }
 
 fn layer_interpretation(
@@ -987,23 +1082,35 @@ fn align_conclusion(
     status: AlignStatus,
     checks: &AlignStatusCounts,
     obligations: &AlignStatusCounts,
+    has_execution_trace: bool,
 ) -> String {
     match status {
         AlignStatus::Pass => {
-            "all deterministic decision checks and execution obligations are proven".to_owned()
+            "decision alignment passed and supplied execution evidence proves every active obligation".to_owned()
         }
         AlignStatus::Fail => format!(
             "{} deterministic check(s) failed; the current spec no longer aligns with the decision trace",
             checks.fail
         ),
-        AlignStatus::Unproven => align_unproven_conclusion(checks, obligations),
+        AlignStatus::Unproven => align_unproven_conclusion(checks, obligations, has_execution_trace),
     }
 }
 
 fn align_unproven_conclusion(
     checks: &AlignStatusCounts,
     obligations: &AlignStatusCounts,
+    has_execution_trace: bool,
 ) -> String {
+    if !has_execution_trace {
+        if checks.unproven == 0 {
+            return "decision alignment passed; execution was not evaluated because no execution trace was supplied".to_owned();
+        }
+        return format!(
+            "decision alignment incomplete: {} deterministic trace check(s) are missing from the reasoning record; execution was not evaluated because no execution trace was supplied",
+            checks.unproven
+        );
+    }
+
     let mut gaps = Vec::new();
     if checks.unproven > 0 {
         gaps.push(format!("{} deterministic trace check(s)", checks.unproven));

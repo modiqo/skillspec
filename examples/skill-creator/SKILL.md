@@ -1,11 +1,17 @@
 ---
-name: example-browser-research
-description: "Use for route browser inspection tasks to browser automation and keep URL discovery separate from page evidence. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
+name: skill-creator
+description: "Create or update a Codex skill with appropriate resources, metadata, validation, and forward-testing. Use for create a skill, update a skill, skill creator, skill authoring, SKILL.md, agents/openai.yaml, init_skill.py, quick_validate.py, forward-test a skill, progressive disclosure, bundled resources and skill frontmatter. Use when the task needs to create a new Codex skill, update an existing skill, validate a skill folder, generate agents/openai.yaml metadata and forward-test a skill with subagents. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
 ---
 
-# browser research
+# Skill Creator
 
-Route browser inspection tasks to browser automation and keep URL discovery separate from page evidence.
+SkillSpec-backed contract for creating, updating, validating, and forward-testing Codex skills.
+
+## Entry Gate
+
+- Before any task action, run `skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the decision JSON.
+- Until that decision is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- Forbidden before the decision: create_skill_files_before_understanding_examples, run_init_skill_without_user_location_or_default, forward_test_with_leaked_expected_answer.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -101,5 +107,8 @@ Minimum final response shape when workspace evidence exists:
 
 ## Route Hints
 
-- `browser`: Browser automation
-- `native_search`: Native search for URL discovery
+- `create_new_skill`: Create a new skill
+- `update_existing_skill`: Update an existing skill
+- `generate_agents_metadata`: Generate agents metadata
+- `validate_skill`: Validate a skill folder
+- `forward_test_skill`: Forward-test a skill

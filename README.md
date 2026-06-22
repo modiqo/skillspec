@@ -53,6 +53,9 @@ Check the installed CLI has the expected surface:
 ```sh
 skillspec --help
 skillspec import-skill --help
+skillspec grammar sensemake --help
+skillspec grammar checklist --help
+skillspec grammar schema --help
 skillspec imports check --help
 skillspec deps check --help
 skillspec sensemake --help
@@ -89,17 +92,30 @@ The creator skill does the careful path:
 The mechanical importer is available directly when you only want a draft:
 
 ```sh
+skillspec grammar sensemake --view index
+skillspec grammar sensemake --view porting
 skillspec import-skill path/to/skill-folder --out skill.spec.yml
+skillspec sensemake skill.spec.yml --view index
+skillspec grammar checklist --for import-skill
 skillspec validate skill.spec.yml
 skillspec imports check skill.spec.yml
-skillspec test skill.spec.yml
 skillspec deps check skill.spec.yml
+skillspec test skill.spec.yml
+skillspec decide skill.spec.yml --input '<realistic task>' --trace-dir .skillspec/traces
+skillspec trace align skill.spec.yml --decision-trace <run-dir>
 ```
 
 `import-skill` preserves source material; it does not pretend to understand the
 whole skill. It extracts runtime-loadable Markdown imports, source resources,
 fenced code blocks, shell-like commands, obvious dependencies, headings, and
 strong directive language, then marks uncertainty as `review_required`.
+
+`grammar sensemake` is embedded in the binary so an agent can learn the grammar
+without reading repository source. Use `--view index` for the section map,
+`--view summary` for prose-to-construct mappings, and `--view porting` for the
+full import command sequence plus the coverage matrix. `grammar checklist --for
+import-skill` is the review gate: every prose obligation should map to a
+SkillSpec construct with confidence, status, and review notes before install.
 
 ## Install A SkillSpec-Backed Skill
 

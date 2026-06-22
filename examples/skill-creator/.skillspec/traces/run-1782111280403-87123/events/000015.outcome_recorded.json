@@ -1,0 +1,25 @@
+{
+  "schema": "skillspec.trace/v0",
+  "run_id": "run-1782111280403-87123",
+  "seq": 15,
+  "timestamp_unix_ms": 1782111280405,
+  "skill_id": "skill.creator",
+  "spec_schema": "skillspec/v0",
+  "spec_fingerprint": "sha256:1f2acaf5533801d43838558ce0946816e55b9c051a1788de73b1c71809e4839a",
+  "input_sha256": "sha256:87457fe328bc201561cf7b1c274b344b22941a0168a8f5df2fbc1792afde3b2d",
+  "event": "outcome_recorded",
+  "event_name": "outcome_recorded",
+  "data": {
+    "event": "outcome_recorded",
+    "matched_rules": [
+      "route_create_skill_requests"
+    ],
+    "route": "create_new_skill",
+    "route_selection": {
+      "basis": "rule_prefer",
+      "reason": "The source skill requires examples, resource planning, initialization, validation, and iteration in order.",
+      "route": "create_new_skill",
+      "rule_id": "route_create_skill_requests"
+    }
+  }
+}

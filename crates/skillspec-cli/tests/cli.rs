@@ -938,6 +938,77 @@ fn sensemake_and_query_teach_progressive_navigation() {
 }
 
 #[test]
+fn grammar_commands_teach_embedded_porting_workflow() {
+    let porting = Command::new(bin())
+        .arg("grammar")
+        .arg("sensemake")
+        .arg("--view")
+        .arg("porting")
+        .output()
+        .unwrap();
+    assert_success(&porting);
+    let out = stdout(&porting);
+    assert!(out.contains("SkillSpec grammar map"));
+    assert!(out.contains("embedded: grammar.md"));
+    assert!(out.contains("Progressive command sequence:"));
+    assert!(out.contains("skillspec grammar sensemake --view porting"));
+    assert!(out.contains("skillspec import-skill <source-skill> --out <draft>/skill.spec.yml"));
+    assert!(out.contains("Prose-to-SkillSpec mappings:"));
+    assert!(out.contains("Import coverage checklist:"));
+    assert!(out.contains("Coverage matrix:"));
+
+    let json = Command::new(bin())
+        .arg("grammar")
+        .arg("sensemake")
+        .arg("--view")
+        .arg("summary")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&json);
+    let report = json_stdout(&json);
+    assert_eq!(report["view"], "summary");
+    assert!(report["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|section| section["name"] == "routes"));
+    assert!(report["prose_mappings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|mapping| mapping["skillspec_construct"]
+            == "rules.forbid, rules.prefer, rules.elicit, rules.after_success"));
+
+    let checklist = Command::new(bin())
+        .arg("grammar")
+        .arg("checklist")
+        .arg("--for")
+        .arg("import-skill")
+        .output()
+        .unwrap();
+    assert_success(&checklist);
+    let checklist_out = stdout(&checklist);
+    assert!(checklist_out.contains("SkillSpec porting checklist: import-skill"));
+    assert!(checklist_out.contains("Coverage matrix columns:"));
+    assert!(checklist_out.contains("Contract quality grades:"));
+
+    let schema = Command::new(bin())
+        .arg("grammar")
+        .arg("schema")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&schema);
+    let schema_report = json_stdout(&schema);
+    assert_eq!(
+        schema_report["$schema"],
+        "https://json-schema.org/draft/2020-12/schema"
+    );
+    assert_eq!(schema_report["title"], "SkillSpec v0");
+}
+
+#[test]
 fn validate_rejects_unknown_fields_through_cli() {
     let dir = TempDir::new("validate-negative");
     let spec = dir.path().join("skill.spec.yml");
@@ -1271,13 +1342,16 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     let report = json_stdout(&align);
     assert_eq!(report["status"], "unproven");
     assert_eq!(report["ok"], true);
+    assert_eq!(report["summary"]["scope"], "decision_trace_only");
+    assert_eq!(report["summary"]["decision_alignment"], "incomplete");
+    assert_eq!(report["summary"]["execution_alignment"], "not_evaluated");
     assert_eq!(
         report["summary"]["conclusion"],
-        "decision replay found no deterministic drift, but proof is incomplete: 3 deterministic trace check(s) and 4 execution obligation(s) remain unproven"
+        "decision alignment incomplete: 3 deterministic trace check(s) are missing from the reasoning record; execution was not evaluated because no execution trace was supplied"
     );
     assert_eq!(
         report["summary"]["status_meaning"],
-        "unproven means no contradiction was found, but the trace lacks structured evidence for every fact alignment needs to prove"
+        "decision alignment is incomplete because the reasoning trace is missing deterministic facts; execution was not evaluated because no execution trace was supplied"
     );
     assert_eq!(report["summary"]["layers"].as_array().unwrap().len(), 2);
     assert_eq!(report["summary"]["layers"][0]["id"], "decision_replay");
@@ -1289,7 +1363,7 @@ fn decide_enforces_required_trace_and_trace_compaction() {
     assert!(report["summary"]["layers"][1]["interpretation"]
         .as_str()
         .unwrap()
-        .contains("execution evidence is incomplete"));
+        .contains("not evaluated because no execution trace was supplied"));
     assert_eq!(report["summary"]["selected_route"], "browser");
     assert_eq!(report["summary"]["route_selection_basis"], "rule_prefer");
     assert_eq!(report["summary"]["route_selection_rule"], "browse_rule");
@@ -1326,12 +1400,20 @@ fn decide_enforces_required_trace_and_trace_compaction() {
         .unwrap();
     assert_success(&align_text);
     let align_text_stdout = stdout(&align_text);
-    assert!(align_text_stdout.contains("summary: decision replay found no deterministic drift, but proof is incomplete: 3 deterministic trace check(s) and 4 execution obligation(s) remain unproven"));
-    assert!(align_text_stdout.contains("meaning: unproven means no contradiction was found"));
+    assert!(align_text_stdout.contains("alignment: decision=incomplete, execution=not_evaluated"));
+    assert!(align_text_stdout.contains("scope: decision_trace_only"));
+    assert!(align_text_stdout.contains("summary: decision alignment incomplete: 3 deterministic trace check(s) are missing from the reasoning record; execution was not evaluated because no execution trace was supplied"));
+    assert!(align_text_stdout.contains("meaning: decision alignment is incomplete because the reasoning trace is missing deterministic facts; execution was not evaluated because no execution trace was supplied"));
     assert!(align_text_stdout.contains("model:"));
     assert!(align_text_stdout.contains("decision_replay: Re-run the current resolved SkillSpec"));
-    assert!(align_text_stdout.contains("execution_proof: Derive obligations"));
-    assert!(align_text_stdout.contains("evidence_gaps:"));
+    assert!(align_text_stdout.contains("execution_proof: When an execution trace is supplied"));
+    assert!(align_text_stdout.contains("proof: execution obligations not evaluated because no execution trace was supplied (4 obligation(s) require execution evidence)"));
+    assert!(align_text_stdout.contains("execution_requirements_by_kind:"));
+    assert!(align_text_stdout.contains("evidence_needed_for_execution_trace:"));
+    assert!(align_text_stdout.contains("execution_evidence_needed:"));
+    assert!(align_text_stdout.contains("status: not_evaluated"));
+    assert!(align_text_stdout.contains("execution_obligations_not_evaluated:"));
+    assert!(align_text_stdout.contains("native_search_as_answer: not_evaluated"));
     assert!(align_text_stdout.contains("execution_obligation native_search_as_answer (forbid)"));
     assert!(align_text_stdout.contains("decision: route browser via rule_prefer (browse_rule)"));
     assert!(
@@ -1426,6 +1508,9 @@ fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     assert!(!out.contains("secret-user"));
     let report: Value = serde_json::from_str(&out).unwrap();
     assert_eq!(report["status"], "pass");
+    assert_eq!(report["summary"]["scope"], "decision_and_execution_trace");
+    assert_eq!(report["summary"]["decision_alignment"], "pass");
+    assert_eq!(report["summary"]["execution_alignment"], "pass");
     assert_eq!(report["summary"]["decision_checks"]["fail"], 0);
     assert_eq!(report["summary"]["execution_obligations"]["pass"], 12);
     assert_eq!(report["summary"]["execution_obligations"]["unproven"], 0);
@@ -1459,6 +1544,8 @@ fn trace_align_uses_execution_ledger_without_leaking_command_args() {
         .unwrap();
     assert_success(&align_text);
     let text = stdout(&align_text);
+    assert!(text.contains("alignment: decision=pass, execution=pass"));
+    assert!(text.contains("scope: decision_and_execution_trace"));
     assert!(text.contains("alignment_evidence:"));
     assert!(text.contains("status: satisfied"));
     assert!(text.contains("command(s) gh ran with arguments redacted"));
@@ -1526,6 +1613,9 @@ fn compile_targets_render_loader_and_full_markdown() {
     ));
     assert!(loader_out.contains("thin loader"));
     assert!(loader_out.contains("## Entry Gate"));
+    assert!(loader_out.contains("## Authoring And Revision Contract"));
+    assert!(loader_out.contains("skillspec grammar sensemake --view porting"));
+    assert!(loader_out.contains("skillspec grammar checklist --for import-skill"));
     assert!(loader_out.contains("## Durable Handoff Contract"));
     assert!(loader_out.contains("Forbidden before the decision"));
     assert!(loader_out.contains("skill.spec.yml"));
@@ -1540,6 +1630,7 @@ fn compile_targets_render_loader_and_full_markdown() {
         .unwrap();
     assert_success(&markdown);
     let markdown_out = stdout(&markdown);
+    assert!(markdown_out.contains("## Authoring And Revision Contract"));
     assert!(markdown_out.contains("## Rules"));
     assert!(markdown_out.contains("## Scenario Tests"));
     assert!(markdown_out.contains("browse_rule"));
@@ -1580,7 +1671,11 @@ print("hello")
         .unwrap();
     assert_success(&import);
     assert!(out.is_file());
-    assert!(stdout(&import).contains("review note"));
+    let import_out = stdout(&import);
+    assert!(import_out.contains("review note"));
+    assert!(import_out.contains("skillspec grammar sensemake --view porting"));
+    assert!(import_out.contains("skillspec sensemake"));
+    assert!(import_out.contains("skillspec grammar checklist --for import-skill"));
 
     let validate = Command::new(bin())
         .arg("validate")

@@ -1,692 +1,114 @@
 ---
 name: skillspec-creator
-description: Use when creating a SkillSpec from an existing prose SKILL.md, whether the source is a local file, local skill folder, public GitHub repo, or public repo path. Stages remote sources locally, reads the old skill, creates a reviewed `skill.spec.yml`, proves it with validation/tests/explanations, compiles a smaller harness skill, and only then optionally installs it.
+description: "Convert prose SKILL.md skills into reviewed SkillSpec packages, using grammar sensemaking before import and proving value before install or release. Use for skillspec creator, import SKILL.md, port skill, prose skill to skillspec, skill.spec.yml, skillspec import-skill, grammar sensemake, grammar checklist, compile skill, install codex agents, prove value and value report. Use when the task needs to convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, import a public GitHub skill into SkillSpec, revise an existing SkillSpec-backed skill, compile and optionally install a reviewed SkillSpec-backed skill and run proof or value reporting for a ported skill. Handles dependency checks. Requires `skillspec decide` before substrate tools or overlapping low-level skills. Preserves evidence with SkillSpec routes, forbids, dependencies, traces"
 ---
 
-# skillspec-creator
+# SkillSpec Creator
 
-Use this skill when the user wants to create a `skill.spec.yml` from an
-existing prose `SKILL.md`.
+SkillSpec-backed contract for porting prose SKILL.md folders into reviewed, tested SkillSpec packages with grammar-first sensemaking, dependency review, compilation, optional install, and value reporting.
 
-The source skill may be:
+## Entry Gate
 
-- a local `SKILL.md`
-- a local skill folder
-- a public GitHub repository
-- a public GitHub repository path that contains one or more skills
+- Before any task action, run `skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"` and read the decision JSON.
+- Until that decision is read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
+- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence.
 
-The job is not a blind conversion. The job is to create a real SkillSpec:
+This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
-```text
-Keep the prose. Structure the decisions.
-```
+## Runtime Contract
 
-The deterministic `skillspec import-skill` command is only a first-pass helper.
-The harness must stage the source, read the folder, reason over the resource
-graph, revise the draft, test it, and prove the resulting spec.
-
-## Source Contract
-
-Accept these source forms:
-
-- local file: `/path/to/SKILL.md`
-- local folder: `/path/to/skill-folder`
-- public repo shorthand: `owner/repo`
-- public repo URL: `https://github.com/owner/repo`
-- public repo path: `owner/repo/path/to/skill`
-- public GitHub tree URL:
-  `https://github.com/owner/repo/tree/main/path/to/skill`
-
-Remote sources must be staged locally before porting. Do not install directly
-from a remote checkout.
-
-Use a temporary staging directory:
-
-```bash
-mkdir -p /tmp/skillspec-port
-git clone --depth 1 <public-repo-url> /tmp/skillspec-port/<repo-name>
-```
-
-If the source is a repo and the user did not provide a skill path, find
-candidate `SKILL.md` files and ask which one to port.
-
-The porting path is always:
-
-```text
-source skill folder
-  -> local staging folder with resources intact
-  -> mechanical draft skill.spec.yml
-  -> semantic reviewed skill.spec.yml
-  -> validation and scenario tests
-  -> compiled SKILL.md
-  -> optional harness install
-```
-
-## Creation Procedure
-
-1. Run the SkillSpec CLI capability preflight before porting:
+1. Load `./skill.spec.yml` from this skill folder before taking task actions.
+2. When the `skillspec` CLI is available and the spec shape is unfamiliar, run `skillspec sensemake ./skill.spec.yml --view index` to learn the section roles, counts, query handles, and navigation grammar without dumping the full YAML.
+3. Then run:
 
    ```bash
-   skillspec --help
-   skillspec import-skill --help
-   skillspec validate --help
-   skillspec imports check --help
-   skillspec test --help
-   skillspec compile --help
-   skillspec deps --help
-   skillspec deps check --help
+   skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
    ```
 
-   Required capabilities are `import-skill`, `validate`, `imports check`,
-   `test`, `compile`, and `deps check`.
+4. Strip skill invocation prefixes such as `/my-skill`, `$my-skill`, or `/durable-executor-spec` before passing `--input`.
+5. Preserve the emitted trace `run_dir`.
+6. Read the decision JSON before using tools. Do not act from route labels alone.
+7. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.
+8. Materialize the active contract described below, then execute only actions that satisfy it.
+9. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <jsonl>`. Report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
+10. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
 
-   If `imports check` or `deps check` is unavailable, continue only in degraded
-   draft mode:
+## Authoring And Revision Contract
 
-   - infer and write imports into the spec
-   - infer and write dependencies into the spec
-   - mark import validation as `review_required`
-   - mark dependency verification as `review_required`
-   - report the inferred dependency surface explicitly
-   - do not claim dependency presence/absence
-   - do not install or release the generated skill
-   - tell the user to upgrade the SkillSpec CLI before install/release
-
-   If `import-skill`, `validate`, `test`, or `compile` is unavailable, stop and
-   ask the user to upgrade the SkillSpec CLI before porting.
-
-2. Resolve the source to one local skill folder. A single `SKILL.md` is allowed,
-   but a folder is preferred because referenced files, scripts, assets, and
-   examples are part of the skill.
-3. If the source is remote, download or clone it into the staging directory.
-   Preserve relative paths. Do not copy only `SKILL.md` unless the source truly
-   has no sibling resources.
-4. Inventory the staged folder before importing:
-
-   - Markdown imports/resources: `SKILL.md`, `reference.md`, `forms.md`,
-     examples, and other linked docs
-   - scripts and assets
-   - fenced code blocks and their languages
-   - shell command blocks
-   - explicit file paths, env vars, packages, CLIs, services, browser/session
-     assumptions
-   - required ordering language such as "first", "before", "then", "after",
-     "must complete in order", and "if/otherwise"
-
-5. Read the entire `SKILL.md`; do not summarize from filenames. Then read every
-   directly referenced local resource that affects routing, commands, code,
-   dependencies, or recipes.
-6. Run the mechanical extractor for a draft:
-
-   ```bash
-   skillspec import-skill path/to/skill-folder --out skill.spec.yml
-   ```
-
-7. Immediately validate imports and tell the user which dependencies were
-   inferred before asking for approval to install or run anything:
-
-   ```bash
-   skillspec imports check skill.spec.yml
-   skillspec deps check skill.spec.yml
-   ```
-
-   Summarize import status plus dependency ids, status, permission requirements,
-   and provision options in plain language. Do not hide this in the final
-   report.
-
-8. Treat the draft as scaffolding, not truth.
-9. Extract routes from strategy choices. Examples:
-
-   - adapter/API
-   - CLI/process
-   - browser
-   - PTY
-   - background job
-   - local file inspection
-   - remembered/reused route
-   - human approval
-
-10. Extract rules from decision language: "always", "never", "prefer",
-   "unless", "when", "before", "after", "ask", "do not", and "must".
-11. Extract elicitations from places where the old skill would ask the user to
-   choose, approve, connect, install, authenticate, attach, or continue.
-12. Extract runtime-loadable Markdown into `imports`, and source provenance or
-   supporting material into `resources`. Use imports for shared policy,
-   branch-specific references, required procedures, examples, or other files
-   the harness should deliberately load during a run. Use resources for
-   evidence, scripts, assets, fixtures, and source material that should be
-   preserved but not loaded as active guidance. Every on-demand import and every
-   resource must be connected to a route, rule, command, code block, artifact,
-   recipe, snippet, or explicit review note. Do not leave orphaned imports or
-   resources.
-
-13. Extract fenced snippets into `code` with:
-
-   - `language`
-   - `kind`: `example`, `runnable_script`, `probe`, `transform`, `validator`,
-     `troubleshooting`, or `reference`
-   - `source`: inline or extracted file
-   - `provenance`: resource or import id, fence index, heading, and line span
-     when known
-   - `purpose`
-   - `requires.dependencies`, `requires.imports`, `requires.resources`, and
-     `requires.artifacts`
-   - `inputs`, `outputs`, and `safety`
-
-   Do not execute a snippet merely because it was imported. Preserve first,
-   classify second, promote intentionally.
-
-14. Extract named files and data products into `artifacts`. Examples:
-
-   - input PDFs
-   - field report JSON
-   - generated images
-   - filled PDFs
-   - log/transcript/report files
-
-   Link artifacts through `produced_by` and `consumed_by` where the source
-   material makes that relationship clear.
-
-15. Extract ordered procedures into `recipes`. Use recipes when a resource says
-   work must happen in order, a probe determines a branch, or intermediate
-   artifacts control the next step.
-
-   A good recipe binds:
-
-   - required imports
-   - required resources
-   - dependencies
-   - artifacts
-   - `load_import`
-   - `load_resource`
-   - `run_code`
-   - `run_command`
-   - `ask`
-   - `branch`
-   - artifact produce/consume steps
-
-16. Extract commands into `commands` with:
-
-   - `template`
-   - `description`
-   - `safety`
-   - `requires.dependencies` for declared tools, files, env vars, services,
-     adapters, browsers, or packages
-
-17. Extract required tools, files, env vars, services, adapters, browsers, and
-   packages into top-level `dependencies`. Do not leave required commands such
-   as `curl`, `sed`, `gh`, `rote`, `python`, or `cargo` as prose.
-18. For every dependency, add the best available check:
-
-    - CLI: `kind: cli`, `command`, and `check.command`
-    - file: `kind: file`, `path`, and `check.path`
-    - env var: `kind: env`, `env`, and `check.env`
-    - service/adapter/browser/package: declare the kind and note that the
-      harness must perform the check
-
-19. Add `permission` when using the dependency needs approval or special care.
-20. Add `provision` when the skill can offer install/connect choices. Provision
-    must point to an elicitation; never silently install missing tools.
-
-21. Extract lifecycle phases into `states`. States should point to command,
-   snippet, elicitation, or closure ids. Do not hide paragraphs in `states.do`.
-22. Extract stable product language into `snippets`.
-23. Extract post-task obligations into `closures`. Examples:
-
-   - collect evidence
-   - compute cost
-   - ask whether to remember
-   - ask whether to share
-   - write a digest
-   - run release QA
-
-24. Add `trace` when the spec steers a harness:
-
-    ```yaml
-    trace:
-      mode: event_log
-      required: true
-      record:
-        - input_received
-        - spec_loaded
-        - rule_evaluated
-        - rule_matched
-        - route_selected
-        - elicitation_requested
-        - outcome_recorded
-    ```
-
-25. Add durable-executor compatibility when the skill may run commands, call
-    APIs, invoke provider CLIs, write files, use adapters, preserve evidence,
-    or participate in future recall. This is an agent-mediated contract, not a
-    runtime engine.
-
-    - Add `activation.summary` so generated trampoline frontmatter states what
-      the skill is before the full spec is loaded.
-    - For durable meta-router skills, use a summary like:
-      `Universal durable-work meta-router and CLI/API/shell substrate with trace, alignment, evidence capture, and future recall.`
-    - For domain skills, use a domain summary like:
-      `Universal browser/web automation router with trace and alignment benefits.`
-    - Do not create or maintain a central domain registry. Domain skills
-      advertise their own activation metadata; the agent selects the matching
-      installed skill from harness metadata.
-    - If the skill receives a durable handoff packet, preserve `workspace`,
-      `trace_dir`, `return_to`, `branch_id`, `execution_policy`, and
-      `evidence_context`.
-    - If no durable handoff packet is present and the task asks for remembered
-      evidence, future recall, trace, alignment, reuse, or durable execution,
-      route through `durable-executor` before domain work unless the user
-      explicitly asks for direct/no-rote execution.
-    - Domain skills own domain interpretation and validation only. Any CLI,
-      shell, local process, package command, API fallback, or provider command
-      must use the durable execution substrate, normally a rote adapter or
-      `rote exec --`.
-    - When domain work completes, the skill should produce a return packet with
-      status, selected route, skill metadata, artifacts, evidence handles,
-      blockers, and trace paths, then hand back to `return_to` for final durable
-      closure.
-    - For parallel branches, keep one top-level workspace and use branch-scoped
-      `branch_id`, trace paths, evidence labels, and artifact directories.
-
-26. Add scenario tests for every important decision, especially old-skill
-    failure modes.
-27. Add `review_required` for any uncertain judgment. Do not bury uncertainty
-    in comments.
-28. Validate, test, and check dependencies:
-
-    ```bash
-    skillspec validate skill.spec.yml
-    skillspec imports check skill.spec.yml
-    skillspec test skill.spec.yml
-    skillspec deps check skill.spec.yml
-    skillspec deps check skill.spec.yml --command '<command-id>'
-    skillspec explain skill.spec.yml --input '<representative request>'
-    ```
-
-29. Before asking to install the generated skill, show the dependency summary
-    again and ask the user to approve the dependency surface. Approval should
-    cover:
-
-    - required CLIs/files/env vars/services/adapters/browser/package managers
-    - permission-sensitive dependencies
-    - provision/install options
-    - any missing dependencies that leave the skill draft-only
-
-30. Compile only after the spec is valid:
-
-    ```bash
-    skillspec compile skill.spec.yml --target codex-skill
-    skillspec compile skill.spec.yml --target claude-skill
-    ```
-
-31. If the user asks to install, create a clean generated skill folder:
-
-    ```text
-    <skill-name>/
-      SKILL.md
-      skill.spec.yml
-    ```
-
-    Then install it through `skillspec install` so harness roots are detected
-    and the spec is validated before files are written.
-
-## Harness Install Targets
-
-Do not install by default. Ask or wait for explicit instruction.
-
-Supported destinations:
-
-- Codex/Codex-style personal skill:
-  `skillspec install skill <skill-folder> --target agents` or
-  `skillspec install skill <skill-folder> --target codex`
-- Claude repo skill:
-  `skillspec install skill <skill-folder> --target claude-local`
-- Hermes or another harness:
-  ask for the target skill root
-
-Install the compiled `SKILL.md` and the reviewed `skill.spec.yml` together.
-The generated skill should point agents to the local `skill.spec.yml`.
-Use `skillspec install targets` to show detected harness roots, and use
-`--dry-run` before writing when the user is still reviewing the install plan.
-
-## Remote Source Staging
-
-For a GitHub tree URL or `owner/repo/path` source, stage the full requested
-folder locally before importing. Prefer sparse checkout when possible:
+When importing, creating, revising, or extending this SkillSpec-backed skill, use the embedded grammar teacher before editing `skill.spec.yml`:
 
 ```bash
-mkdir -p /tmp/skillspec-port
-git clone --depth 1 --filter=blob:none --sparse https://github.com/<owner>/<repo> /tmp/skillspec-port/<repo>
-git -C /tmp/skillspec-port/<repo> sparse-checkout set <path/to/skill>
+skillspec grammar sensemake --view index
+skillspec grammar sensemake --view porting
+skillspec grammar checklist --for import-skill
 ```
 
-If sparse checkout is unavailable, download the files into a temp folder while
-preserving relative paths. After staging, import the local folder, not the URL.
+- Treat the checklist as the review gate for semantic edits: activation, routes, rules, elicitations, imports/resources, commands/deps, procedures, tests, proof, and contract quality.
+- Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
+- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
+- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
 
-Do not install packages, run scripts, or execute imported snippets during
-staging. Staging is read-only source acquisition.
+## Durable Handoff Contract
 
-## SkillSpec CLI Capability Preflight
+This skill participates in agent-mediated durable execution. There is no runtime handoff engine: the agent reads the active SkillSpec contracts, carries the handoff packet in context, and preserves the declared evidence.
 
-The creator skill requires a recent `skillspec` CLI. Check the available
-surface before doing meaningful work:
+- If a durable handoff packet is present, preserve its `workspace`, `trace_dir`, `return_to`, `branch_id`, and `execution_policy` fields.
+- If no durable handoff packet is present and the task asks for remembered evidence, future recall, reuse, trace, alignment, or durable execution, route through `durable-executor` first unless the user explicitly requests direct/no-rote execution.
+- If `durable_context.active` is true, do not route the whole task back to `durable-executor`; use `durable-executor` only as the execution substrate and then return to `return_to`.
+- This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.
+- Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.
+- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.
+- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.
+
+## How To Execute The Structure
+
+Before the first task action, convert the decision output and relevant spec sections into a checklist:
+
+- `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
+- execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.
+- route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.
+- `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.
+- `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.
+- user constraints: carry explicit user instructions such as "do not search the web" into the same checklist. The spec adds structure; it does not erase the user's constraints.
+- `elicit`: ask the required question before irreversible work, side effects, installs, auth steps, or broad exploration.
+- `dependencies`: prove readiness for the active route, command, recipe, or code block before using it. Prefer command-scoped checks such as `skillspec deps check ./skill.spec.yml --command <id>` when a command id is known.
+- dependency evidence: a missing environment variable only proves that variable is absent; it does not prove that auth, API keys, browser sessions, keychains, vaults, or CLI-native credentials are absent. When auth can live outside env, prove readiness with the declared command, adapter, browser, or dependency check instead of grepping env.
+- `imports` and `resources`: load only the items required by the active route/rule/recipe/code, plus anything marked `always`.
+- `commands`, `recipes`, and `code`: use declared templates and ordered steps as the allowed execution surface. Check their `requires` fields first, preserve outputs as evidence, and do not replace them with unrelated tools unless the active contract allows that substitution.
+- `after_success` and closures: these are completion obligations. Do them before the final response, or report why they remain unproven.
+
+If every allowed route is blocked by missing dependencies, auth, permissions, or a forbid, report the blocker and ask how to proceed. Do not switch to native search, raw shell, browser automation, direct API calls, or installs just because they are available in the harness.
+
+## Quick Commands
 
 ```bash
-skillspec --help
-skillspec import-skill --help
-skillspec validate --help
-skillspec imports check --help
-skillspec test --help
-skillspec compile --help
-skillspec deps --help
-skillspec deps check --help
+skillspec sensemake ./skill.spec.yml --view index
+skillspec validate ./skill.spec.yml
+skillspec imports check ./skill.spec.yml
+skillspec test ./skill.spec.yml
+skillspec deps check ./skill.spec.yml
+skillspec query ./skill.spec.yml rule:<id> --view summary
+skillspec refs ./skill.spec.yml rule:<id> --view summary
+skillspec query ./skill.spec.yml command:<id>.requires
+skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
+skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/traces/<run-id>" --execution-trace <execution-ledger.jsonl>
 ```
 
-If `imports check` or `deps check` is missing but import/validate/test/compile
-exist, continue only as a draft port. In draft mode:
+## Completion Report
 
-- keep runtime-loadable Markdown extraction first-class in `imports`
-- keep dependency extraction first-class in `dependencies`
-- mark import validation as `review_required` when `imports check` is missing
-- mark dependency verification as `review_required`
-- report inferred dependencies without local present/missing claims
-- do not install package managers, CLIs, services, adapters, or generated
-  skills
-- tell the user to upgrade the CLI before release or installation
+When reporting completion, include the selected route, the SkillSpec trace `run_dir`, the `skillspec trace align` status (`pass`, `fail`, or `unproven`), status meaning, decision-replay and execution-proof layer results, evidence gaps, align summary/conclusion, and the user-facing alignment proof rows. Command proof must name only the command basename, never raw args. When rote workspace evidence or stats exist, include a visible `Token savings` section: name the workspace and response ids/files the user can retrieve later, state measured context-window/API tokens only if queried, explain that the workspace keeps full evidence outside the prompt, and explain that crystallized or remembered reuse can avoid reloading full evidence into the model window. Do not reduce this to a bare token count or invent replay savings.
 
-If `import-skill`, `validate`, `test`, or `compile` is missing, stop and ask
-the user to upgrade the SkillSpec CLI before porting.
+Minimum final response shape when workspace evidence exists:
 
-When working from this repository during development, prefer the checked-out
-binary if the installed binary is stale:
+- `Result`: answer the user's task directly.
+- `Evidence`: workspace name plus important response ids/files the user can query later.
+- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
+- `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.
 
-```bash
-cargo build
-./target/debug/skillspec imports check skill.spec.yml
-./target/debug/skillspec deps check skill.spec.yml
-```
+## Route Hints
 
-## Semantic Promotion
-
-Mechanical import preserves evidence; semantic promotion creates the useful
-SkillSpec.
-
-Promote code when:
-
-- the source text says it is required
-- a recipe needs it as a probe, transform, or validator
-- it produces or consumes a named artifact
-- it has clear dependencies and safety
-
-Keep code as an example when:
-
-- it illustrates a library but is not required
-- it lacks inputs/outputs
-- it appears in troubleshooting or reference-only sections
-
-Create recipes when:
-
-- a resource has ordered instructions
-- a step must run before another step
-- a probe decides the branch
-- an intermediate artifact is inspected before continuing
-
-Create artifacts when:
-
-- a file or JSON object is produced for later use
-- the source names an output path
-- validation depends on a generated file
-- the user-facing result is a file/report/transcript/image/PDF
-
-Add `review_required` when the harness cannot confidently classify a snippet,
-artifact, or recipe edge.
-
-## Rule Extraction
-
-Rules should be short, testable steering decisions.
-
-Use rules for:
-
-- route choice
-- route order
-- forbidden substitutions
-- narrow allowed fallbacks
-- required elicitation
-- post-success obligations
-
-Good:
-
-```yaml
-rules:
-  - id: browser_words_handoff_to_browse
-    when:
-      user_says_any:
-        - browse
-        - click
-        - snapshot
-    prefer: browser
-    forbid:
-      - native_search_as_answer
-    elicit: browser_mode
-```
-
-Weak:
-
-```yaml
-rules:
-  - id: browser
-    reason: Use the browser when it seems appropriate and be careful.
-```
-
-## Elicitation Extraction
-
-Make elicitation first-class when a user choice changes the route, risk, auth
-surface, browser mode, install scope, or destructive action.
-
-Good:
-
-```yaml
-elicitations:
-  browser_mode:
-    question: How should I access the browser state?
-    choices:
-      - id: attach_existing
-        label: Attach to active browser
-      - id: new_headed
-        label: Start visible browser
-      - id: new_headless
-        label: Start headless browser
-```
-
-Do not leave important choices as prose like "ask the user what to do."
-
-## Command Extraction
-
-Every command template needs a safety class:
-
-- `read_only`
-- `local_read`
-- `local_write`
-- `network_read`
-- `network_write`
-- `browser_attach`
-- `credential_request`
-- `destructive`
-
-If a command depends on a tool, file, auth state, or environment variable,
-record that requirement through `dependencies` and `commands.<id>.requires`.
-If the current grammar cannot express it, add `review_required`.
-
-## Dependency Extraction
-
-Use top-level `dependencies` for anything a command or route assumes is
-available.
-
-Good:
-
-```yaml
-dependencies:
-  gh:
-    kind: cli
-    command: gh
-    check:
-      command: gh
-    permission:
-      required: true
-      reason: GitHub CLI may use authenticated network access.
-      safety: network_read
-    provision:
-      elicit: install_scope
-      options:
-        - id: user_global
-          label: Install with a user package manager
-          command: brew install gh
-          safety: local_write
-
-commands:
-  list_prs:
-    template: gh pr list
-    safety: network_read
-    requires:
-      dependencies:
-        - gh
-```
-
-Weak:
-
-```yaml
-commands:
-  list_prs:
-    template: gh pr list
-    description: Requires gh to be installed somehow.
-```
-
-The creator must preserve install choices as elicitation. It must not tell a
-harness to silently install global tools.
-
-## Dependency Approval
-
-Before validation/install approval, tell the user what the old skill appears to
-depend on. Use this shape:
-
-```text
-Inferred dependency surface:
-- gh: present, network/auth-sensitive, provisionable via user_global
-- rote: present, required for workspace evidence
-- deps.toml: missing, required only for release/replay checks
-
-I will not install or connect anything unless you approve the provision option.
-```
-
-If `skillspec deps check` reports a dependency as missing, do not proceed as if
-the port is production-ready. Either add provision choices, leave the generated
-skill draft-only, or ask the user how to handle it.
-
-## Code-Heavy Skill Porting
-
-For skills with referenced Markdown files and code snippets, such as PDF,
-spreadsheet, browser, data-processing, or build-system skills, do this extra
-pass after mechanical import:
-
-1. Build an import/resource map:
-
-   ```text
-   SKILL.md -> entry/source material
-   reference.md -> import when loaded as active guidance, resource when only provenance
-   forms.md / guide.md / workflow.md -> procedure import when the source says to load/follow it
-   scripts/* -> script resources or file dependencies
-   assets/* -> asset resources
-   ```
-
-2. Build a code map:
-
-   ```text
-   code id -> language -> source import/resource -> heading -> purpose -> deps -> inputs -> outputs -> safety
-   ```
-
-3. Classify snippets:
-
-   - `probe`: decides what route or branch to take
-   - `transform`: converts input artifacts into output artifacts
-   - `validator`: proves a previous step worked
-   - `runnable_script`: command-like code intended to run as-is
-   - `example`: illustrative code that should not run automatically
-   - `troubleshooting`: only used after failure
-   - `reference`: retained for lookup
-
-4. Create artifacts for every intermediate or final file the procedure relies
-   on.
-5. Create recipes for ordered procedures and branch points.
-6. Add tests that prove the route picks the recipe, not a generic answer.
-7. Add review notes for every snippet whose role is uncertain.
-
-Do not flatten referenced files into a giant prose snippet. The whole point is
-to preserve provenance as resources, load active guidance as imports, and move
-control logic into recipes and rules.
-
-## Example: Porting A GitHub Skill Folder
-
-For a public GitHub skill folder:
-
-```bash
-mkdir -p /tmp/skillspec-port
-git clone --depth 1 --filter=blob:none --sparse https://github.com/anthropics/skills /tmp/skillspec-port/anthropics-skills
-git -C /tmp/skillspec-port/anthropics-skills sparse-checkout set skills/pdf
-
-skillspec import-skill /tmp/skillspec-port/anthropics-skills/skills/pdf \
-  --out /tmp/anthropic-pdf.skill.spec.yml
-
-skillspec validate /tmp/anthropic-pdf.skill.spec.yml
-skillspec imports check /tmp/anthropic-pdf.skill.spec.yml
-skillspec deps check /tmp/anthropic-pdf.skill.spec.yml
-```
-
-Then inspect the draft:
-
-```bash
-rg -n "^imports:|^resources:|^code:|^commands:|^dependencies:|provenance:|fence_index:" /tmp/anthropic-pdf.skill.spec.yml
-```
-
-If the source contains a procedural file such as `forms.md`, revise the draft
-into a reviewed spec with:
-
-- `imports.forms.role: procedure` when the harness must load and follow it
-- `resources.forms.role: required_procedure` only when it is preserved as
-  provenance rather than loaded as runtime guidance
-- code blocks classified as probes/transforms/validators/examples
-- artifacts for field reports, rendered pages, generated PDFs, and validation
-  output
-- a recipe that `load_import`s the procedure, runs the probe, branches, and
-  validates the final artifact
-- dependency/provision elicitations for missing CLIs or packages
-
-## Test Extraction
-
-Every meaningful route rule should have at least one scenario test.
-
-Prioritize tests for harness drift:
-
-- browser request answered with native web search
-- adapter setup attempted before browser fallback
-- shell output summarized from scrollback instead of typed evidence
-- long-running process run in a blocking foreground path
-- release or publish run without dry-run or explicit approval
-- dependency-dependent flow marked released without dependency evidence
-- user choice skipped when the spec required elicitation
-
-## Done Definition
-
-A created SkillSpec is ready for serious testing when:
-
-- the source `SKILL.md` was fully read
-- the source was staged locally if remote
-- `skillspec validate skill.spec.yml` passes
-- `skillspec imports check skill.spec.yml` passes
-- `skillspec test skill.spec.yml` passes
-- `skillspec deps check skill.spec.yml` has been run, and any missing
-  dependency is represented by provision choices or review notes
-- the user has seen the dependency surface before approving install
-- `skillspec explain` gives expected routes for realistic inputs
-- the generated Codex/Claude skill is smaller than the old prose skill
-- the generated skill keeps the reviewed `skill.spec.yml` beside it
-- all uncertain mappings are explicit in `review_required`
+- `local_skill_port`: Port local skill
+- `remote_skill_port`: Port remote skill
+- `revise_existing_skillspec`: Revise existing SkillSpec
+- `compile_and_install_reviewed_skill`: Compile and install reviewed skill
+- `prove_skill_value`: Prove skill value
