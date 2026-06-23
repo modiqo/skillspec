@@ -36,6 +36,19 @@ The intended design-doc set is:
   dependency manifests fit together.
 - `progressive-sensemaking.md`: how an agent should orient through `sensemake`,
   `decide`, `query`, and `refs` instead of loading the whole spec file.
+- `runtime-plan-act-progress-loop.md`: how `plan`, `act`, `progress record`,
+  `progress show`, and `trace align` form the visible runtime loop for a
+  SkillSpec-backed run.
+- `execution-progress-ledger.md`: how `execution.jsonl` records phase,
+  requirement, handoff, route, and closure proof for progress and alignment.
+- `phase-tool-boundaries.md`: how `tool_boundary` is rendered by `act` as a hard
+  per-phase permission boundary for tools, data sources, substrates, providers,
+  adapters, APIs, CLIs, browser modes, and skills.
+- `completion-alignment-and-token-reporting.md`: how final responses should
+  render alignment summaries, missing proof rows, trace paths, and measured
+  token consumption and savings.
+- `command-log.md`: a scannable command table with implemented command names,
+  important args/options, explanations, and realistic examples.
 - `grammar-and-conformance.md`: the grammar surface, typed fields, references,
   validation rules, schema strictness, and conformance expectations.
 - `rules-routes-and-decision-algebra.md`: how routes, rules, predicates, forbids,
@@ -63,12 +76,15 @@ Every design claim should be grounded in one or more of these sources:
 | Validation behavior | `crates/skillspec-cli/src/parser.rs`, `conformance/valid/`, `conformance/invalid/` |
 | Route and rule decisions | `crates/skillspec-cli/src/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
 | Progressive sensemaking | `crates/skillspec-cli/src/sensemake.rs`, `crates/skillspec-cli/src/compiler.rs` |
+| Runtime phase loop | `crates/skillspec-cli/src/act.rs`, `crates/skillspec-cli/src/progress.rs`, `crates/skillspec-cli/src/main.rs`, `spec/commandspec.md` |
+| Phase tool boundaries | `crates/skillspec-cli/src/model.rs`, `crates/skillspec-cli/src/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
+| Command log | `crates/skillspec-cli/src/main.rs`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/imports.rs`, `crates/skillspec-cli/src/parser.rs` |
 | Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/prose-vs-skillspec.md` |
 | Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
-| Traces and alignment | `spec/trace.md`, `crates/skillspec-cli/src/trace.rs`, `crates/skillspec-cli/src/align.rs` |
+| Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-cli/src/trace.rs`, `crates/skillspec-cli/src/progress.rs`, `crates/skillspec-cli/src/align.rs` |
 | CLI surface | `crates/skillspec-cli/src/main.rs` |
 
 ## Terms Used In These Docs
@@ -107,11 +123,36 @@ executed as a general-purpose workflow runtime.
 to another when a condition is met. It is a planning and review primitive, not an
 implicit command executor.
 
+`Phase plan` means the ordered execution phases rendered by `skillspec plan` for
+the selected route and task input.
+
+`Action checklist` means the current-route and current-phase operating procedure
+rendered by `skillspec act`, including route authority, matched rules, active
+forbids, transitions, handoffs, before-tool-call checks, and the effective phase
+tool boundary.
+
+`Phase tool boundary` means the effective `tool_boundary` rendered by
+`skillspec act` after merging runtime defaults, entry policy, selected route
+policy, current phase policy, and active forbids. It is a harness-facing
+permission contract, not a standalone security sandbox.
+
+`Progress ledger` means the structured `<run-dir>/execution.jsonl` file appended
+by `skillspec progress record`. It stores compact proof events for phases,
+requirements, handoffs, routes, closures, and evidence references.
+
+`Progress report` means the derived `<run-dir>/progress.json` file and human
+summary produced by `skillspec progress show`.
+
 `Trace` means structured decision evidence emitted by `skillspec decide` or a
 compatible harness.
 
 `Alignment report` means the result of replaying decision evidence and checking
 which execution obligations have proof.
+
+`Completion summary` means the compact final status block from
+`skillspec trace align`, including decision replay, phase order, requirement
+proof counts, missing proof rows, forbidden-action status, alignment status, and
+token usage.
 
 ## Documentation QA Gate
 
