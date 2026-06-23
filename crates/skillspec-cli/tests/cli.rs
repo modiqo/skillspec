@@ -390,6 +390,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("refs"));
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
+    assert!(stdout(&top).contains("router"));
 
     let trace = Command::new(bin())
         .arg("trace")
@@ -710,6 +711,161 @@ description: Use when deploying applications to production hosting targets. Do n
     let route_report = json_stdout(&route);
     assert_eq!(route_report["selected"], Value::Null);
     assert!(route_report["candidates"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn router_install_hooks_install_skill_and_uninstall_restores_visibility() {
+    let dir = TempDir::new("router-lifecycle");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let manifest = skillspec_home.join("router/visibility-manifest.json");
+    let source = dir.path().join("note-source");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images. Do not use for notes.
+---
+# PDF
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--router-root")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+    let install_report = json_stdout(&install_router);
+    assert_eq!(install_report["router_skill_status"], "installed");
+    assert!(root.join("skill-router/SKILL.md").is_file());
+    assert!(root
+        .join("skill-router/.skillspec-router-managed")
+        .is_file());
+    assert!(root.join("pdf/agents/openai.yaml").is_file());
+    assert!(index.is_file());
+    assert!(skillspec_home.join("router/config.json").is_file());
+
+    let clean_status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&clean_status);
+    let clean_report = json_stdout(&clean_status);
+    assert_eq!(clean_report["stale"], false);
+    assert_eq!(clean_report["indexed_skills"], 2);
+
+    write_file(
+        &source.join("SKILL.md"),
+        r#"---
+name: notes
+description: Use when taking structured notes and summarizing meeting action items. Do not use for PDF extraction.
+---
+# Notes
+"#,
+    );
+    write_file(
+        &source.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: notes.skill
+title: Notes
+description: Notes fixture.
+routes:
+  - id: local
+    label: Local
+"#,
+    );
+    let install_skill = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("install")
+        .arg("skill")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--name")
+        .arg("notes")
+        .output()
+        .unwrap();
+    assert_success(&install_skill);
+    assert!(root.join("notes/agents/openai.yaml").is_file());
+
+    let refreshed_status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&refreshed_status);
+    let refreshed_report = json_stdout(&refreshed_status);
+    assert_eq!(refreshed_report["stale"], false);
+    assert_eq!(refreshed_report["indexed_skills"], 3);
+
+    let route_notes = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("summarize meeting action items as notes")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&route_notes);
+    let route_report = json_stdout(&route_notes);
+    assert_eq!(route_report["selected"]["name"], "notes");
+
+    let uninstall_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("uninstall")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&uninstall_router);
+    let uninstall_report = json_stdout(&uninstall_router);
+    assert_eq!(uninstall_report["router_skill_status"], "removed");
+    assert_eq!(uninstall_report["index_removed"], true);
+    assert!(!root.join("skill-router").exists());
+    assert!(!index.exists());
+    assert!(!skillspec_home.join("router/config.json").exists());
+    assert!(!root.join("pdf/agents/openai.yaml").exists());
+    assert!(!root.join("notes/agents/openai.yaml").exists());
 }
 
 #[test]

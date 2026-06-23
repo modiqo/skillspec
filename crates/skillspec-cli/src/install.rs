@@ -158,11 +158,15 @@ pub fn install_skill(
         });
     }
 
-    Ok(InstallReport {
+    let report = InstallReport {
         skill_name,
         dry_run,
         installs,
-    })
+    };
+    if !dry_run {
+        crate::router_lifecycle::after_skill_install()?;
+    }
+    Ok(report)
 }
 
 struct PendingInstall {

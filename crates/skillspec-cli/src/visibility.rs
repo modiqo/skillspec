@@ -574,17 +574,33 @@ fn write_manifest(
     profile: VisibilityProfile,
     changes: &[PreparedChange],
 ) -> Result<()> {
+    let mut manifest_changes = changes
+        .iter()
+        .map(|change| change.manifest.clone())
+        .collect::<Vec<_>>();
+    if manifest_path.is_file() {
+        let existing = read_manifest(manifest_path)?;
+        for existing_change in existing.changes {
+            let replaced = manifest_changes
+                .iter()
+                .any(|change| same_manifest_target(change, &existing_change));
+            if !replaced {
+                manifest_changes.push(existing_change);
+            }
+        }
+    }
     let manifest = VisibilityManifest {
         schema: MANIFEST_SCHEMA.to_owned(),
         created_at_unix: now_unix(),
         profile,
-        changes: changes
-            .iter()
-            .map(|change| change.manifest.clone())
-            .collect(),
+        changes: manifest_changes,
     };
     let json = serde_json::to_string_pretty(&manifest).map_err(Error::RenderJson)?;
     write_file(manifest_path, &format!("{json}\n"))
+}
+
+fn same_manifest_target(left: &VisibilityManifestChange, right: &VisibilityManifestChange) -> bool {
+    left.harness == right.harness && router::same_path(&left.skill_dir, &right.skill_dir)
 }
 
 fn read_manifest(path: &Path) -> Result<VisibilityManifest> {

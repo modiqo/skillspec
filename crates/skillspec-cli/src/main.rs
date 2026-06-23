@@ -14,6 +14,7 @@ mod parser;
 mod progress;
 mod report;
 mod router;
+mod router_lifecycle;
 mod sensemake;
 mod trace;
 mod visibility;
@@ -222,6 +223,11 @@ enum Command {
         #[command(subcommand)]
         command: VisibilityCommand,
     },
+    #[command(about = "Install, uninstall, or refresh the optional skill router")]
+    Router {
+        #[command(subcommand)]
+        command: RouterCommand,
+    },
     #[command(about = "Detect harness roots and install SkillSpec-backed skills")]
     Install {
         #[command(subcommand)]
@@ -370,6 +376,97 @@ enum VisibilityArg {
 #[derive(Clone, Debug, clap::ValueEnum)]
 enum VisibilityProfileArg {
     RouterManaged,
+}
+
+#[derive(Debug, Subcommand)]
+enum RouterCommand {
+    #[command(about = "Install the visible skill-router surface and managed index")]
+    Install {
+        /// Skill roots to scan and manage.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// SQLite index path to write.
+        #[arg(long)]
+        index: PathBuf,
+        /// Reversible visibility manifest path. Defaults beside the index.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        /// Root where the visible skill-router skill should be installed. Defaults to the first root.
+        #[arg(long)]
+        router_root: Option<PathBuf>,
+        /// Visible router skill folder/name.
+        #[arg(long, default_value = router_lifecycle::default_router_name())]
+        router_name: String,
+        /// Show changes without writing files, index, manifest, or config.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Restore visibility and remove the managed skill-router surface")]
+    Uninstall {
+        /// Reversible visibility manifest path. Defaults from router config.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        /// Root containing the visible skill-router skill. Defaults from router config.
+        #[arg(long)]
+        router_root: Option<PathBuf>,
+        /// Visible router skill folder/name.
+        #[arg(long, default_value = router_lifecycle::default_router_name())]
+        router_name: String,
+        /// SQLite index path to remove unless --keep-index is set. Defaults from router config.
+        #[arg(long)]
+        index: Option<PathBuf>,
+        /// Preserve the index file.
+        #[arg(long)]
+        keep_index: bool,
+        /// Show changes without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Refresh or inspect the router index")]
+    Index {
+        #[command(subcommand)]
+        command: RouterIndexCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum RouterIndexCommand {
+    #[command(about = "Refresh the router index from current skill roots")]
+    Refresh {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// SQLite index path to write.
+        #[arg(long)]
+        index: PathBuf,
+        /// Visibility manifest whose final states should override native metadata.
+        #[arg(long)]
+        visibility_manifest: Option<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Compare the router index against current skill roots")]
+    Status {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// SQLite index path to inspect.
+        #[arg(long)]
+        index: PathBuf,
+        /// Visibility manifest whose final states should override native metadata.
+        #[arg(long)]
+        visibility_manifest: Option<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1342,6 +1439,91 @@ fn run() -> Result<()> {
                     report::text(&visibility::render_restore(&report))?;
                 }
             }
+        },
+        Command::Router { command } => match command {
+            RouterCommand::Install {
+                roots,
+                index,
+                manifest,
+                router_root,
+                router_name,
+                dry_run,
+                json,
+            } => {
+                let report = router_lifecycle::install(router_lifecycle::RouterInstallOptions {
+                    roots,
+                    index,
+                    manifest,
+                    router_root,
+                    router_name: Some(router_name),
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_install(&report))?;
+                }
+            }
+            RouterCommand::Uninstall {
+                manifest,
+                router_root,
+                router_name,
+                index,
+                keep_index,
+                dry_run,
+                json,
+            } => {
+                let report =
+                    router_lifecycle::uninstall(router_lifecycle::RouterUninstallOptions {
+                        manifest,
+                        router_root,
+                        router_name: Some(router_name),
+                        index,
+                        keep_index,
+                        dry_run,
+                    })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_uninstall(&report))?;
+                }
+            }
+            RouterCommand::Index { command } => match command {
+                RouterIndexCommand::Refresh {
+                    roots,
+                    index,
+                    visibility_manifest,
+                    json,
+                } => {
+                    let report = router::index(router::IndexOptions {
+                        roots,
+                        out: index,
+                        visibility_manifest,
+                    })?;
+                    if json {
+                        report::json(&report)?;
+                    } else {
+                        report::text(&router::render_index(&report))?;
+                    }
+                }
+                RouterIndexCommand::Status {
+                    roots,
+                    index,
+                    visibility_manifest,
+                    json,
+                } => {
+                    let report = router::index_status(router::IndexStatusOptions {
+                        roots,
+                        index,
+                        visibility_manifest,
+                    })?;
+                    if json {
+                        report::json(&report)?;
+                    } else {
+                        report::text(&router::render_index_status(&report))?;
+                    }
+                }
+            },
         },
         Command::Install { command } => match command {
             InstallCommand::Targets => {

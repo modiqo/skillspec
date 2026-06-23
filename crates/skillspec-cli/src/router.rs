@@ -25,6 +25,13 @@ pub struct RouteOptions {
     pub execution_mode: Option<ExecutionMode>,
 }
 
+#[derive(Clone, Debug)]
+pub struct IndexStatusOptions {
+    pub roots: Vec<PathBuf>,
+    pub index: PathBuf,
+    pub visibility_manifest: Option<PathBuf>,
+}
+
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ExecutionMode {
@@ -38,6 +45,27 @@ pub struct IndexReport {
     pub roots: Vec<PathBuf>,
     pub skills_indexed: usize,
     pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct IndexStatusReport {
+    pub index: PathBuf,
+    pub exists: bool,
+    pub stale: bool,
+    pub roots: Vec<PathBuf>,
+    pub indexed_skills: usize,
+    pub discovered_skills: usize,
+    pub new_skills: Vec<IndexStatusEntry>,
+    pub changed_skills: Vec<IndexStatusEntry>,
+    pub missing_skills: Vec<IndexStatusEntry>,
+    pub updated_at_unix: Option<u64>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct IndexStatusEntry {
+    pub name: String,
+    pub path: PathBuf,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -245,6 +273,79 @@ pub fn audit(roots: &[PathBuf]) -> Result<AuditReport> {
     })
 }
 
+pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
+    let mut warnings = Vec::new();
+    let mut discovered = scan_roots(&options.roots, &mut warnings)?;
+    if let Some(manifest) = &options.visibility_manifest {
+        apply_visibility_manifest_overrides(&mut discovered, manifest, &mut warnings)?;
+    }
+    if !options.index.is_file() {
+        return Ok(IndexStatusReport {
+            index: options.index,
+            exists: false,
+            stale: true,
+            roots: options.roots,
+            indexed_skills: 0,
+            discovered_skills: discovered.len(),
+            new_skills: discovered.iter().map(status_entry).collect(),
+            changed_skills: Vec::new(),
+            missing_skills: Vec::new(),
+            updated_at_unix: None,
+            warnings,
+        });
+    }
+
+    let conn = Connection::open(&options.index)?;
+    let indexed = read_entries(&conn, &options.index)?;
+    let metadata = read_metadata(&conn)?;
+    let updated_at_unix = metadata
+        .get("updated_at_unix")
+        .and_then(|value| value.parse::<u64>().ok());
+
+    let mut new_skills = Vec::new();
+    let mut changed_skills = Vec::new();
+    for discovered_entry in &discovered {
+        match indexed
+            .iter()
+            .find(|indexed_entry| same_path(&indexed_entry.path, &discovered_entry.path))
+        {
+            Some(indexed_entry)
+                if indexed_entry.checksum != discovered_entry.checksum
+                    || indexed_entry.visibility != discovered_entry.visibility =>
+            {
+                changed_skills.push(status_entry(discovered_entry));
+            }
+            Some(_) => {}
+            None => new_skills.push(status_entry(discovered_entry)),
+        }
+    }
+
+    let mut missing_skills = Vec::new();
+    for indexed_entry in &indexed {
+        if !discovered
+            .iter()
+            .any(|discovered_entry| same_path(&indexed_entry.path, &discovered_entry.path))
+        {
+            missing_skills.push(status_entry(indexed_entry));
+        }
+    }
+
+    let stale = !new_skills.is_empty() || !changed_skills.is_empty() || !missing_skills.is_empty();
+    Ok(IndexStatusReport {
+        index: options.index,
+        exists: true,
+        stale,
+        roots: options.roots,
+        indexed_skills: indexed.len(),
+        discovered_skills: discovered.len(),
+        new_skills,
+        changed_skills,
+        missing_skills,
+        updated_at_unix,
+        warnings,
+    })
+}
+
 pub fn route(options: RouteOptions) -> Result<RouteReport> {
     let conn = Connection::open(&options.index)?;
     let entries = read_entries(&conn, &options.index)?;
@@ -279,6 +380,42 @@ pub fn render_index(report: &IndexReport) -> String {
     output
 }
 
+pub fn render_index_status(report: &IndexStatusReport) -> String {
+    let mut output = String::new();
+    output.push_str("Skill router index status\n\n");
+    output.push_str(&format!("Index: {}\n", report.index.display()));
+    output.push_str(&format!("Exists: {}\n", report.exists));
+    output.push_str(&format!("Stale: {}\n", report.stale));
+    output.push_str(&format!("Indexed skills: {}\n", report.indexed_skills));
+    output.push_str(&format!(
+        "Discovered skills: {}\n",
+        report.discovered_skills
+    ));
+    if let Some(updated_at_unix) = report.updated_at_unix {
+        output.push_str(&format!("Updated at unix: {updated_at_unix}\n"));
+    }
+    render_status_entries(&mut output, "New skills", &report.new_skills);
+    render_status_entries(&mut output, "Changed skills", &report.changed_skills);
+    render_status_entries(&mut output, "Missing skills", &report.missing_skills);
+    if !report.warnings.is_empty() {
+        output.push_str("\nWarnings:\n");
+        for warning in &report.warnings {
+            output.push_str(&format!("- {warning}\n"));
+        }
+    }
+    output
+}
+
+fn render_status_entries(output: &mut String, label: &str, entries: &[IndexStatusEntry]) {
+    if entries.is_empty() {
+        return;
+    }
+    output.push_str(&format!("\n{label}:\n"));
+    for entry in entries {
+        output.push_str(&format!("- {}: {}\n", entry.name, entry.path.display()));
+    }
+}
+
 pub fn render_audit(report: &AuditReport) -> String {
     let mut output = String::new();
     output.push_str("Skill router audit\n\n");
@@ -308,6 +445,13 @@ pub fn render_audit(report: &AuditReport) -> String {
         }
     }
     output
+}
+
+fn status_entry(entry: &SkillEntry) -> IndexStatusEntry {
+    IndexStatusEntry {
+        name: entry.name.clone(),
+        path: entry.path.clone(),
+    }
 }
 
 pub fn render_route(report: &RouteReport) -> String {
@@ -842,6 +986,19 @@ fn read_entries(conn: &Connection, index_path: &Path) -> Result<Vec<SkillEntry>>
         });
     }
     Ok(entries)
+}
+
+fn read_metadata(conn: &Connection) -> Result<BTreeMap<String, String>> {
+    let mut statement = conn.prepare("SELECT key, value FROM metadata")?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut metadata = BTreeMap::new();
+    for row in rows {
+        let (key, value) = row?;
+        metadata.insert(key, value);
+    }
+    Ok(metadata)
 }
 
 fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<RouteCandidate> {
