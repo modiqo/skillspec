@@ -217,6 +217,7 @@ routes:
             - compute_workspace_stats
             - record_stats_collected_event
             - run_skillspec_trace_alignment
+            - record_final_response_sent_event
             - report_workspace_evidence_and_token_math
           forbid:
             - final_summary_without_workspace
@@ -1371,6 +1372,7 @@ states:
       - compute_workspace_stats
       - record_stats_collected_event
       - run_skillspec_trace_alignment
+      - record_final_response_sent_event
       - summarize_evidence
       - report_workspace_evidence_and_token_math
     next: done
@@ -1636,19 +1638,27 @@ commands:
       dependencies:
         - rote
 
-  workspace_stats_json:
-    description: Persist the workspace metrics snapshot, then collect JSON stats to a declared file that will be bridged into the SkillSpec execution ledger. Use .metrics.context_tokens for agent-consumed exploration tokens, .metrics.total_tokens for API request+response tokens, and token_savings/source-result fields for query-reduction savings.
+  workspace_stats_report:
+    description: Persist the workspace metrics snapshot, then collect the human-readable workspace stats report to a declared file that will be bridged into the SkillSpec execution ledger. Use total/context token fields when present and Token Savings source/result/saved fields for query-reduction savings.
     template: |
       rote stats --save
-      rote workspace stats <workspace> --json > <workspace-stats-json>
+      rote workspace stats <workspace> > <workspace-stats-report>
     safety: local_write
     requires:
       dependencies:
         - rote
 
   record_workspace_stats:
-    description: Append a machine-readable `stats_collected` event to the active SkillSpec execution ledger from the rote workspace stats JSON.
-    template: "skillspec progress stats <run-dir> --workspace <workspace> --workspace-stats-json <workspace-stats-json>"
+    description: Append a machine-readable `stats_collected` event to the active SkillSpec execution ledger from the rote workspace stats report.
+    template: "skillspec progress stats <run-dir> --workspace <workspace> --workspace-stats-report <workspace-stats-report> --phase durable_closure --requirement compute_workspace_stats --requirement record_stats_collected_event"
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec
+
+  record_final_response_report:
+    description: Append the final-response section proof required by the aligner after drafting the final response and before sending it.
+    template: "skillspec progress final-response <run-dir> --phase durable_closure --requirement record_final_response_sent_event --requirement report_workspace_evidence_and_token_math --result --evidence --alignment --token-savings"
     safety: local_write
     requires:
       dependencies:
@@ -1764,18 +1774,21 @@ closures:
     description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
   compute_workspace_stats:
     description: >
-      Before the final response, run `rote stats --save`, then `rote workspace stats <workspace> --json`;
-      extract `.metrics.context_tokens` as one-time exploration context-window
-      tokens and `.metrics.total_tokens` as API request+response tokens. If
-      metrics are missing, record that token consumption and token savings are
-      not recorded; do not skip the token section.
+      Before the final response, run `rote stats --save`, then
+      `rote workspace stats <workspace> > <workspace-stats-report>`; extract
+      total/context token fields when present and Token Savings source/result/saved
+      fields from the report. If metrics are missing, record that token
+      consumption and token savings are not recorded; do not skip the token section.
   record_stats_collected_event:
     description: >
       Run `skillspec progress stats <run_dir> --workspace <workspace>
-      --workspace-stats-json <workspace-stats-json>` after collecting rote
-      workspace stats and before `skillspec trace align`. This must append a
-      `stats_collected` event with token fields into `<run_dir>/execution.jsonl`
-      so `skillspec trace align` can report numeric token consumption/savings.
+      --workspace-stats-report <workspace-stats-report> --phase durable_closure
+      --requirement compute_workspace_stats --requirement
+      record_stats_collected_event` after collecting rote workspace stats and
+      before `skillspec trace align`. This must append a `stats_collected` event
+      with token fields and matching `requirement_satisfied` events into
+      `<run_dir>/execution.jsonl` so `skillspec trace align` can report numeric
+      token consumption/savings and prove the stats closure requirements.
       For successful rote-backed runs, missing `stats_collected` is a workflow
       bug; stop and report the blocker instead of treating absent stats as a
       normal final-report condition.
@@ -1787,6 +1800,18 @@ closures:
       `Phase order`, `Requirements`, `Missing proof`, `Forbidden actions`, and
       `Alignment`. If proof is incomplete, report `Alignment: partial` with the
       concrete missing-proof rows instead of saying only `unproven`.
+  record_final_response_sent_event:
+    description: >
+      After drafting the final response with visible `Result`, `Evidence`,
+      `Alignment summary`, `Token usage`, and `SkillSpec` sections, run
+      `skillspec progress final-response <run_dir> --phase durable_closure
+      --requirement record_final_response_sent_event --requirement
+      report_workspace_evidence_and_token_math --result --evidence --alignment
+      --token-savings`, then rerun `skillspec trace align` with the execution
+      ledger. If any flag would be false, do not send the final response; fix
+      the missing section or explicitly report the blocker. The final answer
+      must use the rerun alignment summary so the execution ledger proves the
+      report included alignment and token savings.
   report_workspace_evidence_and_token_math:
     description: >
       End with the workspace name, important response ids, SkillSpec trace run

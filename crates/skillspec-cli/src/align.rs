@@ -1878,6 +1878,7 @@ fn evaluate_obligation(obligation: &AlignObligation, ledger: &ExecutionLedger) -
         "compute_workspace_trace" => evaluate_workspace_trace_obligation(obligation, ledger),
         "compute_workspace_stats" => evaluate_stats_obligation(obligation, ledger),
         "report_workspace_evidence_and_token_math"
+        | "record_final_response_sent_event"
         | "final_summary_without_trace_math"
         | "final_summary_without_workspace"
         | "summarize_evidence" => evaluate_final_response_obligation(obligation, ledger),

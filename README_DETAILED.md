@@ -291,7 +291,15 @@ skillspec progress record .skillspec/traces/<run-id> phase-completed \
   --evidence-ref <ref>
 skillspec progress stats .skillspec/traces/<run-id> \
   --workspace <rote-workspace> \
-  --workspace-stats-json .skillspec/traces/<run-id>/workspace-stats.json
+  --workspace-stats-report .skillspec/traces/<run-id>/workspace-stats.txt \
+  --phase durable_closure \
+  --requirement compute_workspace_stats \
+  --requirement record_stats_collected_event
+skillspec progress final-response .skillspec/traces/<run-id> \
+  --phase durable_closure \
+  --requirement record_final_response_sent_event \
+  --requirement report_workspace_evidence_and_token_math \
+  --result --evidence --alignment --token-savings
 skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```
@@ -310,10 +318,14 @@ evidence to `.skillspec/traces/<run-id>/execution.jsonl`, and `progress show`
 derives `.skillspec/traces/<run-id>/progress.json` with completed, current,
 blocked, and remaining phases.
 
-For rote-backed runs, persist `rote workspace stats <workspace> --json` to a
+For rote-backed runs, persist `rote workspace stats <workspace>` to a report
 file and run `progress stats` before `trace align`. That appends the
 `stats_collected` event the aligner uses for measured token consumption and
-query-reduction savings, without manually editing `execution.jsonl`.
+query-reduction savings, without manually editing `execution.jsonl`. After
+drafting the final report sections, run `progress final-response --result
+--evidence --alignment --token-savings` with the durable closure phase and
+requirements, then rerun `trace align` so the final alignment proves the
+response included evidence, alignment, and token usage.
 
 The agent remains the executor. SkillSpec supplies the contract and the phase
 tracker so the harness can ask "what is the current phase?" and "what remains?"

@@ -300,9 +300,18 @@ enum ProgressCommand {
         /// Rote workspace name.
         #[arg(long)]
         workspace: Option<String>,
+        /// Phase id whose requirement(s) this stats event satisfies.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Requirement id satisfied by this stats event. Repeat for multiple requirements.
+        #[arg(long)]
+        requirement: Vec<String>,
         /// JSON file produced by `rote workspace stats <workspace> --json`.
         #[arg(long)]
         workspace_stats_json: Option<PathBuf>,
+        /// Human-readable report produced by `rote workspace stats <workspace>`.
+        #[arg(long)]
+        workspace_stats_report: Option<PathBuf>,
         /// Total API request+response tokens.
         #[arg(long)]
         total_tokens: Option<u64>,
@@ -321,6 +330,35 @@ enum ProgressCommand {
         /// Percent reduction from cached/source tokens to query-result tokens.
         #[arg(long)]
         reduction_percent: Option<f64>,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Append final_response_sent report-section proof to a run ledger")]
+    FinalResponse {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Phase id whose requirement(s) this final response event satisfies.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Requirement id satisfied by this final response event. Repeat for multiple requirements.
+        #[arg(long)]
+        requirement: Vec<String>,
+        /// Final response includes the direct result.
+        #[arg(long)]
+        result: bool,
+        /// Final response includes evidence handles or files.
+        #[arg(long)]
+        evidence: bool,
+        /// Final response includes the alignment summary.
+        #[arg(long)]
+        alignment: bool,
+        /// Final response includes token usage and token savings.
+        #[arg(long)]
+        token_savings: bool,
         /// Human-readable event note.
         #[arg(long)]
         message: Option<String>,
@@ -885,7 +923,10 @@ fn run() -> Result<()> {
             ProgressCommand::Stats {
                 run,
                 workspace,
+                phase,
+                requirement,
                 workspace_stats_json,
+                workspace_stats_report,
                 total_tokens,
                 context_tokens,
                 query_result_tokens,
@@ -898,7 +939,10 @@ fn run() -> Result<()> {
                 let event = progress::record_stats(progress::StatsRecordOptions {
                     run_dir: run,
                     workspace,
+                    phase,
+                    requirements: requirement,
                     workspace_stats_json,
+                    workspace_stats_report,
                     total_tokens,
                     context_tokens,
                     query_result_tokens,
@@ -907,6 +951,30 @@ fn run() -> Result<()> {
                     reduction_percent,
                     message,
                 })?;
+                report::json(&event)?;
+            }
+            ProgressCommand::FinalResponse {
+                run,
+                phase,
+                requirement,
+                result,
+                evidence,
+                alignment,
+                token_savings,
+                message,
+                json: _,
+            } => {
+                let event =
+                    progress::record_final_response(progress::FinalResponseRecordOptions {
+                        run_dir: run,
+                        phase,
+                        requirements: requirement,
+                        included_result: result,
+                        included_evidence: evidence,
+                        included_alignment: alignment,
+                        included_token_savings: token_savings,
+                        message,
+                    })?;
                 report::json(&event)?;
             }
         },

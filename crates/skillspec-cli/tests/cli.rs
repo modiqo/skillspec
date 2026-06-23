@@ -1954,6 +1954,90 @@ fn progress_stats_records_rote_workspace_token_evidence_for_alignment() {
 }
 
 #[test]
+fn progress_stats_records_human_workspace_report_for_alignment() {
+    let dir = TempDir::new("progress-stats-report");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    let stats_report = dir.path().join("workspace-stats.txt");
+    write_file(&spec, alignment_spec());
+    write_file(
+        &stats_report,
+        r#"
+Workspace: stats-report-workspace
+
+  Name: stats-report-workspace
+  Commands: 8
+  Responses: 3
+
+Summary: 596 total tokens, 140 context tokens, and 1,010 saved tokens.
+
+Token Savings:
+  Source tokens:      1510 (if agent read full responses)
+  Result tokens:      500 (what agent actually consumed)
+  Tokens saved:       1010 (66.9% reduction)
+"#,
+    );
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=run gh PR status as a tracked background process")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    let progress_stats = Command::new(bin())
+        .arg("progress")
+        .arg("stats")
+        .arg(&run_dir)
+        .arg("--workspace-stats-report")
+        .arg(&stats_report)
+        .output()
+        .unwrap();
+    assert_success(&progress_stats);
+    let event = json_stdout(&progress_stats);
+    assert_eq!(event["event"], "stats_collected");
+    assert_eq!(event["workspace"], "stats-report-workspace");
+    assert_eq!(event["total_tokens"], 596);
+    assert_eq!(event["context_tokens"], 140);
+    assert_eq!(event["response_tokens_cached"], 1510);
+    assert_eq!(event["query_result_tokens"], 500);
+    assert_eq!(event["saved_tokens"], 1010);
+
+    let execution_trace = run_dir.join("execution.jsonl");
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let report = json_stdout(&align);
+    assert_eq!(
+        report["summary"]["tokens"]["consumption"],
+        "total 596 tokens"
+    );
+    assert_eq!(
+        report["summary"]["tokens"]["savings"],
+        "1010 tokens saved by query reduction (1510 cached response tokens reduced to 500 query-result tokens, 66.9% reduction)"
+    );
+}
+
+#[test]
 fn progress_stats_refuses_empty_token_evidence() {
     let dir = TempDir::new("progress-stats-empty");
     let run_dir = dir.path().join("run-empty-stats");
@@ -1967,9 +2051,47 @@ fn progress_stats_refuses_empty_token_evidence() {
         .unwrap();
     assert_failure(&progress_stats);
     assert!(stderr(&progress_stats).contains(
-        "progress stats requires --workspace-stats-json or at least one explicit token metric"
+        "progress stats requires --workspace-stats-json, --workspace-stats-report, or at least one explicit token metric"
     ));
     assert!(!run_dir.join("execution.jsonl").exists());
+}
+
+#[test]
+fn progress_final_response_records_report_section_proof() {
+    let dir = TempDir::new("progress-final-response");
+    let run_dir = dir.path().join("run-final-response");
+    fs::create_dir_all(&run_dir).unwrap();
+
+    let progress_final = Command::new(bin())
+        .arg("progress")
+        .arg("final-response")
+        .arg(&run_dir)
+        .arg("--phase")
+        .arg("durable_closure")
+        .arg("--requirement")
+        .arg("record_final_response_sent_event")
+        .arg("--requirement")
+        .arg("report_workspace_evidence_and_token_math")
+        .arg("--result")
+        .arg("--evidence")
+        .arg("--alignment")
+        .arg("--token-savings")
+        .output()
+        .unwrap();
+    assert_success(&progress_final);
+    let event = json_stdout(&progress_final);
+    assert_eq!(event["event"], "final_response_sent");
+    assert_eq!(event["included_result"], true);
+    assert_eq!(event["included_evidence"], true);
+    assert_eq!(event["included_alignment"], true);
+    assert_eq!(event["included_token_savings"], true);
+
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert!(ledger.contains("\"event\":\"final_response_sent\""));
+    assert!(ledger.contains("\"included_token_savings\":true"));
+    assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
+    assert!(ledger.contains("\"requirement\":\"record_final_response_sent_event\""));
+    assert!(ledger.contains("\"requirement\":\"report_workspace_evidence_and_token_math\""));
 }
 
 #[test]

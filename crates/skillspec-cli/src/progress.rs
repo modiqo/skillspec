@@ -93,6 +93,14 @@ pub struct ExecutionEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_result: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_alignment: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_evidence: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_token_savings: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<u64>,
@@ -126,13 +134,28 @@ pub struct RecordOptions {
 pub struct StatsRecordOptions {
     pub run_dir: PathBuf,
     pub workspace: Option<String>,
+    pub phase: Option<String>,
+    pub requirements: Vec<String>,
     pub workspace_stats_json: Option<PathBuf>,
+    pub workspace_stats_report: Option<PathBuf>,
     pub total_tokens: Option<u64>,
     pub context_tokens: Option<u64>,
     pub query_result_tokens: Option<u64>,
     pub response_tokens_cached: Option<u64>,
     pub saved_tokens: Option<u64>,
     pub reduction_percent: Option<f64>,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FinalResponseRecordOptions {
+    pub run_dir: PathBuf,
+    pub phase: Option<String>,
+    pub requirements: Vec<String>,
+    pub included_result: bool,
+    pub included_evidence: bool,
+    pub included_alignment: bool,
+    pub included_token_savings: bool,
     pub message: Option<String>,
 }
 
@@ -184,6 +207,10 @@ pub fn record(options: RecordOptions) -> Result<ExecutionEvent> {
         source,
         at_unix_ms: Some(unix_ms()),
         message: options.message,
+        included_result: None,
+        included_alignment: None,
+        included_evidence: None,
+        included_token_savings: None,
         workspace: None,
         total_tokens: None,
         context_tokens: None,
@@ -197,15 +224,19 @@ pub fn record(options: RecordOptions) -> Result<ExecutionEvent> {
 }
 
 pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
+    validate_requirement_recording(options.phase.as_ref(), &options.requirements)?;
     let has_direct_token_field = options.total_tokens.is_some()
         || options.context_tokens.is_some()
         || options.query_result_tokens.is_some()
         || options.response_tokens_cached.is_some()
         || options.saved_tokens.is_some()
         || options.reduction_percent.is_some();
-    if options.workspace_stats_json.is_none() && !has_direct_token_field {
+    if options.workspace_stats_json.is_none()
+        && options.workspace_stats_report.is_none()
+        && !has_direct_token_field
+    {
         return Err(Error::InvalidInput {
-            message: "progress stats requires --workspace-stats-json or at least one explicit token metric".to_owned(),
+            message: "progress stats requires --workspace-stats-json, --workspace-stats-report, or at least one explicit token metric".to_owned(),
         });
     }
 
@@ -238,23 +269,38 @@ pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
         None => None,
     };
     let stats = stats_json.as_ref();
+    let stats_report = match &options.workspace_stats_report {
+        Some(path) => {
+            let content = fs::read_to_string(path).map_err(|source| Error::Read {
+                path: path.clone(),
+                source,
+            })?;
+            Some(parse_workspace_stats_report(&content))
+        }
+        None => None,
+    };
+    let report = stats_report.as_ref();
     let response_tokens_cached = options
         .response_tokens_cached
         .or_else(|| json_u64(stats, &["response_tokens_cached"]))
         .or_else(|| json_u64(stats, &["cached_tokens"]))
-        .or_else(|| json_u64(stats, &["token_savings", "source_tokens"]));
+        .or_else(|| json_u64(stats, &["token_savings", "source_tokens"]))
+        .or_else(|| report.and_then(|stats| stats.response_tokens_cached));
     let query_result_tokens = options
         .query_result_tokens
         .or_else(|| json_u64(stats, &["query_result_tokens"]))
-        .or_else(|| json_u64(stats, &["token_savings", "result_tokens"]));
+        .or_else(|| json_u64(stats, &["token_savings", "result_tokens"]))
+        .or_else(|| report.and_then(|stats| stats.query_result_tokens));
     let saved_tokens = options
         .saved_tokens
         .or_else(|| json_u64(stats, &["saved_tokens"]))
-        .or_else(|| json_u64(stats, &["token_savings", "tokens_saved"]));
+        .or_else(|| json_u64(stats, &["token_savings", "tokens_saved"]))
+        .or_else(|| report.and_then(|stats| stats.saved_tokens));
     let reduction_percent = options
         .reduction_percent
         .or_else(|| json_f64(stats, &["reduction_percent"]))
         .or_else(|| json_f64(stats, &["token_savings", "reduction_percent"]))
+        .or_else(|| report.and_then(|stats| stats.reduction_percent))
         .or_else(|| {
             let source = response_tokens_cached?;
             let saved = saved_tokens
@@ -262,12 +308,7 @@ pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
             (source > 0).then_some((saved as f64 / source as f64) * 100.0)
         });
 
-    let source = options.workspace_stats_json.as_ref().map(|path| {
-        serde_json::json!({
-            "kind": "rote_workspace_stats",
-            "path": path.display().to_string(),
-        })
-    });
+    let source = stats_source(&options);
     let event = ExecutionEvent {
         schema: EXECUTION_SCHEMA.to_owned(),
         run_id: Some(run_id),
@@ -280,22 +321,98 @@ pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
         source,
         at_unix_ms: Some(unix_ms()),
         message: options.message,
-        workspace: options.workspace.or_else(|| json_string(stats, &["name"])),
+        included_result: None,
+        included_alignment: None,
+        included_evidence: None,
+        included_token_savings: None,
+        workspace: options
+            .workspace
+            .or_else(|| json_string(stats, &["name"]))
+            .or_else(|| report.and_then(|stats| stats.workspace.clone())),
         total_tokens: options
             .total_tokens
             .or_else(|| json_u64(stats, &["total_tokens"]))
-            .or_else(|| json_u64(stats, &["metrics", "total_tokens"])),
+            .or_else(|| json_u64(stats, &["metrics", "total_tokens"]))
+            .or_else(|| report.and_then(|stats| stats.total_tokens)),
         context_tokens: options
             .context_tokens
             .or_else(|| json_u64(stats, &["context_tokens"]))
-            .or_else(|| json_u64(stats, &["metrics", "context_tokens"])),
+            .or_else(|| json_u64(stats, &["metrics", "context_tokens"]))
+            .or_else(|| report.and_then(|stats| stats.context_tokens)),
         query_result_tokens,
         response_tokens_cached,
         saved_tokens,
         reduction_percent,
     };
-    append_execution_event(&execution_ledger_path(&options.run_dir), &event)?;
+    let ledger_path = execution_ledger_path(&options.run_dir);
+    append_execution_event(&ledger_path, &event)?;
+    append_requirement_satisfied_events(
+        &ledger_path,
+        event.run_id.as_deref().unwrap_or("unknown"),
+        options.phase.as_deref(),
+        &options.requirements,
+        "stats_collected",
+    )?;
     Ok(event)
+}
+
+pub fn record_final_response(options: FinalResponseRecordOptions) -> Result<ExecutionEvent> {
+    validate_requirement_recording(options.phase.as_ref(), &options.requirements)?;
+    fs::create_dir_all(&options.run_dir).map_err(|source| Error::Write {
+        path: options.run_dir.clone(),
+        source,
+    })?;
+    let run_id = options
+        .run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    let event = ExecutionEvent {
+        schema: EXECUTION_SCHEMA.to_owned(),
+        run_id: Some(run_id),
+        event: "final_response_sent".to_owned(),
+        phase: None,
+        requirement: None,
+        id: None,
+        status: None,
+        evidence: None,
+        source: None,
+        at_unix_ms: Some(unix_ms()),
+        message: options.message,
+        included_result: Some(options.included_result),
+        included_alignment: Some(options.included_alignment),
+        included_evidence: Some(options.included_evidence),
+        included_token_savings: Some(options.included_token_savings),
+        workspace: None,
+        total_tokens: None,
+        context_tokens: None,
+        query_result_tokens: None,
+        response_tokens_cached: None,
+        saved_tokens: None,
+        reduction_percent: None,
+    };
+    let ledger_path = execution_ledger_path(&options.run_dir);
+    append_execution_event(&ledger_path, &event)?;
+    append_requirement_satisfied_events(
+        &ledger_path,
+        event.run_id.as_deref().unwrap_or("unknown"),
+        options.phase.as_deref(),
+        &options.requirements,
+        "final_response_sent",
+    )?;
+    Ok(event)
+}
+
+#[derive(Clone, Debug, Default)]
+struct WorkspaceStatsReport {
+    workspace: Option<String>,
+    total_tokens: Option<u64>,
+    context_tokens: Option<u64>,
+    query_result_tokens: Option<u64>,
+    response_tokens_cached: Option<u64>,
+    saved_tokens: Option<u64>,
+    reduction_percent: Option<f64>,
 }
 
 pub fn render(report: &ProgressReport) -> String {
@@ -521,6 +638,58 @@ fn append_execution_event(path: &Path, event: &ExecutionEvent) -> Result<()> {
     Ok(())
 }
 
+fn validate_requirement_recording(phase: Option<&String>, requirements: &[String]) -> Result<()> {
+    if !requirements.is_empty() && phase.is_none() {
+        return Err(Error::InvalidInput {
+            message: "--requirement requires --phase".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn append_requirement_satisfied_events(
+    ledger_path: &Path,
+    run_id: &str,
+    phase: Option<&str>,
+    requirements: &[String],
+    evidence_ref: &str,
+) -> Result<()> {
+    let Some(phase) = phase else {
+        return Ok(());
+    };
+    for requirement in requirements {
+        let event = ExecutionEvent {
+            schema: EXECUTION_SCHEMA.to_owned(),
+            run_id: Some(run_id.to_owned()),
+            event: "requirement_satisfied".to_owned(),
+            phase: Some(phase.to_owned()),
+            requirement: Some(requirement.to_owned()),
+            id: None,
+            status: Some("pass".to_owned()),
+            evidence: Some(serde_json::json!({
+                "kind": "progress_event",
+                "ref": evidence_ref,
+            })),
+            source: None,
+            at_unix_ms: Some(unix_ms()),
+            message: None,
+            included_result: None,
+            included_alignment: None,
+            included_evidence: None,
+            included_token_savings: None,
+            workspace: None,
+            total_tokens: None,
+            context_tokens: None,
+            query_result_tokens: None,
+            response_tokens_cached: None,
+            saved_tokens: None,
+            reduction_percent: None,
+        };
+        append_execution_event(ledger_path, &event)?;
+    }
+    Ok(())
+}
+
 fn write_progress_json(run_dir: &Path, report: &ProgressReport) -> Result<()> {
     let path = run_dir.join("progress.json");
     let content = serde_json::to_vec_pretty(report)?;
@@ -582,6 +751,191 @@ fn evidence_value(options: &RecordOptions) -> Option<serde_json::Value> {
             "ref": reference,
         })),
     }
+}
+
+fn stats_source(options: &StatsRecordOptions) -> Option<serde_json::Value> {
+    match (
+        &options.workspace_stats_json,
+        &options.workspace_stats_report,
+    ) {
+        (Some(json_path), Some(report_path)) => Some(serde_json::json!({
+            "kind": "rote_workspace_stats",
+            "json_path": json_path.display().to_string(),
+            "report_path": report_path.display().to_string(),
+        })),
+        (Some(path), None) => Some(serde_json::json!({
+            "kind": "rote_workspace_stats",
+            "format": "json",
+            "path": path.display().to_string(),
+        })),
+        (None, Some(path)) => Some(serde_json::json!({
+            "kind": "rote_workspace_stats",
+            "format": "report",
+            "path": path.display().to_string(),
+        })),
+        (None, None) => None,
+    }
+}
+
+fn parse_workspace_stats_report(content: &str) -> WorkspaceStatsReport {
+    let mut report = WorkspaceStatsReport::default();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if report.workspace.is_none() {
+            report.workspace =
+                key_value(trimmed, "workspace").or_else(|| key_value(trimmed, "name"));
+        }
+
+        report.total_tokens = report.total_tokens.or_else(|| {
+            metric_u64(
+                trimmed,
+                &[
+                    "total tokens",
+                    "tokens total",
+                    "api request+response tokens",
+                ],
+            )
+        });
+        report.context_tokens = report.context_tokens.or_else(|| {
+            metric_u64(
+                trimmed,
+                &[
+                    "context tokens",
+                    "workspace context tokens",
+                    "context-window tokens",
+                ],
+            )
+        });
+        report.response_tokens_cached = report.response_tokens_cached.or_else(|| {
+            metric_u64(
+                trimmed,
+                &[
+                    "source tokens",
+                    "cached response tokens",
+                    "response tokens cached",
+                    "cached tokens",
+                ],
+            )
+        });
+        report.query_result_tokens = report.query_result_tokens.or_else(|| {
+            metric_u64(
+                trimmed,
+                &[
+                    "result tokens",
+                    "query-result tokens",
+                    "query result tokens",
+                ],
+            )
+        });
+        report.saved_tokens = report
+            .saved_tokens
+            .or_else(|| metric_u64(trimmed, &["tokens saved", "saved tokens"]));
+        report.reduction_percent = report
+            .reduction_percent
+            .or_else(|| reduction_percent(trimmed));
+    }
+    report
+}
+
+fn key_value(line: &str, key: &str) -> Option<String> {
+    let (candidate, value) = line.split_once(':')?;
+    candidate
+        .trim()
+        .eq_ignore_ascii_case(key)
+        .then(|| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+fn metric_u64(line: &str, labels: &[&str]) -> Option<u64> {
+    let lower = line.to_ascii_lowercase();
+    for label in labels {
+        if let Some(position) = lower.find(label) {
+            let label_end = position + label.len();
+            if let Some(number) = number_after_label_separator(line, label_end) {
+                return Some(number);
+            }
+            if let Some(number) = number_before_label(line, position) {
+                return Some(number);
+            }
+        }
+    }
+    None
+}
+
+fn number_after_label_separator(line: &str, label_end: usize) -> Option<u64> {
+    let suffix = line.get(label_end..)?.trim_start();
+    let rest = suffix
+        .strip_prefix(':')
+        .or_else(|| suffix.strip_prefix('='))?
+        .trim_start();
+    first_u64(rest)
+}
+
+fn number_before_label(line: &str, label_start: usize) -> Option<u64> {
+    let prefix = line.get(..label_start)?;
+    let trimmed_end = prefix.trim_end();
+    let mut start = trimmed_end.len();
+    for (index, ch) in trimmed_end.char_indices().rev() {
+        if ch.is_ascii_digit() || ch == ',' {
+            start = index;
+        } else {
+            break;
+        }
+    }
+    (start < trimmed_end.len())
+        .then(|| &trimmed_end[start..])
+        .and_then(parse_u64_token)
+}
+
+fn first_u64(text: &str) -> Option<u64> {
+    let mut start = None;
+    let mut end = 0;
+    for (index, ch) in text.char_indices() {
+        if ch.is_ascii_digit() {
+            if start.is_none() {
+                start = Some(index);
+            }
+            end = index + ch.len_utf8();
+        } else if ch == ',' && start.is_some() {
+            end = index + ch.len_utf8();
+        } else if start.is_some() {
+            break;
+        }
+    }
+    let start = start?;
+    parse_u64_token(&text[start..end])
+}
+
+fn parse_u64_token(token: &str) -> Option<u64> {
+    let digits = token
+        .chars()
+        .filter(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    (!digits.is_empty())
+        .then_some(digits)
+        .and_then(|digits| digits.parse::<u64>().ok())
+}
+
+fn reduction_percent(line: &str) -> Option<f64> {
+    if !line.to_ascii_lowercase().contains("reduction") {
+        return None;
+    }
+    let percent_index = line.find('%')?;
+    let prefix = line.get(..percent_index)?.trim_end();
+    let mut start = prefix.len();
+    for (index, ch) in prefix.char_indices().rev() {
+        if ch.is_ascii_digit() || ch == '.' {
+            start = index;
+        } else {
+            break;
+        }
+    }
+    (start < prefix.len())
+        .then(|| &prefix[start..])
+        .and_then(|number| number.parse::<f64>().ok())
 }
 
 fn json_string(value: Option<&serde_json::Value>, path: &[&str]) -> Option<String> {

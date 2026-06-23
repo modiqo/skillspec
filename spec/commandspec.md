@@ -223,7 +223,8 @@ Subcommands:
 
 - `show <path> --run <run-dir> [--json]`
 - `record <run-dir> <event> [phase] [requirement] [--status <status>] [--evidence-kind <kind>] [--evidence-ref <ref>]`
-- `stats <run-dir> [--workspace <workspace>] [--workspace-stats-json <path>] [token options...]`
+- `stats <run-dir> [--workspace <workspace>] [--workspace-stats-report <path>] [--workspace-stats-json <path>] [--phase <phase>] [--requirement <requirement>...] [token options...]`
+- `final-response <run-dir> [--phase <phase>] [--requirement <requirement>...] --result --evidence --alignment --token-savings [--message <message>] [--json]`
 
 ### `progress show`
 
@@ -290,9 +291,16 @@ Arguments:
 Options:
 
 - `--workspace <WORKSPACE>`: rote workspace name. When omitted, the command
-  reads `name` from `--workspace-stats-json` if present.
+  reads `name` from `--workspace-stats-json` or `Workspace:`/`Name:` from
+  `--workspace-stats-report` if present.
+- `--phase <PHASE>`: phase id whose requirement(s) this stats event satisfies.
+- `--requirement <REQUIREMENT>`: requirement id satisfied by this stats event.
+  Repeat for multiple requirements. Requires `--phase`.
+- `--workspace-stats-report <PATH>`: human-readable report produced by
+  `rote workspace stats <workspace>`.
 - `--workspace-stats-json <PATH>`: JSON file produced by
-  `rote workspace stats <workspace> --json`.
+  `rote workspace stats <workspace> --json`. This remains supported for
+  compatibility, but durable executor defaults to the report form.
 - `--total-tokens <N>`: total API request+response tokens.
 - `--context-tokens <N>`: one-time context-window tokens consumed during
   exploration.
@@ -307,12 +315,47 @@ Options:
 
 `progress stats` appends a machine-readable `stats_collected` event to
 `<RUN>/execution.jsonl` so `trace align` can report numeric token consumption
-and savings. It understands the current rote workspace stats shape, including
+and savings. It understands the current rote workspace stats JSON shape, including
 `metrics.total_tokens`, `metrics.context_tokens`,
 `token_savings.source_tokens`, `token_savings.result_tokens`, and
-`token_savings.tokens_saved`. The command requires either
-`--workspace-stats-json` or at least one explicit token metric; it will not
-create an empty `stats_collected` event.
+`token_savings.tokens_saved`, and the human report labels `Total tokens`,
+`Context tokens`, `Source tokens`, `Result tokens`, and `Tokens saved`. The
+command requires `--workspace-stats-report`, `--workspace-stats-json`, or at
+least one explicit token metric; it will not create an empty
+`stats_collected` event. When `--phase` and `--requirement` are supplied, it
+also appends matching `requirement_satisfied` events so phase completion
+summaries can prove the stats requirements without manual JSONL edits.
+
+### `progress final-response`
+
+```text
+skillspec progress final-response [OPTIONS] <RUN>
+```
+
+Arguments:
+
+- `<RUN>`: trace run directory containing `execution.jsonl`.
+
+Options:
+
+- `--result`: final response includes the direct result.
+- `--evidence`: final response includes evidence handles or files.
+- `--alignment`: final response includes the alignment summary.
+- `--token-savings`: final response includes token usage and token savings.
+- `--phase <PHASE>`: phase id whose requirement(s) this final response event
+  satisfies.
+- `--requirement <REQUIREMENT>`: requirement id satisfied by this final
+  response event. Repeat for multiple requirements. Requires `--phase`.
+- `--message <MESSAGE>`: human-readable event note.
+- `--json`: emit JSON for the appended event.
+
+`progress final-response` appends the `final_response_sent` event shape that
+`trace align` uses to prove the final report included evidence, alignment, and
+token-savings sections. Run it after drafting those sections and before the
+final answer, then rerun `trace align` and report the rerun alignment summary.
+When `--phase` and `--requirement` are supplied, it also appends matching
+`requirement_satisfied` events so completion summaries can prove the final
+report closure requirements.
 
 ## `deps`
 
