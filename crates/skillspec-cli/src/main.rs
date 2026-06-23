@@ -13,6 +13,7 @@ mod model;
 mod parser;
 mod progress;
 mod report;
+mod router;
 mod sensemake;
 mod trace;
 
@@ -177,6 +178,41 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    #[command(about = "Build a searchable skill catalog outside model context")]
+    Index {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// SQLite index path to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Route a user request to candidate skills from an index")]
+    Route {
+        /// SQLite index path created by `skillspec index`.
+        #[arg(long)]
+        index: PathBuf,
+        /// User task text to route.
+        #[arg(long, allow_hyphen_values = true)]
+        query: String,
+        /// Number of candidates to return.
+        #[arg(long, default_value_t = 5)]
+        top: usize,
+        /// Execution mode already selected by user or caller.
+        #[arg(long, value_enum)]
+        execution_mode: Option<RouterExecutionModeArg>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Inspect or tune installed skills")]
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
+    },
     #[command(about = "Detect harness roots and install SkillSpec-backed skills")]
     Install {
         #[command(subcommand)]
@@ -194,6 +230,25 @@ enum CompileTarget {
     CodexSkill,
     ClaudeSkill,
     Markdown,
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+enum RouterExecutionModeArg {
+    Direct,
+    Durable,
+}
+
+#[derive(Debug, Subcommand)]
+enum SkillsCommand {
+    #[command(about = "Audit skill routing metadata and context-budget risk")]
+    Audit {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1009,6 +1064,43 @@ fn run() -> Result<()> {
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
         }
+        Command::Index { roots, out, json } => {
+            let report = router::index(router::IndexOptions { roots, out })?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&router::render_index(&report))?;
+            }
+        }
+        Command::Route {
+            index,
+            query,
+            top,
+            execution_mode,
+            json,
+        } => {
+            let report = router::route(router::RouteOptions {
+                index,
+                query,
+                top,
+                execution_mode: execution_mode.map(Into::into),
+            })?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&router::render_route(&report))?;
+            }
+        }
+        Command::Skills { command } => match command {
+            SkillsCommand::Audit { roots, json } => {
+                let report = router::audit(&roots)?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router::render_audit(&report))?;
+                }
+            }
+        },
         Command::Install { command } => match command {
             InstallCommand::Targets => {
                 let targets = install::detect_targets()?;
@@ -1234,6 +1326,15 @@ impl From<InstallTargetArg> for HarnessTarget {
             InstallTargetArg::Agents => Self::Agents,
             InstallTargetArg::Codex => Self::Codex,
             InstallTargetArg::ClaudeLocal => Self::ClaudeLocal,
+        }
+    }
+}
+
+impl From<RouterExecutionModeArg> for router::ExecutionMode {
+    fn from(value: RouterExecutionModeArg) -> Self {
+        match value {
+            RouterExecutionModeArg::Direct => Self::Direct,
+            RouterExecutionModeArg::Durable => Self::Durable,
         }
     }
 }

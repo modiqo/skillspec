@@ -417,6 +417,171 @@ fn help_lists_trace_align_arguments() {
 }
 
 #[test]
+fn skill_router_indexes_routes_and_audits_local_skills() {
+    let dir = TempDir::new("skill-router");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("skill-index.sqlite");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when the user needs to read, extract, OCR, merge, split, or transform PDF documents. Do not use for ordinary markdown files.
+metadata:
+  short-description: PDF extraction and transformation.
+  routing:
+    tags: [documents, extraction]
+    triggers:
+      - extract PDF text
+      - OCR scanned PDF
+    negative_triggers:
+      - markdown
+---
+# PDF
+"#,
+    );
+    write_file(
+        &root.join("pdf/agents/openai.yaml"),
+        r#"policy:
+  allow_implicit_invocation: false
+"#,
+    );
+    write_file(
+        &root.join("pdf/skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: router.pdf
+title: PDF Router Fixture
+description: SkillSpec metadata for PDF routing.
+activation:
+  summary: Extract tables and text from PDFs.
+  keywords: [pdf tables, pdf text]
+routes:
+  - id: extract
+    label: Extract
+rules:
+  - id: avoid_markdown
+    forbid: [markdown]
+    reason: Markdown is not a PDF workflow.
+tests:
+  - name: route assertion
+    input: extract pdf text
+    expect:
+      route: extract
+"#,
+    );
+    write_file(
+        &root.join("deploy/SKILL.md"),
+        r#"---
+name: deploy
+description: Use when publishing an application to production environments, release targets, or hosting platforms. Do not use for document extraction.
+disable-model-invocation: true
+metadata:
+  routing:
+    tags: [release, hosting]
+    triggers: [deploy application]
+---
+# Deploy
+"#,
+    );
+    write_file(
+        &root.join("alternate-pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when annotating simple PDF files and adding comments. Do not use for OCR or table extraction.
+metadata:
+  routing:
+    tags: [annotation]
+    triggers: [annotate PDF]
+---
+# PDF Annotation
+"#,
+    );
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Helps with notes.
+---
+# Notes
+"#,
+    );
+
+    let index_output = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&index_output);
+    let index_report = json_stdout(&index_output);
+    assert_eq!(index_report["skills_indexed"], 4);
+    assert!(index.is_file());
+
+    let route = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("extract pdf text from a scanned document")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&route);
+    let route_report = json_stdout(&route);
+    assert_eq!(route_report["selected"]["name"], "pdf");
+    assert!(route_report["selected"]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/pdf/SKILL.md"));
+    assert_eq!(route_report["selected"]["visibility"], "manual-only");
+    assert_eq!(route_report["selected"]["has_skill_spec"], true);
+    assert_eq!(
+        route_report["elicitation"],
+        "execution_mode_direct_or_durable"
+    );
+
+    let direct_route = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("deploy application")
+        .arg("--execution-mode")
+        .arg("direct")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&direct_route);
+    let direct_report = json_stdout(&direct_route);
+    assert_eq!(direct_report["selected"]["name"], "deploy");
+    assert_eq!(direct_report["execution_mode"], "direct");
+    assert_eq!(direct_report["elicitation"], Value::Null);
+
+    let audit = Command::new(bin())
+        .arg("skills")
+        .arg("audit")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&audit);
+    let audit_report = json_stdout(&audit);
+    assert_eq!(audit_report["skills"], 4);
+    assert_eq!(audit_report["vague_descriptions"], 1);
+    assert_eq!(audit_report["missing_negative_boundaries"], 1);
+    assert!(audit_report["duplicate_names"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|name| name == "pdf"));
+}
+
+#[test]
 #[cfg(unix)]
 fn capability_add_inspect_verify_search_prefer_and_remove() {
     let dir = TempDir::new("capability");

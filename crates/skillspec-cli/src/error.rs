@@ -36,6 +36,8 @@ pub enum Error {
     },
     #[error("failed to render JSON: {0}")]
     RenderJson(#[from] serde_json::Error),
+    #[error("sqlite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
     #[error("failed to write output: {0}")]
     Output(#[from] std::io::Error),
     #[error("unsupported schema {found:?}; expected skillspec/v0")]
