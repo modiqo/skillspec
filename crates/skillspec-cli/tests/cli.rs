@@ -523,10 +523,30 @@ description: Helps with notes.
     assert_eq!(index_report["skills_indexed"], 4);
     assert!(index.is_file());
 
+    let directory_status = Command::new(bin())
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(dir.path())
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&directory_status);
+    let directory_status_report = json_stdout(&directory_status);
+    assert_eq!(
+        directory_status_report["index"],
+        index.to_string_lossy().as_ref()
+    );
+    assert_eq!(directory_status_report["exists"], true);
+    assert_eq!(directory_status_report["stale"], false);
+
     let route = Command::new(bin())
         .arg("route")
         .arg("--index")
-        .arg(&index)
+        .arg(dir.path())
         .arg("--query")
         .arg("extract pdf text from a scanned document")
         .arg("--json")

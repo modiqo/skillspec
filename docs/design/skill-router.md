@@ -19,8 +19,8 @@ request, and returns the selected `SKILL.md` path plus confidence and candidates
 The implemented CLI surface is:
 
 ```bash
-skillspec index --roots <skill-root>... --out <index> [--visibility-manifest <manifest>]
-skillspec route --index <index> --query '<user task>' --top 5 --json
+skillspec index --roots <skill-root>... --out <index-file-or-router-dir> [--visibility-manifest <manifest>]
+skillspec route --index <index-file-or-router-dir> --query '<user task>' --top 5 --json
 skillspec skills audit --roots <skill-root>... --json
 skillspec visibility plan --roots <skill-root>... --json
 skillspec visibility apply --roots <skill-root>... --manifest <manifest> --json
@@ -28,9 +28,9 @@ skillspec visibility restore --manifest <manifest> --json
 skillspec skills set-visibility <skill> manual-only --roots <skill-root>... --manifest <manifest>
 skillspec skills disable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec skills enable <skill> --roots <skill-root>... --manifest <manifest>
-skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index>
-skillspec router index status --roots <skill-root>... --index <index> --visibility-manifest <manifest>
-skillspec router index refresh --roots <skill-root>... --index <index> --visibility-manifest <manifest>
+skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index-file-or-router-dir>
+skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
+skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall
 ```
 
@@ -41,6 +41,9 @@ skillspec router uninstall
 - a visibility manifest;
 - a router config under `SKILLSPEC_HOME/router/config.json`, or
   `~/.skillspec/router/config.json` when `SKILLSPEC_HOME` is not set.
+
+Any index argument can be either the SQLite file itself or the router directory;
+directory paths resolve to `skill-index.sqlite`.
 
 When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a

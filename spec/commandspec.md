@@ -32,8 +32,8 @@ skillspec <COMMAND>
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path>` | Create a mechanical draft SkillSpec from a local skill file or folder. |
-| `index --roots <path>... --out <sqlite>` | Build a searchable skill catalog outside model context. |
-| `route --index <sqlite> --query <text>` | Route a user request to candidate skills from an index. |
+| `index --roots <path>... --out <index-file-or-router-dir>` | Build a searchable skill catalog outside model context. |
+| `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
 | `visibility <COMMAND>` | Plan, apply, or restore harness-native skill visibility controls. |
 | `router <COMMAND>` | Install, uninstall, refresh, or inspect the optional skill router. |
@@ -457,7 +457,8 @@ skillspec index --roots <ROOTS>... --out <OUT>
 Options:
 
 - `--roots <ROOTS>`: skill roots to scan. Repeat or pass multiple paths.
-- `--out <OUT>`: SQLite index path to write.
+- `--out <OUT>`: SQLite index file to write, or a router directory where
+  `skill-index.sqlite` should be written.
 - `--visibility-manifest <VISIBILITY_MANIFEST>`: optional manifest whose final
   states override native metadata. This is how explicit `off` states exclude
   skills from router results when a native harness has no off state.
@@ -476,8 +477,9 @@ skillspec route --index <INDEX> --query <QUERY>
 
 Options:
 
-- `--index <INDEX>`: SQLite index path created by `skillspec index` or
-  `skillspec router index refresh`.
+- `--index <INDEX>`: SQLite index file created by `skillspec index` or
+  `skillspec router index refresh`, or a router directory containing
+  `skill-index.sqlite`.
 - `--query <QUERY>`: user task text to route.
 - `--top <TOP>`: number of candidates to return. Defaults to 5.
 - `--execution-mode <direct|durable>`: execution mode already selected by the
@@ -529,10 +531,10 @@ skillspec router <COMMAND>
 
 Subcommands:
 
-- `install --roots <path>... --index <sqlite> [--router-root <path>] [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
-- `uninstall [--manifest <path>] [--router-root <path>] [--index <sqlite>] [--keep-index] [--dry-run] [--json]`
-- `index refresh --roots <path>... --index <sqlite> [--visibility-manifest <path>] [--json]`
-- `index status --roots <path>... --index <sqlite> [--visibility-manifest <path>] [--json]`
+- `install --roots <path>... --index <index-file-or-router-dir> [--router-root <path>] [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `uninstall [--manifest <path>] [--router-root <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
+- `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
+- `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 
 `router install` writes a visible `skill-router` skill, a visibility manifest, a
 SQLite index, and a router config. Once that config exists, successful

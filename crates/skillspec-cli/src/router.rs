@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SCHEMA_VERSION: i64 = 1;
+pub(crate) const DEFAULT_INDEX_FILE: &str = "skill-index.sqlite";
 
 #[derive(Clone, Debug)]
 pub struct IndexOptions {
@@ -196,22 +197,23 @@ struct SkillFrontmatter {
 }
 
 pub fn index(options: IndexOptions) -> Result<IndexReport> {
+    let out = normalize_index_path(options.out);
     let mut warnings = Vec::new();
     let mut entries = scan_roots(&options.roots, &mut warnings)?;
     if let Some(manifest) = &options.visibility_manifest {
         apply_visibility_manifest_overrides(&mut entries, manifest, &mut warnings)?;
     }
-    if let Some(parent) = options.out.parent() {
+    if let Some(parent) = out.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
             path: parent.to_path_buf(),
             source,
         })?;
     }
-    let mut conn = Connection::open(&options.out)?;
+    let mut conn = Connection::open(&out)?;
     create_schema(&conn)?;
     write_entries(&mut conn, &entries)?;
     Ok(IndexReport {
-        index: options.out,
+        index: out,
         roots: options.roots,
         skills_indexed: entries.len(),
         warnings,
@@ -274,14 +276,15 @@ pub fn audit(roots: &[PathBuf]) -> Result<AuditReport> {
 }
 
 pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
+    let index = normalize_index_path(options.index);
     let mut warnings = Vec::new();
     let mut discovered = scan_roots(&options.roots, &mut warnings)?;
     if let Some(manifest) = &options.visibility_manifest {
         apply_visibility_manifest_overrides(&mut discovered, manifest, &mut warnings)?;
     }
-    if !options.index.is_file() {
+    if !index.is_file() {
         return Ok(IndexStatusReport {
-            index: options.index,
+            index,
             exists: false,
             stale: true,
             roots: options.roots,
@@ -295,8 +298,8 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
         });
     }
 
-    let conn = Connection::open(&options.index)?;
-    let indexed = read_entries(&conn, &options.index)?;
+    let conn = Connection::open(&index)?;
+    let indexed = read_entries(&conn, &index)?;
     let metadata = read_metadata(&conn)?;
     let updated_at_unix = metadata
         .get("updated_at_unix")
@@ -332,7 +335,7 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
 
     let stale = !new_skills.is_empty() || !changed_skills.is_empty() || !missing_skills.is_empty();
     Ok(IndexStatusReport {
-        index: options.index,
+        index,
         exists: true,
         stale,
         roots: options.roots,
@@ -347,8 +350,9 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
 }
 
 pub fn route(options: RouteOptions) -> Result<RouteReport> {
-    let conn = Connection::open(&options.index)?;
-    let entries = read_entries(&conn, &options.index)?;
+    let index = normalize_index_path(options.index);
+    let conn = Connection::open(&index)?;
+    let entries = read_entries(&conn, &index)?;
     let candidates = score_candidates(&entries, &options.query, options.top);
     let selected = candidates.first().cloned();
     let elicitation = if options.execution_mode.is_none() && selected.is_some() {
@@ -362,8 +366,17 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         candidates,
         elicitation,
         execution_mode: options.execution_mode,
-        index: options.index,
+        index,
     })
+}
+
+pub(crate) fn normalize_index_path(path: PathBuf) -> PathBuf {
+    let path_text = path.as_os_str().to_string_lossy();
+    if path.is_dir() || path_text.ends_with(std::path::MAIN_SEPARATOR) {
+        path.join(DEFAULT_INDEX_FILE)
+    } else {
+        path
+    }
 }
 
 pub fn render_index(report: &IndexReport) -> String {

@@ -185,7 +185,7 @@ enum Command {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
         roots: Vec<PathBuf>,
-        /// SQLite index path to write.
+        /// SQLite index file to write, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         out: PathBuf,
         /// Visibility manifest whose final states should override native metadata.
@@ -197,7 +197,7 @@ enum Command {
     },
     #[command(about = "Route a user request to candidate skills from an index")]
     Route {
-        /// SQLite index path created by `skillspec index`.
+        /// SQLite index file created by `skillspec index`, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         index: PathBuf,
         /// User task text to route.
@@ -385,7 +385,7 @@ enum RouterCommand {
         /// Skill roots to scan and manage.
         #[arg(long = "roots", num_args = 1.., required = true)]
         roots: Vec<PathBuf>,
-        /// SQLite index path to write.
+        /// SQLite index file to write, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         index: PathBuf,
         /// Reversible visibility manifest path. Defaults beside the index.
@@ -415,7 +415,7 @@ enum RouterCommand {
         /// Visible router skill folder/name.
         #[arg(long, default_value = router_lifecycle::default_router_name())]
         router_name: String,
-        /// SQLite index path to remove unless --keep-index is set. Defaults from router config.
+        /// SQLite index file or router directory to remove unless --keep-index is set. Defaults from router config.
         #[arg(long)]
         index: Option<PathBuf>,
         /// Preserve the index file.
@@ -442,7 +442,7 @@ enum RouterIndexCommand {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
         roots: Vec<PathBuf>,
-        /// SQLite index path to write.
+        /// SQLite index file to write, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         index: PathBuf,
         /// Visibility manifest whose final states should override native metadata.
@@ -457,7 +457,7 @@ enum RouterIndexCommand {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
         roots: Vec<PathBuf>,
-        /// SQLite index path to inspect.
+        /// SQLite index file to inspect, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         index: PathBuf,
         /// Visibility manifest whose final states should override native metadata.

@@ -27,7 +27,7 @@ The router does not execute task work. It selects a likely skill, reports confid
 2. For normal discovery, run:
 
    ```bash
-   skillspec route --index <index> --query '<user task>' --top 5 --json
+   skillspec route --index <index-file-or-router-dir> --query '<user task>' --top 5 --json
    ```
 
 3. If the selected candidate has high confidence, read that skill's `SKILL.md` and follow it.
@@ -41,11 +41,14 @@ The router does not execute task work. It selects a likely skill, reports confid
 Use lifecycle commands for managed installation:
 
 ```bash
-skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index>
-skillspec router index status --roots <skill-root>... --index <index> --visibility-manifest <manifest>
-skillspec router index refresh --roots <skill-root>... --index <index> --visibility-manifest <manifest>
+skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index-file-or-router-dir>
+skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
+skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall
 ```
+
+Any index argument can be either the SQLite file itself or the router directory;
+directory paths resolve to `skill-index.sqlite`.
 
 Use visibility commands for explicit controls:
 

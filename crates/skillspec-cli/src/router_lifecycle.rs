@@ -97,6 +97,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
             message: "router install requires at least one --roots path".to_owned(),
         });
     }
+    let index = router::normalize_index_path(options.index);
     let router_name = options
         .router_name
         .unwrap_or_else(|| DEFAULT_ROUTER_NAME.to_owned());
@@ -108,11 +109,11 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
     let manifest = options
         .manifest
         .clone()
-        .unwrap_or_else(|| default_manifest_for_index(&options.index));
+        .unwrap_or_else(|| default_manifest_for_index(&index));
     let config = config_path()?;
 
     if !options.dry_run {
-        write_router_skill(&router_skill_dir, &router_name, &options.index)?;
+        write_router_skill(&router_skill_dir, &router_name, &index)?;
     }
     let visibility = visibility::apply(visibility::VisibilityApplyOptions {
         roots: options.roots.clone(),
@@ -125,13 +126,13 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
     } else {
         let report = router::index(router::IndexOptions {
             roots: options.roots.clone(),
-            out: options.index.clone(),
+            out: index.clone(),
             visibility_manifest: Some(manifest.clone()),
         })?;
         write_config(
             &config,
             &options.roots,
-            &options.index,
+            &index,
             &manifest,
             &router_root,
             &router_name,
@@ -143,7 +144,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         router_name,
         router_root,
         router_skill_dir,
-        index: options.index,
+        index,
         manifest,
         config,
         dry_run: options.dry_run,
@@ -179,6 +180,7 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
         })?;
     let index = options
         .index
+        .map(router::normalize_index_path)
         .or_else(|| config.as_ref().map(|config| config.index.clone()));
     let router_skill_dir = router_root.join(&router_name);
 
@@ -308,6 +310,8 @@ Use this skill as the visible discovery surface for large local skill libraries.
 3. If confidence is medium, compare the top candidates briefly and choose the best fit.
 4. If confidence is low, ask the user to choose a skill or continue without a skill.
 5. If route output includes `execution_mode_direct_or_durable`, ask the user whether to run direct or durable before tool-backed execution.
+
+Index arguments may use either the SQLite file or the router directory; directory paths resolve to `skill-index.sqlite`.
 "#,
         index = index.display()
     );
