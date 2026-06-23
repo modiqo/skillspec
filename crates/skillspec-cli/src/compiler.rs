@@ -26,6 +26,7 @@ pub fn compile(spec: &SkillSpec, target: Target) -> String {
 
     write_overview(&mut output, spec, target);
     write_runtime_contract(&mut output);
+    write_harness_presentation_contract(&mut output);
     write_authoring_contract(&mut output);
     write_entry(&mut output, spec);
     write_activation(&mut output, spec);
@@ -85,6 +86,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("9. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.\n");
     output.push_str("10. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
     output.push_str("11. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    write_harness_presentation_contract(output);
     write_authoring_contract(output);
     write_durable_handoff_contract(output);
     output.push_str("## How To Execute The Structure\n\n");
@@ -795,6 +797,14 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align`.\n");
     output.push_str("- `Token usage`: include `Token consumption` and `Token savings` exactly as reported by `skillspec trace align`; say `not recorded` when absent.\n");
     output.push_str("- `SkillSpec`: selected route, trace run directory, align status, status meaning, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, Alignment summary, or Token usage sections.\n\n");
+}
+
+fn write_harness_presentation_contract(output: &mut String) {
+    output.push_str("## Harness Presentation Contract\n\n");
+    output.push_str("- When presenting plan, action, progress, command, recipe, or closure steps to a user, show the step `description` as the default visible text. If no description is present, show a humanized id.\n");
+    output.push_str("- Keep raw command templates, concrete argv, provider payloads, and low-level tool details collapsed by default in normal progress UI. Reveal them only when the user explicitly expands details, approval is required, a command fails, debug/verbose mode is active, or no usable description exists.\n");
+    output.push_str("- For approval prompts, destructive or externally mutating actions, and failure reports, show both the human description and the raw command or payload summary needed for informed approval/debugging.\n");
+    output.push_str("- This is presentation-only. Always preserve raw command templates, concrete executed commands, stdout/stderr handles, response ids, and files in trace/evidence/alignment data exactly as required by the active SkillSpec.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {
@@ -1648,6 +1658,9 @@ mod tests {
         assert!(output.contains("Alignment summary"));
         assert!(output.contains("Token usage"));
         assert!(output.contains("Token consumption"));
+        assert!(output.contains("Harness Presentation Contract"));
+        assert!(output.contains("step `description` as the default visible text"));
+        assert!(output.contains("collapsed by default in normal progress UI"));
         assert!(output.contains("evidence gaps"));
         assert!(output.contains("skillspec act ./skill.spec.yml"));
         assert!(output.contains("active execution SOP"));
