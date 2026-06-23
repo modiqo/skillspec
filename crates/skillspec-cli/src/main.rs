@@ -293,6 +293,41 @@ enum ProgressCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Append a stats_collected token/workspace metrics event to a run ledger")]
+    Stats {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Rote workspace name.
+        #[arg(long)]
+        workspace: Option<String>,
+        /// JSON file produced by `rote workspace stats <workspace> --json`.
+        #[arg(long)]
+        workspace_stats_json: Option<PathBuf>,
+        /// Total API request+response tokens.
+        #[arg(long)]
+        total_tokens: Option<u64>,
+        /// One-time context-window tokens consumed during exploration.
+        #[arg(long)]
+        context_tokens: Option<u64>,
+        /// Tokens in extracted query results.
+        #[arg(long)]
+        query_result_tokens: Option<u64>,
+        /// Cached response/source tokens before query reduction.
+        #[arg(long)]
+        response_tokens_cached: Option<u64>,
+        /// Tokens saved by query reduction or cache reuse.
+        #[arg(long)]
+        saved_tokens: Option<u64>,
+        /// Percent reduction from cached/source tokens to query-result tokens.
+        #[arg(long)]
+        reduction_percent: Option<f64>,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -604,6 +639,7 @@ enum ProgressEventArg {
     RequirementStarted,
     RequirementSatisfied,
     RequirementFailed,
+    StatsCollected,
     ObligationSatisfied,
     RouteFulfilled,
     AfterSuccessCompleted,
@@ -842,6 +878,33 @@ fn run() -> Result<()> {
                     evidence_kind,
                     evidence_ref,
                     source_skill,
+                    message,
+                })?;
+                report::json(&event)?;
+            }
+            ProgressCommand::Stats {
+                run,
+                workspace,
+                workspace_stats_json,
+                total_tokens,
+                context_tokens,
+                query_result_tokens,
+                response_tokens_cached,
+                saved_tokens,
+                reduction_percent,
+                message,
+                json: _,
+            } => {
+                let event = progress::record_stats(progress::StatsRecordOptions {
+                    run_dir: run,
+                    workspace,
+                    workspace_stats_json,
+                    total_tokens,
+                    context_tokens,
+                    query_result_tokens,
+                    response_tokens_cached,
+                    saved_tokens,
+                    reduction_percent,
                     message,
                 })?;
                 report::json(&event)?;
@@ -1153,6 +1216,7 @@ impl From<ProgressEventArg> for String {
             ProgressEventArg::RequirementStarted => "requirement_started",
             ProgressEventArg::RequirementSatisfied => "requirement_satisfied",
             ProgressEventArg::RequirementFailed => "requirement_failed",
+            ProgressEventArg::StatsCollected => "stats_collected",
             ProgressEventArg::ObligationSatisfied => "obligation_satisfied",
             ProgressEventArg::RouteFulfilled => "route_fulfilled",
             ProgressEventArg::AfterSuccessCompleted => "after_success_completed",

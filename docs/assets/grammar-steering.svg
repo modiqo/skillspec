@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 1120" role="img" aria-labelledby="title desc">
+  <title id="title">SkillSpec steering grammar</title>
+  <desc id="desc">Visual lexical cards for activation, entry, tool boundaries, routes, rules, rule algebra, and elicitations.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0.8" flood-color="#8a7a60" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .label { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #27313a; letter-spacing: 0; }
+      .headline { font-size: 38px; font-weight: 760; }
+      .subtitle { font-size: 18px; font-weight: 450; }
+      .title { font-size: 22px; font-weight: 740; }
+      .body { font-size: 16px; font-weight: 460; }
+      .mono { font-family: "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace; font-size: 14px; fill: #26313a; }
+      .card { fill: #fbfaf6; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .blue { fill: #f7fbff; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .gold { fill: #fffaf0; stroke: #8a6c1f; stroke-width: 2.4; filter: url(#shadow); }
+      .soft { fill: #f4efe4; stroke: #29323a; stroke-width: 2.1; }
+      .line { stroke: #29323a; stroke-width: 2.2; fill: none; }
+      .arrowhead { fill: #29323a; }
+    </style>
+  </defs>
+
+  <rect width="1420" height="1120" fill="#f7f2e8"/>
+  <text class="label headline" x="710" y="68" text-anchor="middle">Steering Grammar</text>
+  <text class="label subtitle" x="710" y="102" text-anchor="middle">The sections that decide when the skill loads, which route wins, and what the agent must ask or avoid.</text>
+
+  <g transform="translate(54 164)">
+    <rect class="blue" width="300" height="258" rx="12"/>
+    <text class="label title" x="150" y="43" text-anchor="middle">ACTIVATION</text>
+    <text class="mono" x="24" y="86">activation.summary : string</text>
+    <text class="mono" x="24" y="112">activation.keywords : string[]</text>
+    <text class="mono" x="24" y="138">activation.priority : string</text>
+    <text class="mono" x="24" y="184">applies_when : hint[]</text>
+    <text class="label body" x="24" y="224">Harness selection hint, not</text>
+    <text class="label body" x="24" y="246">route execution.</text>
+  </g>
+
+  <g transform="translate(390 164)">
+    <rect class="card" width="300" height="258" rx="12"/>
+    <text class="label title" x="150" y="43" text-anchor="middle">ENTRY</text>
+    <text class="mono" x="24" y="92">entry.prompt : string</text>
+    <text class="mono" x="24" y="122">entry.tool_boundary</text>
+    <text class="label body" x="24" y="182">First posture and default</text>
+    <text class="label body" x="24" y="206">permission boundary.</text>
+  </g>
+
+  <g transform="translate(726 164)">
+    <rect class="gold" width="300" height="258" rx="12"/>
+    <text class="label title" x="150" y="43" text-anchor="middle">TOOL BOUNDARIES</text>
+    <text class="mono" x="24" y="86">default : deny | allow</text>
+    <text class="mono" x="24" y="112">allow[]</text>
+    <text class="mono" x="24" y="138">forbid[]</text>
+    <text class="mono" x="24" y="164">permission_required_for[]</text>
+    <text class="label body" x="24" y="222">Rendered by act per phase.</text>
+  </g>
+
+  <g transform="translate(1062 164)">
+    <rect class="blue" width="300" height="258" rx="12"/>
+    <text class="label title" x="150" y="43" text-anchor="middle">ROUTES</text>
+    <text class="mono" x="24" y="86">route.id : route-id</text>
+    <text class="mono" x="24" y="112">label : string</text>
+    <text class="mono" x="24" y="138">rank? : number</text>
+    <text class="mono" x="24" y="164">checks? : command-id[]</text>
+    <text class="mono" x="24" y="190">tool_boundary?</text>
+    <text class="label body" x="24" y="232">Candidate strategy.</text>
+  </g>
+
+  <path class="line" d="M354 293 H376"/>
+  <polygon class="arrowhead" points="390,293 376,286 376,300"/>
+  <path class="line" d="M690 293 H712"/>
+  <polygon class="arrowhead" points="726,293 712,286 712,300"/>
+  <path class="line" d="M1026 293 H1048"/>
+  <polygon class="arrowhead" points="1062,293 1048,286 1048,300"/>
+
+  <g transform="translate(110 506)">
+    <rect class="card" width="360" height="314" rx="12"/>
+    <text class="label title" x="180" y="43" text-anchor="middle">RULES</text>
+    <text class="mono" x="26" y="88">when : predicate</text>
+    <text class="mono" x="26" y="114">prefer : route-id</text>
+    <text class="mono" x="26" y="140">route_order : route-id[]</text>
+    <text class="mono" x="26" y="166">forbid : identifier[]</text>
+    <text class="mono" x="26" y="192">allow : mapping</text>
+    <text class="mono" x="26" y="218">elicit : elicitation-id[]</text>
+    <text class="mono" x="26" y="244">after_success : command|closure[]</text>
+    <text class="label body" x="26" y="292">Evaluated in file order.</text>
+  </g>
+
+  <g transform="translate(530 506)">
+    <rect class="gold" width="360" height="314" rx="12"/>
+    <text class="label title" x="180" y="43" text-anchor="middle">RULE EFFECT ALGEBRA</text>
+    <text class="mono" x="26" y="88">if prefer:</text>
+    <text class="mono" x="46" y="114">route := prefer</text>
+    <text class="mono" x="26" y="150">if route_order:</text>
+    <text class="mono" x="46" y="176">route_order := route_order</text>
+    <text class="mono" x="26" y="212">forbid := forbid union rule.forbid</text>
+    <text class="mono" x="26" y="238">elicit := append rule.elicit</text>
+    <text class="mono" x="26" y="264">after_success := append closures</text>
+  </g>
+
+  <g transform="translate(950 506)">
+    <rect class="card" width="360" height="314" rx="12"/>
+    <text class="label title" x="180" y="43" text-anchor="middle">ELICITATIONS</text>
+    <text class="mono" x="26" y="88">question : string</text>
+    <text class="mono" x="26" y="114">required_when : condition[]</text>
+    <text class="mono" x="26" y="140">choices : choice[]</text>
+    <text class="mono" x="26" y="166">default? : choice-id</text>
+    <text class="mono" x="26" y="192">max_choices? : number</text>
+    <rect class="soft" x="26" y="224" width="308" height="58" rx="8"/>
+    <text class="mono" x="44" y="258">choice -> sets | route | next</text>
+  </g>
+
+  <path class="line" d="M470 663 H516"/>
+  <polygon class="arrowhead" points="530,663 516,656 516,670"/>
+  <path class="line" d="M890 663 H936"/>
+  <polygon class="arrowhead" points="950,663 936,656 936,670"/>
+  <path class="line" d="M1210 506 C1195 458 1160 432 1112 422"/>
+  <polygon class="arrowhead" points="1112,422 1127,418 1123,432"/>
+
+  <g transform="translate(300 914)">
+    <rect class="gold" width="820" height="116" rx="12"/>
+    <text class="label title" x="410" y="42" text-anchor="middle">RUNTIME READING</text>
+    <text class="label body" x="410" y="74" text-anchor="middle">skillspec plan picks the route. skillspec act renders the phase boundary and current checklist.</text>
+  </g>
+</svg>
+

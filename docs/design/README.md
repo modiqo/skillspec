@@ -51,6 +51,8 @@ The intended design-doc set is:
   important args/options, explanations, and realistic examples.
 - `grammar-and-conformance.md`: the grammar surface, typed fields, references,
   validation rules, schema strictness, and conformance expectations.
+- `../grammar-visuals.md`: a visual companion to `spec/grammar.md` with
+  lexical cards for every top-level grammar section.
 - `rules-routes-and-decision-algebra.md`: how routes, rules, predicates, forbids,
   allows, elicitations, route order, and after-success closures combine.
 - `state-machines-handoffs-and-jumps.md`: how lifecycle states, route execution

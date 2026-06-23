@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">SkillSpec grammar foundation</title>
+  <desc id="desc">Visual lexical cards for the lexical conventions, reference rules, and top-level document grammar sections.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0.8" flood-color="#8a7a60" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .label { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #27313a; letter-spacing: 0; }
+      .headline { font-size: 38px; font-weight: 760; }
+      .subtitle { font-size: 18px; font-weight: 450; }
+      .title { font-size: 23px; font-weight: 740; }
+      .body { font-size: 17px; font-weight: 460; }
+      .mono { font-family: "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace; font-size: 15px; fill: #26313a; }
+      .card { fill: #fbfaf6; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .blue { fill: #f7fbff; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .gold { fill: #fffaf0; stroke: #8a6c1f; stroke-width: 2.4; filter: url(#shadow); }
+      .soft { fill: #f4efe4; stroke: #29323a; stroke-width: 2.1; }
+      .rule { stroke: #2f6690; stroke-width: 5; stroke-linecap: round; }
+      .line { stroke: #29323a; stroke-width: 2.2; fill: none; }
+      .arrowhead { fill: #29323a; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="720" fill="#f7f2e8"/>
+  <text class="label headline" x="640" y="68" text-anchor="middle">Grammar Foundation</text>
+  <text class="label subtitle" x="640" y="102" text-anchor="middle">The lexical layer names stable ids, validates references, and wraps the document.</text>
+
+  <g transform="translate(56 164)">
+    <rect class="blue" width="350" height="390" rx="12"/>
+    <text class="label title" x="175" y="45" text-anchor="middle">LEXICAL CONVENTIONS</text>
+    <text class="mono" x="28" y="92">identifier = lowercase-letter,</text>
+    <text class="mono" x="28" y="118">             { letter | digit |</text>
+    <text class="mono" x="28" y="144">               "_" | "-" | "." } ;</text>
+    <text class="mono" x="28" y="190">route-id = identifier ;</text>
+    <text class="mono" x="28" y="216">rule-id  = identifier ;</text>
+    <text class="mono" x="28" y="242">state-id = identifier ;</text>
+    <text class="mono" x="28" y="288">value = string | number | boolean</text>
+    <text class="mono" x="28" y="314">      | sequence | mapping ;</text>
+    <line class="rule" x1="0" y1="382" x2="350" y2="382"/>
+  </g>
+
+  <path class="line" d="M406 358 H468"/>
+  <polygon class="arrowhead" points="482,358 468,351 468,365"/>
+
+  <g transform="translate(482 164)">
+    <rect class="gold" width="350" height="390" rx="12"/>
+    <text class="label title" x="175" y="45" text-anchor="middle">REFERENCE RULES</text>
+    <text class="mono" x="28" y="92">Rule.prefer -> Route.id</text>
+    <text class="mono" x="28" y="120">State.ask   -> Elicitation.id</text>
+    <text class="mono" x="28" y="148">Command.requires.dependencies</text>
+    <text class="mono" x="28" y="174">               -> Dependency.id</text>
+    <text class="mono" x="28" y="220">Import.requires.imports</text>
+    <text class="mono" x="28" y="246">               -> Import.id</text>
+    <text class="mono" x="28" y="292">import graph must be acyclic</text>
+    <text class="mono" x="28" y="338">unknown typed fields are invalid</text>
+  </g>
+
+  <path class="line" d="M832 358 H894"/>
+  <polygon class="arrowhead" points="908,358 894,351 894,365"/>
+
+  <g transform="translate(908 164)">
+    <rect class="card" width="316" height="390" rx="12"/>
+    <text class="label title" x="158" y="45" text-anchor="middle">DOCUMENT</text>
+    <text class="mono" x="28" y="92">skillspec = header,</text>
+    <text class="mono" x="28" y="118">            [ activation ],</text>
+    <text class="mono" x="28" y="144">            [ entry ],</text>
+    <text class="mono" x="28" y="170">            [ routes ],</text>
+    <text class="mono" x="28" y="196">            [ rules ],</text>
+    <text class="mono" x="28" y="222">            [ ... sections ... ] ;</text>
+    <rect class="soft" x="28" y="260" width="260" height="86" rx="8"/>
+    <text class="mono" x="48" y="294">header = schema, id,</text>
+    <text class="mono" x="48" y="320">         title, description ;</text>
+  </g>
+
+  <text class="label subtitle" x="640" y="635" text-anchor="middle">Identifiers are stable API. Human labels can change; ids should not churn.</text>
+</svg>
+

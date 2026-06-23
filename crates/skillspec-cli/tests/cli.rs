@@ -1871,6 +1871,108 @@ trace:
 }
 
 #[test]
+fn progress_stats_records_rote_workspace_token_evidence_for_alignment() {
+    let dir = TempDir::new("progress-stats");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    let stats_json = dir.path().join("workspace-stats.json");
+    write_file(&spec, alignment_spec());
+    write_file(
+        &stats_json,
+        r#"{
+  "name": "stats-bridge-workspace",
+  "metrics": {
+    "total_tokens": 1234,
+    "context_tokens": 456
+  },
+  "token_savings": {
+    "source_tokens": 1000,
+    "result_tokens": 250,
+    "tokens_saved": 750
+  }
+}
+"#,
+    );
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=run gh PR status as a tracked background process")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    let progress_stats = Command::new(bin())
+        .arg("progress")
+        .arg("stats")
+        .arg(&run_dir)
+        .arg("--workspace-stats-json")
+        .arg(&stats_json)
+        .output()
+        .unwrap();
+    assert_success(&progress_stats);
+    let event = json_stdout(&progress_stats);
+    assert_eq!(event["event"], "stats_collected");
+    assert_eq!(event["workspace"], "stats-bridge-workspace");
+    assert_eq!(event["total_tokens"], 1234);
+    assert_eq!(event["context_tokens"], 456);
+    assert_eq!(event["response_tokens_cached"], 1000);
+    assert_eq!(event["query_result_tokens"], 250);
+    assert_eq!(event["saved_tokens"], 750);
+
+    let execution_trace = run_dir.join("execution.jsonl");
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let report = json_stdout(&align);
+    assert_eq!(
+        report["summary"]["tokens"]["consumption"],
+        "total 1234 tokens"
+    );
+    assert_eq!(
+        report["summary"]["tokens"]["savings"],
+        "750 tokens saved by query reduction (1000 cached response tokens reduced to 250 query-result tokens, 75.0% reduction)"
+    );
+}
+
+#[test]
+fn progress_stats_refuses_empty_token_evidence() {
+    let dir = TempDir::new("progress-stats-empty");
+    let run_dir = dir.path().join("run-empty-stats");
+    fs::create_dir_all(&run_dir).unwrap();
+
+    let progress_stats = Command::new(bin())
+        .arg("progress")
+        .arg("stats")
+        .arg(&run_dir)
+        .output()
+        .unwrap();
+    assert_failure(&progress_stats);
+    assert!(stderr(&progress_stats).contains(
+        "progress stats requires --workspace-stats-json or at least one explicit token metric"
+    ));
+    assert!(!run_dir.join("execution.jsonl").exists());
+}
+
+#[test]
 fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     let dir = TempDir::new("align-execution");
     let spec = dir.path().join("skill.spec.yml");

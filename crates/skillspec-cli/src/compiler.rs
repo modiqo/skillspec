@@ -110,6 +110,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec act ./skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n");
     output.push_str("skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n");
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <rote-workspace> --workspace-stats-json \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.json\"\n");
     output.push_str(
         "skillspec progress show ./skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
     );
@@ -126,7 +127,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
     output.push_str("When reporting completion, always include the selected route, the SkillSpec trace `run_dir`, the persisted `<run_dir>/alignment.json`, and the compact `skillspec trace align` completion summary. Do not report a bare `unproven`; if alignment is incomplete, use `Alignment: partial` plus specific `Missing proof` rows from the align output. Command proof must name only the command basename, never raw args.\n\n");
-    output.push_str("Always include token usage. If no stats were recorded, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.\n\n");
+    output.push_str("Always include token usage. For successful rote-backed runs, collect `rote workspace stats <workspace> --json` into a file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-json <file>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.\n\n");
     output.push_str("Minimum final response shape:\n\n");
     output.push_str("- `Result`: answer the user's task directly.\n");
     output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
@@ -785,7 +786,7 @@ fn write_runtime_contract(output: &mut String) {
     output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
     output.push_str("- After `skillspec plan` or `skillspec act` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
     output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <run_dir>/execution.jsonl` when structured action evidence exists. This writes `<run_dir>/alignment.json`. Include the compact alignment summary, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, and any failed or partial checks in the completion report. Do not report a bare `unproven`; use `Alignment: partial` plus specific `Missing proof` rows.\n");
-    output.push_str("- Always include token usage in the completion report. Use `Token consumption` and `Token savings` from `skillspec trace align`; if stats are absent, say `not recorded`. When query-reduction stats exist, report cached response tokens reduced to query-result tokens, saved-token delta, and reduction percentage instead of calling cached tokens consumed prompt tokens. When rote workspace evidence or stats exist, name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens when available, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not invent replay savings.\n");
+    output.push_str("- Always include token usage in the completion report. For successful rote-backed runs, collect `rote workspace stats <workspace> --json` into a file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-json <file>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Use `Token consumption` and `Token savings` from `skillspec trace align`; if stats truly cannot be collected, say `not recorded`. When query-reduction stats exist, report cached response tokens reduced to query-result tokens, saved-token delta, and reduction percentage instead of calling cached tokens consumed prompt tokens. When rote workspace evidence or stats exist, name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens when available, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not invent replay savings.\n");
     output.push_str("- Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.\n\n");
     output.push_str("Minimum final response shape:\n\n");
     output.push_str("- `Result`: answer the user's task directly.\n");
@@ -1367,6 +1368,7 @@ fn write_runtime_commands(output: &mut String) {
     output.push_str(
         "skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n",
     );
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <rote-workspace> --workspace-stats-json \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.json\"\n");
     output.push_str(
         "skillspec progress show <skill-folder>/skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
     );

@@ -94,6 +94,7 @@ skillspec sensemake ./skill.spec.yml --view index
 skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>
 skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>
+skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --workspace <rote-workspace> --workspace-stats-json "${PWD}/.skillspec/traces/<run-id>/workspace-stats.json"
 skillspec progress show ./skill.spec.yml --run "${PWD}/.skillspec/traces/<run-id>"
 skillspec validate ./skill.spec.yml
 skillspec imports check ./skill.spec.yml
@@ -111,7 +112,7 @@ skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/trace
 
 When reporting completion, always include the selected route, the SkillSpec trace `run_dir`, the persisted `<run_dir>/alignment.json`, and the compact `skillspec trace align` completion summary. Do not report a bare `unproven`; if alignment is incomplete, use `Alignment: partial` plus specific `Missing proof` rows from the align output. Command proof must name only the command basename, never raw args.
 
-Always include token usage. If no stats were recorded, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.
+Always include token usage. For successful rote-backed runs, collect `rote workspace stats <workspace> --json` into a file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-json <file>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.
 
 Minimum final response shape:
 

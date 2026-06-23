@@ -223,6 +223,7 @@ Subcommands:
 
 - `show <path> --run <run-dir> [--json]`
 - `record <run-dir> <event> [phase] [requirement] [--status <status>] [--evidence-kind <kind>] [--evidence-ref <ref>]`
+- `stats <run-dir> [--workspace <workspace>] [--workspace-stats-json <path>] [token options...]`
 
 ### `progress show`
 
@@ -275,6 +276,43 @@ Options:
 - `--source-skill <SOURCE_SKILL>`: skill that emitted this progress event.
 - `--message <MESSAGE>`: human-readable event note.
 - `--json`: emit JSON for the appended event.
+
+### `progress stats`
+
+```text
+skillspec progress stats [OPTIONS] <RUN>
+```
+
+Arguments:
+
+- `<RUN>`: trace run directory containing `execution.jsonl`.
+
+Options:
+
+- `--workspace <WORKSPACE>`: rote workspace name. When omitted, the command
+  reads `name` from `--workspace-stats-json` if present.
+- `--workspace-stats-json <PATH>`: JSON file produced by
+  `rote workspace stats <workspace> --json`.
+- `--total-tokens <N>`: total API request+response tokens.
+- `--context-tokens <N>`: one-time context-window tokens consumed during
+  exploration.
+- `--query-result-tokens <N>`: tokens in extracted query results.
+- `--response-tokens-cached <N>`: cached response/source tokens before query
+  reduction.
+- `--saved-tokens <N>`: tokens saved by query reduction or cache reuse.
+- `--reduction-percent <PCT>`: percent reduction from cached/source tokens to
+  query-result tokens.
+- `--message <MESSAGE>`: human-readable event note.
+- `--json`: emit JSON for the appended event.
+
+`progress stats` appends a machine-readable `stats_collected` event to
+`<RUN>/execution.jsonl` so `trace align` can report numeric token consumption
+and savings. It understands the current rote workspace stats shape, including
+`metrics.total_tokens`, `metrics.context_tokens`,
+`token_savings.source_tokens`, `token_savings.result_tokens`, and
+`token_savings.tokens_saved`. The command requires either
+`--workspace-stats-json` or at least one explicit token metric; it will not
+create an empty `stats_collected` event.
 
 ## `deps`
 

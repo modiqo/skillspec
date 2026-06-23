@@ -215,6 +215,8 @@ routes:
             - receive_domain_return_packet
             - compute_workspace_trace
             - compute_workspace_stats
+            - record_stats_collected_event
+            - run_skillspec_trace_alignment
             - report_workspace_evidence_and_token_math
           forbid:
             - final_summary_without_workspace
@@ -297,6 +299,8 @@ routes:
           requires:
             - compute_workspace_trace
             - compute_workspace_stats
+            - record_stats_collected_event
+            - run_skillspec_trace_alignment
             - report_workspace_evidence_and_token_math
   - id: shell_then_browser_handoff
     label: Run shell evidence, then hand off browser work
@@ -328,10 +332,11 @@ routes:
         - id: browser_draft_handoff
           owner_skill: rote-browse
           route: browser_handoff
-          description: Pass the shell evidence summary, browser/email/profile intent, required headed active-browser attach session preference, and forbidden native substitutes to rote-browse; do not run browser tools inside durable-executor.
+          description: Pass the shell evidence summary, browser/email/profile intent, required live headed attached-browser session preference, and forbidden native substitutes to rote-browse; do not run browser tools inside durable-executor.
           requires:
             - handoff_browser_work_to_rote_browse_skill
             - pass_browser_context_to_rote_browse
+            - require_headed_active_browser_attach_for_browser_work
             - resume_shell_work_after_browser_evidence
           forbid:
             - native_search_as_answer
@@ -385,7 +390,7 @@ routes:
       user's intent, workspace/evidence context, and any shell-side prerequisites, but it must not
       prescribe browser command sequences itself. The default session context for browser, public-web,
       profile, social-profile, contributor-profile, and committer-profile work is
-      `browser_session_preference=headed_existing_browser_attach_required`.
+      `browser_session_preference=headed_existing_browser_attach_required`: a live, headed browser attached to the user's active browser session.
     handoff:
       to_skill: rote-browse
       boundary: stop_current_skill
@@ -444,6 +449,35 @@ routes:
     description: Allowed only for tiny local inspection where no evidence, replay, or queryability is needed.
 
 rules:
+  - id: execution_preflight_asks_durable_choice
+    when:
+      user_says_any:
+        - run
+        - execute
+        - call
+        - invoke
+        - inspect
+        - check
+        - list
+        - find
+        - show
+        - read
+        - browse
+        - search
+        - open
+        - create
+        - generate
+        - install
+        - test
+        - build
+        - fetch
+        - automate
+        - mutate
+        - use
+    elicit:
+      - durable_or_direct
+    reason: Ask once before execution whether the user wants direct task execution or durable SkillSpec/rote evidence; the existing route rules still decide the durable route when durable execution is chosen.
+
   - id: durable_memory_tasks_start_at_meta_router
     when:
       user_says_any:
@@ -471,6 +505,8 @@ rules:
       - receive_domain_return_packet
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Requests that ask for memory, reuse, trace, or durable evidence should start at durable-executor, hand domain work to the matching SkillSpec, and return for closure.
 
@@ -494,6 +530,10 @@ rules:
       - preserve_durable_context
       - require_domain_execution_through_durable_executor
       - receive_domain_return_packet
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Domain skills own domain decisions, but durable-executor owns the workspace, execution substrate, evidence, and final closure.
 
@@ -518,6 +558,10 @@ rules:
       - capture_execution_evidence
       - draft_domain_skillspec_from_trace
       - run_generated_skill_qa
+      - compute_workspace_trace
+      - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: When no domain SkillSpec exists but a local seed, adapter, CLI, or previous trace can satisfy the capability, durable-executor may bootstrap the immediate task and draft a starter SkillSpec from evidence.
 
@@ -564,6 +608,8 @@ rules:
       - run_cli_only_through_rote_exec
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Any local CLI invocation must go through `rote exec --` so stdout, stderr, exit status, workspace context, and evidence ids are captured instead of disappearing into harness terminal scrollback.
 
@@ -589,6 +635,8 @@ rules:
       - run_cli_only_through_rote_exec
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Explicit command-form prompts should capture a bounded process response through the durable execution substrate.
 
@@ -640,6 +688,8 @@ rules:
       - run_cli_only_through_rote_exec
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: External-service work should prefer rote adapters; if no healthy adapter exists, prove installed/authenticated CLI fallback through rote exec before use.
 
@@ -689,6 +739,8 @@ rules:
       - capture_parallel_search_results
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: When the user names Parallel, run paired discovery for the Parallel/parallelweb adapter and a harness-discovered Parallel CLI candidate such as `parallel-cli`. Choose the adapter if healthy, otherwise choose the CLI only when readiness is proven through rote exec; never assume the binary is named `parallel` and never substitute native Codex web search.
 
@@ -786,10 +838,10 @@ rules:
     after_success:
       - handoff_browser_work_to_rote_browse_skill
       - pass_browser_context_to_rote_browse
-      - require_headed_active_browser_attach_for_profile_lookup
+      - require_headed_active_browser_attach_for_browser_work
       - forbid_native_web_search_fallback
       - resume_shell_work_after_browser_evidence
-    reason: Profile and social enrichment is session-sensitive; pass `browser_session_preference=headed_existing_browser_attach_required` to rote-browse and do not substitute native web search, anonymous headless browsing, or a public-read-only headless default.
+    reason: Profile and social enrichment is session-sensitive; pass `browser_session_preference=headed_existing_browser_attach_required` to rote-browse and require a live, headed browser attached to the user's active browser session. Do not substitute native web search, anonymous headless browsing, a new isolated browser, or a public-read-only headless default.
 
   - id: compound_shell_then_browser_uses_ordered_plan
     when:
@@ -819,6 +871,8 @@ rules:
       - resume_shell_work_after_browser_evidence
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: >
       A compound shell-plus-browser request must emit an ordered execution plan:
@@ -841,11 +895,15 @@ rules:
       - anonymous_workspace
       - final_summary_without_workspace
       - final_summary_without_trace_math
+      - final_summary_without_alignment_summary
+      - final_summary_without_token_usage
     after_success:
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
-    reason: Durable shell work must start in a named rote workspace and finish with workspace evidence, dependency trace, and token math.
+    reason: Durable shell work must start in a named rote workspace and finish with workspace evidence, dependency trace, alignment summary, and token math.
 
   - id: durable_result_uses_rote_exec
     when:
@@ -863,6 +921,8 @@ rules:
       - run_cli_only_through_rote_exec
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Durable CLI facts should be captured as typed process responses.
 
@@ -902,6 +962,8 @@ rules:
       - run_cli_only_through_rote_exec
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - report_workspace_evidence_and_token_math
     reason: Repository markdown discovery must be captured as durable-executor evidence, not direct `rg`, file listing, or file reads.
 
@@ -1045,6 +1107,26 @@ trace:
     - outcome_recorded
 
 elicitations:
+  durable_or_direct:
+    question: Do you want durable execution of this task?
+    required_when:
+      - missing: execution_mode
+    max_choices: 1
+    choices:
+      - id: direct
+        label: Direct check
+        description: Use normal task-appropriate execution without SkillSpec/rote evidence capture; normal safety approvals still apply.
+        sets:
+          execution_mode: direct
+        next: done
+        safety: read_only
+      - id: durable
+        label: Durable trace
+        description: Use SkillSpec plus rote evidence, alignment, workspace stats, and token reporting.
+        sets:
+          execution_mode: durable
+        safety: local_read
+
   install_scope:
     question: How should missing local tools be provisioned?
     required_when:
@@ -1287,6 +1369,8 @@ states:
     do:
       - compute_workspace_trace
       - compute_workspace_stats
+      - record_stats_collected_event
+      - run_skillspec_trace_alignment
       - summarize_evidence
       - report_workspace_evidence_and_token_math
     next: done
@@ -1553,14 +1637,22 @@ commands:
         - rote
 
   workspace_stats_json:
-    description: Persist the workspace metrics snapshot, then collect JSON stats. Use .metrics.context_tokens for agent-consumed exploration tokens and .metrics.total_tokens for API request+response tokens; if .metrics is null, report token math as unavailable.
+    description: Persist the workspace metrics snapshot, then collect JSON stats to a declared file that will be bridged into the SkillSpec execution ledger. Use .metrics.context_tokens for agent-consumed exploration tokens, .metrics.total_tokens for API request+response tokens, and token_savings/source-result fields for query-reduction savings.
     template: |
       rote stats --save
-      rote workspace stats <workspace> --json
+      rote workspace stats <workspace> --json > <workspace-stats-json>
     safety: local_write
     requires:
       dependencies:
         - rote
+
+  record_workspace_stats:
+    description: Append a machine-readable `stats_collected` event to the active SkillSpec execution ledger from the rote workspace stats JSON.
+    template: "skillspec progress stats <run-dir> --workspace <workspace> --workspace-stats-json <workspace-stats-json>"
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec
 
 closures:
   choose_shell_route:
@@ -1627,13 +1719,9 @@ closures:
   handoff_browser_work_to_rote_browse_skill:
     description: Defer all browser navigation, interaction, capture, auth/session, and cleanup decisions to the `rote-browse` skill instead of prescribing them in durable-executor.
   pass_browser_context_to_rote_browse:
-    description: Pass the user's browser goal, URLs or sites, workspace/evidence context, any shell-derived inputs, required headed active-browser attach session preference, and forbidden native substitutes to `rote-browse` so it can own browser execution.
+    description: Pass the user's browser goal, URLs or sites, workspace/evidence context, any shell-derived inputs, required live headed attached-browser session preference, and forbidden native substitutes to `rote-browse` so it can own browser execution.
   require_headed_active_browser_attach_for_browser_work:
-    description: For browser, public-web, profile, social-profile, contributor-profile, and committer-profile work, pass `browser_session_preference=headed_existing_browser_attach_required` to `rote-browse`; do not choose anonymous or headless browsing because the target page is public or read-only.
-  prefer_active_browser_session_for_profile_lookup:
-    description: Deprecated compatibility alias for `require_headed_active_browser_attach_for_profile_lookup`; do not treat "preferred" as weaker than required.
-  require_headed_active_browser_attach_for_profile_lookup:
-    description: For public/social/contributor/committer profile enrichment, pass `browser_session_preference=headed_existing_browser_attach_required` to `rote-browse`; anonymous or headless browsing is not a default fallback.
+    description: For any browser, public-web, profile, social-profile, contributor-profile, or committer-profile work, pass `browser_session_preference=headed_existing_browser_attach_required` to `rote-browse` and require a live, headed browser attached to the user's active browser session. Do not choose anonymous browsing, headless browsing, a new isolated browser, or a public-read-only shortcut because the target page is public or read-only. If live headed attach is unavailable, stop and ask the user to attach/approve a different substrate.
   forbid_native_web_search_fallback:
     description: Do not call native Codex web search/open, raw browser tools, curl, search summaries, anonymous headless browsing, or public-read-only headless shortcuts to discover or extract browser/profile evidence; if rote-browse cannot observe the page or lacks a URL, stop for headed active-browser attach, user-supplied URL, or explicit approval to switch substrates.
   resume_shell_work_after_browser_evidence:
@@ -1676,10 +1764,29 @@ closures:
     description: Run `rote trace --deps` in the completed workspace and use it to describe dependency flow.
   compute_workspace_stats:
     description: >
-      Run `rote stats --save`, then `rote workspace stats <workspace> --json`;
+      Before the final response, run `rote stats --save`, then `rote workspace stats <workspace> --json`;
       extract `.metrics.context_tokens` as one-time exploration context-window
       tokens and `.metrics.total_tokens` as API request+response tokens. If
-      metrics are missing, say measured token savings are unavailable.
+      metrics are missing, record that token consumption and token savings are
+      not recorded; do not skip the token section.
+  record_stats_collected_event:
+    description: >
+      Run `skillspec progress stats <run_dir> --workspace <workspace>
+      --workspace-stats-json <workspace-stats-json>` after collecting rote
+      workspace stats and before `skillspec trace align`. This must append a
+      `stats_collected` event with token fields into `<run_dir>/execution.jsonl`
+      so `skillspec trace align` can report numeric token consumption/savings.
+      For successful rote-backed runs, missing `stats_collected` is a workflow
+      bug; stop and report the blocker instead of treating absent stats as a
+      normal final-report condition.
+  run_skillspec_trace_alignment:
+    description: >
+      Before the final response, run `skillspec trace align` for the active
+      decision trace and execution ledger, preserve the emitted `alignment.json`,
+      and extract the compact alignment summary including `Decision replay`,
+      `Phase order`, `Requirements`, `Missing proof`, `Forbidden actions`, and
+      `Alignment`. If proof is incomplete, report `Alignment: partial` with the
+      concrete missing-proof rows instead of saying only `unproven`.
   report_workspace_evidence_and_token_math:
     description: >
       End with the workspace name, important response ids, SkillSpec trace run
@@ -1689,8 +1796,10 @@ closures:
       slices by id instead of carrying full outputs in the model window. If the
       workflow is crystallized or memoried, repeat use can avoid both API
       request tokens and context-window tokens for cached evidence. If stats or
-      replay measurements were not queried, say token consumption and savings
-      are not recorded. Do not invent numeric replay savings.
+      replay measurements were unavailable after the required stats check, print
+      `Token consumption: not recorded` and `Token savings: not recorded`. Do not
+      invent numeric replay savings, and do not omit the alignment or token
+      sections.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -1752,6 +1861,8 @@ tests:
         - receive_domain_return_packet
         - compute_workspace_trace
         - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
       forbid:
         - direct_cli_without_rote_exec
@@ -1777,6 +1888,10 @@ tests:
         - preserve_durable_context
         - require_domain_execution_through_durable_executor
         - receive_domain_return_packet
+        - compute_workspace_trace
+        - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
       forbid:
         - direct_cli_without_rote_exec
@@ -1816,7 +1931,10 @@ tests:
     input: can you check the gh status for repo skillspec and let me know if its ahead or sync with remote
     expect:
       route: adapter_first_cli_fallback
+      elicit:
+        - durable_or_direct
       matched_rules:
+        - execution_preflight_asks_durable_choice
         - cli_invocations_use_rote_exec
         - external_service_tasks_are_adapter_first
         - durable_work_requires_named_workspace
@@ -1831,7 +1949,24 @@ tests:
         - run_cli_only_through_rote_exec
         - compute_workspace_trace
         - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
+
+  - name: simple execution asks durable or direct before running
+    input: run pwd and show me the output
+    expect:
+      route: one_shot_process
+      elicit:
+        - durable_or_direct
+      matched_rules:
+        - execution_preflight_asks_durable_choice
+        - cli_invocations_use_rote_exec
+      forbid:
+        - direct_cli_without_rote_exec
+        - direct_shell_command_without_rote_exec
+        - direct_harness_cli_call_without_rote_exec
+        - untracked_stdout_scrollback
 
   - name: browser intent hands off to browser
     input: browse the active dashboard and summarize it
@@ -1840,6 +1975,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
@@ -1859,6 +1995,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
@@ -1878,6 +2015,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
       forbid:
         - raw_playwright
@@ -1916,6 +2054,7 @@ tests:
         - run_cli_only_through_rote_exec
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
 
   - name: browser setup belongs to rote-browse
@@ -1925,6 +2064,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
       forbid:
         - raw_playwright
@@ -1945,7 +2085,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
-        - require_headed_active_browser_attach_for_profile_lookup
+        - require_headed_active_browser_attach_for_browser_work
         - forbid_native_web_search_fallback
         - resume_shell_work_after_browser_evidence
       forbid:
@@ -1971,7 +2111,7 @@ tests:
       after_success:
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
-        - require_headed_active_browser_attach_for_profile_lookup
+        - require_headed_active_browser_attach_for_browser_work
         - forbid_native_web_search_fallback
         - resume_shell_work_after_browser_evidence
       forbid:
@@ -1998,9 +2138,12 @@ tests:
       after_success:
         - compute_workspace_trace
         - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
         - handoff_browser_work_to_rote_browse_skill
         - pass_browser_context_to_rote_browse
+        - require_headed_active_browser_attach_for_browser_work
         - resume_shell_work_after_browser_evidence
       forbid:
         - native_search_as_answer
@@ -2139,6 +2282,9 @@ tests:
       route: one_shot_process
       after_success:
         - compute_workspace_trace
+        - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
       forbid:
         - untracked_stdout_scrollback
@@ -2163,6 +2309,8 @@ tests:
       after_success:
         - compute_workspace_trace
         - compute_workspace_stats
+        - record_stats_collected_event
+        - run_skillspec_trace_alignment
         - report_workspace_evidence_and_token_math
       forbid:
         - rote_exec_outside_workspace

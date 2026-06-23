@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 620" role="img" aria-labelledby="title desc">
+  <title id="title">SkillSpec grammar to plan loop</title>
+  <desc id="desc">A diagram showing an existing SKILL.md flowing into SkillSpec grammar, then an ordered plan, verifiers, proof artifacts, and session learnings.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="6" stdDeviation="0.8" flood-color="#8a7a60" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .label { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #27313a; }
+      .title { font-size: 22px; font-weight: 700; letter-spacing: 0; }
+      .body { font-size: 17px; font-weight: 450; letter-spacing: 0; }
+      .small { font-size: 15px; font-weight: 450; letter-spacing: 0; }
+      .box { fill: #fbfaf6; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .soft { fill: #f4efe4; stroke: #29323a; stroke-width: 2.2; filter: url(#shadow); }
+      .gold { fill: #fffaf0; stroke: #8a6c1f; stroke-width: 2.2; filter: url(#shadow); }
+      .blue { fill: #f7fbff; stroke: #29323a; stroke-width: 2.4; filter: url(#shadow); }
+      .accent { stroke: #2f6690; stroke-width: 5; stroke-linecap: round; }
+      .arrow { fill: none; stroke: #29323a; stroke-width: 2.2; }
+      .loop { fill: none; stroke: #29323a; stroke-width: 2.1; }
+      .arrowhead { fill: #29323a; }
+    </style>
+  </defs>
+
+  <rect width="1160" height="620" fill="#f7f2e8"/>
+
+  <g transform="translate(52 236)">
+    <rect class="gold" width="124" height="72" rx="8"/>
+    <text class="label title" x="62" y="34" text-anchor="middle">SKILL.md</text>
+    <text class="label small" x="62" y="56" text-anchor="middle">prose skill</text>
+  </g>
+
+  <path class="arrow" d="M176 272 H248"/>
+  <polygon class="arrowhead" points="260,272 248,266 248,278"/>
+
+  <g transform="translate(260 178)">
+    <rect class="blue" width="250" height="188" rx="10"/>
+    <text class="label title" x="125" y="54" text-anchor="middle">GRAMMAR</text>
+    <text class="label body" x="125" y="86" text-anchor="middle">routes, rules, phases</text>
+    <text class="label body" x="125" y="114" text-anchor="middle">deps, imports, tests</text>
+    <text class="label body" x="125" y="142" text-anchor="middle">tool boundaries</text>
+    <line class="accent" x1="0" y1="184" x2="250" y2="184"/>
+  </g>
+
+  <path class="arrow" d="M510 272 H580"/>
+  <polygon class="arrowhead" points="592,272 580,266 580,278"/>
+
+  <g transform="translate(592 114)">
+    <rect class="box" width="255" height="316" rx="10"/>
+    <text class="label title" x="127.5" y="42" text-anchor="middle">ORDERED PLAN</text>
+
+    <rect class="soft" x="22" y="70" width="211" height="50" rx="8"/>
+    <text class="label body" x="127.5" y="101" text-anchor="middle">sensemake</text>
+
+    <rect class="soft" x="22" y="135" width="211" height="50" rx="8"/>
+    <text class="label body" x="127.5" y="166" text-anchor="middle">plan</text>
+
+    <rect class="soft" x="22" y="200" width="211" height="50" rx="8"/>
+    <text class="label body" x="127.5" y="231" text-anchor="middle">act by phase</text>
+
+    <rect class="soft" x="22" y="265" width="211" height="50" rx="8"/>
+    <text class="label body" x="127.5" y="296" text-anchor="middle">record progress</text>
+  </g>
+
+  <path class="arrow" d="M847 272 H906"/>
+  <polygon class="arrowhead" points="918,272 906,266 906,278"/>
+
+  <g transform="translate(918 178)">
+    <rect class="gold" width="190" height="150" rx="8"/>
+    <text class="label title" x="95" y="46" text-anchor="middle">PROOF</text>
+    <text class="label body" x="95" y="78" text-anchor="middle">decision replay</text>
+    <text class="label body" x="95" y="104" text-anchor="middle">requirements</text>
+    <text class="label body" x="95" y="130" text-anchor="middle">forbids + tokens</text>
+  </g>
+
+  <g transform="translate(432 468)">
+    <rect class="gold" width="300" height="86" rx="8"/>
+    <text class="label title" x="150" y="36" text-anchor="middle">SESSION LEARNINGS</text>
+    <text class="label body" x="150" y="62" text-anchor="middle">trace, gaps, value report</text>
+  </g>
+
+  <path class="loop" d="M1013 328 C1010 416 872 510 732 510"/>
+  <polygon class="arrowhead" points="732,510 746,503 746,517"/>
+  <path class="loop" d="M432 510 C300 496 238 430 314 366"/>
+  <polygon class="arrowhead" points="314,366 307,380 299,370"/>
+  <path class="arrow" d="M720 430 C720 450 694 464 658 468"/>
+  <polygon class="arrowhead" points="658,468 671,461 673,472"/>
+
+  <text class="label small" x="580" y="54" text-anchor="middle">SkillSpec makes the plan explicit, then checks what the run actually proved.</text>
+</svg>

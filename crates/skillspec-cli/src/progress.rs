@@ -92,6 +92,20 @@ pub struct ExecutionEvent {
     pub at_unix_ms: Option<u128>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_result_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_tokens_cached: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reduction_percent: Option<f64>,
 }
 
 #[derive(Clone, Debug)]
@@ -105,6 +119,20 @@ pub struct RecordOptions {
     pub evidence_kind: Option<String>,
     pub evidence_ref: Option<String>,
     pub source_skill: Option<String>,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct StatsRecordOptions {
+    pub run_dir: PathBuf,
+    pub workspace: Option<String>,
+    pub workspace_stats_json: Option<PathBuf>,
+    pub total_tokens: Option<u64>,
+    pub context_tokens: Option<u64>,
+    pub query_result_tokens: Option<u64>,
+    pub response_tokens_cached: Option<u64>,
+    pub saved_tokens: Option<u64>,
+    pub reduction_percent: Option<f64>,
     pub message: Option<String>,
 }
 
@@ -156,6 +184,115 @@ pub fn record(options: RecordOptions) -> Result<ExecutionEvent> {
         source,
         at_unix_ms: Some(unix_ms()),
         message: options.message,
+        workspace: None,
+        total_tokens: None,
+        context_tokens: None,
+        query_result_tokens: None,
+        response_tokens_cached: None,
+        saved_tokens: None,
+        reduction_percent: None,
+    };
+    append_execution_event(&execution_ledger_path(&options.run_dir), &event)?;
+    Ok(event)
+}
+
+pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
+    let has_direct_token_field = options.total_tokens.is_some()
+        || options.context_tokens.is_some()
+        || options.query_result_tokens.is_some()
+        || options.response_tokens_cached.is_some()
+        || options.saved_tokens.is_some()
+        || options.reduction_percent.is_some();
+    if options.workspace_stats_json.is_none() && !has_direct_token_field {
+        return Err(Error::InvalidInput {
+            message: "progress stats requires --workspace-stats-json or at least one explicit token metric".to_owned(),
+        });
+    }
+
+    fs::create_dir_all(&options.run_dir).map_err(|source| Error::Write {
+        path: options.run_dir.clone(),
+        source,
+    })?;
+    let run_id = options
+        .run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_owned();
+
+    let stats_json = match &options.workspace_stats_json {
+        Some(path) => {
+            let content = fs::read_to_string(path).map_err(|source| Error::Read {
+                path: path.clone(),
+                source,
+            })?;
+            Some(
+                serde_json::from_str::<serde_json::Value>(&content).map_err(|source| {
+                    Error::ParseJson {
+                        path: path.clone(),
+                        source,
+                    }
+                })?,
+            )
+        }
+        None => None,
+    };
+    let stats = stats_json.as_ref();
+    let response_tokens_cached = options
+        .response_tokens_cached
+        .or_else(|| json_u64(stats, &["response_tokens_cached"]))
+        .or_else(|| json_u64(stats, &["cached_tokens"]))
+        .or_else(|| json_u64(stats, &["token_savings", "source_tokens"]));
+    let query_result_tokens = options
+        .query_result_tokens
+        .or_else(|| json_u64(stats, &["query_result_tokens"]))
+        .or_else(|| json_u64(stats, &["token_savings", "result_tokens"]));
+    let saved_tokens = options
+        .saved_tokens
+        .or_else(|| json_u64(stats, &["saved_tokens"]))
+        .or_else(|| json_u64(stats, &["token_savings", "tokens_saved"]));
+    let reduction_percent = options
+        .reduction_percent
+        .or_else(|| json_f64(stats, &["reduction_percent"]))
+        .or_else(|| json_f64(stats, &["token_savings", "reduction_percent"]))
+        .or_else(|| {
+            let source = response_tokens_cached?;
+            let saved = saved_tokens
+                .or_else(|| query_result_tokens.map(|result| source.saturating_sub(result)))?;
+            (source > 0).then_some((saved as f64 / source as f64) * 100.0)
+        });
+
+    let source = options.workspace_stats_json.as_ref().map(|path| {
+        serde_json::json!({
+            "kind": "rote_workspace_stats",
+            "path": path.display().to_string(),
+        })
+    });
+    let event = ExecutionEvent {
+        schema: EXECUTION_SCHEMA.to_owned(),
+        run_id: Some(run_id),
+        event: "stats_collected".to_owned(),
+        phase: None,
+        requirement: None,
+        id: None,
+        status: None,
+        evidence: None,
+        source,
+        at_unix_ms: Some(unix_ms()),
+        message: options.message,
+        workspace: options.workspace.or_else(|| json_string(stats, &["name"])),
+        total_tokens: options
+            .total_tokens
+            .or_else(|| json_u64(stats, &["total_tokens"]))
+            .or_else(|| json_u64(stats, &["metrics", "total_tokens"])),
+        context_tokens: options
+            .context_tokens
+            .or_else(|| json_u64(stats, &["context_tokens"]))
+            .or_else(|| json_u64(stats, &["metrics", "context_tokens"])),
+        query_result_tokens,
+        response_tokens_cached,
+        saved_tokens,
+        reduction_percent,
     };
     append_execution_event(&execution_ledger_path(&options.run_dir), &event)?;
     Ok(event)
@@ -445,6 +582,36 @@ fn evidence_value(options: &RecordOptions) -> Option<serde_json::Value> {
             "ref": reference,
         })),
     }
+}
+
+fn json_string(value: Option<&serde_json::Value>, path: &[&str]) -> Option<String> {
+    json_path(value?, path)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+}
+
+fn json_u64(value: Option<&serde_json::Value>, path: &[&str]) -> Option<u64> {
+    let value = json_path(value?, path)?;
+    value.as_u64().or_else(|| {
+        value
+            .as_i64()
+            .and_then(|number| (number >= 0).then_some(number as u64))
+    })
+}
+
+fn json_f64(value: Option<&serde_json::Value>, path: &[&str]) -> Option<f64> {
+    let value = json_path(value?, path)?;
+    value
+        .as_f64()
+        .or_else(|| value.as_i64().map(|number| number as f64))
+        .or_else(|| value.as_u64().map(|number| number as f64))
+}
+
+fn json_path<'a>(mut value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    for key in path {
+        value = value.get(*key)?;
+    }
+    Some(value)
 }
 
 fn trace_input(envelopes: &[TraceEnvelope]) -> Result<String> {
