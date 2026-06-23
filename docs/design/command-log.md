@@ -52,6 +52,27 @@ SkillSpec-backed skills.
 | `skillspec install targets` | none | Lists detected harness skill roots, such as Codex, Agents, or Claude local skill directories. | `skillspec install targets` |
 | `skillspec install skill` | `<folder>`, `--target agents,codex,claude-local`, `--all-detected`, `--dry-run`, `--name <name>`, `--force` | Installs a generated skill folder containing `SKILL.md` and `skill.spec.yml` into one or more detected harness roots. Use `--dry-run` before writing. | `skillspec install skill examples/pdf --target agents --target codex --dry-run` |
 
+## Skill Router Commands
+
+These commands support large skill catalogs without putting every skill
+description into the model context.
+
+| Command | Args And Options | Explanation | Example |
+| --- | --- | --- | --- |
+| `skillspec index` | `--roots <path>...`, `--out <sqlite>`, `--visibility-manifest <path>`, `--json` | Builds a local SQLite skill catalog from `SKILL.md`, native visibility metadata, and optional `skill.spec.yml` routing hints. | `skillspec index --roots ~/.agents/skills --out ~/.skillspec/router/skill-index.sqlite --json` |
+| `skillspec route` | `--index <sqlite>`, `--query <text>`, `--top <n>`, `--execution-mode direct,durable`, `--json` | Scores candidate skills from the index and returns the selected skill path, candidates, confidence, visibility, and optional direct/durable elicitation hint. | `skillspec route --index ~/.skillspec/router/skill-index.sqlite --query 'extract text from a pdf' --json` |
+| `skillspec skills audit` | `--roots <path>...`, `--json` | Audits routing metadata for overlong descriptions, vague descriptions, missing negative boundaries, and duplicate names. | `skillspec skills audit --roots ~/.agents/skills --json` |
+| `skillspec skills set-visibility` | `<skill> <implicit,manual-only,name-only,off>`, `--roots <path>...`, `--manifest <path>`, `--dry-run`, `--json` | Sets one skill's conceptual visibility using native Codex/Claude controls and records a reversible manifest. | `skillspec skills set-visibility pdf manual-only --roots ~/.agents/skills --manifest ~/.skillspec/router/visibility-manifest.json` |
+| `skillspec skills disable` | `<skill>`, `--roots <path>...`, `--manifest <path>`, `--dry-run`, `--json` | Convenience command for `set-visibility <skill> off`; off skills are excluded from router results when the manifest is used. | `skillspec skills disable legacy-skill --roots ~/.agents/skills --manifest ~/.skillspec/router/visibility-manifest.json` |
+| `skillspec skills enable` | `<skill>`, `--roots <path>...`, `--manifest <path>`, `--dry-run`, `--json` | Convenience command for `set-visibility <skill> implicit`. | `skillspec skills enable pdf --roots ~/.agents/skills --manifest ~/.skillspec/router/visibility-manifest.json` |
+| `skillspec visibility plan` | `--roots <path>...`, `--profile router-managed`, `--json` | Shows the native visibility changes router install would apply without editing files. | `skillspec visibility plan --roots ~/.agents/skills ~/.claude/skills --json` |
+| `skillspec visibility apply` | `--roots <path>...`, `--profile router-managed`, `--manifest <path>`, `--dry-run`, `--json` | Applies native Codex `agents/openai.yaml` or Claude `skillOverrides` visibility controls and writes a rollback manifest. | `skillspec visibility apply --roots ~/.agents/skills --manifest ~/.skillspec/router/visibility-manifest.json --json` |
+| `skillspec visibility restore` | `--manifest <path>`, `--dry-run`, `--json` | Restores exact file snapshots from a visibility manifest. It does not infer previous state. | `skillspec visibility restore --manifest ~/.skillspec/router/visibility-manifest.json --json` |
+| `skillspec router install` | `--roots <path>...`, `--router-root <path>`, `--index <sqlite>`, `--manifest <path>`, `--router-name <name>`, `--dry-run`, `--json` | Installs the visible `skill-router` skill, applies router-managed visibility, builds the index, and writes router config for future install hooks. | `skillspec router install --roots ~/.agents/skills --router-root ~/.agents/skills --index ~/.skillspec/router/skill-index.sqlite --json` |
+| `skillspec router uninstall` | `--manifest <path>`, `--router-root <path>`, `--index <sqlite>`, `--keep-index`, `--dry-run`, `--json` | Restores visibility from the manifest, removes only the managed router skill marker directory, removes config, and optionally removes the index. | `skillspec router uninstall --json` |
+| `skillspec router index refresh` | `--roots <path>...`, `--index <sqlite>`, `--visibility-manifest <path>`, `--json` | Refreshes the router index after skill additions, removals, or metadata changes. | `skillspec router index refresh --roots ~/.agents/skills --index ~/.skillspec/router/skill-index.sqlite --visibility-manifest ~/.skillspec/router/visibility-manifest.json` |
+| `skillspec router index status` | `--roots <path>...`, `--index <sqlite>`, `--visibility-manifest <path>`, `--json` | Compares the index against current roots and reports new, changed, missing, stale, and updated-at state. | `skillspec router index status --roots ~/.agents/skills --index ~/.skillspec/router/skill-index.sqlite --json` |
+
 ## Capability Bootstrap Commands
 
 These commands manage local capability seeds used by durable bootstrap flows when
@@ -97,6 +118,8 @@ The command surface has three layers:
   `progress`, and `trace align`.
 - Authoring and QA: `validate`, `test`, `query`, `refs`, `grammar`, `imports`,
   `deps`, `compile`, `import-skill`, and `install`.
+- Large skill discovery: `index`, `route`, `skills`, `visibility`, and
+  `router`.
 - Local durable bootstrap: `capability`.
 
 The CLI does not execute arbitrary task work. It renders contracts, validates
@@ -114,6 +137,7 @@ This doc is grounded in:
 - `crates/skillspec-cli/src/main.rs`, which defines the clap command tree;
 - `spec/commandspec.md`, which is the reference command inventory;
 - `crates/skillspec-cli/src/act.rs`, `progress.rs`, `align.rs`, `grammar.rs`,
-  `deps.rs`, `imports.rs`, `compiler.rs`, `importer.rs`, `install.rs`, and
-  `capability.rs`, which implement the listed command behavior;
+  `deps.rs`, `imports.rs`, `compiler.rs`, `importer.rs`, `install.rs`,
+  `router.rs`, `visibility.rs`, `router_lifecycle.rs`, and `capability.rs`,
+  which implement the listed command behavior;
 - `skillspec --help` and subcommand help output from the current local binary.

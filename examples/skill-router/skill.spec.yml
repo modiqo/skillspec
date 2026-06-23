@@ -1,0 +1,223 @@
+schema: skillspec/v0
+id: skill.router
+title: skill router
+description: Route user requests to the best local skill from a large indexed library and manage native visibility controls for Codex and Claude.
+
+activation:
+  summary: Use for skill discovery, large skill catalogs, shortened skill descriptions, router install/uninstall, index refresh/status, and Codex or Claude implicit invocation controls.
+  keywords:
+    - skill router
+    - route to a skill
+    - choose the right skill
+    - many skills installed
+    - skill descriptions shortened
+    - 2% skills context budget
+    - install router
+    - uninstall router
+    - refresh skill index
+    - skill visibility
+    - disable implicit invocation
+    - allow_implicit_invocation
+    - disable-model-invocation
+    - skillOverrides
+  priority: broad_router
+
+applies_when:
+  - user_intent:
+      - select a skill from a large local skill library
+      - route a request to the best SkillSpec or SKILL.md package
+      - reduce native skill discovery context pressure
+      - install or uninstall the SkillSpec router
+      - make skills manual-only, name-only, implicit, or off
+      - refresh a skill index after skill additions or removals
+
+entry:
+  prompt: Route first, then load only the selected skill or ask for direct versus durable execution.
+  decision_required: true
+  tool_boundary:
+    default: deny
+    allow:
+      - skillspec_cli
+      - local_skill_files
+      - local_router_index
+      - local_visibility_manifest
+    permission_required_for:
+      - any_unlisted_tool
+      - mutating_visibility_files
+      - installing_router_skill
+      - deleting_router_skill
+      - deleting_router_index
+
+routes:
+  - id: route_from_index
+    label: Route from the skill index
+    rank: 10
+    description: Use the local SQLite index to choose the best candidate skill for the user request.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: check_index_status
+          owner_skill: skill-router
+          description: Check whether the router index exists and whether it is stale for the configured roots.
+          requires:
+            - inspect_router_index_status
+        - id: route_query
+          owner_skill: skill-router
+          description: Query the router index and select or present candidate skills.
+          requires:
+            - run_route_query
+        - id: execution_mode_elicitation
+          owner_skill: skill-router
+          description: Ask direct versus durable execution only when route output requests it and the user has not already chosen.
+          requires:
+            - ask_direct_or_durable_when_needed
+
+  - id: manage_router_lifecycle
+    label: Install, refresh, or uninstall router
+    rank: 20
+    description: Install the visible router skill, manage its index and manifest, or uninstall and restore visibility from the manifest.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: plan_lifecycle_change
+          owner_skill: skill-router
+          description: Show the lifecycle operation, affected roots, index path, manifest path, and restore behavior before mutation.
+          requires:
+            - show_router_lifecycle_plan
+        - id: apply_lifecycle_change
+          owner_skill: skill-router
+          description: Run router install, uninstall, index refresh, or index status commands.
+          requires:
+            - run_router_lifecycle_command
+        - id: verify_lifecycle_change
+          owner_skill: skill-router
+          description: Verify router skill files, manifest, config, and index status after the lifecycle change.
+          requires:
+            - verify_router_lifecycle_result
+
+  - id: manage_visibility
+    label: Manage native skill visibility
+    rank: 30
+    description: Plan, apply, restore, or explicitly set Codex and Claude native visibility controls.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: visibility_plan
+          owner_skill: skill-router
+          description: Preview native Codex and Claude visibility changes before editing files.
+          requires:
+            - run_visibility_plan
+        - id: visibility_apply_or_restore
+          owner_skill: skill-router
+          description: Apply or restore visibility from a reversible manifest.
+          requires:
+            - run_visibility_apply_or_restore
+        - id: visibility_verify
+          owner_skill: skill-router
+          description: Verify native metadata and router manifest state.
+          requires:
+            - verify_visibility_state
+
+rules:
+  - id: route_queries_use_index
+    when:
+      user_says_any:
+        - route to a skill
+        - choose the right skill
+        - find matching skill
+        - many skills installed
+        - skill descriptions shortened
+    prefer: route_from_index
+    reason: Discovery should use the local index instead of loading every skill description into context.
+
+  - id: lifecycle_requests_use_router_commands
+    when:
+      user_says_any:
+        - install router
+        - uninstall router
+        - router index
+        - refresh index
+        - index status
+    prefer: manage_router_lifecycle
+    reason: Router lifecycle changes must write a manifest, config, and index through dedicated commands.
+
+  - id: visibility_requests_use_native_controls
+    when:
+      user_says_any:
+        - set visibility
+        - manual-only
+        - name-only
+        - implicit invocation
+        - disable implicit
+        - skillOverrides
+        - disable-model-invocation
+        - allow_implicit_invocation
+    prefer: manage_visibility
+    reason: Visibility changes should use Codex and Claude native controls with a manifest-backed restore path.
+
+elicitations:
+  execution_mode_direct_or_durable:
+    question: Do you want direct execution or durable execution for this selected skill?
+    choices:
+      - id: direct
+        label: Direct
+        sets:
+          execution_mode: direct
+      - id: durable
+        label: Durable
+        sets:
+          execution_mode: durable
+    default: direct
+
+commands:
+  inspect_router_index_status:
+    description: Compare the router index against current skill roots.
+    template: "skillspec router index status --roots {{roots}} --index {{index}} --visibility-manifest {{manifest}} --json"
+    safety: local_read
+
+  run_route_query:
+    description: Route the user request to candidate skills from the index.
+    template: "skillspec route --index {{index}} --query {{query}} --top 5 --json"
+    safety: local_read
+
+  show_router_lifecycle_plan:
+    description: Preview router lifecycle changes before writing files.
+    template: "skillspec router install --roots {{roots}} --router-root {{router_root}} --index {{index}} --manifest {{manifest}} --dry-run --json"
+    safety: local_read
+
+  run_router_lifecycle_command:
+    description: Apply the requested router lifecycle command.
+    template: "skillspec router install|uninstall|index refresh|index status"
+    safety: local_write
+
+  run_visibility_plan:
+    description: Preview native Codex and Claude visibility changes.
+    template: "skillspec visibility plan --roots {{roots}} --json"
+    safety: local_read
+
+  run_visibility_apply_or_restore:
+    description: Apply or restore native visibility controls using a manifest.
+    template: "skillspec visibility apply|restore --manifest {{manifest}}"
+    safety: local_write
+
+tests:
+  - name: route query uses index
+    input: choose the right skill from many skills installed
+    expect:
+      route: route_from_index
+      matched_rules:
+        - route_queries_use_index
+
+  - name: lifecycle uses router commands
+    input: install router and refresh index
+    expect:
+      route: manage_router_lifecycle
+      matched_rules:
+        - lifecycle_requests_use_router_commands
+
+  - name: visibility uses native controls
+    input: set a noisy skill to manual-only with allow_implicit_invocation false
+    expect:
+      route: manage_visibility
+      matched_rules:
+        - visibility_requests_use_native_controls

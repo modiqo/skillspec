@@ -32,6 +32,11 @@ skillspec <COMMAND>
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path>` | Create a mechanical draft SkillSpec from a local skill file or folder. |
+| `index --roots <path>... --out <sqlite>` | Build a searchable skill catalog outside model context. |
+| `route --index <sqlite> --query <text>` | Route a user request to candidate skills from an index. |
+| `skills <COMMAND>` | Audit or control installed skill visibility. |
+| `visibility <COMMAND>` | Plan, apply, or restore harness-native skill visibility controls. |
+| `router <COMMAND>` | Install, uninstall, refresh, or inspect the optional skill router. |
 | `install <COMMAND>` | Detect harness roots and install SkillSpec-backed skills. |
 | `capability <COMMAND>` | Manage local capability seeds for durable bootstrap. |
 
@@ -442,6 +447,98 @@ Subcommands:
 
 - `targets`
 - `skill <folder> [--target <target>...] [--all-detected] [--dry-run] [--name <name>]`
+
+## `index`
+
+```text
+skillspec index --roots <ROOTS>... --out <OUT>
+```
+
+Options:
+
+- `--roots <ROOTS>`: skill roots to scan. Repeat or pass multiple paths.
+- `--out <OUT>`: SQLite index path to write.
+- `--visibility-manifest <VISIBILITY_MANIFEST>`: optional manifest whose final
+  states override native metadata. This is how explicit `off` states exclude
+  skills from router results when a native harness has no off state.
+- `--json`: emit JSON instead of a concise human report.
+
+The indexer scans `SKILL.md` frontmatter, optional `agents/openai.yaml`, Claude
+`.claude/settings.json` skill overrides, and optional `skill.spec.yml` routing
+metadata. It stores skill text, routing hints, visibility, checksums, and source
+paths in SQLite.
+
+## `route`
+
+```text
+skillspec route --index <INDEX> --query <QUERY>
+```
+
+Options:
+
+- `--index <INDEX>`: SQLite index path created by `skillspec index` or
+  `skillspec router index refresh`.
+- `--query <QUERY>`: user task text to route.
+- `--top <TOP>`: number of candidates to return. Defaults to 5.
+- `--execution-mode <direct|durable>`: execution mode already selected by the
+  user or caller.
+- `--json`: emit JSON instead of a concise human report.
+
+The route result includes selected skill, candidates, scores, confidence,
+visibility, SkillSpec-backed status, and an
+`execution_mode_direct_or_durable` elicitation hint when no execution mode was
+supplied and a candidate was selected.
+
+## `skills`
+
+```text
+skillspec skills <COMMAND>
+```
+
+Subcommands:
+
+- `audit --roots <path>... [--json]`
+- `set-visibility <skill> <visibility> --roots <path>... --manifest <path> [--dry-run] [--json]`
+- `disable <skill> --roots <path>... --manifest <path> [--dry-run] [--json]`
+- `enable <skill> --roots <path>... --manifest <path> [--dry-run] [--json]`
+
+Visibility values are `implicit`, `manual-only`, `name-only`, and `off`.
+Visibility commands use native Codex or Claude controls where available and
+write a reversible manifest.
+
+## `visibility`
+
+```text
+skillspec visibility <COMMAND>
+```
+
+Subcommands:
+
+- `plan --roots <path>... [--profile router-managed] [--json]`
+- `apply --roots <path>... --manifest <path> [--profile router-managed] [--dry-run] [--json]`
+- `restore --manifest <path> [--dry-run] [--json]`
+
+`restore` uses exact file snapshots from the manifest. It does not infer
+previous visibility state from current files.
+
+## `router`
+
+```text
+skillspec router <COMMAND>
+```
+
+Subcommands:
+
+- `install --roots <path>... --index <sqlite> [--router-root <path>] [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `uninstall [--manifest <path>] [--router-root <path>] [--index <sqlite>] [--keep-index] [--dry-run] [--json]`
+- `index refresh --roots <path>... --index <sqlite> [--visibility-manifest <path>] [--json]`
+- `index status --roots <path>... --index <sqlite> [--visibility-manifest <path>] [--json]`
+
+`router install` writes a visible `skill-router` skill, a visibility manifest, a
+SQLite index, and a router config. Once that config exists, successful
+`skillspec install skill` calls reapply router-managed visibility and refresh the
+configured index. `router uninstall` restores visibility from the manifest and
+removes only a generated router skill that contains the managed marker file.
 
 ## `capability`
 

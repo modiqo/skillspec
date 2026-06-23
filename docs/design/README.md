@@ -47,6 +47,9 @@ The intended design-doc set is:
 - `completion-alignment-and-token-reporting.md`: how final responses should
   render alignment summaries, missing proof rows, trace paths, and measured
   token consumption and savings.
+- `skill-router.md`: how the optional router indexes large skill libraries,
+  applies native Codex and Claude visibility controls, and preserves a
+  manifest-backed restore path.
 - `command-log.md`: a scannable command table with implemented command names,
   important args/options, explanations, and realistic examples.
 - `grammar-and-conformance.md`: the grammar surface, typed fields, references,
@@ -86,6 +89,7 @@ Every design claim should be grounded in one or more of these sources:
 | Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
+| Skill router | `crates/skillspec-cli/src/router.rs`, `crates/skillspec-cli/src/visibility.rs`, `crates/skillspec-cli/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-cli/src/trace.rs`, `crates/skillspec-cli/src/progress.rs`, `crates/skillspec-cli/src/align.rs` |
 | CLI surface | `crates/skillspec-cli/src/main.rs` |
 
