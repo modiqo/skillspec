@@ -14,6 +14,7 @@ const SCHEMA_VERSION: i64 = 1;
 pub struct IndexOptions {
     pub roots: Vec<PathBuf>,
     pub out: PathBuf,
+    pub visibility_manifest: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -101,7 +102,7 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Implicit => "implicit",
             Self::ManualOnly => "manual-only",
@@ -110,7 +111,7 @@ impl Visibility {
         }
     }
 
-    fn from_str(value: &str) -> Self {
+    pub(crate) fn from_str(value: &str) -> Self {
         match value {
             "manual-only" => Self::ManualOnly,
             "name-only" => Self::NameOnly,
@@ -121,21 +122,21 @@ impl Visibility {
 }
 
 #[derive(Clone, Debug)]
-struct SkillEntry {
-    id: String,
-    name: String,
-    path: PathBuf,
-    skill_dir: PathBuf,
-    description: String,
-    short_description: Option<String>,
-    source: String,
-    visibility: Visibility,
-    has_skill_spec: bool,
-    checksum: String,
-    tags: Vec<String>,
-    triggers: Vec<String>,
-    negative_triggers: Vec<String>,
-    text: String,
+pub(crate) struct SkillEntry {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) path: PathBuf,
+    pub(crate) skill_dir: PathBuf,
+    pub(crate) description: String,
+    pub(crate) short_description: Option<String>,
+    pub(crate) source: String,
+    pub(crate) visibility: Visibility,
+    pub(crate) has_skill_spec: bool,
+    pub(crate) checksum: String,
+    pub(crate) tags: Vec<String>,
+    pub(crate) triggers: Vec<String>,
+    pub(crate) negative_triggers: Vec<String>,
+    pub(crate) text: String,
 }
 
 #[derive(Debug)]
@@ -168,7 +169,10 @@ struct SkillFrontmatter {
 
 pub fn index(options: IndexOptions) -> Result<IndexReport> {
     let mut warnings = Vec::new();
-    let entries = scan_roots(&options.roots, &mut warnings)?;
+    let mut entries = scan_roots(&options.roots, &mut warnings)?;
+    if let Some(manifest) = &options.visibility_manifest {
+        apply_visibility_manifest_overrides(&mut entries, manifest, &mut warnings)?;
+    }
     if let Some(parent) = options.out.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
             path: parent.to_path_buf(),
@@ -338,7 +342,7 @@ pub fn render_route(report: &RouteReport) -> String {
     output
 }
 
-fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Result<Vec<SkillEntry>> {
+pub(crate) fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Result<Vec<SkillEntry>> {
     let mut entries = Vec::new();
     let mut seen_paths = BTreeSet::new();
     for (root_index, root) in roots.iter().enumerate() {
@@ -413,7 +417,10 @@ fn read_skill_entry(root: &Path, root_index: usize, skill_path: &Path) -> Result
         None
     };
     let openai_visibility = read_openai_visibility(&skill_dir)?;
-    let visibility = if frontmatter.disable_model_invocation {
+    let claude_visibility = read_claude_visibility(&skill_dir, &frontmatter.name)?;
+    let visibility = if let Some(visibility) = claude_visibility {
+        visibility
+    } else if frontmatter.disable_model_invocation {
         Visibility::ManualOnly
     } else {
         openai_visibility.unwrap_or(Visibility::Implicit)
@@ -509,6 +516,131 @@ fn read_openai_visibility(skill_dir: &Path) -> Result<Option<Visibility>> {
         Some(true) => Some(Visibility::Implicit),
         None => None,
     })
+}
+
+fn apply_visibility_manifest_overrides(
+    entries: &mut [SkillEntry],
+    manifest_path: &Path,
+    warnings: &mut Vec<String>,
+) -> Result<()> {
+    let text = fs::read_to_string(manifest_path).map_err(|source| Error::Read {
+        path: manifest_path.to_path_buf(),
+        source,
+    })?;
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|source| Error::ParseJson {
+            path: manifest_path.to_path_buf(),
+            source,
+        })?;
+    let Some(changes) = value.get("changes").and_then(serde_json::Value::as_array) else {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "visibility manifest {} is missing changes[]",
+                manifest_path.display()
+            ),
+        });
+    };
+
+    for change in changes {
+        let Some(visibility_text) = change
+            .get("after_visibility")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| {
+                change
+                    .get("after")
+                    .and_then(|after| after.get("visibility"))
+                    .and_then(serde_json::Value::as_str)
+            })
+        else {
+            warnings.push("visibility manifest change is missing after_visibility".to_owned());
+            continue;
+        };
+        let visibility = Visibility::from_str(visibility_text);
+        let skill_dir = change
+            .get("skill_dir")
+            .and_then(serde_json::Value::as_str)
+            .map(PathBuf::from);
+        let skill_file = change
+            .get("skill_file")
+            .or_else(|| change.get("path"))
+            .and_then(serde_json::Value::as_str)
+            .map(PathBuf::from);
+        let skill_name = change
+            .get("skill")
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned);
+
+        let mut matched = false;
+        for entry in entries.iter_mut() {
+            let path_match = skill_dir
+                .as_ref()
+                .is_some_and(|path| same_path(path, &entry.skill_dir))
+                || skill_file
+                    .as_ref()
+                    .is_some_and(|path| same_path(path, &entry.path));
+            let name_match = skill_dir.is_none()
+                && skill_file.is_none()
+                && skill_name.as_ref() == Some(&entry.name);
+            if path_match || name_match {
+                entry.visibility = visibility;
+                matched = true;
+            }
+        }
+        if !matched {
+            let label = skill_name.unwrap_or_else(|| "<unknown>".to_owned());
+            warnings.push(format!(
+                "visibility manifest references missing skill: {label}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn same_path(left: &Path, right: &Path) -> bool {
+    let left = fs::canonicalize(left).unwrap_or_else(|_| left.to_path_buf());
+    let right = fs::canonicalize(right).unwrap_or_else(|_| right.to_path_buf());
+    left == right
+}
+
+fn read_claude_visibility(skill_dir: &Path, skill_name: &str) -> Result<Option<Visibility>> {
+    let Some(settings_path) = claude_settings_path(skill_dir) else {
+        return Ok(None);
+    };
+    if !settings_path.is_file() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(&settings_path).map_err(|source| Error::Read {
+        path: settings_path.clone(),
+        source,
+    })?;
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|source| Error::ParseJson {
+            path: settings_path.clone(),
+            source,
+        })?;
+    let Some(state) = value
+        .get("skillOverrides")
+        .and_then(|overrides| overrides.get(skill_name))
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+    Ok(match state {
+        "on" => Some(Visibility::Implicit),
+        "name-only" => Some(Visibility::NameOnly),
+        "user-invocable-only" => Some(Visibility::ManualOnly),
+        "off" => Some(Visibility::Off),
+        _ => None,
+    })
+}
+
+pub(crate) fn claude_settings_path(skill_dir: &Path) -> Option<PathBuf> {
+    for ancestor in skill_dir.ancestors() {
+        if ancestor.file_name().and_then(|name| name.to_str()) == Some(".claude") {
+            return Some(ancestor.join("settings.json"));
+        }
+    }
+    None
 }
 
 fn extract_routing_metadata(

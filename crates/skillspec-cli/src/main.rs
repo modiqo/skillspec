@@ -16,6 +16,7 @@ mod report;
 mod router;
 mod sensemake;
 mod trace;
+mod visibility;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use error::Result;
@@ -186,6 +187,9 @@ enum Command {
         /// SQLite index path to write.
         #[arg(long)]
         out: PathBuf,
+        /// Visibility manifest whose final states should override native metadata.
+        #[arg(long)]
+        visibility_manifest: Option<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -212,6 +216,11 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    #[command(about = "Plan, apply, or restore harness-native skill visibility controls")]
+    Visibility {
+        #[command(subcommand)]
+        command: VisibilityCommand,
     },
     #[command(about = "Detect harness roots and install SkillSpec-backed skills")]
     Install {
@@ -249,6 +258,118 @@ enum SkillsCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Set one skill's native visibility state")]
+    SetVisibility {
+        /// Skill name from SKILL.md frontmatter.
+        skill: String,
+        /// Target visibility state.
+        visibility: VisibilityArg,
+        /// Skill roots to search. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Reversible manifest path to write.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Show changes without writing files or manifest.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Mark one skill off for native discovery and router routing")]
+    Disable {
+        /// Skill name from SKILL.md frontmatter.
+        skill: String,
+        /// Skill roots to search. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Reversible manifest path to write.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Show changes without writing files or manifest.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Mark one skill implicit/on for native discovery")]
+    Enable {
+        /// Skill name from SKILL.md frontmatter.
+        skill: String,
+        /// Skill roots to search. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Reversible manifest path to write.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Show changes without writing files or manifest.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum VisibilityCommand {
+    #[command(about = "Show router-managed visibility changes without editing files")]
+    Plan {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Visibility profile to apply.
+        #[arg(long, value_enum, default_value_t = VisibilityProfileArg::RouterManaged)]
+        profile: VisibilityProfileArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Apply harness-native visibility controls and write a manifest")]
+    Apply {
+        /// Skill roots to scan. Repeat or pass multiple paths.
+        #[arg(long = "roots", num_args = 1.., required = true)]
+        roots: Vec<PathBuf>,
+        /// Visibility profile to apply.
+        #[arg(long, value_enum, default_value_t = VisibilityProfileArg::RouterManaged)]
+        profile: VisibilityProfileArg,
+        /// Reversible manifest path to write.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Show changes without writing files or manifest.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Restore visibility files from a prior manifest")]
+    Restore {
+        /// Reversible manifest path produced by visibility apply or skills set-visibility.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Show restore changes without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+enum VisibilityArg {
+    Implicit,
+    ManualOnly,
+    NameOnly,
+    Off,
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+enum VisibilityProfileArg {
+    RouterManaged,
 }
 
 #[derive(Debug, Subcommand)]
@@ -1064,8 +1185,17 @@ fn run() -> Result<()> {
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
         }
-        Command::Index { roots, out, json } => {
-            let report = router::index(router::IndexOptions { roots, out })?;
+        Command::Index {
+            roots,
+            out,
+            visibility_manifest,
+            json,
+        } => {
+            let report = router::index(router::IndexOptions {
+                roots,
+                out,
+                visibility_manifest,
+            })?;
             if json {
                 report::json(&report)?;
             } else {
@@ -1098,6 +1228,118 @@ fn run() -> Result<()> {
                     report::json(&report)?;
                 } else {
                     report::text(&router::render_audit(&report))?;
+                }
+            }
+            SkillsCommand::SetVisibility {
+                skill,
+                visibility,
+                roots,
+                manifest,
+                dry_run,
+                json,
+            } => {
+                let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+                    roots,
+                    skill,
+                    visibility: visibility.into(),
+                    manifest,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_apply(&report))?;
+                }
+            }
+            SkillsCommand::Disable {
+                skill,
+                roots,
+                manifest,
+                dry_run,
+                json,
+            } => {
+                let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+                    roots,
+                    skill,
+                    visibility: router::Visibility::Off,
+                    manifest,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_apply(&report))?;
+                }
+            }
+            SkillsCommand::Enable {
+                skill,
+                roots,
+                manifest,
+                dry_run,
+                json,
+            } => {
+                let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+                    roots,
+                    skill,
+                    visibility: router::Visibility::Implicit,
+                    manifest,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_apply(&report))?;
+                }
+            }
+        },
+        Command::Visibility { command } => match command {
+            VisibilityCommand::Plan {
+                roots,
+                profile,
+                json,
+            } => {
+                let report = visibility::plan(visibility::VisibilityPlanOptions {
+                    roots,
+                    profile: profile.into(),
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_plan(&report))?;
+                }
+            }
+            VisibilityCommand::Apply {
+                roots,
+                profile,
+                manifest,
+                dry_run,
+                json,
+            } => {
+                let report = visibility::apply(visibility::VisibilityApplyOptions {
+                    roots,
+                    profile: profile.into(),
+                    manifest,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_apply(&report))?;
+                }
+            }
+            VisibilityCommand::Restore {
+                manifest,
+                dry_run,
+                json,
+            } => {
+                let report = visibility::restore(visibility::VisibilityRestoreOptions {
+                    manifest,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&visibility::render_restore(&report))?;
                 }
             }
         },
@@ -1335,6 +1577,25 @@ impl From<RouterExecutionModeArg> for router::ExecutionMode {
         match value {
             RouterExecutionModeArg::Direct => Self::Direct,
             RouterExecutionModeArg::Durable => Self::Durable,
+        }
+    }
+}
+
+impl From<VisibilityArg> for router::Visibility {
+    fn from(value: VisibilityArg) -> Self {
+        match value {
+            VisibilityArg::Implicit => Self::Implicit,
+            VisibilityArg::ManualOnly => Self::ManualOnly,
+            VisibilityArg::NameOnly => Self::NameOnly,
+            VisibilityArg::Off => Self::Off,
+        }
+    }
+}
+
+impl From<VisibilityProfileArg> for visibility::VisibilityProfile {
+    fn from(value: VisibilityProfileArg) -> Self {
+        match value {
+            VisibilityProfileArg::RouterManaged => Self::RouterManaged,
         }
     }
 }

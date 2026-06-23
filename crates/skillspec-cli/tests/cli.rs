@@ -389,6 +389,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
     assert!(stdout(&top).contains("capability"));
+    assert!(stdout(&top).contains("visibility"));
 
     let trace = Command::new(bin())
         .arg("trace")
@@ -579,6 +580,136 @@ description: Helps with notes.
         .unwrap()
         .iter()
         .any(|name| name == "pdf"));
+}
+
+#[test]
+fn visibility_apply_restore_and_manifest_override_router_index() {
+    let dir = TempDir::new("visibility");
+    let codex_root = dir.path().join(".codex/skills");
+    let claude_root = dir.path().join("repo/.claude/skills");
+    let manifest = dir.path().join("visibility-manifest.json");
+    let disable_manifest = dir.path().join("disable-manifest.json");
+    let index = dir.path().join("skill-index.sqlite");
+
+    write_file(
+        &codex_root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting text, tables, and images from PDF documents. Do not use for deployment work.
+---
+# PDF
+"#,
+    );
+    write_file(
+        &claude_root.join("deploy/SKILL.md"),
+        r#"---
+name: deploy
+description: Use when deploying applications to production hosting targets. Do not use for PDF extraction.
+---
+# Deploy
+"#,
+    );
+
+    let plan = Command::new(bin())
+        .arg("visibility")
+        .arg("plan")
+        .arg("--roots")
+        .arg(&codex_root)
+        .arg(&claude_root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&plan);
+    let plan_report = json_stdout(&plan);
+    assert_eq!(plan_report["changes"].as_array().unwrap().len(), 2);
+    assert!(plan_report["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|change| change["after_visibility"] == "manual-only"));
+
+    let apply = Command::new(bin())
+        .arg("visibility")
+        .arg("apply")
+        .arg("--roots")
+        .arg(&codex_root)
+        .arg(&claude_root)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&apply);
+    let apply_report = json_stdout(&apply);
+    assert_eq!(apply_report["changes"].as_array().unwrap().len(), 2);
+    assert!(manifest.is_file());
+    assert!(
+        fs::read_to_string(codex_root.join("pdf/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: false")
+    );
+    let claude_settings: Value = serde_json::from_str(
+        &fs::read_to_string(dir.path().join("repo/.claude/settings.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        claude_settings["skillOverrides"]["deploy"],
+        "user-invocable-only"
+    );
+
+    let restore = Command::new(bin())
+        .arg("visibility")
+        .arg("restore")
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&restore);
+    assert!(!codex_root.join("pdf/agents/openai.yaml").exists());
+    assert!(!dir.path().join("repo/.claude/settings.json").exists());
+
+    let disable = Command::new(bin())
+        .arg("skills")
+        .arg("disable")
+        .arg("pdf")
+        .arg("--roots")
+        .arg(&codex_root)
+        .arg("--manifest")
+        .arg(&disable_manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable);
+    let disable_report = json_stdout(&disable);
+    assert_eq!(disable_report["changes"][0]["after_visibility"], "off");
+
+    let index_output = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&codex_root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&disable_manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&index_output);
+
+    let route = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("extract pdf text")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&route);
+    let route_report = json_stdout(&route);
+    assert_eq!(route_report["selected"], Value::Null);
+    assert!(route_report["candidates"].as_array().unwrap().is_empty());
 }
 
 #[test]
