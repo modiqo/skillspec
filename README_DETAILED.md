@@ -390,10 +390,10 @@ as `not recorded` rather than omitted. When query-reduction stats are present,
 and `Token savings` names the cached-response token count, extracted
 query-result token count, saved-token delta, and reduction percentage.
 
-The runtime skill [skills/skillspec-runtime/SKILL.md](skills/skillspec-runtime/SKILL.md)
-teaches agents how to use an existing `skill.spec.yml`: validate first, check
-dependencies, create the phase plan, act on the current phase, obey forbids and
-elicitations, record progress evidence, then report trace and alignment.
+Compiled SkillSpec-backed `SKILL.md` loaders include runtime guidance for using
+an existing `skill.spec.yml`: validate first, check dependencies, create the
+phase plan, act on the current phase, obey forbids and elicitations, record
+progress evidence, then report trace and alignment.
 
 `skillspec act` also renders `PHASE TOOL BOUNDARY - HARD` for every phase. The
 effective boundary inherits `entry.tool_boundary`, route `tool_boundary`, and
@@ -475,7 +475,7 @@ tests:
 spec/       specification, schema, semantics, security notes
 examples/   complete SkillSpec examples
 conformance/ valid and invalid fixtures for CLI conformance behavior
-skills/     creator/runtime skills for authoring and using specs
+skills/     official SkillSpec-backed skills for authoring specs
 .claude/    repo-local SkillSpec-backed skills for this repository
 generators/ compiler target notes for Codex, Claude, Markdown
 crates/     reference Rust CLI
