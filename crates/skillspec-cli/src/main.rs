@@ -271,6 +271,9 @@ enum ProgressCommand {
         phase: Option<String>,
         /// Requirement id for requirement events.
         requirement: Option<String>,
+        /// Obligation, route, closure, or elicitation id for proof events.
+        #[arg(long)]
+        id: Option<String>,
         /// Event status, such as pass, fail, blocked, or pending.
         #[arg(long)]
         status: Option<String>,
@@ -601,6 +604,9 @@ enum ProgressEventArg {
     RequirementStarted,
     RequirementSatisfied,
     RequirementFailed,
+    ObligationSatisfied,
+    RouteFulfilled,
+    AfterSuccessCompleted,
     EvidenceAttached,
     HandoffStarted,
     HandoffCompleted,
@@ -791,6 +797,8 @@ fn run() -> Result<()> {
                 let spec = parser::load_spec(&path)?;
                 let report =
                     align::align_decision_trace(&spec, &path, &decision_trace, &execution_trace)?;
+                let alignment_report = align::write_report_json(&decision_trace, &report)?;
+                report::alignment_written(&alignment_report)?;
                 if json {
                     report::json(&report)?;
                 } else {
@@ -816,6 +824,7 @@ fn run() -> Result<()> {
                 event,
                 phase,
                 requirement,
+                id,
                 status,
                 evidence_kind,
                 evidence_ref,
@@ -828,6 +837,7 @@ fn run() -> Result<()> {
                     event: event.into(),
                     phase,
                     requirement,
+                    id,
                     status,
                     evidence_kind,
                     evidence_ref,
@@ -1143,6 +1153,9 @@ impl From<ProgressEventArg> for String {
             ProgressEventArg::RequirementStarted => "requirement_started",
             ProgressEventArg::RequirementSatisfied => "requirement_satisfied",
             ProgressEventArg::RequirementFailed => "requirement_failed",
+            ProgressEventArg::ObligationSatisfied => "obligation_satisfied",
+            ProgressEventArg::RouteFulfilled => "route_fulfilled",
+            ProgressEventArg::AfterSuccessCompleted => "after_success_completed",
             ProgressEventArg::EvidenceAttached => "evidence_attached",
             ProgressEventArg::HandoffStarted => "handoff_started",
             ProgressEventArg::HandoffCompleted => "handoff_completed",

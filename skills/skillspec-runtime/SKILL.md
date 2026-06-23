@@ -152,13 +152,23 @@ End with a compact evidence report:
 ```text
 SkillSpec route: <route>
 SkillSpec decision trace: <run_dir>
-SkillSpec alignment: <pass|fail|unproven, with key failed/unproven checks>
+Alignment summary:
+  Decision replay: <pass|partial|fail>
+  Phase order: <pass|partial|fail|not evaluated|not applicable>
+  Requirements: <proven>/<total> proven
+  Missing proof: <specific missing progress or execution proof>
+  Forbidden actions: <no violations recorded|violation count|not checked>
+  Alignment: <pass|partial|fail>
+Token usage:
+  Token consumption: <measured tokens or query-result data tokens|not recorded>
+  Token savings: <query-reduction savings with cached/result token counts|not recorded>
 Evidence: <response ids, files, browser snapshots, logs, or workspace>
 Completion obligations: <closures completed or still pending>
 ```
 
-If the underlying system exposes cost or replay metrics, include them only when
-they were actually queried. Explain the economics precisely:
+Always include token usage. If the underlying system exposes cost or replay
+metrics, include them only when they were actually queried. If not, write `not
+recorded` for both token lines. Explain the economics precisely:
 
 - Exploration context tokens are the one-time model-window spend needed to find
   and validate the answer.

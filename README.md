@@ -346,11 +346,41 @@ the decision facts deterministically. With `execution.jsonl`, it can also check
 whether the selected route, phase obligations, forbids, and after-success
 closures were actually proven. Without structured execution evidence it reports
 the specific missing proof rows as `unproven`, not as guessed pass/fail results.
+It writes the full alignment report to
+`.skillspec/traces/<run-id>/alignment.json` so the completion summary and token
+usage are durable run artifacts.
+The text report always includes a completion-facing block:
+
+```text
+alignment_summary:
+  Decision replay: pass
+  Phase order: pass
+  Requirements: 4/5 proven
+  Missing proof: requirement `install_codex` has no progress event
+  Forbidden actions: no violations recorded
+  Alignment: partial
+token_usage:
+  Token consumption: total 1234 tokens
+  Token savings: 3729702 tokens saved by query reduction (4439892 cached response tokens reduced to 710190 query-result tokens, 84.0% reduction)
+```
+
+When token stats are absent, `Token consumption` and `Token savings` are shown
+as `not recorded` rather than omitted. When query-reduction stats are present,
+`Token consumption` describes the extracted query-result data actually recorded,
+and `Token savings` names the cached-response token count, extracted
+query-result token count, saved-token delta, and reduction percentage.
 
 The runtime skill [skills/skillspec-runtime/SKILL.md](skills/skillspec-runtime/SKILL.md)
 teaches agents how to use an existing `skill.spec.yml`: validate first, check
 dependencies, create the phase plan, act on the current phase, obey forbids and
 elicitations, record progress evidence, then report trace and alignment.
+
+`skillspec act` also renders `PHASE TOOL BOUNDARY - HARD` for every phase. The
+effective boundary inherits `entry.tool_boundary`, route `tool_boundary`, and
+phase `tool_boundary`; if none is declared, SkillSpec renders a conservative
+default-deny boundary. Any tool, data source, execution substrate, provider,
+adapter, CLI, browser mode, API, or skill outside that boundary requires
+explicit user permission before use.
 
 ## Compile A SkillSpec Into Harness Guidance
 

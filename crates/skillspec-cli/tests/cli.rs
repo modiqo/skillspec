@@ -144,10 +144,17 @@ entry:
   decision_required: true
   supersedes_skills: [browser:browser]
   forbid_before_decision: [node_repl, direct_cli_without_rote_exec]
+  tool_boundary:
+    default: deny
+    allow: [skillspec_cli, local_files]
+    permission_required_for: [any_unlisted_tool, any_new_data_source]
 routes:
   - id: browser
     label: Browser
     rank: 10
+    tool_boundary:
+      allow: [rote_exec, rote_browse]
+      forbid: [native_web_search]
     handoff:
       to_skill: rote-browse
       boundary: stop_current_skill
@@ -162,6 +169,10 @@ routes:
           route: local
           requires: [run_cli_only_through_rote_exec]
           forbid: [direct_cli_without_rote_exec]
+          tool_boundary:
+            allow: [rote_exec]
+            forbid: [direct_native_cli]
+            permission_required_for: [any_unlisted_cli]
           jumps:
             - when: cli_evidence_missing
               to_phase: browser_handoff
@@ -1474,6 +1485,12 @@ fn act_generates_current_route_ooda_checklist() {
     assert!(text.contains("Current phase:"));
     assert!(text.contains("collect_cli_evidence owned by durable-executor"));
     assert!(text.contains("requires: run_cli_only_through_rote_exec"));
+    assert!(text.contains("PHASE TOOL BOUNDARY - HARD"));
+    assert!(text.contains("- default: deny"));
+    assert!(text.contains("rote_exec"));
+    assert!(text.contains("any_unlisted_tool"));
+    assert!(text.contains("any_unlisted_cli"));
+    assert!(text.contains("stop and ask for explicit permission"));
     assert!(text.contains("Allowed now:"));
     assert!(text.contains("rote flow search, a named rote workspace, and `rote exec --`"));
     assert!(text.contains("Forbidden:"));
@@ -1509,6 +1526,22 @@ fn act_generates_current_route_ooda_checklist() {
     assert_eq!(report["route_selection"]["basis"], "rule_prefer");
     assert_eq!(report["current_phase"]["id"], "collect_cli_evidence");
     assert_eq!(report["current_phase"]["owner_skill"], "durable-executor");
+    assert_eq!(report["tool_boundary"]["default"], "deny");
+    assert!(report["tool_boundary"]["allow"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "rote_exec"));
+    assert!(report["tool_boundary"]["permission_required_for"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "any_unlisted_cli"));
+    assert!(report["tool_boundary"]["forbid"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "native_web_search"));
     assert!(report["forbidden"]
         .as_array()
         .unwrap()
@@ -1526,7 +1559,7 @@ fn act_generates_current_route_ooda_checklist() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|item| item.as_str().unwrap().contains("lower-level default")));
+        .any(|item| item.as_str().unwrap().contains("explicitly allowed")));
 }
 
 #[test]
@@ -1670,6 +1703,24 @@ fn progress_records_phase_completion_and_lists_remaining_work() {
     assert_eq!(event["event"], "phase_completed");
     assert_eq!(event["phase"], "collect_cli_evidence");
 
+    let obligation = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("obligation-satisfied")
+        .arg("--id")
+        .arg("browser")
+        .arg("--evidence-kind")
+        .arg("trace")
+        .arg("--evidence-ref")
+        .arg("@route")
+        .output()
+        .unwrap();
+    assert_success(&obligation);
+    let obligation_event = json_stdout(&obligation);
+    assert_eq!(obligation_event["event"], "obligation_satisfied");
+    assert_eq!(obligation_event["id"], "browser");
+
     let progressed = Command::new(bin())
         .arg("progress")
         .arg("show")
@@ -1683,9 +1734,140 @@ fn progress_records_phase_completion_and_lists_remaining_work() {
     let report = json_stdout(&progressed);
     assert_eq!(report["completed_phases"][0], "collect_cli_evidence");
     assert_eq!(report["current_phase"], "browser_handoff");
-    assert_eq!(report["execution_proof"]["event_count"], 1);
+    assert_eq!(report["execution_proof"]["event_count"], 2);
     assert!(run_dir.join("execution.jsonl").exists());
     assert!(run_dir.join("progress.json").exists());
+}
+
+#[test]
+fn trace_align_summarizes_progress_ledger_and_token_stats() {
+    let dir = TempDir::new("align-progress");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.progress-align
+title: CLI Progress Alignment
+description: Exercises progress-ledger alignment summary.
+routes:
+  - id: port_skill
+    label: Port skill
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: extract_source
+          owner_skill: skillspec-creator
+          requires: [read_source_skill]
+        - id: install_skill
+          owner_skill: skillspec-creator
+          requires: [install_codex]
+rules:
+  - id: port_request
+    when:
+      user_says_any: ["port"]
+    prefer: port_skill
+trace:
+  mode: event_log
+  required: true
+"#,
+    );
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=port this skill")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+    let execution_trace = run_dir.join("execution.jsonl");
+    write_file(
+        &execution_trace,
+        r#"{"event":"phase_started","phase":"extract_source","evidence":{"kind":"checklist","ref":"skillspec-act"}}
+{"event":"requirement_satisfied","phase":"extract_source","requirement":"read_source_skill","evidence":{"kind":"file","ref":"source/SKILL.md"}}
+{"event":"phase_completed","phase":"extract_source","evidence":{"kind":"trace","ref":"@phase-1"}}
+{"event":"stats_collected","workspace":"skillspec-align-progress","total_tokens":1234,"response_tokens_cached":500,"reduction_percent":28.5}
+"#,
+    );
+
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let report = json_stdout(&align);
+    assert_eq!(report["status"], "unproven");
+    assert_eq!(report["summary"]["completion"]["decision_replay"], "pass");
+    assert_eq!(report["summary"]["completion"]["phase_order"], "pass");
+    assert_eq!(
+        report["summary"]["completion"]["requirements"],
+        "1/2 proven"
+    );
+    assert_eq!(report["summary"]["completion"]["alignment"], "partial");
+    assert_eq!(
+        report["summary"]["completion"]["forbidden_actions"],
+        "no violations recorded"
+    );
+    assert!(report["summary"]["completion"]["missing_proof"][0]
+        .as_str()
+        .unwrap()
+        .contains("requirement `install_codex`"));
+    assert_eq!(
+        report["summary"]["tokens"]["consumption"],
+        "total 1234 tokens"
+    );
+    assert_eq!(
+        report["summary"]["tokens"]["savings"],
+        "500 tokens saved or cached; 28.5% reduction"
+    );
+    let alignment_json = run_dir.join("alignment.json");
+    assert!(alignment_json.exists());
+    let persisted: Value = serde_json::from_str(&fs::read_to_string(&alignment_json).unwrap())
+        .expect("alignment.json should be valid JSON");
+    assert_eq!(persisted["summary"]["completion"]["alignment"], "partial");
+
+    let align_text = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .output()
+        .unwrap();
+    assert_success(&align_text);
+    let text = stdout(&align_text);
+    assert!(text.contains("alignment_summary:"));
+    assert!(text.contains("  Decision replay: pass"));
+    assert!(text.contains("  Phase order: pass"));
+    assert!(text.contains("  Requirements: 1/2 proven"));
+    assert!(text.contains(
+        "  Missing proof: requirement `install_codex` in phase `install_skill` has no progress event"
+    ));
+    assert!(text.contains("  Forbidden actions: no violations recorded"));
+    assert!(text.contains("  Alignment: partial"));
+    assert!(text.contains("token_usage:"));
+    assert!(text.contains("  Token consumption: total 1234 tokens"));
+    assert!(text.contains("  Token savings: 500 tokens saved or cached; 28.5% reduction"));
 }
 
 #[test]
@@ -1754,6 +1936,14 @@ fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     assert_eq!(report["summary"]["decision_checks"]["fail"], 0);
     assert_eq!(report["summary"]["execution_obligations"]["pass"], 12);
     assert_eq!(report["summary"]["execution_obligations"]["unproven"], 0);
+    assert_eq!(
+        report["summary"]["tokens"]["consumption"],
+        "query-result data 826 tokens recorded"
+    );
+    assert_eq!(
+        report["summary"]["tokens"]["savings"],
+        "5973 tokens saved by query reduction (6799 cached response tokens reduced to 826 query-result tokens, 87.9% reduction)"
+    );
     assert!(report["checks"].as_array().unwrap().iter().any(|check| {
         check["id"] == "tracked_background_rule_triggered" && check["status"] == "pass"
     }));

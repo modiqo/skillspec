@@ -80,6 +80,8 @@ pub struct Entry {
     pub supersedes_skills: Vec<String>,
     #[serde(default)]
     pub forbid_before_decision: Vec<String>,
+    #[serde(default)]
+    pub tool_boundary: Option<ToolBoundary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -97,6 +99,28 @@ pub struct Route {
     pub handoff: Option<RouteHandoff>,
     #[serde(default)]
     pub execution_plan: Option<ExecutionPlan>,
+    #[serde(default)]
+    pub tool_boundary: Option<ToolBoundary>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolBoundary {
+    #[serde(default)]
+    pub default: Option<ToolBoundaryDefault>,
+    #[serde(default)]
+    pub allow: Vec<String>,
+    #[serde(default)]
+    pub forbid: Vec<String>,
+    #[serde(default)]
+    pub permission_required_for: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolBoundaryDefault {
+    Allow,
+    Deny,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -155,6 +179,8 @@ pub struct ExecutionPhase {
     pub handoff: Option<RouteHandoff>,
     #[serde(default)]
     pub jumps: Vec<ExecutionJump>,
+    #[serde(default)]
+    pub tool_boundary: Option<ToolBoundary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

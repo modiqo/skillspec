@@ -16,9 +16,9 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - Use the scenario tests as examples of expected behavior.
 - When unfamiliar with the spec shape, run `skillspec sensemake <skill-folder>/skill.spec.yml --view index` to get section roles, counts, ids, and query commands without consuming the whole spec.
 - When the `skillspec` CLI is available, run `skillspec plan <skill-folder>/skill.spec.yml --input='<task>' --trace-dir "${PWD}/.skillspec/traces"`, preserve the printed `run_dir`, then run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before substrate tools. Treat the phase plan and current-route checklist as the active execution SOP.
-- The `skillspec act` checklist is an OODA loop for the selected route: observe the task and trace, orient with matched rules and current phase, decide the next allowed action, act with evidence capture, then repeat before the next tool call.
+- The `skillspec act` checklist is an OODA loop for the selected route: observe the task and trace, orient with matched rules, current phase, and `PHASE TOOL BOUNDARY - HARD`, decide the next allowed action, act with evidence capture, then repeat before the next tool call.
 - The selected route and matched rules override lower-level skill defaults and generic tool preferences. If a lower-level skill suggests a forbidden tool, stop and follow the SkillSpec route.
-- For each execution phase, run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show <skill-folder>/skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.
+- For each execution phase, run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before acting, obey the rendered phase tool boundary, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show <skill-folder>/skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.
 - If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide` plus a manually constructed allow/deny checklist and progress notes before tool use. Prefer `skillspec explain` for human-facing route rationale.
 - After `skillspec act`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.
 - Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.
@@ -27,16 +27,17 @@ This document is a complete Markdown rendering of the SkillSpec behavioral contr
 - Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.
 - Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.
 - After `skillspec plan` or `skillspec act` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.
-- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <run_dir>/execution.jsonl` when structured action evidence exists. Include the alignment status, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, summary, and any failed/unproven checks in the completion report.
-- When rote workspace evidence or stats exist, make the completion report user-facing with a visible `Token savings` section: name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens only when queried, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not reduce this to a bare token count.
+- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <run_dir>/execution.jsonl` when structured action evidence exists. This writes `<run_dir>/alignment.json`. Include the compact alignment summary, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, and any failed or partial checks in the completion report. Do not report a bare `unproven`; use `Alignment: partial` plus specific `Missing proof` rows.
+- Always include token usage in the completion report. Use `Token consumption` and `Token savings` from `skillspec trace align`; if stats are absent, say `not recorded`. When query-reduction stats exist, report cached response tokens reduced to query-result tokens, saved-token delta, and reduction percentage instead of calling cached tokens consumed prompt tokens. When rote workspace evidence or stats exist, name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens when available, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not invent replay savings.
 - Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.
 
-Minimum final response shape when workspace evidence exists:
+Minimum final response shape:
 
 - `Result`: answer the user's task directly.
 - `Evidence`: workspace name plus important response ids/files the user can query later.
-- `Token savings`: state measured context-window/API tokens when available; otherwise say savings are structurally available but not measured. Explain that full evidence is outside the prompt in the rote workspace and can be retrieved by id/file instead of reloaded into context.
-- `SkillSpec`: selected route, trace run directory, alignment status, evidence gaps, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, or Token savings sections.
+- `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align`.
+- `Token usage`: include `Token consumption` and `Token savings` exactly as reported by `skillspec trace align`; say `not recorded` when absent.
+- `SkillSpec`: selected route, trace run directory, align status, status meaning, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, Alignment summary, or Token usage sections.
 
 ## Authoring And Revision Contract
 

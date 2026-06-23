@@ -159,6 +159,8 @@ SkillSpec is useful because several repo components inspect the same contract:
 - `skillspec decide` evaluates rules in order, records selected route, route
   order, forbids, allows, elicitations, after-success closures, matched rules,
   and optional trace events.
+- `skillspec act` renders the selected route as an action checklist, including
+  the effective phase tool boundary inherited from entry, route, and phase.
 - `skillspec imports check` validates explicit local imports, Markdown sections,
   and dependency-first load order.
 - `skillspec deps check` checks locally verifiable dependencies and marks
@@ -189,6 +191,12 @@ If a claim depends on reading extra instructions, it belongs in an explicit
 If a claim depends on a local CLI, file, environment variable, service, adapter,
 or browser substrate, it belongs in `dependencies`. The v0 CLI can check some
 dependency kinds directly and marks others as harness-required.
+
+If a claim depends on which tool, data source, execution substrate, provider,
+adapter, CLI, browser mode, API, or skill the harness may use next, it belongs
+in `tool_boundary`. `skillspec act` renders a default-deny effective boundary
+for every phase. Anything outside that boundary requires explicit user
+permission before use.
 
 If a claim depends on actually running a command, using a browser, calling a
 service, editing files, or taking a destructive action, it crosses into harness

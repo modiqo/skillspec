@@ -158,6 +158,12 @@ pub fn trace_written(trace: &TraceWriteResult) -> Result<()> {
     Ok(())
 }
 
+pub fn alignment_written(path: &Path) -> Result<()> {
+    let mut stderr = io::stderr().lock();
+    writeln!(stderr, "alignment: wrote {}", path.display())?;
+    Ok(())
+}
+
 pub fn align(report: &AlignReport) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
     let execution_not_evaluated = matches!(
@@ -183,6 +189,49 @@ pub fn align(report: &AlignReport) -> Result<()> {
     }
     writeln!(stdout, "summary: {}", report.summary.conclusion)?;
     writeln!(stdout, "meaning: {}", report.summary.status_meaning)?;
+    writeln!(stdout, "alignment_summary:")?;
+    writeln!(
+        stdout,
+        "  Decision replay: {}",
+        report.summary.completion.decision_replay
+    )?;
+    writeln!(
+        stdout,
+        "  Phase order: {}",
+        report.summary.completion.phase_order
+    )?;
+    writeln!(
+        stdout,
+        "  Requirements: {}",
+        report.summary.completion.requirements
+    )?;
+    for item in &report.summary.completion.missing_proof {
+        writeln!(stdout, "  Missing proof: {item}")?;
+    }
+    writeln!(
+        stdout,
+        "  Forbidden actions: {}",
+        report.summary.completion.forbidden_actions
+    )?;
+    writeln!(
+        stdout,
+        "  Alignment: {}",
+        report.summary.completion.alignment
+    )?;
+    writeln!(stdout, "token_usage:")?;
+    writeln!(
+        stdout,
+        "  Token consumption: {}",
+        report.summary.tokens.consumption
+    )?;
+    writeln!(stdout, "  Token savings: {}", report.summary.tokens.savings)?;
+    if !report.summary.tokens.evidence.is_empty() {
+        writeln!(
+            stdout,
+            "  Token evidence: {}",
+            report.summary.tokens.evidence.join(", ")
+        )?;
+    }
     if !report.summary.layers.is_empty() {
         writeln!(stdout, "model:")?;
         for layer in &report.summary.layers {

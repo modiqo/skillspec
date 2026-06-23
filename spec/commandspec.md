@@ -119,8 +119,13 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `act` emits the current-route OODA checklist: selected route, matched rules,
-current phase, allowed actions, forbids, handoffs, dependencies, and the
-before-tool-call allow/deny checks.
+current phase, `PHASE TOOL BOUNDARY - HARD`, allowed actions, forbids,
+handoffs, dependencies, and the before-tool-call allow/deny checks. The tool
+boundary is inherited from `entry.tool_boundary`, selected-route
+`tool_boundary`, and phase `tool_boundary`. If no boundary is declared, the
+report still renders a conservative default-deny boundary and requires
+permission for any unlisted tool, data source, execution substrate, provider,
+adapter, CLI, browser mode, API, or skill.
 
 ## `explain`
 
@@ -186,6 +191,27 @@ deterministic checks, and pass/fail/unproven counts for execution obligations.
 `unproven` means no deterministic drift was found but one or more required
 facts or execution obligations still lack structured proof. Execution
 obligations remain `unproven` until structured execution evidence is supplied.
+The command writes the full report to `<DECISION_TRACE>/alignment.json`.
+The human report also includes a completion-facing summary:
+
+```text
+alignment_summary:
+  Decision replay: pass
+  Phase order: pass
+  Requirements: 4/5 proven
+  Missing proof: requirement `install_codex` has no progress event
+  Forbidden actions: no violations recorded
+  Alignment: partial
+token_usage:
+  Token consumption: total 1234 tokens
+  Token savings: 3729702 tokens saved by query reduction (4439892 cached response tokens reduced to 710190 query-result tokens, 84.0% reduction)
+```
+
+`Alignment: partial` is the user-facing label for a non-failing `status:
+unproven`. Token usage is always shown; absent stats are reported as `not
+recorded`. Query-reduction stats are reported as cached response tokens reduced
+to extracted query-result tokens, plus the saved-token delta and reduction
+percentage.
 
 ## `progress`
 
@@ -228,7 +254,8 @@ Arguments:
 
 - `<RUN>`: trace run directory containing `execution.jsonl`.
 - `<EVENT>`: one of `phase-started`, `requirement-started`,
-  `requirement-satisfied`, `requirement-failed`, `evidence-attached`,
+  `requirement-satisfied`, `requirement-failed`, `obligation-satisfied`,
+  `route-fulfilled`, `after-success-completed`, `evidence-attached`,
   `handoff-started`, `handoff-completed`, `phase-completed`, or
   `phase-blocked`.
 - `[PHASE]`: phase id for phase or requirement events.
@@ -236,6 +263,9 @@ Arguments:
 
 Options:
 
+- `--id <ID>`: obligation, route, closure, or elicitation id for
+  `obligation-satisfied`, `route-fulfilled`, `after-success-completed`, and
+  related proof events.
 - `--status <STATUS>`: event status, such as `pass`, `fail`, `blocked`, or
   `pending`.
 - `--evidence-kind <EVIDENCE_KIND>`: evidence kind, such as `rote_response`,

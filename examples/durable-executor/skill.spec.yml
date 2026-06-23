@@ -92,6 +92,27 @@ entry:
     - direct_harness_cli_call_without_rote_exec
     - browser_browser_skill
     - node_repl
+  tool_boundary:
+    default: deny
+    allow:
+      - skillspec_cli
+      - local_skill_files
+      - rote_flow_search
+      - rote_exec
+      - rote_workspace
+      - declared_commands_dependencies_imports_resources
+    forbid:
+      - direct_cli_without_rote_exec
+      - direct_shell_command_without_rote_exec
+      - direct_harness_cli_call_without_rote_exec
+      - direct_api_call_without_rote_adapter_or_rote_exec
+    permission_required_for:
+      - any_unlisted_tool
+      - any_forbidden_action
+      - any_new_data_source
+      - any_new_execution_substrate
+      - any_new_provider_or_adapter
+      - any_external_side_effect
 
 routes:
   - id: durable_domain_handoff
@@ -119,6 +140,15 @@ routes:
         - id: domain_skill_handoff
           owner_skill: matching-domain-skill
           description: Let the matching domain SkillSpec own domain interpretation and validation while preserving the durable handoff packet.
+          tool_boundary:
+            allow:
+              - matching_domain_skill
+              - skillspec_cli
+              - rote_exec
+              - rote_adapter_or_domain_substrate_declared_by_selected_skill
+            permission_required_for:
+              - any_tool_outside_selected_domain_skill_boundary
+              - any_substrate_not_declared_by_selected_domain_skill
           requires:
             - handoff_to_matching_domain_skill
             - preserve_durable_context
@@ -172,6 +202,15 @@ routes:
         - id: durable_closure
           owner_skill: durable-executor
           description: Review the domain return packet, align traces, summarize evidence, report token-savings context, and handle recall or crystallization closure.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - rote_workspace_stats
+              - local_trace_files
+              - alignment_json
+            permission_required_for:
+              - any_new_execution_substrate
+              - any_new_external_side_effect
           requires:
             - receive_domain_return_packet
             - compute_workspace_trace
@@ -1644,13 +1683,14 @@ closures:
   report_workspace_evidence_and_token_math:
     description: >
       End with the workspace name, important response ids, SkillSpec trace run
-      directory, and a visible `Token savings` section. Explain that the
+      directory, compact alignment summary, and a visible `Token usage` section
+      with `Token consumption` and `Token savings`. Explain that the
       workspace is a context file system: future steps can retrieve exact
       slices by id instead of carrying full outputs in the model window. If the
       workflow is crystallized or memoried, repeat use can avoid both API
       request tokens and context-window tokens for cached evidence. If stats or
-      replay measurements were not queried, say the savings are structurally
-      available but not measured yet. Do not invent numeric replay savings.
+      replay measurements were not queried, say token consumption and savings
+      are not recorded. Do not invent numeric replay savings.
   query_lease_status:
     description: Query the lease status before acting on background process assumptions.
   follow_process_stream:
@@ -1670,10 +1710,17 @@ snippets:
       Evidence was captured in rote workspace {{ workspace }}: {{ evidence_refs }}.
       SkillSpec route trace: {{ skillspec_trace_dir }}.
       Rote dependency trace: captured with `rote trace --deps`.
-      Token savings:
-      - Exploration spent {{ context_tokens }} context-window tokens and {{ total_tokens }} API request+response tokens once.
+      Alignment summary:
+      - Decision replay: {{ decision_replay }}
+      - Phase order: {{ phase_order }}
+      - Requirements: {{ requirements }}
+      - Missing proof: {{ missing_proof }}
+      - Forbidden actions: {{ forbidden_actions }}
+      - Alignment: {{ alignment }}
+      Token usage:
+      - Token consumption: {{ token_consumption }}
+      - Token savings: {{ token_savings }}
       - The important data now lives outside the prompt in the rote workspace, addressable by response ids/files instead of pasted back into the model window.
-      - If this is crystallized as a flow or remembered, repeat use can skip the API work and avoid reloading the full evidence into context; measured replay savings: {{ replay_savings }} when available, otherwise say not measured yet.
 
 proof:
   metrics:

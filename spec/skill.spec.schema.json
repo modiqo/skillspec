@@ -127,7 +127,8 @@
         "forbid_before_decision": {
           "type": "array",
           "items": { "$ref": "#/$defs/identifier" }
-        }
+        },
+        "tool_boundary": { "$ref": "#/$defs/tool_boundary" }
       },
       "additionalProperties": false
     },
@@ -144,7 +145,30 @@
           "items": { "$ref": "#/$defs/identifier" }
         },
         "handoff": { "$ref": "#/$defs/route_handoff" },
-        "execution_plan": { "$ref": "#/$defs/execution_plan" }
+        "execution_plan": { "$ref": "#/$defs/execution_plan" },
+        "tool_boundary": { "$ref": "#/$defs/tool_boundary" }
+      },
+      "additionalProperties": false
+    },
+    "tool_boundary": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "enum": ["allow", "deny"]
+        },
+        "allow": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "forbid": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "permission_required_for": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       },
       "additionalProperties": false
     },
@@ -190,7 +214,8 @@
         "jumps": {
           "type": "array",
           "items": { "$ref": "#/$defs/execution_jump" }
-        }
+        },
+        "tool_boundary": { "$ref": "#/$defs/tool_boundary" }
       },
       "additionalProperties": false
     },

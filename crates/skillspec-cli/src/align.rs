@@ -73,6 +73,29 @@ pub struct AlignSummary {
     pub unproven_obligation_kinds: Vec<AlignObligationKindCount>,
     /// Missing proof items that explain an `unproven` status.
     pub evidence_gaps: Vec<AlignEvidenceGap>,
+    /// Compact completion-facing summary suitable for final agent responses.
+    pub completion: AlignCompletionSummary,
+    /// Token consumption and savings evidence supplied by the execution ledger.
+    pub tokens: AlignTokenSummary,
+}
+
+/// Compact alignment summary intended for the end of an inference cycle.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignCompletionSummary {
+    pub decision_replay: String,
+    pub phase_order: String,
+    pub requirements: String,
+    pub missing_proof: Vec<String>,
+    pub forbidden_actions: String,
+    pub alignment: String,
+}
+
+/// Token usage and savings evidence captured from structured execution events.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignTokenSummary {
+    pub consumption: String,
+    pub savings: String,
+    pub evidence: Vec<String>,
 }
 
 /// One layer of the alignment measurement model.
@@ -272,6 +295,8 @@ struct ExecutionLedger {
 #[derive(Clone, Debug)]
 struct ExecutionEvent {
     event: String,
+    phase: Option<String>,
+    requirement: Option<String>,
     command: Option<String>,
     executor: Option<String>,
     through_rote: Option<bool>,
@@ -293,6 +318,17 @@ struct ExecutionEvent {
     fallback_needed: Option<bool>,
     matches_len: Option<usize>,
     id: Option<String>,
+    total_tokens: Option<u64>,
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
+    prompt_tokens: Option<u64>,
+    completion_tokens: Option<u64>,
+    context_tokens: Option<u64>,
+    query_result_tokens: Option<u64>,
+    cached_tokens: Option<u64>,
+    response_tokens_cached: Option<u64>,
+    saved_tokens: Option<u64>,
+    reduction_percent: Option<f64>,
 }
 
 impl ExecutionLedger {
@@ -598,12 +634,159 @@ impl ExecutionLedger {
                 && event.id.as_deref().is_some_and(|value| value == id)
         })
     }
+
+    fn phase_events(&self) -> Vec<&ExecutionEvent> {
+        self.events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event.as_str(),
+                    "phase_started" | "phase_completed" | "phase_blocked"
+                ) && event.phase.is_some()
+            })
+            .collect()
+    }
+
+    fn has_requirement_satisfied(&self, phase: &str, requirement: &str) -> bool {
+        self.events.iter().any(|event| {
+            event.event == "requirement_satisfied"
+                && event.phase.as_deref() == Some(phase)
+                && event.requirement.as_deref() == Some(requirement)
+        })
+    }
+
+    fn has_requirement_failed(&self, phase: &str, requirement: &str) -> bool {
+        self.events.iter().any(|event| {
+            event.event == "requirement_failed"
+                && event.phase.as_deref() == Some(phase)
+                && event.requirement.as_deref() == Some(requirement)
+        })
+    }
+
+    fn forbidden_violation_count(&self) -> usize {
+        self.events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event.as_str(),
+                    "forbidden_action" | "forbidden_action_observed" | "forbid_violated"
+                )
+            })
+            .count()
+    }
+
+    fn token_summary(&self) -> AlignTokenSummary {
+        let token_events = self
+            .events
+            .iter()
+            .filter(|event| event.has_token_fields())
+            .collect::<Vec<_>>();
+        if token_events.is_empty() {
+            return AlignTokenSummary {
+                consumption: "not recorded".to_owned(),
+                savings: "not recorded".to_owned(),
+                evidence: vec![
+                    "add a stats_collected event with token usage and savings fields".to_owned(),
+                ],
+            };
+        }
+
+        let total_tokens = sum_token(&token_events, |event| event.total_tokens).or_else(|| {
+            let input = sum_token(&token_events, |event| {
+                event.input_tokens.or(event.prompt_tokens)
+            });
+            let output = sum_token(&token_events, |event| {
+                event.output_tokens.or(event.completion_tokens)
+            });
+            input.zip(output).map(|(input, output)| input + output)
+        });
+        let input_tokens = sum_token(&token_events, |event| {
+            event.input_tokens.or(event.prompt_tokens)
+        });
+        let output_tokens = sum_token(&token_events, |event| {
+            event.output_tokens.or(event.completion_tokens)
+        });
+        let context_tokens = sum_token(&token_events, |event| event.context_tokens);
+        let query_result_tokens = sum_token(&token_events, |event| event.query_result_tokens);
+        let saved_tokens = sum_token(&token_events, |event| {
+            event
+                .saved_tokens
+                .or(event.cached_tokens)
+                .or(event.response_tokens_cached)
+        });
+        let reduction_percent = token_events
+            .iter()
+            .find_map(|event| event.reduction_percent);
+
+        let consumption = if let Some(total) = total_tokens {
+            let mut parts = vec![format!("total {total} tokens")];
+            if let Some(input) = input_tokens {
+                parts.push(format!("input {input}"));
+            }
+            if let Some(output) = output_tokens {
+                parts.push(format!("output {output}"));
+            }
+            parts.join("; ")
+        } else if let Some(context) = context_tokens {
+            format!("retrieved workspace context {context} tokens")
+        } else if let Some(query_result) = query_result_tokens {
+            format!("query-result data {query_result} tokens recorded")
+        } else {
+            "recorded, but no total/input/output token fields were present".to_owned()
+        };
+
+        let savings = if let (Some(cached), Some(result)) = (
+            sum_token(&token_events, |event| event.response_tokens_cached),
+            query_result_tokens,
+        ) {
+            let saved = cached.saturating_sub(result);
+            match reduction_percent {
+                Some(percent) => format!(
+                    "{saved} tokens saved by query reduction ({cached} cached response tokens reduced to {result} query-result tokens, {percent:.1}% reduction)"
+                ),
+                None => format!(
+                    "{saved} tokens saved by query reduction ({cached} cached response tokens reduced to {result} query-result tokens)"
+                ),
+            }
+        } else {
+            match (saved_tokens, reduction_percent) {
+                (Some(saved), Some(percent)) => {
+                    format!("{saved} tokens saved or cached; {percent:.1}% reduction")
+                }
+                (Some(saved), None) => format!("{saved} tokens saved or cached"),
+                (None, Some(percent)) => format!("{percent:.1}% reduction recorded"),
+                (None, None) => "not recorded".to_owned(),
+            }
+        };
+
+        let evidence = token_events
+            .iter()
+            .map(|event| {
+                let mut label = event.event.clone();
+                if let Some(workspace) = &event.workspace {
+                    label.push_str(&format!(" in workspace {workspace}"));
+                }
+                if let Some(reference) = event.short_ref() {
+                    label.push_str(&format!(" ({reference})"));
+                }
+                label
+            })
+            .collect();
+
+        AlignTokenSummary {
+            consumption,
+            savings,
+            evidence,
+        }
+    }
 }
 
 impl ExecutionEvent {
     fn from_value(value: &serde_json::Value) -> Self {
         Self {
             event: string_field(value, "event").unwrap_or_else(|| "unknown".to_owned()),
+            phase: string_field(value, "phase"),
+            requirement: string_field(value, "requirement"),
             command: command_field(value),
             executor: string_field(value, "executor"),
             through_rote: bool_field(value, "through_rote"),
@@ -628,6 +811,17 @@ impl ExecutionEvent {
                 .and_then(serde_json::Value::as_array)
                 .map(Vec::len),
             id: string_field(value, "id").or_else(|| string_field(value, "obligation_id")),
+            total_tokens: u64_field(value, "total_tokens"),
+            input_tokens: u64_field(value, "input_tokens"),
+            output_tokens: u64_field(value, "output_tokens"),
+            prompt_tokens: u64_field(value, "prompt_tokens"),
+            completion_tokens: u64_field(value, "completion_tokens"),
+            context_tokens: u64_field(value, "context_tokens"),
+            query_result_tokens: u64_field(value, "query_result_tokens"),
+            cached_tokens: u64_field(value, "cached_tokens"),
+            response_tokens_cached: u64_field(value, "response_tokens_cached"),
+            saved_tokens: u64_field(value, "saved_tokens"),
+            reduction_percent: f64_field(value, "reduction_percent"),
         }
     }
 
@@ -652,6 +846,20 @@ impl ExecutionEvent {
             .map(|id| format!("response {id}"))
             .or_else(|| self.lease_id.as_ref().map(|id| format!("lease {id}")))
     }
+
+    fn has_token_fields(&self) -> bool {
+        self.total_tokens.is_some()
+            || self.input_tokens.is_some()
+            || self.output_tokens.is_some()
+            || self.prompt_tokens.is_some()
+            || self.completion_tokens.is_some()
+            || self.context_tokens.is_some()
+            || self.query_result_tokens.is_some()
+            || self.cached_tokens.is_some()
+            || self.response_tokens_cached.is_some()
+            || self.saved_tokens.is_some()
+            || self.reduction_percent.is_some()
+    }
 }
 
 fn string_field(value: &serde_json::Value, key: &str) -> Option<String> {
@@ -667,6 +875,33 @@ fn bool_field(value: &serde_json::Value, key: &str) -> Option<bool> {
 
 fn i64_field(value: &serde_json::Value, key: &str) -> Option<i64> {
     value.get(key).and_then(serde_json::Value::as_i64)
+}
+
+fn u64_field(value: &serde_json::Value, key: &str) -> Option<u64> {
+    value.get(key).and_then(|value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_i64().and_then(|number| u64::try_from(number).ok()))
+    })
+}
+
+fn f64_field(value: &serde_json::Value, key: &str) -> Option<f64> {
+    value.get(key).and_then(serde_json::Value::as_f64)
+}
+
+fn sum_token(
+    events: &[&ExecutionEvent],
+    field: impl Fn(&ExecutionEvent) -> Option<u64>,
+) -> Option<u64> {
+    let mut saw = false;
+    let mut total = 0_u64;
+    for event in events {
+        if let Some(value) = field(event) {
+            saw = true;
+            total = total.saturating_add(value);
+        }
+    }
+    saw.then_some(total)
 }
 
 fn command_field(value: &serde_json::Value) -> Option<String> {
@@ -826,7 +1061,7 @@ pub fn align_decision_trace(
         &checks,
         &obligations,
         &expected_decision,
-        execution_ledger.has_events(),
+        &execution_ledger,
     );
 
     Ok(AlignReport {
@@ -843,13 +1078,24 @@ pub fn align_decision_trace(
     })
 }
 
+pub fn write_report_json(decision_trace: &Path, report: &AlignReport) -> Result<PathBuf> {
+    let path = decision_trace.join("alignment.json");
+    let content = serde_json::to_vec_pretty(report)?;
+    fs::write(&path, content).map_err(|source| Error::Write {
+        path: path.clone(),
+        source,
+    })?;
+    Ok(path)
+}
+
 fn summary_for(
     status: AlignStatus,
     checks: &[AlignCheck],
     obligations: &[AlignObligation],
     decision: &decision::Decision,
-    has_execution_trace: bool,
+    execution_ledger: &ExecutionLedger,
 ) -> AlignSummary {
+    let has_execution_trace = execution_ledger.has_events();
     let decision_checks = status_counts(checks.iter().map(|check| check.status));
     let execution_obligations =
         status_counts(obligations.iter().map(|obligation| obligation.status));
@@ -883,6 +1129,15 @@ fn summary_for(
         has_execution_trace,
     );
     let evidence_gaps = evidence_gaps(checks, obligations);
+    let completion = completion_summary_for(
+        status,
+        decision,
+        &decision_checks,
+        execution_ledger,
+        has_execution_trace,
+        &evidence_gaps,
+    );
+    let tokens = execution_ledger.token_summary();
 
     AlignSummary {
         scope,
@@ -910,6 +1165,197 @@ fn summary_for(
         execution_obligations,
         unproven_obligation_kinds,
         evidence_gaps,
+        completion,
+        tokens,
+    }
+}
+
+fn completion_summary_for(
+    status: AlignStatus,
+    decision: &decision::Decision,
+    decision_checks: &AlignStatusCounts,
+    ledger: &ExecutionLedger,
+    has_execution_trace: bool,
+    evidence_gaps: &[AlignEvidenceGap],
+) -> AlignCompletionSummary {
+    let requirement_summary = requirement_completion_summary(decision, ledger, has_execution_trace);
+    let mut missing_proof = requirement_summary.missing_proof;
+    if missing_proof.is_empty() {
+        missing_proof.extend(evidence_gaps.iter().take(3).map(|gap| {
+            format!(
+                "{} `{}` needs {}",
+                compact_evidence_gap_kind_name(gap.kind),
+                gap.id,
+                gap.needed
+            )
+        }));
+    }
+    if missing_proof.is_empty() {
+        missing_proof.push("none".to_owned());
+    }
+
+    AlignCompletionSummary {
+        decision_replay: compact_layer_status(layer_status(decision_checks)).to_owned(),
+        phase_order: phase_order_summary(decision, ledger, has_execution_trace),
+        requirements: requirement_summary.requirements,
+        missing_proof,
+        forbidden_actions: forbidden_actions_summary(ledger, has_execution_trace),
+        alignment: terminal_alignment_status(status).to_owned(),
+    }
+}
+
+#[derive(Clone, Debug)]
+struct RequirementCompletionSummary {
+    requirements: String,
+    missing_proof: Vec<String>,
+}
+
+fn requirement_completion_summary(
+    decision: &decision::Decision,
+    ledger: &ExecutionLedger,
+    has_execution_trace: bool,
+) -> RequirementCompletionSummary {
+    let requirements = phase_requirements(decision);
+    if requirements.is_empty() {
+        return RequirementCompletionSummary {
+            requirements: "none declared".to_owned(),
+            missing_proof: Vec::new(),
+        };
+    }
+
+    let mut proven = 0_usize;
+    let mut failed = 0_usize;
+    let mut missing = Vec::new();
+    for (phase, requirement) in &requirements {
+        if ledger.has_requirement_satisfied(phase, requirement) {
+            proven += 1;
+        } else if ledger.has_requirement_failed(phase, requirement) {
+            failed += 1;
+            missing.push(format!(
+                "requirement `{requirement}` in phase `{phase}` has a failed progress event"
+            ));
+        } else if has_execution_trace {
+            missing.push(format!(
+                "requirement `{requirement}` in phase `{phase}` has no progress event"
+            ));
+        } else {
+            missing.push(format!(
+                "requirement `{requirement}` in phase `{phase}` was not checked; no execution trace supplied"
+            ));
+        }
+    }
+
+    let requirements = if failed > 0 {
+        format!("{proven}/{} proven, {failed} failed", requirements.len())
+    } else {
+        format!("{proven}/{} proven", requirements.len())
+    };
+
+    RequirementCompletionSummary {
+        requirements,
+        missing_proof: missing,
+    }
+}
+
+fn phase_requirements(decision: &decision::Decision) -> Vec<(String, String)> {
+    decision
+        .execution_plan
+        .as_ref()
+        .map(|plan| {
+            plan.phases
+                .iter()
+                .flat_map(|phase| {
+                    phase
+                        .requires
+                        .iter()
+                        .map(|requirement| (phase.id.clone(), requirement.clone()))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn phase_order_summary(
+    decision: &decision::Decision,
+    ledger: &ExecutionLedger,
+    has_execution_trace: bool,
+) -> String {
+    let expected = decision
+        .execution_plan
+        .as_ref()
+        .map(|plan| {
+            plan.phases
+                .iter()
+                .map(|phase| phase.id.clone())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if expected.is_empty() {
+        return "not applicable".to_owned();
+    }
+    if !has_execution_trace {
+        return "not evaluated".to_owned();
+    }
+    let phase_events = ledger.phase_events();
+    if phase_events.is_empty() {
+        return "partial; no phase progress events recorded".to_owned();
+    }
+
+    let expected_index = expected
+        .iter()
+        .enumerate()
+        .map(|(index, phase)| (phase.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    let mut last_index = None;
+    for event in phase_events {
+        let Some(phase) = event.phase.as_deref() else {
+            continue;
+        };
+        let Some(index) = expected_index.get(phase).copied() else {
+            return format!("fail; unexpected phase `{phase}` recorded");
+        };
+        if last_index.is_some_and(|last| index < last) {
+            return format!("fail; phase `{phase}` was recorded out of order");
+        }
+        last_index = Some(index);
+    }
+    "pass".to_owned()
+}
+
+fn forbidden_actions_summary(ledger: &ExecutionLedger, has_execution_trace: bool) -> String {
+    if !has_execution_trace {
+        return "not checked; no execution trace supplied".to_owned();
+    }
+    let violations = ledger.forbidden_violation_count();
+    if violations == 0 {
+        "no violations recorded".to_owned()
+    } else {
+        format!("{violations} violation event(s) recorded")
+    }
+}
+
+fn compact_layer_status(status: AlignLayerStatus) -> &'static str {
+    match status {
+        AlignLayerStatus::Pass => "pass",
+        AlignLayerStatus::Fail => "fail",
+        AlignLayerStatus::Incomplete => "partial",
+        AlignLayerStatus::NotEvaluated => "not evaluated",
+    }
+}
+
+fn terminal_alignment_status(status: AlignStatus) -> &'static str {
+    match status {
+        AlignStatus::Pass => "pass",
+        AlignStatus::Fail => "fail",
+        AlignStatus::Unproven => "partial",
+    }
+}
+
+fn compact_evidence_gap_kind_name(kind: AlignEvidenceGapKind) -> &'static str {
+    match kind {
+        AlignEvidenceGapKind::DecisionTrace => "decision trace",
+        AlignEvidenceGapKind::ExecutionObligation => "execution obligation",
     }
 }
 

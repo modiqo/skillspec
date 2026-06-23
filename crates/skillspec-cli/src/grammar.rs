@@ -322,6 +322,14 @@ fn grammar_sections() -> Vec<GrammarSection> {
             use_for: "decision traces and execution evidence alignment",
             query_handle: "trace",
         },
+        GrammarSection {
+            name: "tool_boundary",
+            role: "phase-scoped tool and substrate permission boundary",
+            use_for:
+                "default deny, explicit allow lists, forbids, and permission-required surfaces",
+            query_handle:
+                "entry.tool_boundary, route:<id>.tool_boundary, route:<id>.execution_plan",
+        },
     ]
 }
 
@@ -410,9 +418,9 @@ fn prose_mappings() -> Vec<ProseMapping> {
         },
         ProseMapping {
             prose_signal: "tools, scripts, packages, env vars, services, adapters, browser state",
-            skillspec_construct: "dependencies",
+            skillspec_construct: "dependencies, tool_boundary",
             extraction_question:
-                "How can readiness be checked without granting permission to install?",
+                "How can readiness be checked, and which tools or substrates are permitted before asking for permission?",
         },
         ProseMapping {
             prose_signal: "linked guidance that should be loaded only when needed",
@@ -477,8 +485,8 @@ fn import_skill_checklist() -> Vec<ChecklistItem> {
         },
         ChecklistItem {
             id: "commands_deps",
-            prompt: "Declare executable templates and checkable dependencies without pretending install permission exists.",
-            evidence: "commands.requires plus deps check output",
+            prompt: "Declare executable templates, checkable dependencies, and phase tool boundaries without pretending install permission exists.",
+            evidence: "commands.requires, tool_boundary, plus deps check output",
             status_values: &["present", "deferred", "missing", "unsafe"],
         },
         ChecklistItem {
@@ -512,8 +520,9 @@ fn quality_grades() -> Vec<ChecklistItem> {
         },
         ChecklistItem {
             id: "contract_quality.dependencies",
-            prompt: "Grade whether dependencies are checkable and permission-aware.",
-            evidence: "deps check output and provision/permission fields",
+            prompt:
+                "Grade whether dependencies are checkable and tool boundaries are permission-aware.",
+            evidence: "deps check output, tool_boundary, and provision/permission fields",
             status_values: &["strong", "partial", "missing", "unsafe"],
         },
         ChecklistItem {

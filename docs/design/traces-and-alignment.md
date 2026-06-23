@@ -118,6 +118,10 @@ The report includes:
 - execution `obligations`;
 - user-facing `proof_rows`.
 
+`skillspec trace align` writes the full report to `<run_dir>/alignment.json`.
+This keeps the completion summary and token usage with the run artifacts
+instead of leaving them only in terminal output.
+
 `ok` is true when no deterministic check failed. A report can have `ok: true`
 and `status: unproven` when decision replay succeeded but execution proof is
 missing.
@@ -135,6 +139,28 @@ Alignment has three statuses:
 
 This status model prevents false confidence. A traced decision can be perfectly
 reproducible while the actual work remains unproven.
+
+The human completion summary should not stop at a bare `unproven`. For a
+non-failing incomplete report, render `Alignment: partial` and include the
+specific missing proof rows. The compact completion block is:
+
+```text
+alignment_summary:
+  Decision replay: pass
+  Phase order: pass
+  Requirements: 4/5 proven
+  Missing proof: requirement `install_codex` has no progress event
+  Forbidden actions: no violations recorded
+  Alignment: partial
+token_usage:
+  Token consumption: total 1234 tokens
+  Token savings: 3729702 tokens saved by query reduction (4439892 cached response tokens reduced to 710190 query-result tokens, 84.0% reduction)
+```
+
+Token usage must be present even when stats are absent. In that case the values
+are `not recorded`, not omitted. When query-reduction fields are present,
+reported savings are the difference between cached response tokens and extracted
+query-result tokens.
 
 ## Alignment Layers
 
@@ -246,8 +272,9 @@ The final report should include:
 
 - selected route;
 - trace run directory;
-- alignment status;
-- status meaning;
+- compact alignment summary;
+- token consumption and savings, or `not recorded`;
+- alignment status and status meaning;
 - decision replay layer result;
 - execution proof layer result;
 - evidence gaps;

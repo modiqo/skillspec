@@ -163,9 +163,35 @@ skill, but it is not part of route decision.
 ```text
 entry           = "entry" ":" mapping ;
 entry.prompt    = "prompt" ":" string ;
+entry.tool-boundary = tool-boundary ;
 ```
 
 Entry describes the first user-facing question or setup posture.
+
+## Tool Boundaries
+
+```text
+tool-boundary   = "tool_boundary" ":" mapping ;
+tool-boundary.default = "default" ":" ( "deny" | "allow" ) ;
+tool-boundary.allow = "allow" ":" sequence-of string ;
+tool-boundary.forbid = "forbid" ":" sequence-of string ;
+tool-boundary.permission-required-for =
+                  "permission_required_for" ":" sequence-of string ;
+```
+
+Tool boundaries are phase-scoped permission contracts. They may appear at
+`entry.tool_boundary`, `routes[].tool_boundary`, and
+`routes[].execution_plan.phases[].tool_boundary`. `skillspec act` renders an
+effective boundary for every phase by inheriting `entry -> route -> phase`.
+When a spec omits the field, the runtime default is `default: deny` with
+permission required for any unlisted tool, forbidden action, new data source,
+new execution substrate, provider, adapter, CLI, browser mode, API, or skill.
+
+`allow` and `forbid` are strings rather than identifiers because harness tool
+names may contain punctuation or provider-specific names. A boundary does not
+execute enforcement by itself; it gives the harness a concrete pre-tool-call
+checklist. Any action outside the rendered boundary requires explicit user
+permission before use.
 
 ## Routes
 
@@ -175,7 +201,8 @@ route           = "id" ":" route-id ,
                   "label" ":" string ,
                   [ "rank" ":" number ] ,
                   [ "description" ":" string ] ,
-                  [ "checks" ":" sequence-of command-id ] ;
+                  [ "checks" ":" sequence-of command-id ] ,
+                  [ tool-boundary ] ;
 ```
 
 Routes are candidate ways to satisfy work. Lower `rank` means earlier default

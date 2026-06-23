@@ -81,6 +81,8 @@ pub struct ExecutionEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requirement: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<serde_json::Value>,
@@ -98,6 +100,7 @@ pub struct RecordOptions {
     pub event: String,
     pub phase: Option<String>,
     pub requirement: Option<String>,
+    pub id: Option<String>,
     pub status: Option<String>,
     pub evidence_kind: Option<String>,
     pub evidence_ref: Option<String>,
@@ -147,6 +150,7 @@ pub fn record(options: RecordOptions) -> Result<ExecutionEvent> {
         event: options.event,
         phase: options.phase,
         requirement: options.requirement,
+        id: options.id,
         status: options.status,
         evidence,
         source,
@@ -371,8 +375,12 @@ fn append_execution_event(path: &Path, event: &ExecutionEvent) -> Result<()> {
             path: path.to_path_buf(),
             source,
         })?;
-    serde_json::to_writer(&mut file, event)?;
-    writeln!(file)?;
+    let mut row = serde_json::to_vec(event)?;
+    row.push(b'\n');
+    file.write_all(&row).map_err(|source| Error::Write {
+        path: path.to_path_buf(),
+        source,
+    })?;
     Ok(())
 }
 

@@ -42,6 +42,28 @@ entry:
     - import_without_reading_source_skill
     - install_before_dependency_surface_approval
     - claim_unproven_execution_evidence
+  tool_boundary:
+    default: deny
+    allow:
+      - skillspec_cli
+      - skillspec_grammar_commands
+      - local_skill_files
+      - local_repo_files
+      - git
+      - cargo
+      - declared_commands_dependencies_imports_resources
+    forbid:
+      - edit_yaml_from_memory
+      - skip_grammar_sensemake
+      - install_before_dependency_surface_approval
+      - claim_unproven_execution_evidence
+    permission_required_for:
+      - any_unlisted_tool
+      - any_forbidden_action
+      - any_new_data_source
+      - any_new_execution_substrate
+      - any_new_provider_or_adapter
+      - any_external_side_effect
 routes:
   - id: local_skill_port
     label: Port local skill
@@ -62,6 +84,13 @@ routes:
         - id: grammar_preflight
           owner_skill: skillspec-creator
           description: Run the grammar sensemaking and checklist commands before import or YAML editing.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - skillspec_grammar_commands
+              - local_skill_files
+            permission_required_for:
+              - any_grammar_source_outside_embedded_runtime_artifacts
           requires:
             - grammar_sensemake_index
             - grammar_sensemake_porting
@@ -78,6 +107,17 @@ routes:
         - id: semantic_promotion
           owner_skill: skillspec-creator
           description: Fill the coverage matrix and promote routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+              - file_edit_tool
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - any_unlisted_tool
+              - any_new_data_source
+              - install_or_release_side_effect
           requires:
             - fill_coverage_matrix
             - review_and_promote_draft
@@ -85,6 +125,16 @@ routes:
         - id: qa_and_proof
           owner_skill: skillspec-creator
           description: Validate, test, check imports and dependencies, run a demo phase plan/action checklist, record progress evidence, and align the trace.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - cargo
+              - local_repo_files
+              - local_trace_files
+            permission_required_for:
+              - install_or_release_side_effect
+              - network_access
+              - any_unlisted_tool
           requires:
             - run_structural_qa
             - plan_phase_order
@@ -1042,11 +1092,11 @@ closures:
       - decide_demo
       - trace_align
   generate_value_report:
-    description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, context savings, decision trace, alignment, and contract-quality grades.
+    description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
   show_dependency_surface:
     description: Show dependency ids, status, permission sensitivity, and provision choices before compile/install approval.
   report_alignment_status:
-    description: Report trace alignment as pass, unproven, or fail without converting missing execution evidence into a pass.
+    description: Report trace alignment with Decision replay, Phase order, Requirements, Missing proof, Forbidden actions, and Alignment pass/partial/fail instead of a bare unproven label.
   report_degraded_status:
     description: Mark the generated skill draft-only when grammar, imports, deps, validate, test, or compile capability is missing.
   produce_decision_trace:
@@ -1077,7 +1127,7 @@ proof:
     - phase plan and current-phase action checklist produced
     - progress ledger and progress report generated when proving value
     - demo decision trace captured
-    - trace alignment status reported as pass, unproven, or fail
+    - trace alignment summary reported as pass, partial, or fail with missing proof rows
 tests:
   - name: local prose skill ports through grammar-first loop
     input: Port /tmp/my-skill/SKILL.md into SkillSpec
