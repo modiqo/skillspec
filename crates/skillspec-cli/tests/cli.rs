@@ -1181,6 +1181,90 @@ description: Use as the durable execution first-hop for tool-backed requests tha
 }
 
 #[test]
+fn router_install_handles_duplicate_skill_names_across_roots() {
+    let dir = TempDir::new("router-duplicate-names");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let agents_root = home.join(".agents/skills");
+    let codex_root = home.join(".codex/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let manifest = skillspec_home.join("router/visibility-manifest.json");
+
+    write_file(
+        &agents_root.join("rote/SKILL.md"),
+        r#"---
+name: rote
+description: Use rote before tool calls from the shared agents root.
+---
+# Rote
+"#,
+    );
+    write_file(
+        &codex_root.join("rote/SKILL.md"),
+        r#"---
+name: rote
+description: Use rote before tool calls from the Codex root.
+---
+# Rote
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&agents_root)
+        .arg(&codex_root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+    let install_report = json_stdout(&install_router);
+    assert_eq!(install_report["preparedness"]["ready"], true);
+    assert_eq!(install_report["preparedness"]["index_stale"], false);
+    assert_eq!(install_report["preparedness"]["indexed_skills"], 4);
+    assert_eq!(install_report["preparedness"]["discovered_skills"], 4);
+    assert!(skillspec_home.join("router/config.json").is_file());
+
+    let status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&agents_root)
+        .arg(&codex_root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&status);
+    let status_report = json_stdout(&status);
+    assert_eq!(status_report["stale"], false);
+    assert_eq!(status_report["indexed_skills"], 4);
+    assert_eq!(status_report["discovered_skills"], 4);
+    assert!(status_report["new_skills"].as_array().unwrap().is_empty());
+    assert!(status_report["changed_skills"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(status_report["missing_skills"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
 #[cfg(unix)]
 fn router_update_backs_up_and_repairs_all_recorded_router_roots() {
     let dir = TempDir::new("router-update");

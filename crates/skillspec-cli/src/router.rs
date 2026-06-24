@@ -603,6 +603,7 @@ pub(crate) fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Resul
             warnings,
         )?;
     }
+    disambiguate_duplicate_ids(&mut entries);
     entries.sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
     Ok(entries)
 }
@@ -968,6 +969,24 @@ fn entry_id(root: &Path, root_index: usize, skill_path: &Path, name: &str) -> St
     } else {
         format!("root{root_index}-{slug}")
     }
+}
+
+fn disambiguate_duplicate_ids(entries: &mut [SkillEntry]) {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for entry in entries.iter() {
+        *counts.entry(entry.id.clone()).or_default() += 1;
+    }
+    for entry in entries {
+        if counts.get(&entry.id).copied().unwrap_or_default() > 1 {
+            entry.id = format!("{}-{}", entry.id, path_fingerprint(&entry.path));
+        }
+    }
+}
+
+fn path_fingerprint(path: &Path) -> String {
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let hex = format!("{:x}", Sha256::digest(path.to_string_lossy().as_bytes()));
+    hex.chars().take(12).collect()
 }
 
 fn create_schema(conn: &Connection) -> Result<()> {
