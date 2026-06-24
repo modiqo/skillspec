@@ -179,6 +179,25 @@ contract needs. External dependency manifests can describe what another tool
 needs. The spec can connect to those manifests explicitly, but it should not
 hide them as implicit package behavior.
 
+For imported or shareable skills, `deps.toml` is also the dependency provenance
+ledger. It should preserve every dependency mention found in `SKILL.md`,
+referenced docs, helper scripts, fenced code imports, command examples, and
+package manifests. A dependency record should include:
+
+- dependency id and ecosystem;
+- authority such as `source_required`, `source_recommended`,
+  `reference_required`, `script_import`, `example_only`, or `inferred`;
+- source location;
+- local status such as `present`, `missing`, `unknown`, `provisionable`,
+  `deferred`, or `required_but_unproven`;
+- workflows that require it;
+- install risk and proposed provision command;
+- degraded proof impact and any user approval or waiver.
+
+Dependency checks may update local status, but they should not delete records to
+make QA pass. If a required imported dependency is missing and not provisioned
+or explicitly deferred, the skill's final proof is partial or blocked.
+
 ## Supporting Files
 
 Supporting files fall into two categories.

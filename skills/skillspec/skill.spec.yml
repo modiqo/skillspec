@@ -17,6 +17,9 @@ activation:
     - import existing skill
     - port skill
     - local folder or uri
+    - dependency ledger
+    - deps.toml
+    - dependency preservation
     - install router
     - install skill-router
     - update router
@@ -51,6 +54,7 @@ applies_when:
       - port a local skill folder into SkillSpec
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
+      - preserve imported dependency mentions, package authority, install risk, and missing dependency proof gaps
       - install skill-router after SkillSpec is installed
       - install router mode after SkillSpec is installed
       - update or repair an installed skill-router mode
@@ -72,6 +76,9 @@ entry:
     - consult_existing_ports_without_user_request
     - consult_repo_history_without_user_request
     - consult_memory_or_prior_examples_without_user_request
+    - drop_imported_dependency_mentions
+    - work_around_missing_dependency_without_waiver
+    - claim_partial_dependency_proof_as_full
   tool_boundary:
     default: deny
     allow:
@@ -735,6 +742,9 @@ rules:
         - compile
         - deps
         - dependency
+        - dependencies
+        - package
+        - missing package
     route_order:
       - compile_and_install_reviewed_skill
     elicit:
@@ -746,7 +756,33 @@ rules:
     after_success:
       - deps_check_all
       - show_dependency_surface
+      - report_dependency_waiver
     reason: Old prose dependency assumptions must become explicit checks and provision choices before side effects.
+  - id: import_preserves_dependency_ledger
+    when:
+      user_says_any:
+        - import
+        - port
+        - remote skill
+        - public repo
+        - SKILL.md
+        - dependency
+        - dependencies
+        - package
+        - missing package
+        - deps.toml
+    elicit:
+      - approve_dependency_surface
+    forbid:
+      - drop_imported_dependency_mentions
+      - mutate_dependency_set_to_pass_qa
+      - work_around_missing_dependency_without_waiver
+      - claim_partial_dependency_proof_as_full
+    after_success:
+      - preserve_dependency_ledger
+      - show_dependency_surface
+      - report_dependency_waiver
+    reason: Imported skills must preserve source, reference, script, code, command, and package-manifest dependency mentions as package evidence before install or proof.
   - id: install_requires_validated_reviewed_spec
     when:
       user_says_any:
@@ -909,16 +945,19 @@ elicitations:
         description: Use the workspace name provided by the user.
     default: run_task_first
   approve_dependency_surface:
-    question: Do you approve the inferred dependency surface for validation, proof, compile, or install?
+    question: Do you approve the imported dependency ledger and any missing dependency decisions for validation, proof, compile, or install?
     required_when:
       - route: compile_and_install_reviewed_skill
     choices:
       - id: approve_checked_only
         label: Checked dependencies only
-        description: Continue when required dependencies are present or deferred with explicit review notes.
+        description: Continue only when required dependencies are present or explicitly deferred in deps.toml with proof impact recorded.
       - id: draft_only
         label: Keep draft-only
         description: Do not install or release until missing dependencies are resolved.
+      - id: defer_missing_with_waiver
+        label: Defer missing
+        description: Continue with partial proof only after missing dependencies, authority, install risk, and degraded workflows are recorded.
       - id: choose_provision
         label: Provision missing
         description: Ask before running any provision command for a missing tool.
@@ -1064,6 +1103,16 @@ artifacts:
     produced_by:
       - kind: recipe
         id: coverage_review_loop
+  dependency_ledger:
+    kind: file
+    path: deps.toml
+    description: Package-local dependency ledger preserving source authority, package risk, local status, install candidates, required workflows, and degraded proof decisions for every imported dependency mention.
+    produced_by:
+      - kind: recipe
+        id: dependency_preservation_loop
+    consumed_by:
+      - kind: command
+        id: inspect_dependency_ledger
   value_report:
     kind: report
     path: .skillspec/reports/value-report.md
@@ -1287,6 +1336,10 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  inspect_dependency_ledger:
+    description: Inspect the imported skill's package-local dependency ledger; failure means dependency preservation is incomplete.
+    template: sed -n '1,240p' <skill-folder>/deps.toml
+    safety: local_read
   test_spec:
     description: Run scenario tests for route, rule, forbid, elicitation, and closure expectations.
     template: skillspec test <skill-folder>/skill.spec.yml
@@ -1447,6 +1500,21 @@ recipes:
       - note: Use only the current source folder, embedded grammar, draft sensemake, and user-approved references; do not consult existing ports, repo history, memory, or examples unless the user explicitly asks.
       - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
       - produce_artifact: coverage_matrix
+  dependency_preservation_loop:
+    description: Preserve imported dependency mentions as deps.toml package evidence before QA, proof, compile, or install.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - dependency_ledger
+    steps:
+      - load_resource: source_skill_md
+      - note: Extract dependencies from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests; include source authority, package risk, local status, install candidate, required workflows, and degraded proof impact.
+      - produce_artifact: dependency_ledger
+      - run_command: inspect_dependency_ledger
+      - ask: approve_dependency_surface
+      - note: Do not delete or soften dependency records to pass QA. Missing required dependencies must be present in deps.toml as missing, provisionable, deferred, or required_but_unproven with explicit proof impact.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
     ordered: true
@@ -1459,6 +1527,7 @@ recipes:
       artifacts:
         - preserved_source
         - mechanical_draft
+        - dependency_ledger
         - reviewed_spec
         - value_report
     steps:
@@ -1470,6 +1539,11 @@ recipes:
       - run_command: import_skill_draft
       - run_command: sensemake_draft
       - run_command: grammar_checklist_import
+      - load_resource: source_skill_md
+      - note: Before semantic promotion, build deps.toml from all dependency mentions in source prose, references, helper scripts, code imports, command examples, and package manifests. Record authority values such as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - produce_artifact: dependency_ledger
+      - run_command: inspect_dependency_ledger
+      - ask: approve_dependency_surface
       - run_code: review_and_promote_draft
       - note: If source code was found in source prose or sibling files, split durable snippets into resource files and declare matching resources/code entries before QA.
       - produce_artifact: reviewed_spec
@@ -1596,7 +1670,7 @@ code:
     language: text
     kind: validator
     source:
-      inline: "For each source section, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance."
+      inline: "For each source section, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
     provenance:
       resource: source_skill_md
       heading: Creation Procedure
@@ -1678,17 +1752,33 @@ states:
 snippets:
   dependency_surface_shape:
     text: |
-      Inferred dependency surface:
-      - skillspec_cli: required, checkable CLI
-      - git_cli: required only for remote public sources, network-read sensitive
-      - rg_cli: recommended for local inventory
-      - cargo_cli: optional development fallback
-      I will not install, connect, or write into harness roots unless you approve the provision or install option.
+      Imported dependency preservation SOP:
+      - Create deps.toml beside skill.spec.yml for every imported/shareable skill.
+      - Extract dependency mentions from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests.
+      - Record authority as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - Record local_status as present, missing, unknown, provisionable, deferred, or required_but_unproven.
+      - Record package risk, install candidate, required workflows, degraded_without, proof substitution, and user approval or waiver.
+      - Do not mutate the dependency set to make QA pass. Missing required dependencies make proof partial unless installed or explicitly deferred.
+
+      Example:
+      [[dependency]]
+      id = "pypdf"
+      ecosystem = "python"
+      authority = "source_required"
+      source = "SKILL.md:30"
+      reason = "Used for PDF read/write, merge, split, rotate, watermark, and encryption workflows."
+      local_status = "missing"
+      required_for = ["pdf_operations"]
+      degraded_without = true
+      risk = "Third-party Python package; install only with user approval."
+      install = "pip install pypdf"
 closures:
   fill_coverage_matrix:
     description: Record prose_span, obligation, skillspec_construct, confidence, status, and review_note before semantic edits or install.
   split_source_code_into_resources:
     description: When source material contains scripts or code blocks, preserve each durable code surface as a package-local resource file, declare matching resources/code entries with provenance, and reference them from commands, recipes, tests, artifacts, or review notes.
+  preserve_dependency_ledger:
+    description: Create and keep deps.toml beside skill.spec.yml for imported/shareable skills, preserving every dependency mention with authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver.
   produce_mechanical_draft:
     description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
   produce_reviewed_spec:
@@ -1716,7 +1806,9 @@ closures:
   generate_value_report:
     description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
   show_dependency_surface:
-    description: Show dependency ids, status, permission sensitivity, and provision choices before compile/install approval.
+    description: Show dependency ids, source authority, local status, permission sensitivity, install risk, provision choices, missing required dependencies, optional/example dependencies, and degraded proof impact before compile/install/proof approval.
+  report_dependency_waiver:
+    description: If any required dependency is missing, report the missing package, source authority, affected workflows, proof substitution, user approval or waiver, and why final alignment is partial or blocked.
   verify_router_installed:
     description: Report the router install/index status, selected roots, router skill location, and whether a separate router root was avoided.
     commands:
@@ -1921,6 +2013,7 @@ tests:
         - route_remote_sources_to_remote_port
         - route_prompt_import_to_skill_port
         - grammar_preflight_is_mandatory
+        - import_preserves_dependency_ledger
         - dependency_surface_requires_review
         - install_requires_validated_reviewed_spec
         - prove_requests_route_to_value
@@ -1933,6 +2026,31 @@ tests:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
         - consult_existing_ports_without_user_request
+        - drop_imported_dependency_mentions
+        - work_around_missing_dependency_without_waiver
+        - claim_partial_dependency_proof_as_full
+  - name: remote import preserves dependency ledger before proof
+    input: /skillspec import a remote SKILL.md with Python package dependencies, do not install missing packages, and prove it
+    expect:
+      route: remote_skill_port
+      matched_rules:
+        - route_remote_sources_to_remote_port
+        - route_prompt_import_to_skill_port
+        - import_preserves_dependency_ledger
+        - dependency_surface_requires_review
+        - prove_requests_route_to_value
+      elicit:
+        - approve_remote_source_access
+        - approve_dependency_surface
+      after_success:
+        - preserve_dependency_ledger
+        - show_dependency_surface
+        - report_dependency_waiver
+      forbid:
+        - drop_imported_dependency_mentions
+        - mutate_dependency_set_to_pass_qa
+        - work_around_missing_dependency_without_waiver
+        - claim_partial_dependency_proof_as_full
   - name: dependency approval required for install
     input: Port a skill and install it into codex and agents
     expect:
@@ -2040,6 +2158,7 @@ review_required:
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an existing skill or approved source path/URI.
   - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
+  - Mechanical import does not yet generate deps.toml automatically; the prompt import loop must create and review deps.toml before proof, compile, install, or release.
   - The optional Claude compile/install path should be verified in a Claude-compatible harness before release claims.
 metadata:
   source:
@@ -2059,11 +2178,11 @@ metadata:
   extracted_value_targets:
     activation_triggers: 12
     routes: 9
-    rules: 19
+    rules: 20
     dependency_checks: 5
-    command_templates: 42
-    recipes: 9
-    tests: 20
+    command_templates: 43
+    recipes: 10
+    tests: 21
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:
@@ -2088,10 +2207,10 @@ metadata:
       review_note: Runtime grammar artifact is the authoritative teacher.
     - prose_span: Creation Procedure 9-20
       obligation: Extract routes, rules, elicitations, imports, resources, code, artifacts, commands, and dependencies with checks and approvals.
-      skillspec_construct: rules.imports_resources_must_be_connected, rules.dependency_surface_requires_review, dependencies, commands, artifacts, code.review_and_promote_draft
+      skillspec_construct: rules.imports_resources_must_be_connected, rules.dependency_surface_requires_review, rules.import_preserves_dependency_ledger, artifacts.dependency_ledger, recipes.dependency_preservation_loop, dependencies, commands, artifacts, code.review_and_promote_draft
       confidence: high
       status: reviewed
-      review_note: This spec uses one source resource because the original skill has no sibling reference files beyond preserved source.
+      review_note: Imported dependencies must be preserved in deps.toml with authority and risk; missing required packages make proof partial unless provisioned or explicitly deferred.
     - prose_span: Harness Install Targets and Dependency Approval
       obligation: Do not install by default; show dependency surface, dry-run, and ask for install targets.
       skillspec_construct: route.compile_and_install_reviewed_skill, elicitations.approve_dependency_surface, elicitations.approve_install_targets, commands.install_dry_run, commands.install_skill

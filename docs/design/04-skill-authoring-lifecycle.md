@@ -82,6 +82,13 @@ SkillSpec scaffold. It can:
   code blocks, and strong directives;
 - add `review_required` notes.
 
+The importer does not yet create a full dependency ledger. For imported or
+shareable skills, the review pass must create `deps.toml` beside
+`skill.spec.yml` and preserve dependency mentions from `SKILL.md`, referenced
+docs, helper scripts, fenced code imports, command examples, and package
+manifests. Each entry should record source authority, local status, install
+risk, proposed provision command, required workflows, and degraded proof impact.
+
 The importer deliberately does not finish the behavioral contract. The generated
 spec starts with empty `applies_when`, `entry`, `routes`, `rules`, `states`,
 `elicitations`, `trace`, `artifacts`, `recipes`, `closures`, `proof`, and
@@ -104,6 +111,10 @@ review pass should answer these questions:
 - Which command templates need a safety class?
 - Which dependencies were inferred correctly, and which need permission or
   provision choices?
+- Which dependency mentions came from source-required prose, reference prose,
+  helper scripts, code imports, command examples, package manifests, or
+  inference, and are they preserved in `deps.toml` without being deleted to make
+  QA pass?
 - Which Markdown files should be active `imports`, and which should remain
   passive `resources`?
 - Which fenced code blocks are examples, and which are runnable code surfaces?
@@ -111,6 +122,11 @@ review pass should answer these questions:
 - Which behaviors need scenario tests before the skill can be trusted?
 
 The answer to those questions is the real authoring work.
+
+Missing dependencies are not proof shortcuts. If a required imported dependency
+is absent, the reviewed skill must either provision it with user approval or
+record it as missing/deferred/required_but_unproven in `deps.toml`; the final
+proof is partial until that dependency-backed workflow is actually proven.
 
 ## Harness As Author
 
