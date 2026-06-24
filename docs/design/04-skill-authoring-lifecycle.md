@@ -73,7 +73,8 @@ SkillSpec scaffold. It can:
 - extract title and summary material;
 - preserve source documents as `resources` or `imports`;
 - extract shell-like command blocks into `commands`;
-- extract fenced code blocks into `code`;
+- extract fenced code blocks into package-local resource files and `code`
+  entries;
 - infer simple CLI dependencies from command blocks and code languages;
 - attach provenance to imported code blocks;
 - create a `source_summary` snippet;

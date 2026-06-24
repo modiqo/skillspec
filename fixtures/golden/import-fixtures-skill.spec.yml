@@ -35,12 +35,24 @@ resources:
     - kind: snippet
       id: source_summary
     load_when: []
+  skill_code_1_file:
+    path: resources/imported-code/skill_code_1.sh
+    role: script
+    description: Imported fenced code materialized from code block skill_code_1.
+    used_by:
+    - kind: code
+      id: skill_code_1
+    load_when: []
 code:
   skill_code_1:
     language: bash
     kind: runnable_script
     source:
-      inline: rote browse https://example.com --headed
+      file: resources/imported-code/skill_code_1.sh
+      from_resource: skill_code_1_file
+      fence_index: 1
+      heading: Example Browser Skill
+      sha256: null
     provenance:
       resource: skill
       fence_index: 1
@@ -53,6 +65,7 @@ code:
       imports: []
       resources:
       - skill
+      - skill_code_1_file
       artifacts: []
     inputs: []
     outputs: []

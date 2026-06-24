@@ -1,11 +1,11 @@
 ---
 name: skillspec
-description: "SkillSpec post-install setup and skill-authoring multiplexer. Use for skillspec, import existing SKILL.md, port skill, revise existing SkillSpec, update skill.spec.yml, install skill-router, install durable-executor, create a SkillSpec skill from an observed durable execution workspace, skillspec import-skill, skillspec router install, skillspec plan, skillspec act, skillspec progress and phase progress. Use when the task needs to convert a prose SKILL.md to skill.spec.yml, port a local skill folder or public URI into SkillSpec, install the explicit-only router surface, optionally install durable-executor, create a spec skill from durable rote-exec evidence, compile and optionally install a reviewed SkillSpec-backed skill, or run proof and value reporting."
+description: "Multiplex SkillSpec post-install setup: import existing SKILL.md skills from local folders or public URIs, install router mode, optionally install durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, local folder or uri, install router, install skill-router, router mode and install durable-executor. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, import a public GitHub skill into SkillSpec, import an existing prose skill from a local folder or public URI, install skill-router after SkillSpec is installed and install router mode after SkillSpec is installed"
 ---
 
 # SkillSpec
 
-SkillSpec-backed post-install setup and skill-authoring multiplexer for importing prose skills, installing router mode, optionally installing durable-executor, revising existing SkillSpecs, creating specs from durable execution evidence, compiling reviewed skills, optional install, and value reporting.
+SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, installing router mode, optionally installing durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 
 ## Entry Gate
 
@@ -13,7 +13,7 @@ SkillSpec-backed post-install setup and skill-authoring multiplexer for importin
 - Until that plan and checklist are read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
 - The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.
 - After each phase action, record structured progress in `<run_dir>/execution.jsonl` and run `skillspec progress show ./skill.spec.yml --run <run_dir>` before moving to the next phase.
-- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence.
+- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence, consult_existing_ports_without_user_request, consult_repo_history_without_user_request, consult_memory_or_prior_examples_without_user_request.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -36,6 +36,13 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
 9. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.
 10. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
 11. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+
+## Harness Presentation Contract
+
+- When presenting plan, action, progress, command, recipe, or closure steps to a user, show the step `description` as the default visible text. If no description is present, show a humanized id.
+- Keep raw command templates, concrete argv, provider payloads, and low-level tool details collapsed by default in normal progress UI. Reveal them only when the user explicitly expands details, approval is required, a command fails, debug/verbose mode is active, or no usable description exists.
+- For approval prompts, destructive or externally mutating actions, and failure reports, show both the human description and the raw command or payload summary needed for informed approval/debugging.
+- This is presentation-only. Always preserve raw command templates, concrete executed commands, stdout/stderr handles, response ids, and files in trace/evidence/alignment data exactly as required by the active SkillSpec.
 
 ## Authoring And Revision Contract
 
@@ -93,6 +100,8 @@ skillspec sensemake ./skill.spec.yml --view index
 skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>
 skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>
+skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --workspace <rote-workspace> --workspace-stats-report "${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt" --phase <phase-id> --requirement <stats-requirement-id>
+skillspec progress final-response "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings
 skillspec progress show ./skill.spec.yml --run "${PWD}/.skillspec/traces/<run-id>"
 skillspec validate ./skill.spec.yml
 skillspec imports check ./skill.spec.yml
@@ -110,7 +119,7 @@ skillspec trace align ./skill.spec.yml --decision-trace "${PWD}/.skillspec/trace
 
 When reporting completion, always include the selected route, the SkillSpec trace `run_dir`, the persisted `<run_dir>/alignment.json`, and the compact `skillspec trace align` completion summary. Do not report a bare `unproven`; if alignment is incomplete, use `Alignment: partial` plus specific `Missing proof` rows from the align output. Command proof must name only the command basename, never raw args.
 
-Always include token usage. If no stats were recorded, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.
+Always include token usage. For successful rote-backed runs, collect `rote workspace stats <workspace>` into a report file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-report <file> --phase <phase-id> --requirement <stats-requirement-id>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Draft the final response with Result, Evidence, Alignment summary, Token usage, and SkillSpec sections, run `skillspec progress final-response <run_dir> --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings`, then rerun `skillspec trace align` and report that final alignment. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.
 
 Minimum final response shape:
 
@@ -124,6 +133,9 @@ Minimum final response shape:
 
 - `local_skill_port`: Port local skill
 - `remote_skill_port`: Port remote skill
+- `install_skill_router`: Install router mode
+- `install_durable_executor`: Install durable-executor
+- `observed_durable_workspace_to_skill`: Create skill from observed durable workspace
 - `revise_existing_skillspec`: Revise existing SkillSpec
 - `compile_and_install_reviewed_skill`: Compile and install reviewed skill
 - `prove_skill_value`: Prove skill value

@@ -51,11 +51,12 @@ understand all prose. It should:
 1. parse frontmatter
 2. extract headings
 3. extract fenced commands
-4. extract tables
-5. identify always/never/forbid/required language
-6. identify examples and trigger phrases
-7. write a scaffold with `review_required`
+4. materialize fenced code into package-local `resources/imported-code/`
+   files and reference them from `code.source.file`
+5. extract tables
+6. identify always/never/forbid/required language
+7. identify examples and trigger phrases
+8. write a scaffold with `review_required`
 
 An agent-assisted pass may improve the scaffold, but uncertainty must remain
 visible.
-

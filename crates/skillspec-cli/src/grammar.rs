@@ -348,7 +348,7 @@ fn progressive_sequence() -> Vec<CommandStep> {
         CommandStep {
             phase: "create mechanical draft",
             command: "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml",
-            proves: "frontmatter, headings, code fences, imports, deps, and review notes were extracted",
+            proves: "frontmatter, headings, materialized code resources, imports, deps, and review notes were extracted",
         },
         CommandStep {
             phase: "sensemake the draft",
@@ -479,8 +479,8 @@ fn import_skill_checklist() -> Vec<ChecklistItem> {
         },
         ChecklistItem {
             id: "imports_resources",
-            prompt: "Move on-demand guidance into imports and provenance/assets/scripts into resources.",
-            evidence: "package-local import/resource paths with used_by or load=always",
+            prompt: "Move on-demand guidance into imports and provenance/assets/scripts/code files into resources.",
+            evidence: "package-local import/resource paths, code.source.file entries, and used_by or load=always",
             status_values: &["strong", "partial", "orphaned", "missing"],
         },
         ChecklistItem {

@@ -66,6 +66,9 @@ entry:
     - import_without_reading_source_skill
     - install_before_dependency_surface_approval
     - claim_unproven_execution_evidence
+    - consult_existing_ports_without_user_request
+    - consult_repo_history_without_user_request
+    - consult_memory_or_prior_examples_without_user_request
   tool_boundary:
     default: deny
     allow:
@@ -82,6 +85,9 @@ entry:
       - skip_grammar_sensemake
       - install_before_dependency_surface_approval
       - claim_unproven_execution_evidence
+      - consult_existing_ports_without_user_request
+      - consult_repo_history_without_user_request
+      - consult_memory_or_prior_examples_without_user_request
     permission_required_for:
       - any_unlisted_tool
       - any_forbidden_action
@@ -131,7 +137,7 @@ routes:
             - produce_mechanical_draft
         - id: semantic_promotion
           owner_skill: skillspec
-          description: Fill the coverage matrix and promote routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
+          description: Fill the coverage matrix from the current source only, split source code into package-local resources/code entries, and promote routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -145,8 +151,13 @@ routes:
               - install_or_release_side_effect
           requires:
             - fill_coverage_matrix
+            - split_source_code_into_resources
             - review_and_promote_draft
             - produce_reviewed_spec
+          forbid:
+            - consult_existing_ports_without_user_request
+            - consult_repo_history_without_user_request
+            - consult_memory_or_prior_examples_without_user_request
         - id: qa_and_proof
           owner_skill: skillspec
           description: Validate, test, check imports and dependencies, run a demo phase plan/action checklist, record progress evidence, and align the trace.
@@ -556,6 +567,37 @@ rules:
       - sensemake_draft
       - fill_coverage_matrix
     reason: The source prose states the deterministic import command is first-pass scaffolding, not a finished contract.
+  - id: field_import_uses_only_current_source
+    when:
+      user_says_any:
+        - port
+        - import
+        - convert
+        - semantic promotion
+        - coverage matrix
+    forbid:
+      - consult_existing_ports_without_user_request
+      - consult_repo_history_without_user_request
+      - consult_memory_or_prior_examples_without_user_request
+      - infer_from_example_skill_specs
+    after_success:
+      - fill_coverage_matrix
+    reason: Field imports must derive semantics from the staged source, embedded grammar, draft sensemake, and user-approved references only.
+  - id: source_code_becomes_resources_and_code
+    when:
+      user_says_any:
+        - source code
+        - fenced code
+        - code blocks
+        - scripts
+        - source/
+    forbid:
+      - leave_source_code_unreferenced
+      - flatten_source_code_into_prompt_blob
+      - execute_imported_snippets_during_staging
+    after_success:
+      - split_source_code_into_resources
+    reason: Source code found in source material must be preserved as package-local resource files and referenced through resources/code instead of loose prompt prose.
   - id: imports_resources_must_be_connected
     when:
       user_says_any:
@@ -583,7 +625,8 @@ rules:
         - compile
         - deps
         - dependency
-    prefer: compile_and_install_reviewed_skill
+    route_order:
+      - compile_and_install_reviewed_skill
     elicit:
       - approve_dependency_surface
     forbid:
@@ -606,7 +649,8 @@ rules:
         - codex and agents
         - --install
         - install target
-    prefer: compile_and_install_reviewed_skill
+    route_order:
+      - compile_and_install_reviewed_skill
     elicit:
       - approve_install_targets
     forbid:
@@ -630,7 +674,8 @@ rules:
         - skillspec act
         - skillspec progress
         - progress report
-    prefer: prove_skill_value
+    route_order:
+      - prove_skill_value
     after_success:
       - decide_demo
       - trace_align
@@ -1013,7 +1058,7 @@ commands:
       dependencies:
         - rg_cli
   read_source_skill:
-    description: Read the full SKILL.md and directly referenced resources before semantic promotion.
+    description: Read the full SKILL.md and directly referenced resources before semantic promotion; source code blocks and scripts are review material until declared as resources/code.
     template: sed -n '1,999p' <source-skill-folder>/SKILL.md
     safety: local_read
   preserve_source_skill:
@@ -1274,6 +1319,8 @@ recipes:
     steps:
       - load_resource: source_skill_md
       - note: Fill prose_span, obligation, skillspec_construct, confidence, status, and review_note for every source section.
+      - note: Use only the current source folder, embedded grammar, draft sensemake, and user-approved references; do not consult existing ports, repo history, memory, or examples unless the user explicitly asks.
+      - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
       - produce_artifact: coverage_matrix
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
@@ -1299,6 +1346,7 @@ recipes:
       - run_command: sensemake_draft
       - run_command: grammar_checklist_import
       - run_code: review_and_promote_draft
+      - note: If source code was found in source prose or sibling files, split durable snippets into resource files and declare matching resources/code entries before QA.
       - produce_artifact: reviewed_spec
       - run_command: validate_spec
       - run_command: imports_check
@@ -1412,7 +1460,7 @@ code:
     language: text
     kind: validator
     source:
-      inline: "For each source section, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. The mechanical draft is evidence, not authority."
+      inline: "For each source section, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance."
     provenance:
       resource: source_skill_md
       heading: Creation Procedure
@@ -1503,6 +1551,8 @@ snippets:
 closures:
   fill_coverage_matrix:
     description: Record prose_span, obligation, skillspec_construct, confidence, status, and review_note before semantic edits or install.
+  split_source_code_into_resources:
+    description: When source material contains scripts or code blocks, preserve each durable code surface as a package-local resource file, declare matching resources/code entries with provenance, and reference them from commands, recipes, tests, artifacts, or review notes.
   produce_mechanical_draft:
     description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
   produce_reviewed_spec:
@@ -1578,8 +1628,10 @@ proof:
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
     - observed durable workspace synthesis uses named rote workspace stats and logs
+    - field imports do not consult existing ports, repo history, memory, or examples unless the user explicitly asks
     - mechanical draft sensemade before semantic edits
     - coverage matrix completed before install
+    - source code in source material is preserved as package-local resources/code with provenance
     - validate/imports/deps/test pass
     - phase plan and current-phase action checklist produced
     - progress ledger and progress report generated when proving value
@@ -1676,13 +1728,34 @@ tests:
   - name: mechanical draft cannot be installed directly
     input: Run skillspec import-skill and install the result
     expect:
-      route: compile_and_install_reviewed_skill
+      route: local_skill_port
       matched_rules:
         - mechanical_import_is_draft_only
         - install_requires_validated_reviewed_spec
       forbid:
         - treat_mechanical_draft_as_final
         - install_unreviewed_draft
+        - consult_existing_ports_without_user_request
+  - name: compound remote import install proof starts with remote port
+    input: /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf, compile it for Codex, install it, and prove it
+    expect:
+      route: remote_skill_port
+      matched_rules:
+        - route_remote_sources_to_remote_port
+        - route_prompt_import_to_skill_port
+        - grammar_preflight_is_mandatory
+        - dependency_surface_requires_review
+        - install_requires_validated_reviewed_spec
+        - prove_requests_route_to_value
+      elicit:
+        - approve_remote_source_access
+        - choose_candidate_skill
+        - approve_dependency_surface
+        - approve_install_targets
+      forbid:
+        - install_from_remote_checkout
+        - execute_imported_snippets_during_staging
+        - consult_existing_ports_without_user_request
   - name: dependency approval required for install
     input: Port a skill and install it into codex and agents
     expect:
@@ -1745,10 +1818,23 @@ tests:
       route: local_skill_port
       matched_rules:
         - imports_resources_must_be_connected
+        - source_code_becomes_resources_and_code
       forbid:
         - leave_orphaned_imports
         - leave_orphaned_resources
         - flatten_referenced_files_into_prompt_blob
+        - leave_source_code_unreferenced
+  - name: field import does not consult history or examples
+    input: Import a prose SKILL.md into SkillSpec from this staged source
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - field_import_uses_only_current_source
+        - grammar_preflight_is_mandatory
+      forbid:
+        - consult_existing_ports_without_user_request
+        - consult_repo_history_without_user_request
+        - consult_memory_or_prior_examples_without_user_request
   - name: degraded draft blocks release
     input: The CLI has no deps check, but go ahead and release it
     expect:

@@ -3184,6 +3184,16 @@ fn install_skill_supports_dry_run_and_claude_local_install() {
     );
     write_file(&skill.join("deps.toml"), "# dependency manifest\n");
     write_file(
+        &skill.join("source/reference.md"),
+        "# Reference
+",
+    );
+    write_file(
+        &skill.join("resources/helper.py"),
+        "print('helper')
+",
+    );
+    write_file(
         &skill.join("skill.spec.yml"),
         r#"
 schema: skillspec/v0
@@ -3197,6 +3207,27 @@ dependencies:
   deps_toml:
     kind: file
     path: deps.toml
+imports:
+  reference:
+    path: source/reference.md
+    role: reference
+    used_by:
+      - kind: route
+        id: local
+resources:
+  helper_script:
+    path: resources/helper.py
+    role: script
+    used_by:
+      - kind: code
+        id: helper
+code:
+  helper:
+    language: python
+    kind: runnable_script
+    source:
+      file: resources/helper.py
+      from_resource: helper_script
 "#,
     );
 
@@ -3240,6 +3271,12 @@ dependencies:
         .is_file());
     assert!(repo
         .join(".claude/skills/installed-skill/deps.toml")
+        .is_file());
+    assert!(repo
+        .join(".claude/skills/installed-skill/source/reference.md")
+        .is_file());
+    assert!(repo
+        .join(".claude/skills/installed-skill/resources/helper.py")
         .is_file());
 }
 
@@ -3489,6 +3526,10 @@ fn importer_output_matches_golden_snapshot() {
         &root.join("fixtures/golden/import-fixtures-skill.spec.yml"),
         &fs::read_to_string(out).unwrap(),
     );
+    assert!(dir
+        .path()
+        .join("resources/imported-code/skill_code_1.sh")
+        .is_file());
 }
 
 #[test]

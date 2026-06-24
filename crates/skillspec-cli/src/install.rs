@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::model::{DependencyKind, SkillSpec};
+use crate::model::{CodeSource, DependencyKind, SkillSpec};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::env;
@@ -91,7 +91,7 @@ pub fn install_skill(
     };
     validate_skill_folder(skill_folder)?;
     let spec = crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
-    let support_files = declared_relative_file_dependencies(skill_folder, &spec)?;
+    let support_files = declared_package_files(skill_folder, &spec)?;
 
     let target_roots = selected_roots(targets, all_detected)?;
     if target_roots.is_empty() {
@@ -272,11 +272,9 @@ fn copy_file(skill_folder: &Path, install_dir: &Path, file_name: &str) -> Result
     Ok(())
 }
 
-fn declared_relative_file_dependencies(
-    skill_folder: &Path,
-    spec: &SkillSpec,
-) -> Result<BTreeSet<PathBuf>> {
+fn declared_package_files(skill_folder: &Path, spec: &SkillSpec) -> Result<BTreeSet<PathBuf>> {
     let mut paths = BTreeSet::new();
+
     for dependency in spec.dependencies.values() {
         if dependency.kind != DependencyKind::File {
             continue;
@@ -291,36 +289,60 @@ fn declared_relative_file_dependencies(
             continue;
         };
 
-        let relative_path = Path::new(path);
-        if relative_path.is_absolute() {
-            continue;
-        }
-        if relative_path.components().any(|component| {
-            matches!(
-                component,
-                Component::ParentDir | Component::Prefix(_) | Component::RootDir
-            )
-        }) {
-            return Err(Error::InvalidInput {
-                message: format!(
-                    "file dependency path {} must stay within the skill folder",
-                    relative_path.display()
-                ),
-            });
-        }
-
-        if !skill_folder.join(relative_path).is_file() {
-            return Err(Error::InvalidInput {
-                message: format!(
-                    "declared file dependency is missing: {}",
-                    skill_folder.join(relative_path).display()
-                ),
-            });
-        }
-
-        paths.insert(relative_path.to_path_buf());
+        insert_declared_package_file(skill_folder, &mut paths, Path::new(path))?;
     }
+
+    for import in spec.imports.values() {
+        insert_declared_package_file(skill_folder, &mut paths, Path::new(&import.path))?;
+    }
+
+    for resource in spec.resources.values() {
+        insert_declared_package_file(skill_folder, &mut paths, Path::new(&resource.path))?;
+    }
+
+    for code in spec.code.values() {
+        if let CodeSource::File(source) = &code.source {
+            insert_declared_package_file(skill_folder, &mut paths, Path::new(&source.file))?;
+        }
+    }
+
     Ok(paths)
+}
+
+fn insert_declared_package_file(
+    skill_folder: &Path,
+    paths: &mut BTreeSet<PathBuf>,
+    relative_path: &Path,
+) -> Result<()> {
+    let raw_path = relative_path.to_string_lossy();
+    if relative_path.is_absolute() || raw_path.starts_with("~/") || raw_path.contains("://") {
+        return Ok(());
+    }
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    }) {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "declared package file path {} must stay within the skill folder",
+                relative_path.display()
+            ),
+        });
+    }
+
+    if !skill_folder.join(relative_path).is_file() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "declared package file is missing: {}",
+                skill_folder.join(relative_path).display()
+            ),
+        });
+    }
+
+    paths.insert(relative_path.to_path_buf());
+    Ok(())
 }
 
 fn copy_relative_file(skill_folder: &Path, install_dir: &Path, relative_path: &Path) -> Result<()> {

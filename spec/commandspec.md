@@ -554,6 +554,13 @@ Options:
 
 - `--out <OUT>`: output path for the generated `skill.spec.yml` draft.
 
+Notes:
+
+- The generated file is a scaffold for semantic review, not a finished port.
+- Fenced code blocks are materialized under `resources/imported-code/` next to
+  the output draft and referenced from `code.source.file` with resource
+  provenance.
+
 ## `install`
 
 ```text

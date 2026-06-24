@@ -48,4 +48,9 @@ skillspec deps check skill.spec.yml
 skillspec compile skill.spec.yml --target codex-skill > SKILL.md
 ```
 
-The importer is intentionally conservative. It preserves source material, extracts obvious structure, and adds `review_required` notes. A human should then promote the important prose into rules, dependencies, recipes, commands, and tests.
+The importer is intentionally conservative. It preserves source material,
+extracts obvious structure, materializes fenced code into package-local
+resources, and adds `review_required` notes. A human or agent should then
+promote the important prose into rules, dependencies, recipes, commands, and
+tests using only the current source, grammar guidance, and explicit
+user-approved references.

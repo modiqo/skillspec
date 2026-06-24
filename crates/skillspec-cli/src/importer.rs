@@ -1,9 +1,9 @@
 use crate::error::{Error, Result};
 use crate::model::{
-    CodeBlock, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires, CodeSafety, CodeSource,
-    CommandRequires, CommandTemplate, Dependency, DependencyCheck, DependencyKind, Import,
-    ImportLoad, ImportRequires, ImportRole, ImportUse, ImportUseKind, Resource, ResourceRole,
-    ResourceUse, ResourceUseKind, SkillSpec, Snippet,
+    CodeBlock, CodeFileSource, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires,
+    CodeSafety, CodeSource, CommandRequires, CommandTemplate, Dependency, DependencyCheck,
+    DependencyKind, Import, ImportLoad, ImportRequires, ImportRole, ImportUse, ImportUseKind,
+    Resource, ResourceRole, ResourceUse, ResourceUseKind, SkillSpec, Snippet,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -103,7 +103,149 @@ pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
             import.path = relative.display().to_string();
         }
     }
+    materialize_inline_code_resources(&mut spec, out_dir)?;
     Ok(spec)
+}
+
+#[derive(Debug)]
+struct CodeMaterialization {
+    code_id: String,
+    resource_id: String,
+    relative_path: PathBuf,
+    text: String,
+    role: ResourceRole,
+    fence_index: Option<u32>,
+    heading: Option<String>,
+}
+
+fn materialize_inline_code_resources(spec: &mut SkillSpec, out_dir: &Path) -> Result<()> {
+    let materializations = spec
+        .code
+        .iter()
+        .filter_map(|(id, block)| {
+            let CodeSource::Inline(source) = &block.source else {
+                return None;
+            };
+            let extension = code_file_extension(&block.language);
+            let file_name = format!("{}.{}", file_stem(id), extension);
+            let relative_path = PathBuf::from("resources")
+                .join("imported-code")
+                .join(file_name);
+            Some(CodeMaterialization {
+                code_id: id.clone(),
+                resource_id: format!("{id}_file"),
+                relative_path,
+                text: source.inline.clone(),
+                role: code_resource_role(&block.kind),
+                fence_index: block
+                    .provenance
+                    .as_ref()
+                    .and_then(|provenance| provenance.fence_index),
+                heading: block
+                    .provenance
+                    .as_ref()
+                    .and_then(|provenance| provenance.heading.clone()),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    for materialization in materializations {
+        let destination = out_dir.join(&materialization.relative_path);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|source| Error::Write {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+        }
+        fs::write(&destination, &materialization.text).map_err(|source| Error::Write {
+            path: destination,
+            source,
+        })?;
+
+        let file = path_to_spec_string(&materialization.relative_path);
+        spec.resources.insert(
+            materialization.resource_id.clone(),
+            Resource {
+                path: file.clone(),
+                role: materialization.role,
+                description: Some(format!(
+                    "Imported fenced code materialized from code block {}.",
+                    materialization.code_id
+                )),
+                used_by: vec![ResourceUse {
+                    kind: ResourceUseKind::Code,
+                    id: materialization.code_id.clone(),
+                }],
+                load_when: Vec::new(),
+            },
+        );
+
+        if let Some(block) = spec.code.get_mut(&materialization.code_id) {
+            block.source = CodeSource::File(CodeFileSource {
+                file,
+                from_resource: Some(materialization.resource_id.clone()),
+                fence_index: materialization.fence_index,
+                heading: materialization.heading,
+                sha256: None,
+            });
+            if !block
+                .requires
+                .resources
+                .iter()
+                .any(|id| id == &materialization.resource_id)
+            {
+                block
+                    .requires
+                    .resources
+                    .push(materialization.resource_id.clone());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn code_resource_role(kind: &CodeKind) -> ResourceRole {
+    match kind {
+        CodeKind::RunnableScript | CodeKind::Probe | CodeKind::Transform | CodeKind::Validator => {
+            ResourceRole::Script
+        }
+        CodeKind::Example | CodeKind::Troubleshooting | CodeKind::Reference => {
+            ResourceRole::Example
+        }
+    }
+}
+
+fn code_file_extension(language: &str) -> &'static str {
+    match language.trim().to_ascii_lowercase().as_str() {
+        "bash" | "sh" | "shell" | "zsh" => "sh",
+        "python" | "py" => "py",
+        "javascript" | "js" => "js",
+        "typescript" | "ts" => "ts",
+        "json" => "json",
+        "yaml" | "yml" => "yml",
+        "markdown" | "md" => "md",
+        _ => "txt",
+    }
+}
+
+fn file_stem(id: &str) -> String {
+    id.chars()
+        .map(|char| {
+            if char.is_ascii_alphanumeric() || matches!(char, '-' | '_') {
+                char
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn path_to_spec_string(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 fn source_root(path: &Path) -> PathBuf {
