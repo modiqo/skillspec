@@ -59,6 +59,18 @@ SkillSpec-backed skills.
 | `skillspec install targets` | none | Lists detected harness skill roots, such as Codex, Agents, or Claude local skill directories. | `skillspec install targets` |
 | `skillspec install skill` | `<folder>`, `--target agents,codex,claude-local`, `--all-detected`, `--dry-run`, `--name <name>`, `--force` | Installs a generated skill folder containing `SKILL.md`, `skill.spec.yml`, and declared package-local files from imports, resources, code sources, and file dependencies into one or more detected harness roots. Use `--dry-run` before writing. | `skillspec install skill examples/pdf --target agents --target codex --dry-run` |
 
+## Durable Executor Lifecycle Commands
+
+These commands manage the optional SkillSpec-owned durable first-hop skill. They
+are separate from ordinary `install skill` so update and delete can operate only
+on recorded, managed durable-executor installs.
+
+| Command | Args And Options | Explanation | Example |
+| --- | --- | --- | --- |
+| `skillspec durable-executor install` | `<source-folder>`, `--target agents,codex,claude-local`, `--all-detected`, `--dry-run`, `--force`, `--json` | Installs durable-executor from an explicit local source folder, writes a managed marker, records source and install dirs under `~/.skillspec/durable-executor/config.json`, and refreshes router visibility/index when router mode is configured. | `skillspec durable-executor install examples/durable-executor --target agents --json` |
+| `skillspec durable-executor update` | `--source <source-folder>`, `--backup-dir <path>`, `--dry-run`, `--json` | Backs up durable config and every recorded managed durable-executor folder, rewrites marker-protected folders from the recorded source or `--source`, refreshes router state when configured, and warns to restart active harness sessions. It refuses an existing unmarked folder. | `skillspec durable-executor update --json` |
+| `skillspec durable-executor delete` | `--dry-run`, `--json`; alias: `uninstall` | Deletes only recorded durable-executor folders that contain the managed marker, removes durable config, and refreshes router state when configured. It refuses unmarked folders. | `skillspec durable-executor delete --json` |
+
 ## Skill Router Commands
 
 These commands support large skill catalogs without putting every skill
@@ -77,7 +89,7 @@ description into the model context.
 | `skillspec visibility restore` | `--manifest <path>`, `--dry-run`, `--json` | Restores exact file snapshots from a visibility manifest. It does not infer previous state. | `skillspec visibility restore --manifest ~/.skillspec/router/visibility-manifest.json --json` |
 | `skillspec router install` | `--roots <path>...`, `--index <index-file-or-router-dir>`, `--manifest <path>`, `--router-name <name>`, `--dry-run`, `--json` | Installs the explicit-only SkillSpec-backed `skill-router` skill into every configured root, applies router-managed visibility to make indexed skills explicit-only except an already-installed `durable-executor`, builds the index, checks post-index preparedness, reports whether durable first-hop is available, and writes router config with all managed router skill directories for future hooks. Directory paths resolve to `skill-index.sqlite`. | `skillspec router install --roots ~/.agents/skills --index ~/.skillspec/router --json` |
 | `skillspec router update` | `--backup-dir <path>`, `--dry-run`, `--json` | Reads the existing router config, backs up config, manifest, index, and managed router skill directories, rewrites the SkillSpec-backed router package in every recorded harness root, reapplies router-managed visibility, rebuilds the index, checks preparedness, and warns that active harness sessions should be restarted. | `skillspec router update --json` |
-| `skillspec router uninstall` | `--manifest <path>`, `--index <index-file-or-router-dir>`, `--keep-index`, `--dry-run`, `--json` | Restores visibility from the manifest, removes every managed router skill marker directory recorded by router config, removes config, and optionally removes the index. Directory paths resolve to `skill-index.sqlite`. | `skillspec router uninstall --json` |
+| `skillspec router uninstall` | `--manifest <path>`, `--index <index-file-or-router-dir>`, `--keep-index`, `--dry-run`, `--json`; alias: `delete` | Restores visibility from the manifest, removes every managed router skill marker directory recorded by router config, removes config, and optionally removes the index. Directory paths resolve to `skill-index.sqlite`. | `skillspec router uninstall --json` |
 | `skillspec router index refresh` | `--roots <path>...`, `--index <index-file-or-router-dir>`, `--visibility-manifest <path>`, `--json` | Repairs router-managed state after skill additions, removals, or metadata changes. When router config is present, it first reapplies explicit-only native controls across roots while preserving an installed `durable-executor` as implicit, then rebuilds the index and reports preparedness plus pre-refresh advice. Directory paths resolve to `skill-index.sqlite`. | `skillspec router index refresh --roots ~/.agents/skills --index ~/.skillspec/router --visibility-manifest ~/.skillspec/router/visibility-manifest.json` |
 | `skillspec router index status` | `--roots <path>...`, `--index <index-file-or-router-dir>`, `--visibility-manifest <path>`, `--json` | Compares the index against current roots and reports new, changed, missing, stale, and updated-at state. New and changed entries include whether they are prose-only or SkillSpec-backed; prose-only entries include `skillspec import-skill` conversion advice. Directory paths resolve to `skill-index.sqlite`. | `skillspec router index status --roots ~/.agents/skills --index ~/.skillspec/router --json` |
 
@@ -129,7 +141,7 @@ The command surface has three layers:
   `imports`, `deps`, `compile`, `import-skill`, and `install`.
 - Large skill discovery: `index`, `route`, `skills`, `visibility`, and
   `router`.
-- Local durable bootstrap: `capability`.
+- Durable lifecycle and bootstrap: `durable-executor` and `capability`.
 
 The CLI does not execute arbitrary task work. It renders contracts, validates
 them, records progress evidence, and aligns traces. The surrounding harness
@@ -147,6 +159,7 @@ This doc is grounded in:
 - `spec/commandspec.md`, which is the reference command inventory;
 - `crates/skillspec-cli/src/act.rs`, `progress.rs`, `align.rs`, `grammar.rs`,
   `deps.rs`, `imports.rs`, `compiler.rs`, `importer.rs`, `install.rs`,
-  `router.rs`, `visibility.rs`, `router_lifecycle.rs`, and `capability.rs`,
+  `router.rs`, `visibility.rs`, `router_lifecycle.rs`,
+  `durable_lifecycle.rs`, and `capability.rs`,
   which implement the listed command behavior;
 - `skillspec --help` and subcommand help output from the current local binary.

@@ -4,6 +4,7 @@ mod capability;
 mod compiler;
 mod decision;
 mod deps;
+mod durable_lifecycle;
 mod error;
 mod grammar;
 mod import_dependency_ledger;
@@ -280,6 +281,11 @@ enum Command {
         #[command(subcommand)]
         command: RouterCommand,
     },
+    #[command(about = "Install, update, or delete the optional durable-executor first-hop skill")]
+    DurableExecutor {
+        #[command(subcommand)]
+        command: DurableExecutorCommand,
+    },
     #[command(about = "Detect harness roots and install SkillSpec-backed skills")]
     Install {
         #[command(subcommand)]
@@ -504,7 +510,10 @@ enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Restore visibility and remove the managed skill-router")]
+    #[command(
+        about = "Restore visibility and remove the managed skill-router",
+        alias = "delete"
+    )]
     Uninstall {
         /// Reversible visibility manifest path. Defaults from router config.
         #[arg(long)]
@@ -543,6 +552,57 @@ enum RouterCommand {
     Index {
         #[command(subcommand)]
         command: RouterIndexCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DurableExecutorCommand {
+    #[command(about = "Install durable-executor from an explicit local source folder")]
+    Install {
+        /// Local durable-executor skill folder containing SKILL.md and skill.spec.yml.
+        source: PathBuf,
+        /// Harness target to install into. Repeat for multiple targets.
+        #[arg(long, value_enum)]
+        target: Vec<InstallTargetArg>,
+        /// Install into every harness root detected on this machine.
+        #[arg(long)]
+        all_detected: bool,
+        /// Show the install plan without writing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Overwrite an existing durable-executor folder without prompting.
+        #[arg(long)]
+        force: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Back up and refresh every managed durable-executor install")]
+    Update {
+        /// Override the source folder recorded at install time.
+        #[arg(long)]
+        source: Option<PathBuf>,
+        /// Backup directory to create before mutation. Defaults under the durable-executor config directory.
+        #[arg(long)]
+        backup_dir: Option<PathBuf>,
+        /// Show changes without writing files or backups.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Delete every managed durable-executor install",
+        alias = "uninstall"
+    )]
+    Delete {
+        /// Show changes without removing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1748,6 +1808,60 @@ fn run() -> Result<()> {
                     }
                 }
             },
+        },
+        Command::DurableExecutor { command } => match command {
+            DurableExecutorCommand::Install {
+                source,
+                target,
+                all_detected,
+                dry_run,
+                force,
+                json,
+            } => {
+                let targets = target
+                    .into_iter()
+                    .map(HarnessTarget::from)
+                    .collect::<Vec<_>>();
+                let report =
+                    durable_lifecycle::install(durable_lifecycle::DurableInstallOptions {
+                        source,
+                        targets,
+                        all_detected,
+                        dry_run,
+                        force,
+                    })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&durable_lifecycle::render_install(&report))?;
+                }
+            }
+            DurableExecutorCommand::Update {
+                source,
+                backup_dir,
+                dry_run,
+                json,
+            } => {
+                let report = durable_lifecycle::update(durable_lifecycle::DurableUpdateOptions {
+                    source,
+                    backup_dir,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&durable_lifecycle::render_update(&report))?;
+                }
+            }
+            DurableExecutorCommand::Delete { dry_run, json } => {
+                let report =
+                    durable_lifecycle::delete(durable_lifecycle::DurableDeleteOptions { dry_run })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&durable_lifecycle::render_delete(&report))?;
+                }
+            }
         },
         Command::Install { command } => match command {
             InstallCommand::Targets => {

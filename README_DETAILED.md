@@ -492,7 +492,6 @@ examples/   complete SkillSpec examples
 conformance/ valid and invalid fixtures for CLI conformance behavior
 skills/     official SkillSpec-backed skills for authoring specs
 .claude/    repo-local SkillSpec-backed skills for this repository
-generators/ compiler target notes for Codex, Claude, Markdown
 crates/     reference Rust CLI
 fixtures/   sample skills and expected outputs
 ```

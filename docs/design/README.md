@@ -51,6 +51,22 @@ directory listings.
 | 17 | [Design Documentation QA Process](17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |
 | 18 | [Source Map Progressive Reader](18-source-map-progressive-reader.md) | How `skillspec source map/query/coverage/stale` lets imports navigate large Markdown skill sources by exact handles before `import-skill --source-map`. |
 
+## Visual Explainers
+
+The [explained](explained/README.md) subdirectory is the companion visual layer.
+It is intentionally separate from the numbered design-doc sequence: each file is
+a small diagram-first explainer that points back to the deeper design docs.
+
+Read these when introducing SkillSpec to someone who needs the system shape
+before the full contract detail:
+
+| Order | Explainer | Purpose |
+| --- | --- | --- |
+| 01 | [Import To Release](explained/01-import-to-release.md) | Source map, scaffold, progressive authoring, QA, compile, and release gates. |
+| 02 | [Runtime Trampoline And Alignment](explained/02-runtime-trampoline-and-alignment.md) | Thin loader, `plan`, `act`, OODA loop, progress ledger, and alignment. |
+| 03 | [Router Mode](explained/03-router-mode.md) | Explicit-only skill catalog, router index, out-of-band repair, and router lifecycle. |
+| 04 | [Durable Executor](explained/04-durable-executor.md) | Durable first-hop execution, capability seeds, handoffs, workspace evidence, synthesis, and durable lifecycle. |
+
 ## Evidence Map
 
 Every design claim should be grounded in one or more of these sources:

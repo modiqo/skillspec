@@ -1,6 +1,6 @@
 ---
 name: skillspec
-description: Use as the SkillSpec post-install setup and skill-authoring multiplexer: import an existing prose SKILL.md from a local folder or public URI, install router mode, optionally install durable-executor, create a SkillSpec skill from an observed durable rote workspace, revise an existing SkillSpec, prove value, compile, and optionally install.
+description: Use as the SkillSpec post-install setup and skill-authoring multiplexer: import an existing prose SKILL.md from a local folder or public URI, install router mode, install/update/delete durable-executor, create a SkillSpec skill from an observed durable rote workspace, revise an existing SkillSpec, prove value, compile, and optionally install.
 ---
 
 # skillspec
@@ -13,7 +13,7 @@ The main modes are:
 
 - import an existing prose `SKILL.md` from a local folder or public URI
 - install or refresh router mode
-- optionally install durable-executor from an existing skill or approved source
+- install, update, or delete durable-executor from a managed lifecycle
 - create a SkillSpec skill from an observed durable rote workspace
 - revise an existing `skill.spec.yml`
 - prove value, compile, and optionally install a reviewed SkillSpec-backed skill
@@ -26,7 +26,9 @@ Use `/skillspec` as the prompt-level setup surface:
 /skillspec import /Users/me/.agents/skills/durable-executor
 /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf
 /skillspec install router
-/skillspec install durable-executor from /path/or/public-uri
+/skillspec install durable-executor from /path/to/durable-executor
+/skillspec update durable-executor
+/skillspec delete durable-executor
 /skillspec observe durable workspace <workspace> and create a spec skill
 ```
 
@@ -34,9 +36,12 @@ Router install must write the visible router skill into the selected roots and
 must not require a separate router root. In router mode, durable-executor is the
 managed implicit exception when present.
 
-durable-executor is optional. If it is already present in the selected roots,
-verify it and keep it implicit. If it is missing, ask for a source path or URI,
-or report that durable first-hop is unavailable.
+durable-executor is optional. Install it only from an explicit local source
+folder using `skillspec durable-executor install`. Updates and deletes must use
+`skillspec durable-executor update` and `skillspec durable-executor delete` so
+managed markers, recorded install dirs, backups, router refreshes, and harness
+restart warnings stay consistent. If durable-executor is missing and no source
+is supplied, report that durable first-hop is unavailable.
 
 Observed-workspace skill creation starts from a named rote workspace. Inspect
 workspace stats, command logs, metadata, files, outputs, dependencies, errors,

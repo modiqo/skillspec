@@ -32,7 +32,10 @@ skillspec router install --roots <skill-root>... --index <index-file-or-router-d
 skillspec router update [--backup-dir <backup-dir>]
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
-skillspec router uninstall
+skillspec router uninstall # alias: delete
+skillspec durable-executor install <source-folder> --target <target>
+skillspec durable-executor update [--source <source-folder>] [--backup-dir <backup-dir>]
+skillspec durable-executor delete # alias: uninstall
 ```
 
 `skillspec router install` writes:
@@ -68,6 +71,17 @@ implicit first-hop. If it is missing, router install still succeeds and reports
 that durable first-hop execution is unavailable until durable-executor is
 installed separately.
 
+`durable-executor` has its own managed lifecycle. `skillspec durable-executor
+install <source-folder>` installs from an explicit local source, records the
+source and every managed install directory under
+`SKILLSPEC_HOME/durable-executor/config.json`, and writes a managed marker into
+each installed folder. `skillspec durable-executor update` backs up that config
+and every recorded folder before rewriting marker-protected folders from the
+recorded source or `--source`; it refuses an existing unmarked folder.
+`skillspec durable-executor delete` removes only recorded folders that contain
+the durable managed marker. If router mode is configured, durable install,
+update, and delete refresh router-managed visibility and the index.
+
 This differs from the original proposal where the router itself was the visible
 implicit skill. In the implemented mode, `durable-executor` remains the implicit
 first-hop for tool-backed work and can call `skillspec route` as a discovery
@@ -76,6 +90,11 @@ primitive before handing off domain work.
 When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a
 successful install, then performs the same preparedness check.
+
+Ordinary `skillspec install skill` is for domain skills. It is not the cleanup
+surface for SkillSpec-owned router or durable-executor installs; use the
+specific lifecycle commands so recorded roots, managed markers, backups, router
+refresh, and restart warnings stay consistent.
 
 `skillspec router update` is for maintenance of an existing router install. It
 starts from `SKILLSPEC_HOME/router/config.json`, backs up the config, manifest,

@@ -3,7 +3,8 @@
 This runbook verifies the post-install `skillspec` prompt skill in both Codex
 and Claude. The prompt skill is the user-facing multiplexer: users invoke
 `/skillspec ...` in the harness, and the skill routes setup work to import,
-router install, optional durable-executor install, rote-browse import/install,
+router install/update/delete, optional durable-executor install/update/delete,
+rote-browse import/install,
 or observed-workspace skill creation.
 
 The multiplexer is not a separate `skillspec multiplexer` CLI subcommand. The
@@ -17,7 +18,11 @@ Expected prompt forms:
 ```text
 /skillspec import <local-skill-folder-or-public-github-uri>
 /skillspec install router
-/skillspec install durable-executor from <local-skill-folder-or-public-github-uri>
+/skillspec update router
+/skillspec delete router
+/skillspec install durable-executor from <local-skill-folder>
+/skillspec update durable-executor
+/skillspec delete durable-executor
 /skillspec import <rote-browse-source>, compile it, and install it
 /skillspec observe durable workspace <workspace> and create a spec skill
 ```
@@ -153,11 +158,15 @@ Prompt:
 
 Expected result:
 
-- If `durable-executor` is already present, the skill reports it and keeps it
-  implicit.
-- If it is missing, the skill asks for or uses the approved source path or URI.
-- The install path follows the same reviewed import, validate, test, compile,
-  and install loop as other skills.
+- The install path uses `skillspec durable-executor install <source-folder>`.
+- The command records managed install directories under
+  `~/.skillspec/durable-executor/config.json`.
+- If router mode is already configured, the router index refreshes and
+  `durable-executor` remains implicit.
+- `skillspec durable-executor update` creates a backup and rewrites recorded
+  marker-protected managed installs.
+- `skillspec durable-executor delete` removes only marker-protected managed
+  installs.
 
 ### 3. Install Rote Browse
 
@@ -252,6 +261,7 @@ the prompt asks for it:
 ```text
 /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf, compile it for Claude, install it, and prove it
 /skillspec install durable-executor from /path/to/durable-executor
+/skillspec update durable-executor
 /skillspec import /path/to/rote-browse, compile it for Claude, install it, and prove it
 /skillspec install router
 ```

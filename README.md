@@ -252,7 +252,8 @@ when the harness discovery path is known.
 This README is the fast path.
 
 - [Detailed README](README_DETAILED.md)
-- [Docs index](docs/README.md)
+- [Docs index and reader paths](docs/README.md)
+- [The Reliability Gap In Agent Skills](docs/00-skills-reliability-gap.md)
 - [Design docs](docs/design/README.md)
 - [Why SkillSpec](docs/01-why-skillspec.md)
 - [Grammar](spec/grammar.md)

@@ -45,6 +45,32 @@ fn write_file(path: &Path, content: &str) {
     fs::write(path, content).unwrap();
 }
 
+fn write_durable_source(path: &Path, description_suffix: &str) {
+    write_file(
+        &path.join("SKILL.md"),
+        &format!(
+            r#"---
+name: durable-executor
+description: Use as the durable execution first-hop for tool-backed requests that need trace, evidence, and alignment. {description_suffix}
+---
+# Durable Executor
+"#
+        ),
+    );
+    write_file(
+        &path.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: durable.executor
+title: Durable Executor
+description: Durable executor fixture.
+routes:
+  - id: durable
+    label: Durable
+"#,
+    );
+}
+
 #[cfg(unix)]
 fn write_executable(path: &Path, content: &str) {
     write_file(path, content);
@@ -392,6 +418,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
     assert!(stdout(&top).contains("router"));
+    assert!(stdout(&top).contains("durable-executor"));
     assert!(stdout(&top).contains("synthesize-from-workspace"));
 
     let trace = Command::new(bin())
@@ -455,6 +482,25 @@ fn help_lists_trace_align_arguments() {
     let import_help = stdout(&import_skill);
     assert!(import_help.contains("--source-map"));
     assert!(import_help.contains("source-map.json"));
+
+    let durable = Command::new(bin())
+        .arg("durable-executor")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&durable);
+    let durable_help = stdout(&durable);
+    assert!(durable_help.contains("install"));
+    assert!(durable_help.contains("update"));
+    assert!(durable_help.contains("delete"));
+
+    let router = Command::new(bin())
+        .arg("router")
+        .arg("delete")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&router);
 }
 
 #[test]
@@ -1453,6 +1499,176 @@ description: Use when extracting PDF text, tables, and images.
         .unwrap()
         .contains("disable-model-invocation: true"));
     assert!(!root.join("durable-executor").exists());
+}
+
+#[test]
+fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
+    let dir = TempDir::new("durable-lifecycle");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let source = dir.path().join("source");
+    write_durable_source(&source, "initial");
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+    let install_report = json_stdout(&install);
+    assert_eq!(install_report["skill_name"], "durable-executor");
+    assert_eq!(install_report["managed_installs"][0]["status"], "installed");
+    assert!(root.join("durable-executor/SKILL.md").is_file());
+    assert!(root
+        .join("durable-executor/.skillspec-durable-executor-managed")
+        .is_file());
+    assert!(skillspec_home
+        .join("durable-executor/config.json")
+        .is_file());
+
+    fs::remove_file(root.join("durable-executor/.skillspec-durable-executor-managed")).unwrap();
+    let unsafe_update = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("update")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&unsafe_update);
+    assert!(stderr(&unsafe_update).contains("managed marker"));
+    write_file(
+        &root.join("durable-executor/.skillspec-durable-executor-managed"),
+        "schema: skillspec/durable-executor-managed/v1\n",
+    );
+
+    write_durable_source(&source, "updated");
+    let update = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("update")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&update);
+    let update_report = json_stdout(&update);
+    assert_eq!(update_report["managed_installs"][0]["status"], "updated");
+    assert!(update_report["backup"]["path"].as_str().is_some());
+    assert!(fs::read_to_string(root.join("durable-executor/SKILL.md"))
+        .unwrap()
+        .contains("updated"));
+    assert!(root
+        .join("durable-executor/.skillspec-durable-executor-managed")
+        .is_file());
+
+    fs::remove_file(root.join("durable-executor/.skillspec-durable-executor-managed")).unwrap();
+    let unsafe_delete = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("delete")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&unsafe_delete);
+    assert!(stderr(&unsafe_delete).contains("managed marker"));
+    assert!(root.join("durable-executor").exists());
+
+    write_file(
+        &root.join("durable-executor/.skillspec-durable-executor-managed"),
+        "schema: skillspec/durable-executor-managed/v1\n",
+    );
+    let delete = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("delete")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&delete);
+    let delete_report = json_stdout(&delete);
+    assert_eq!(delete_report["managed_installs"][0]["status"], "removed");
+    assert_eq!(delete_report["config_removed"], true);
+    assert!(!root.join("durable-executor").exists());
+    assert!(!skillspec_home.join("durable-executor/config.json").exists());
+}
+
+#[test]
+fn durable_executor_install_refreshes_router_and_remains_implicit() {
+    let dir = TempDir::new("durable-router-hook");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let source = dir.path().join("durable-source");
+    write_durable_source(&source, "router hook");
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images.
+---
+# PDF
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+
+    let install_durable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_durable);
+    let durable_report = json_stdout(&install_durable);
+    assert!(durable_report["router_hook"].is_object());
+    assert!(root.join("durable-executor/SKILL.md").is_file());
+    assert!(!root.join("durable-executor/agents/openai.yaml").exists());
+
+    let status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&status);
+    let status_report = json_stdout(&status);
+    assert_eq!(status_report["stale"], false);
+    assert_eq!(status_report["indexed_skills"], 3);
 }
 
 #[test]

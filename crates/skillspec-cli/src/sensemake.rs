@@ -426,6 +426,24 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_durable_lifecycle(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "install durable-executor lifecycle",
+                command:
+                    "skillspec durable-executor install <source-folder> --target <target> --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "update durable-executor lifecycle",
+                command: "skillspec durable-executor update --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "delete durable-executor lifecycle",
+                command: "skillspec durable-executor delete --json".to_owned(),
+            },
+        ]);
+    }
     if has_source_import(spec) {
         hints.extend([
             NavigationHint {
@@ -474,6 +492,16 @@ fn has_rote_workspace_synthesis(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("synthesize-from-workspace"))
+}
+
+fn has_durable_lifecycle(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("durable_install")
+        || spec.commands.contains_key("durable_update")
+        || spec.commands.contains_key("durable_delete")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("durable-executor"))
 }
 
 fn has_source_import(spec: &SkillSpec) -> bool {

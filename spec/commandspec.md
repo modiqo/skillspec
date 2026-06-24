@@ -43,6 +43,7 @@ skillspec <COMMAND>
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
 | `visibility <COMMAND>` | Plan, apply, or restore harness-native skill visibility controls. |
 | `router <COMMAND>` | Install, uninstall, refresh, or inspect the optional skill router. |
+| `durable-executor <COMMAND>` | Install, update, or delete the optional durable first-hop skill. |
 | `install <COMMAND>` | Detect harness roots and install SkillSpec-backed skills. |
 | `capability <COMMAND>` | Manage local capability seeds for durable bootstrap. |
 
@@ -822,7 +823,7 @@ Subcommands:
 
 - `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
 - `update [--backup-dir <path>] [--dry-run] [--json]`
-- `uninstall [--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
+- `uninstall` or `delete` `[--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
 - `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 - `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 
@@ -860,6 +861,39 @@ installed `durable-executor` as the implicit exception, rebuilds the index, and
 runs the preparedness check. SkillSpec-backed additions are indexed directly;
 prose-only additions are also made explicit-only and indexed, with conversion
 advice retained in the report.
+
+## `durable-executor`
+
+```text
+skillspec durable-executor <COMMAND>
+```
+
+Subcommands:
+
+- `install <source-folder> [--target <target>...] [--all-detected] [--dry-run] [--force] [--json]`
+- `update [--source <source-folder>] [--backup-dir <path>] [--dry-run] [--json]`
+- `delete` or `uninstall` `[--dry-run] [--json]`
+
+`durable-executor install` installs the optional first-hop skill from an
+explicit local source folder. The source must contain `SKILL.md` with
+`name: durable-executor` plus `skill.spec.yml`. The command installs the package
+as `durable-executor`, writes a managed marker into each installed folder, and
+records source plus managed install directories under
+`SKILLSPEC_HOME/durable-executor/config.json`, or
+`~/.skillspec/durable-executor/config.json` when `SKILLSPEC_HOME` is not set. If
+router mode is configured, install refreshes router-managed visibility and the
+router index; `durable-executor` remains the implicit exception.
+
+`durable-executor update` reads the durable config, creates a backup, rewrites
+every recorded marker-protected managed install from the recorded source or
+`--source`, refreshes router state when router mode is configured, and warns
+that active harness sessions should be restarted. It refuses to overwrite an
+existing unmarked folder.
+
+`durable-executor delete` removes only recorded durable-executor folders that
+contain the durable managed marker, removes durable config, and refreshes router
+state when router mode is configured. It refuses to remove an unmarked folder so
+hand-installed or unrelated skills are not deleted by lifecycle cleanup.
 
 ## `capability`
 

@@ -42,14 +42,14 @@ pub struct HarnessRoot {
     pub detected: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct InstallReport {
     pub skill_name: String,
     pub dry_run: bool,
     pub installs: Vec<InstallTargetReport>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct InstallTargetReport {
     pub target: HarnessTarget,
     pub id: &'static str,
@@ -58,7 +58,7 @@ pub struct InstallTargetReport {
     pub status: InstallStatus,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InstallStatus {
     Planned,
@@ -84,6 +84,45 @@ pub fn install_skill(
     dry_run: bool,
     force: bool,
     name: Option<&str>,
+) -> Result<InstallReport> {
+    install_skill_impl(
+        skill_folder,
+        targets,
+        all_detected,
+        dry_run,
+        force,
+        name,
+        true,
+    )
+}
+
+pub fn install_skill_without_router_hook(
+    skill_folder: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    dry_run: bool,
+    force: bool,
+    name: Option<&str>,
+) -> Result<InstallReport> {
+    install_skill_impl(
+        skill_folder,
+        targets,
+        all_detected,
+        dry_run,
+        force,
+        name,
+        false,
+    )
+}
+
+fn install_skill_impl(
+    skill_folder: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    dry_run: bool,
+    force: bool,
+    name: Option<&str>,
+    refresh_router: bool,
 ) -> Result<InstallReport> {
     let skill_name = match name {
         Some(name) => validate_skill_name(name)?,
@@ -135,15 +174,7 @@ pub fn install_skill(
     let mut installs = Vec::new();
     for install in pending {
         if !dry_run {
-            fs::create_dir_all(&install.install_dir).map_err(|source| Error::Write {
-                path: install.install_dir.clone(),
-                source,
-            })?;
-            copy_file(skill_folder, &install.install_dir, "SKILL.md")?;
-            copy_file(skill_folder, &install.install_dir, "skill.spec.yml")?;
-            for relative_path in &support_files {
-                copy_relative_file(skill_folder, &install.install_dir, relative_path)?;
-            }
+            copy_skill_package(skill_folder, &install.install_dir, &support_files)?;
         }
         installs.push(InstallTargetReport {
             target: install.root.target,
@@ -163,10 +194,17 @@ pub fn install_skill(
         dry_run,
         installs,
     };
-    if !dry_run {
+    if !dry_run && refresh_router {
         crate::router_lifecycle::after_skill_install()?;
     }
     Ok(report)
+}
+
+pub fn sync_skill_package(skill_folder: &Path, install_dir: &Path) -> Result<()> {
+    validate_skill_folder(skill_folder)?;
+    let spec = crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
+    let support_files = declared_package_files(skill_folder, &spec)?;
+    copy_skill_package(skill_folder, install_dir, &support_files)
 }
 
 struct PendingInstall {
@@ -265,10 +303,37 @@ fn validate_skill_name(name: &str) -> Result<String> {
 fn copy_file(skill_folder: &Path, install_dir: &Path, file_name: &str) -> Result<()> {
     let source = skill_folder.join(file_name);
     let destination = install_dir.join(file_name);
+    if same_existing_file(&source, &destination) {
+        return Ok(());
+    }
     fs::copy(&source, &destination).map_err(|source| Error::Write {
         path: destination,
         source,
     })?;
+    Ok(())
+}
+
+fn same_existing_file(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn copy_skill_package(
+    skill_folder: &Path,
+    install_dir: &Path,
+    support_files: &BTreeSet<PathBuf>,
+) -> Result<()> {
+    fs::create_dir_all(install_dir).map_err(|source| Error::Write {
+        path: install_dir.to_path_buf(),
+        source,
+    })?;
+    copy_file(skill_folder, install_dir, "SKILL.md")?;
+    copy_file(skill_folder, install_dir, "skill.spec.yml")?;
+    for relative_path in support_files {
+        copy_relative_file(skill_folder, install_dir, relative_path)?;
+    }
     Ok(())
 }
 
