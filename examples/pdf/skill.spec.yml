@@ -320,7 +320,7 @@ imports:
 
 resources:
   source_skill_md:
-    path: source/SKILL.md
+    path: source/SKILL_md.old
     role: source_material
     description: Preserved upstream PDF skill source.
     used_by:
@@ -874,7 +874,7 @@ review_required:
 metadata:
   source:
     imported_from: https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md
-    staged_source: source/SKILL.md
+    staged_source: source/SKILL_md.old
     source_lines: 314
     license: source/LICENSE.txt
   mechanical_import_observation:

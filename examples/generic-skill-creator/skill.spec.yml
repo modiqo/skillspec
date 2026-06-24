@@ -442,7 +442,7 @@ imports:
       - Load before generating display_name, short_description, default_prompt, or optional interface fields.
 resources:
   source_skill:
-    path: source/SKILL.md
+    path: source/SKILL_md.old
     role: source_material
     description: Original prose skill used as provenance for this dogfood port.
     used_by:
