@@ -356,6 +356,11 @@ fn progressive_sequence() -> Vec<CommandStep> {
             proves: "the draft's actual routes, rules, deps, commands, imports, and tests are visible",
         },
         CommandStep {
+            phase: "inspect dependency ledger",
+            command: "sed -n '1,240p' <draft>/deps.toml",
+            proves: "the generated dependency ledger exists, is not byte-empty, and is ready for dependency authority review; dependency_count = 0 is valid when no dependencies exist",
+        },
+        CommandStep {
             phase: "apply import checklist",
             command: "skillspec grammar checklist --for import-skill",
             proves: "the harness has a coverage matrix and quality grades to fill before install",
@@ -486,8 +491,14 @@ fn import_skill_checklist() -> Vec<ChecklistItem> {
         ChecklistItem {
             id: "commands_deps",
             prompt: "Declare executable templates, checkable dependencies, and phase tool boundaries without pretending install permission exists.",
-            evidence: "commands.requires, tool_boundary, plus deps check output",
+            evidence: "commands.requires, tool_boundary, deps.toml review, plus deps check output",
             status_values: &["present", "deferred", "missing", "unsafe"],
+        },
+        ChecklistItem {
+            id: "dependency_ledger",
+            prompt: "Inspect and complete the scaffolded deps.toml before proof or install; zero dependency entries are allowed only when dependency_count = 0 is recorded.",
+            evidence: "deps.toml with schema_version, review_required, dependency_count, source authority, local_status, install risk, and degraded proof impact",
+            status_values: &["reviewed", "zero_entries", "incomplete", "missing"],
         },
         ChecklistItem {
             id: "procedures",
@@ -552,6 +563,7 @@ fn anti_patterns() -> Vec<&'static str> {
         "Do not turn every Markdown heading into a route.",
         "Do not treat imported Markdown as if it creates routes, rules, or tests automatically.",
         "Do not classify bundled scripts as PATH dependencies when they are package-local files.",
+        "Do not treat a byte-empty deps.toml as a valid zero-dependency ledger; use dependency_count = 0 with schema/review metadata.",
         "Do not mark execution proof as pass without an execution ledger or closure evidence.",
         "Do not hide review_required fields; they are the honesty layer of a port.",
         "Do not install a generated skill until validation, imports, deps, tests, and a demo decision have run.",

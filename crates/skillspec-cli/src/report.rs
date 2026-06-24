@@ -37,6 +37,14 @@ pub fn import_ok(path: &Path, out: &Path, spec: &SkillSpec) -> Result<()> {
         stdout,
         "next: run `skillspec grammar checklist --for import-skill` and fill the coverage matrix before install"
     )?;
+    writeln!(
+        stdout,
+        "deps ledger: wrote deps.toml beside the draft; zero dependency entries are allowed, but a byte-empty ledger is not"
+    )?;
+    writeln!(
+        stdout,
+        "next: inspect deps.toml and complete dependency authority, local status, install risk, and degraded proof impact before proof/install"
+    )?;
     if spec.imports.is_empty() {
         writeln!(stdout, "imports: none inferred")?;
     } else {

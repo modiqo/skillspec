@@ -2091,6 +2091,8 @@ fn grammar_commands_teach_embedded_porting_workflow() {
     assert_success(&checklist);
     let checklist_out = stdout(&checklist);
     assert!(checklist_out.contains("SkillSpec porting checklist: import-skill"));
+    assert!(checklist_out.contains("inspect dependency ledger"));
+    assert!(checklist_out.contains("dependency_count = 0"));
     assert!(checklist_out.contains("Coverage matrix columns:"));
     assert!(checklist_out.contains("Contract quality grades:"));
 
@@ -3425,6 +3427,8 @@ print("hello")
     assert!(import_out.contains("skillspec grammar sensemake --view porting"));
     assert!(import_out.contains("skillspec sensemake"));
     assert!(import_out.contains("skillspec grammar checklist --for import-skill"));
+    assert!(import_out.contains("deps ledger: wrote deps.toml"));
+    assert!(import_out.contains("byte-empty ledger is not"));
 
     let validate = Command::new(bin())
         .arg("validate")
@@ -3441,6 +3445,16 @@ print("hello")
     assert!(content.contains("command_block_1"));
     assert!(content.contains("python3"));
     assert!(content.contains("dependency_ledger"));
+
+    let draft_sensemake = Command::new(bin())
+        .arg("sensemake")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&draft_sensemake);
+    let draft_sensemake_out = stdout(&draft_sensemake);
+    assert!(draft_sensemake_out.contains("inspect dependency ledger"));
+    assert!(draft_sensemake_out.contains("dependency_count = 0 is valid"));
 
     let ledger = dir.path().join("deps.toml");
     assert!(ledger.is_file());

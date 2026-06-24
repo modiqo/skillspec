@@ -569,6 +569,8 @@ Notes:
   it with package mentions from source prose, references, helper scripts,
   command examples, and manifests, preserving authority, local status, install
   risk, and degraded proof impact.
+- If no dependencies are found after review, keep the generated ledger with
+  `dependency_count = 0`; do not replace it with a byte-empty `deps.toml`.
 
 ## `synthesize-from-workspace`
 

@@ -185,7 +185,9 @@ spec and declares it as a file dependency/artifact, so `skillspec deps check`
 can report a missing or byte-empty ledger. The review pass must complete that
 scaffold by preserving every dependency mention found in `SKILL.md`, referenced
 docs, helper scripts, fenced code imports, command examples, and package
-manifests. A dependency record should include:
+manifests. If review finds no dependencies, keep the ledger with
+`dependency_count = 0`; do not replace it with an empty file. A dependency
+record should include:
 
 - dependency id and ecosystem;
 - authority such as `source_required`, `source_recommended`,

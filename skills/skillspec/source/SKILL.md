@@ -644,6 +644,7 @@ Inferred dependency surface:
 - gh: present, network/auth-sensitive, provisionable via user_global
 - rote: present, required for workspace evidence
 - deps.toml: generated scaffold present, review required before proof/install
+- no dependencies: keep dependency_count = 0 in deps.toml; do not leave the file byte-empty
 
 I will not install or connect anything unless you approve the provision option.
 ```

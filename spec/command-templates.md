@@ -61,4 +61,5 @@ understand all prose. It should:
 9. write a scaffold with `review_required`
 
 An agent-assisted pass may improve the scaffold, but uncertainty must remain
-visible.
+visible. If review finds no dependencies, the ledger should keep
+`dependency_count = 0`; it should not be byte-empty.

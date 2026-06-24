@@ -91,7 +91,9 @@ review. For imported or shareable skills, the review pass must complete
 `deps.toml` by preserving dependency mentions from `SKILL.md`, referenced docs,
 helper scripts, fenced code imports, command examples, and package manifests.
 Each entry should record source authority, local status, install risk, proposed
-provision command, required workflows, and degraded proof impact.
+provision command, required workflows, and degraded proof impact. A reviewed
+zero-dependency skill should keep `deps.toml` with `dependency_count = 0`; a
+byte-empty ledger is not valid proof that dependencies were reviewed.
 
 The importer deliberately does not finish the behavioral contract. The generated
 spec starts with empty `applies_when`, `entry`, `routes`, `rules`, `states`,

@@ -1755,6 +1755,7 @@ snippets:
       Imported dependency preservation SOP:
       - import-skill creates deps.toml beside skill.spec.yml and declares it as a file dependency/artifact.
       - Complete the scaffolded ledger for every imported/shareable skill.
+      - If review finds no dependencies, keep the scaffold with dependency_count = 0. Do not replace it with a byte-empty deps.toml.
       - Extract dependency mentions from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests.
       - Record authority as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
       - Record local_status as present, missing, unknown, provisionable, deferred, or required_but_unproven.

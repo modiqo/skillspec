@@ -352,6 +352,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             command: format!("skillspec deps check {spec_path} --command <id>"),
         },
         NavigationHint {
+            intent: "check all dependencies",
+            command: format!("skillspec deps check {spec_path}"),
+        },
+        NavigationHint {
             intent: "inspect lifecycle",
             command: format!("skillspec query {spec_path} state:<id> --view summary"),
         },
@@ -360,6 +364,14 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             command: format!("skillspec trace align {spec_path} --decision-trace <run_dir>"),
         },
     ];
+    if spec.dependencies.contains_key("dependency_ledger")
+        || spec.artifacts.contains_key("dependency_ledger")
+    {
+        hints.push(NavigationHint {
+            intent: "inspect dependency ledger",
+            command: "sed -n '1,240p' <skill-folder>/deps.toml # dependency_count = 0 is valid; byte-empty is not".to_owned(),
+        });
+    }
     if has_capability_bootstrap(spec) {
         hints.extend([
             NavigationHint {
