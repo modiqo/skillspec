@@ -52,6 +52,10 @@ activation:
     - grammar checklist
     - compile skill
     - install codex agents
+    - retire existing skill
+    - replace old skill
+    - --retire-existing
+    - backup old skill
     - prove value
     - value report
   priority: domain
@@ -73,6 +77,7 @@ applies_when:
       - revise an existing SkillSpec-backed skill
       - add phase planning and progress tracking to a SkillSpec-backed skill
       - compile and optionally install a reviewed SkillSpec-backed skill
+      - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
   prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, stage or map sources, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
@@ -89,6 +94,7 @@ entry:
     - drop_imported_dependency_mentions
     - work_around_missing_dependency_without_waiver
     - claim_partial_dependency_proof_as_full
+    - leave_old_and_new_skill_discoverable_without_user_choice
   tool_boundary:
     default: deny
     allow:
@@ -546,7 +552,7 @@ routes:
   - id: compile_and_install_reviewed_skill
     label: Compile and install reviewed skill
     rank: 10
-    description: Use only after a reviewed spec validates and the user explicitly approves install targets and dependency surface.
+    description: Use only after a reviewed spec validates and the user explicitly approves dependency surface, install targets, and whether any existing active skill should be retired before replacement.
     execution_plan:
       mode: ordered
       phases:
@@ -567,6 +573,7 @@ routes:
             - list_install_targets
             - install_dry_run
             - approve_install_targets
+            - approve_retire_existing_skill
         - id: install
           owner_skill: skillspec
           requires:
@@ -924,14 +931,17 @@ rules:
       - compile_and_install_reviewed_skill
     elicit:
       - approve_install_targets
+      - approve_retire_existing_skill
     forbid:
       - install_unreviewed_draft
       - install_before_validate_test_imports_deps
       - install_from_remote_checkout
+      - leave_old_and_new_skill_discoverable_without_user_choice
     after_success:
       - install_skill
+      - retire_existing_skill_when_approved
       - generate_value_report
-    reason: Installing writes into harness roots, so it requires reviewed QA and explicit target approval.
+    reason: Installing writes into harness roots, so it requires reviewed QA, explicit target approval, and an explicit choice to retire any old active skill instead of leaving duplicate discoverable skills.
   - id: prove_requests_route_to_value
     when:
       user_says_any:
@@ -1102,6 +1112,21 @@ elicitations:
         label: Agents only
         description: Install only into the Agents skill root after dry-run.
     default: codex_and_agents
+  approve_retire_existing_skill:
+    question: If the target skill already exists in a harness root, should SkillSpec back up and remove the old active skill before installing the reviewed replacement?
+    required_when:
+      - route: compile_and_install_reviewed_skill
+    choices:
+      - id: retire_existing
+        label: Retire existing
+        description: Back up the current active skill under SKILLSPEC_HOME/backups/retired-skills, remove it from harness discovery, then install the reviewed SkillSpec-backed replacement at the same name.
+      - id: install_new_name
+        label: Install new name
+        description: Keep the old skill discoverable only when the user intentionally chooses a different installed name for side-by-side testing.
+      - id: stop_before_install
+        label: Stop before install
+        description: Do not write harness roots until the retirement or side-by-side choice is explicit.
+    default: retire_existing
 dependencies:
   skillspec_cli:
     kind: cli
@@ -1676,15 +1701,22 @@ commands:
         - skillspec_cli
         - rote_cli
   install_dry_run:
-    description: Preview install writes for the selected target without modifying harness roots.
-    template: skillspec install skill <skill-folder> --target <target> --dry-run
+    description: Preview install writes for the selected target, including any backup path for retiring an existing active skill, without modifying harness roots.
+    template: skillspec install skill <skill-folder> --target <target> --dry-run --retire-existing
     safety: local_read
     requires:
       dependencies:
         - skillspec_cli
   install_skill:
-    description: Install the compiled SKILL.md and reviewed skill.spec.yml into an explicitly approved harness target.
-    template: skillspec install skill <skill-folder> --target <target>
+    description: Install the compiled SKILL.md and reviewed skill.spec.yml into an explicitly approved harness target, backing up and removing any existing active skill at that name first.
+    template: skillspec install skill <skill-folder> --target <target> --retire-existing
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  install_skill_new_name:
+    description: Install the reviewed replacement under a different explicit name only when the user intentionally keeps the old active skill for side-by-side testing.
+    template: skillspec install skill <skill-folder> --target <target> --name <new-skill-name>
     safety: local_write
     requires:
       dependencies:
@@ -1851,6 +1883,8 @@ recipes:
       - run_command: list_install_targets
       - run_command: install_dry_run
       - ask: approve_install_targets
+      - ask: approve_retire_existing_skill
+      - note: If the user chooses `install_new_name`, use `install_skill_new_name` with an explicit non-conflicting name instead of `install_skill`.
       - run_command: install_skill
   router_install_loop:
     description: Post-install router setup through the prompt skill.
@@ -2082,6 +2116,8 @@ closures:
       - trace_align
   generate_value_report:
     description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
+  retire_existing_skill_when_approved:
+    description: When replacing an existing active skill, install with --retire-existing after approval, report the backup path, and avoid leaving duplicate old/new skills discoverable in harness roots. If the user chooses side-by-side testing, require a distinct --name instead.
   show_dependency_surface:
     description: Show dependency ids, source authority, local status, permission sensitivity, install risk, provision choices, missing required dependencies, optional/example dependencies, and degraded proof impact before compile/install/proof approval.
   report_dependency_waiver:
@@ -2323,6 +2359,7 @@ tests:
         - choose_candidate_skill
         - approve_dependency_surface
         - approve_install_targets
+        - approve_retire_existing_skill
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
@@ -2362,9 +2399,11 @@ tests:
       elicit:
         - approve_dependency_surface
         - approve_install_targets
+        - approve_retire_existing_skill
       forbid:
         - install_before_dependency_surface_approval
         - install_before_validate_test_imports_deps
+        - leave_old_and_new_skill_discoverable_without_user_choice
   - name: prove value routes to trace and report
     input: Prove value for the ported rote-browse skill with a demo decision
     expect:
@@ -2513,12 +2552,12 @@ metadata:
       confidence: high
       status: reviewed
       review_note: Imported dependencies must be preserved in deps.toml with authority and risk; missing required packages make proof partial unless provisioned or explicitly deferred.
-    - prose_span: Harness Install Targets and Dependency Approval
-      obligation: Do not install by default; show dependency surface, dry-run, and ask for install targets.
-      skillspec_construct: route.compile_and_install_reviewed_skill, elicitations.approve_dependency_surface, elicitations.approve_install_targets, commands.install_dry_run, commands.install_skill
+    - prose_span: Harness Install Targets, Retirement, and Dependency Approval
+      obligation: Do not install by default; show dependency surface, dry-run, ask for install targets, and ask whether any existing active skill should be retired before replacement.
+      skillspec_construct: route.compile_and_install_reviewed_skill, elicitations.approve_dependency_surface, elicitations.approve_install_targets, elicitations.approve_retire_existing_skill, commands.install_dry_run, commands.install_skill, commands.install_skill_new_name
       confidence: high
       status: proven_by_tests
-      review_note: Actual install was not performed during this self-port.
+      review_note: The default install command uses --retire-existing; side-by-side testing requires an explicit non-conflicting --name choice.
     - prose_span: Code-Heavy Skill Porting, Semantic Promotion, Rule Extraction
       obligation: Preserve provenance, classify snippets, create recipes/artifacts, write testable rules, and add review notes for uncertainty.
       skillspec_construct: recipe.coverage_review_loop, code.review_and_promote_draft, rules.mechanical_import_is_draft_only, review_required

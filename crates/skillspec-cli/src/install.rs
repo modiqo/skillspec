@@ -1,11 +1,12 @@
 use crate::error::{Error, Result};
 use crate::model::{CodeSource, DependencyKind, SkillSpec};
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Component, Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -55,6 +56,9 @@ pub struct InstallTargetReport {
     pub id: &'static str,
     pub path: PathBuf,
     pub existed: bool,
+    pub retired_existing: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_path: Option<PathBuf>,
     pub status: InstallStatus,
 }
 
@@ -83,6 +87,7 @@ pub fn install_skill(
     all_detected: bool,
     dry_run: bool,
     force: bool,
+    retire_existing: bool,
     name: Option<&str>,
 ) -> Result<InstallReport> {
     install_skill_impl(
@@ -90,9 +95,12 @@ pub fn install_skill(
         targets,
         all_detected,
         dry_run,
-        force,
+        InstallBehavior {
+            force,
+            retire_existing,
+            refresh_router: true,
+        },
         name,
-        true,
     )
 }
 
@@ -102,6 +110,7 @@ pub fn install_skill_without_router_hook(
     all_detected: bool,
     dry_run: bool,
     force: bool,
+    retire_existing: bool,
     name: Option<&str>,
 ) -> Result<InstallReport> {
     install_skill_impl(
@@ -109,10 +118,20 @@ pub fn install_skill_without_router_hook(
         targets,
         all_detected,
         dry_run,
-        force,
+        InstallBehavior {
+            force,
+            retire_existing,
+            refresh_router: false,
+        },
         name,
-        false,
     )
+}
+
+#[derive(Clone, Copy, Debug)]
+struct InstallBehavior {
+    force: bool,
+    retire_existing: bool,
+    refresh_router: bool,
 }
 
 fn install_skill_impl(
@@ -120,10 +139,14 @@ fn install_skill_impl(
     targets: &[HarnessTarget],
     all_detected: bool,
     dry_run: bool,
-    force: bool,
+    behavior: InstallBehavior,
     name: Option<&str>,
-    refresh_router: bool,
 ) -> Result<InstallReport> {
+    if behavior.force && behavior.retire_existing {
+        return Err(Error::InvalidInput {
+            message: "--force and --retire-existing are mutually exclusive; use --retire-existing to back up and remove the old active skill before install".to_owned(),
+        });
+    }
     let skill_name = match name {
         Some(name) => validate_skill_name(name)?,
         None => infer_skill_name(skill_folder)?,
@@ -140,6 +163,12 @@ fn install_skill_impl(
     }
 
     let mut pending = Vec::new();
+    let mut backup_paths_by_identity: BTreeMap<PathBuf, PathBuf> = BTreeMap::new();
+    let backup_root = if behavior.retire_existing {
+        Some(retired_backup_root()?)
+    } else {
+        None
+    };
     for root in target_roots {
         let install_dir = root.path.join(&skill_name);
         let existed = install_dir.exists();
@@ -151,14 +180,33 @@ fn install_skill_impl(
                 ),
             });
         }
+        let install_identity = install_identity(&install_dir);
+        let backup_path = if existed && behavior.retire_existing {
+            match backup_paths_by_identity.get(&install_identity) {
+                Some(path) => Some(path.clone()),
+                None => {
+                    let path = retired_backup_path(
+                        backup_root.as_ref().expect("backup root"),
+                        root.target,
+                        &skill_name,
+                    );
+                    backup_paths_by_identity.insert(install_identity.clone(), path.clone());
+                    Some(path)
+                }
+            }
+        } else {
+            None
+        };
         pending.push(PendingInstall {
             root,
             install_dir,
+            install_identity,
             existed,
+            backup_path,
         });
     }
 
-    if !dry_run && !force {
+    if !dry_run && !behavior.force && !behavior.retire_existing {
         for install in pending.iter().filter(|install| install.existed) {
             if !confirm_overwrite(&install.install_dir)? {
                 return Err(Error::InvalidInput {
@@ -172,8 +220,14 @@ fn install_skill_impl(
     }
 
     let mut installs = Vec::new();
+    let mut retired_identities = BTreeSet::new();
     for install in pending {
         if !dry_run {
+            if let Some(backup_path) = &install.backup_path {
+                if retired_identities.insert(install.install_identity.clone()) {
+                    retire_existing_install(&install.install_dir, backup_path)?;
+                }
+            }
             copy_skill_package(skill_folder, &install.install_dir, &support_files)?;
         }
         installs.push(InstallTargetReport {
@@ -181,6 +235,8 @@ fn install_skill_impl(
             id: install.root.id,
             path: install.install_dir,
             existed: install.existed,
+            retired_existing: install.existed && behavior.retire_existing,
+            backup_path: install.backup_path,
             status: if dry_run {
                 InstallStatus::Planned
             } else {
@@ -194,7 +250,7 @@ fn install_skill_impl(
         dry_run,
         installs,
     };
-    if !dry_run && refresh_router {
+    if !dry_run && behavior.refresh_router {
         crate::router_lifecycle::after_skill_install()?;
     }
     Ok(report)
@@ -210,7 +266,9 @@ pub fn sync_skill_package(skill_folder: &Path, install_dir: &Path) -> Result<()>
 struct PendingInstall {
     root: HarnessRoot,
     install_dir: PathBuf,
+    install_identity: PathBuf,
     existed: bool,
+    backup_path: Option<PathBuf>,
 }
 
 fn selected_roots(targets: &[HarnessTarget], all_detected: bool) -> Result<Vec<HarnessRoot>> {
@@ -256,6 +314,100 @@ fn confirm_overwrite(path: &Path) -> Result<bool> {
 
 fn is_yes(answer: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+}
+
+fn install_identity(install_dir: &Path) -> PathBuf {
+    install_dir
+        .canonicalize()
+        .unwrap_or_else(|_| install_dir.to_path_buf())
+}
+
+fn retire_existing_install(install_dir: &Path, backup_path: &Path) -> Result<()> {
+    if let Some(parent) = backup_path.parent() {
+        fs::create_dir_all(parent).map_err(|source| Error::Write {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    if backup_path.exists() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "retired skill backup already exists: {}",
+                backup_path.display()
+            ),
+        });
+    }
+    match fs::rename(install_dir, backup_path) {
+        Ok(()) => Ok(()),
+        Err(_rename_error) => {
+            copy_dir_all(install_dir, backup_path)?;
+            fs::remove_dir_all(install_dir).map_err(|source| Error::Write {
+                path: install_dir.to_path_buf(),
+                source,
+            })?;
+            Ok(())
+        }
+    }
+}
+
+fn copy_dir_all(source: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(destination).map_err(|source| Error::Write {
+        path: destination.to_path_buf(),
+        source,
+    })?;
+    for entry in fs::read_dir(source).map_err(|err| Error::Read {
+        path: source.to_path_buf(),
+        source: err,
+    })? {
+        let entry = entry.map_err(|err| Error::Read {
+            path: source.to_path_buf(),
+            source: err,
+        })?;
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: entry.path(),
+            source,
+        })?;
+        let child_source = entry.path();
+        let child_destination = destination.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_all(&child_source, &child_destination)?;
+        } else {
+            fs::copy(&child_source, &child_destination).map_err(|source| Error::Write {
+                path: child_destination,
+                source,
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn retired_backup_root() -> Result<PathBuf> {
+    Ok(skillspec_home()?
+        .join("backups/retired-skills")
+        .join(format!("retire-{}-{}", now_unix(), std::process::id())))
+}
+
+fn retired_backup_path(root: &Path, target: HarnessTarget, skill_name: &str) -> PathBuf {
+    root.join(target.id()).join(skill_name)
+}
+
+fn skillspec_home() -> Result<PathBuf> {
+    if let Some(path) = env::var_os("SKILLSPEC_HOME") {
+        return Ok(PathBuf::from(path));
+    }
+    let Some(home) = env::var_os("HOME") else {
+        return Err(Error::InvalidInput {
+            message: "HOME is not set; set SKILLSPEC_HOME or HOME".to_owned(),
+        });
+    };
+    Ok(PathBuf::from(home).join(".skillspec"))
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }
 
 fn validate_skill_folder(skill_folder: &Path) -> Result<()> {

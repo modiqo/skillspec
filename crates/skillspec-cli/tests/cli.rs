@@ -5,7 +5,7 @@ use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{symlink, PermissionsExt};
 
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_skillspec")
@@ -483,6 +483,17 @@ fn help_lists_trace_align_arguments() {
     let import_help = stdout(&import_skill);
     assert!(import_help.contains("--source-map"));
     assert!(import_help.contains("source-map.json"));
+
+    let install_skill = Command::new(bin())
+        .arg("install")
+        .arg("skill")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&install_skill);
+    let install_help = stdout(&install_skill);
+    assert!(install_help.contains("--retire-existing"));
+    assert!(install_help.contains("Back up and remove"));
 
     let doctor = Command::new(bin())
         .arg("doctor")
@@ -2196,6 +2207,54 @@ commands:
     assert!(out.contains("diagnose prose reliability debt"));
     assert!(out.contains("skillspec doctor <source-skill-folder-or-uri> --json"));
     assert!(out.contains("run doctor before import"));
+}
+
+#[test]
+fn sensemake_teaches_retire_existing_install_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-retire-existing");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Retire existing install fixture.
+routes:
+  - id: compile_and_install_reviewed_skill
+    label: Compile and install reviewed skill
+elicitations:
+  approve_retire_existing_skill:
+    question: Should SkillSpec retire an existing active skill before installing the reviewed replacement?
+    required_when:
+      - route: compile_and_install_reviewed_skill
+    choices:
+      - id: retire_existing
+        label: Retire existing
+        description: Back up and remove the old active skill before installing the replacement.
+      - id: stop_before_install
+        label: Stop before install
+        description: Do not write harness roots until the replacement choice is clear.
+commands:
+  install_skill:
+    description: Install while retiring any old active skill.
+    template: skillspec install skill <skill-folder> --target <target> --retire-existing
+    safety: local_write
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("inspect active-skill retirement gate"));
+    assert!(
+        out.contains("skillspec install skill <skill-folder> --target <target> --retire-existing")
+    );
+    assert!(out.contains("ask for retirement approval"));
 }
 
 #[test]
@@ -4353,6 +4412,175 @@ routes:
         "# Installable Skill\n\nThin loader for skill.spec.yml.\n"
     );
     assert!(install_dir.join("stale.txt").is_file());
+}
+
+#[test]
+fn install_skill_can_retire_existing_target_with_backup() {
+    let dir = TempDir::new("install-retire-existing");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let skill = dir.path().join("skill-source");
+    let install_dir = home.join(".agents/skills/skill-source");
+    fs::create_dir_all(&install_dir).unwrap();
+    write_file(&install_dir.join("SKILL.md"), "# Old Skill\n");
+    write_file(&install_dir.join("skill.spec.yml"), "schema: old\n");
+    write_file(&install_dir.join("stale.txt"), "old-only\n");
+    write_file(
+        &skill.join("SKILL.md"),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n",
+    );
+    write_file(
+        &skill.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: installable.skill
+title: Installable Skill
+description: Install target fixture.
+routes:
+  - id: local
+    label: Local
+"#,
+    );
+
+    let dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--retire-existing")
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let planned = json_stdout(&dry_run);
+    assert_eq!(planned["installs"][0]["status"], "planned");
+    assert_eq!(planned["installs"][0]["retired_existing"], true);
+    assert!(planned["installs"][0]["backup_path"]
+        .as_str()
+        .unwrap()
+        .contains("backups/retired-skills"));
+    assert!(!skillspec_home.join("backups/retired-skills").exists());
+
+    let retired = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--retire-existing")
+        .output()
+        .unwrap();
+    assert_success(&retired);
+    let report = json_stdout(&retired);
+    assert_eq!(report["installs"][0]["status"], "installed");
+    assert_eq!(report["installs"][0]["retired_existing"], true);
+    let backup_path = PathBuf::from(report["installs"][0]["backup_path"].as_str().unwrap());
+    assert!(backup_path.join("SKILL.md").is_file());
+    assert_eq!(
+        fs::read_to_string(backup_path.join("SKILL.md")).unwrap(),
+        "# Old Skill\n"
+    );
+    assert!(backup_path.join("stale.txt").is_file());
+    assert_eq!(
+        fs::read_to_string(install_dir.join("SKILL.md")).unwrap(),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n"
+    );
+    assert!(!install_dir.join("stale.txt").exists());
+
+    let conflict = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--force")
+        .arg("--retire-existing")
+        .output()
+        .unwrap();
+    assert_failure(&conflict);
+    assert!(stderr(&conflict).contains("mutually exclusive"));
+}
+
+#[cfg(unix)]
+#[test]
+fn install_skill_retire_existing_groups_symlinked_roots() {
+    let dir = TempDir::new("install-retire-symlinked-roots");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let agents_root = home.join(".agents/skills");
+    let codex_parent = home.join(".codex");
+    let codex_root = codex_parent.join("skills");
+    let install_dir = agents_root.join("skill-source");
+    let skill = dir.path().join("skill-source");
+    fs::create_dir_all(&install_dir).unwrap();
+    fs::create_dir_all(&codex_parent).unwrap();
+    symlink(&agents_root, &codex_root).unwrap();
+    write_file(&install_dir.join("SKILL.md"), "# Old Skill\n");
+    write_file(&install_dir.join("skill.spec.yml"), "schema: old\n");
+    write_file(&install_dir.join("stale.txt"), "old-only\n");
+    write_file(
+        &skill.join("SKILL.md"),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n",
+    );
+    write_file(
+        &skill.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: installable.skill
+title: Installable Skill
+description: Install target fixture.
+routes:
+  - id: local
+    label: Local
+"#,
+    );
+
+    let retired = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .arg("--target")
+        .arg("codex")
+        .arg("--retire-existing")
+        .output()
+        .unwrap();
+    assert_success(&retired);
+    let report = json_stdout(&retired);
+    let installs = report["installs"].as_array().unwrap();
+    assert_eq!(installs.len(), 2);
+    assert_eq!(installs[0]["retired_existing"], true);
+    assert_eq!(installs[1]["retired_existing"], true);
+    assert_eq!(installs[0]["backup_path"], installs[1]["backup_path"]);
+
+    let backup_path = PathBuf::from(installs[0]["backup_path"].as_str().unwrap());
+    assert_eq!(
+        fs::read_to_string(backup_path.join("SKILL.md")).unwrap(),
+        "# Old Skill\n"
+    );
+    assert!(backup_path.join("stale.txt").is_file());
+    assert!(!backup_path
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("codex/skill-source")
+        .exists());
+    assert_eq!(
+        fs::read_to_string(install_dir.join("SKILL.md")).unwrap(),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n"
+    );
+    assert!(!install_dir.join("stale.txt").exists());
 }
 
 #[test]

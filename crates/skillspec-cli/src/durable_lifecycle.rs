@@ -113,6 +113,7 @@ pub fn install(options: DurableInstallOptions) -> Result<DurableInstallReport> {
         options.all_detected,
         options.dry_run,
         options.force,
+        false,
         Some(DURABLE_NAME),
     )?;
     let config = config_path()?;

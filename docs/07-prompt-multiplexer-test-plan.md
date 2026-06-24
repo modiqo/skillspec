@@ -102,14 +102,14 @@ Install the local `skillspec` prompt skill into the harness roots under test.
 Shared-root test:
 
 ```sh
-skillspec install skill skills/skillspec --target agents --force
+skillspec install skill skills/skillspec --target agents --retire-existing
 ```
 
 Separate-root test:
 
 ```sh
-skillspec install skill skills/skillspec --target codex --force
-skillspec install skill skills/skillspec --target claude-local --force
+skillspec install skill skills/skillspec --target codex --retire-existing
+skillspec install skill skills/skillspec --target claude-local --retire-existing
 ```
 
 Cross-harness smoke test:
@@ -119,8 +119,13 @@ skillspec install skill skills/skillspec \
   --target agents \
   --target codex \
   --target claude-local \
-  --force
+  --retire-existing
 ```
+
+`--retire-existing` is the replacement path for this test plan: it backs up any
+existing active `skillspec` prompt skill under `~/.skillspec/backups/retired-skills`
+before installing the new copy, avoiding duplicate active skills in harness
+discovery.
 
 After installing the prompt skill, fully restart the Codex or Claude session.
 Do not rely on an already-open chat session to reload changed skills or a new

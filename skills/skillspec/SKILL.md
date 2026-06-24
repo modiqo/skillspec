@@ -1,11 +1,11 @@
 ---
 name: skillspec
-description: "Multiplex SkillSpec post-install setup: import existing SKILL.md skills from local folders or public URIs, install router mode, install/update/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, local folder or uri, install router, install skill-router, router mode, install durable-executor, update durable-executor and delete durable-executor. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, import a public GitHub skill into SkillSpec, import an existing prose skill from a local folder or public URI, install skill-router after SkillSpec is installed and install router mode after SkillSpec is installed"
+description: "Multiplex SkillSpec post-install setup: import existing SKILL.md skills from local folders or public URIs, install router mode, install/update/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, retire old active skills before replacement installs, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, local folder or uri, install router, install skill-router, router mode, install durable-executor, update durable-executor, delete durable-executor, retire existing skill and --retire-existing. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, import a public GitHub skill into SkillSpec, import an existing prose skill from a local folder or public URI, replace an existing active prose skill without duplicate discovery, install skill-router after SkillSpec is installed and install router mode after SkillSpec is installed"
 ---
 
 # SkillSpec
 
-SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, installing router mode, installing/updating/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, installing router mode, installing/updating/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install with active-skill retirement, and value reporting.
 
 ## Entry Gate
 
@@ -13,7 +13,7 @@ SkillSpec post-install setup and skill-authoring multiplexer for importing exist
 - Until that plan and checklist are read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
 - The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.
 - After each phase action, record structured progress in `<run_dir>/execution.jsonl` and run `skillspec progress show ./skill.spec.yml --run <run_dir>` before moving to the next phase.
-- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence, consult_existing_ports_without_user_request, consult_repo_history_without_user_request, consult_memory_or_prior_examples_without_user_request.
+- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence, consult_existing_ports_without_user_request, consult_repo_history_without_user_request, consult_memory_or_prior_examples_without_user_request, leave_old_and_new_skill_discoverable_without_user_choice.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -83,6 +83,7 @@ Before the first task action, use `skillspec plan` and `skillspec act` to conver
 - `forbid`: forbids are hard negative constraints on behavior. They block substitutions even when a convenient tool is available. If a forbidden action seems necessary, stop and ask for explicit user approval or a different route; do not silently do it.
 - user constraints: carry explicit user instructions into the same checklist. The spec adds structure; it does not erase the user's constraints.
 - `elicit`: ask the required question before irreversible work, side effects, installs, auth steps, or broad exploration.
+- replacement installs: if a reviewed SkillSpec-backed skill replaces an existing active prose skill, ask the retirement gate and use `skillspec install skill <skill-folder> --target <target> --retire-existing`; use a different explicit `--name` only when the user intentionally keeps both active for side-by-side testing.
 - `dependencies`: prove readiness for the active route, command, recipe, or code block before using it. Prefer command-scoped checks such as `skillspec deps check ./skill.spec.yml --command <id>` when a command id is known.
 - dependency evidence: a missing environment variable only proves that variable is absent; it does not prove that auth, API keys, browser sessions, keychains, vaults, or CLI-native credentials are absent. When auth can live outside env, prove readiness with the declared command, adapter, browser, or dependency check instead of grepping env.
 - `imports` and `resources`: load only the items required by the active route/rule/recipe/code, plus anything marked `always`.

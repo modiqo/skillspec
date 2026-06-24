@@ -775,7 +775,7 @@ skillspec install <COMMAND>
 Subcommands:
 
 - `targets`
-- `skill <folder> [--target <target>...] [--all-detected] [--dry-run] [--name <name>] [--force]`
+- `skill <folder> [--target <target>...] [--all-detected] [--dry-run] [--name <name>] [--force] [--retire-existing]`
 
 ## `index`
 
@@ -1102,6 +1102,12 @@ Options:
 - `--all-detected`: install into every harness root detected on this machine.
 - `--dry-run`: show the install plan without writing files.
 - `--force`: overwrite an existing installed skill folder without prompting.
+- `--retire-existing`: when the target skill folder already exists, back it up
+  under `SKILLSPEC_HOME/backups/retired-skills` or
+  `~/.skillspec/backups/retired-skills`, remove it from active harness
+  discovery, then install the reviewed replacement at the same name. This is
+  the preferred path for replacing a prose skill with a SkillSpec-backed port.
+  `--force` and `--retire-existing` are mutually exclusive.
 - `--name <NAME>`: override the installed skill folder name.
 
 `install skill` copies declared package-local files from imports, resources,
@@ -1109,3 +1115,10 @@ code sources, and file dependencies. It rejects support files named nested
 `SKILL.md`, because those become additional harness-discoverable skills. Preserve
 old prose as `source/SKILL_md.old` or another non-discoverable, non-Markdown
 filename.
+
+When a ported skill replaces an already-installed prose skill, run
+`skillspec install skill <folder> --target <target> --dry-run --retire-existing`
+before the real install so the user can see the backup path and target root.
+Do not leave both the old prose skill and the new SkillSpec-backed skill active
+under the same harness roots unless the user explicitly chooses side-by-side
+testing with a different `--name`.

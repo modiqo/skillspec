@@ -1,6 +1,6 @@
 ---
 name: skillspec
-description: Use as the SkillSpec post-install setup and skill-authoring multiplexer: import an existing prose SKILL.md from a local folder or public URI, install router mode, install/update/delete durable-executor, create a SkillSpec skill from an observed durable rote workspace, revise an existing SkillSpec, prove value, compile, and optionally install.
+description: Use as the SkillSpec post-install setup and skill-authoring multiplexer: import an existing prose SKILL.md from a local folder or public URI, install router mode, install/update/delete durable-executor, create a SkillSpec skill from an observed durable rote workspace, revise an existing SkillSpec, prove value, compile, and optionally install while retiring old active skills when replacing them.
 ---
 
 # skillspec
@@ -17,6 +17,7 @@ The main modes are:
 - create a SkillSpec skill from an observed durable rote workspace
 - revise an existing `skill.spec.yml`
 - prove value, compile, and optionally install a reviewed SkillSpec-backed skill
+- retire an existing active prose skill before installing its reviewed SkillSpec replacement
 
 ## Post-Install Multiplexer
 
@@ -441,7 +442,9 @@ source skill folder
     ```
 
     Then install it through `skillspec install` so harness roots are detected
-    and the spec is validated before files are written.
+    and the spec is validated before files are written. If the new skill is
+    replacing an existing active skill at the same name, ask the user whether to
+    retire the old active copy and use `--retire-existing` after approval.
 
 ## Harness Install Targets
 
@@ -450,17 +453,23 @@ Do not install by default. Ask or wait for explicit instruction.
 Supported destinations:
 
 - Codex/Codex-style personal skill:
-  `skillspec install skill <skill-folder> --target agents` or
-  `skillspec install skill <skill-folder> --target codex`
+  `skillspec install skill <skill-folder> --target agents --retire-existing` or
+  `skillspec install skill <skill-folder> --target codex --retire-existing`
 - Claude repo skill:
-  `skillspec install skill <skill-folder> --target claude-local`
+  `skillspec install skill <skill-folder> --target claude-local --retire-existing`
 - Hermes or another harness:
   ask for the target skill root
 
 Install the compiled `SKILL.md` and the reviewed `skill.spec.yml` together.
 The generated skill should point agents to the local `skill.spec.yml`.
 Use `skillspec install targets` to show detected harness roots, and use
-`--dry-run` before writing when the user is still reviewing the install plan.
+`--dry-run --retire-existing` before writing when the user is still reviewing
+the install plan. `--retire-existing` backs up the old active skill under
+`SKILLSPEC_HOME/backups/retired-skills` or
+`~/.skillspec/backups/retired-skills`, removes it from harness discovery, then
+installs the reviewed replacement. Do not leave both old and new skills
+discoverable unless the user explicitly chooses side-by-side testing under a
+different `--name`.
 
 ## Remote Source Staging
 

@@ -118,6 +118,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_retire_existing_install(spec) {
+        items.push(
+            "for installs that replace an existing active prose skill, ask for retirement approval and use --retire-existing so the old skill is backed up outside harness discovery roots"
+                .to_owned(),
+        );
+    }
     items
 }
 
@@ -482,6 +488,22 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_retire_existing_install(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "inspect active-skill retirement gate",
+                command: format!(
+                    "skillspec query {spec_path} elicitation:approve_retire_existing_skill --view summary"
+                ),
+            },
+            NavigationHint {
+                intent: "install while retiring an old active skill",
+                command:
+                    "skillspec install skill <skill-folder> --target <target> --retire-existing"
+                        .to_owned(),
+            },
+        ]);
+    }
     hints
 }
 
@@ -529,6 +551,15 @@ fn has_doctor(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("skillspec doctor"))
+}
+
+fn has_retire_existing_install(spec: &SkillSpec) -> bool {
+    spec.elicitations
+        .contains_key("approve_retire_existing_skill")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("--retire-existing"))
 }
 
 #[derive(Clone, Debug)]

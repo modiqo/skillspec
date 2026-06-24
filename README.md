@@ -188,8 +188,13 @@ skillspec compile --target markdown ./my-skill
 Install it:
 
 ```sh
-skillspec install skill ./my-skill --target codex --target agents --force
+skillspec install skill ./my-skill --target codex --target agents --retire-existing
 ```
+
+Use `--retire-existing` when replacing an active prose skill with the reviewed
+SkillSpec-backed port. It backs up the old active skill outside harness
+discovery before installing the replacement. Use `--name <new-name>` only when
+you intentionally want side-by-side testing.
 
 That gives you:
 

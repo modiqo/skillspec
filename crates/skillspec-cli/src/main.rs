@@ -865,6 +865,9 @@ enum InstallCommand {
         /// Overwrite an existing installed skill folder without prompting.
         #[arg(long)]
         force: bool,
+        /// Back up and remove an existing active skill before installing this one.
+        #[arg(long)]
+        retire_existing: bool,
         /// Override the installed skill folder name.
         #[arg(long)]
         name: Option<String>,
@@ -1894,6 +1897,7 @@ fn run() -> Result<()> {
                 all_detected,
                 dry_run,
                 force,
+                retire_existing,
                 name,
             } => {
                 let targets = target
@@ -1906,6 +1910,7 @@ fn run() -> Result<()> {
                     all_detected,
                     dry_run,
                     force,
+                    retire_existing,
                     name.as_deref(),
                 )?;
                 report::json(&report)?;
