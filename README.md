@@ -76,6 +76,32 @@ Forbidden actions: no violations recorded
 Alignment: partial
 ```
 
+## What `/skillspec` Does In Chat
+
+The installed `skillspec` skill is a prompt multiplexer. You give it one plain
+chat request, and its `skill.spec.yml` chooses the route, phases, commands,
+checks, and proof obligations.
+
+```text
+/skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf,
+compile it for Codex, install it, and prove it
+```
+
+That one prompt stages the source, converts prose into a SkillSpec contract,
+preserves package resources, validates and tests the spec, compiles the harness
+skill, installs it, and reports proof.
+
+The broader use cases are:
+
+| Goal | Chat prompt | What SkillSpec does |
+| --- | --- | --- |
+| Make skills verifiable | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` | Converts a prose `SKILL.md` into routes, rules, phases, dependencies, resources, commands, tests, progress tracking, and alignment proof. |
+| Route large skill libraries | `/skillspec install router` | Marks managed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves `durable-executor` as the implicit first hop when present. |
+| Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop skill so tool-backed work can preserve traces, evidence, alignment, and token stats. |
+| Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable rote workspace as evidence, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
+| Revise an existing contract | `/skillspec revise this spec to add router setup checks` | Starts from the current grammar and active handles, patches the reviewed contract, then reruns structural QA. |
+| Prove value before release | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
+
 ## Install
 
 Marketplace path:
@@ -87,7 +113,7 @@ Marketplace path:
 /skillspec import ./my-skill, compile it for Codex, install it, and prove it
 /skillspec install router
 /skillspec install durable-executor from /path/or/public-uri
-/skillspec observe durable workspace <workspace> and create a spec skill
+/skillspec create from observed durable execution: "use parallel web to enrich this profile"
 ```
 
 That is the intended user experience: import the existing skill, choose the

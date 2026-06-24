@@ -18,6 +18,7 @@ mod router_lifecycle;
 mod sensemake;
 mod trace;
 mod visibility;
+mod workspace_synthesizer;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use error::Result;
@@ -179,6 +180,44 @@ enum Command {
         /// Output path for the generated skill.spec.yml draft.
         #[arg(long)]
         out: PathBuf,
+    },
+    #[command(
+        about = "Synthesize a draft SkillSpec from a durable rote workspace (rote-specific)",
+        long_about = "Synthesize a draft SkillSpec from rote-specific durable execution evidence. This optional integration requires a rote workspace name and validates `rote workspace stats`, `rote workspace inspect log`, and `rote workspace inspect meta` evidence before writing a scaffold."
+    )]
+    SynthesizeFromWorkspace {
+        /// Durable rote workspace name that was created by durable execution.
+        workspace: String,
+        /// Output skill folder to create. The command writes skill.spec.yml and resources/observed-workspace/.
+        #[arg(long)]
+        out: PathBuf,
+        /// Original user task that created the durable workspace.
+        #[arg(long, allow_hyphen_values = true)]
+        task: Option<String>,
+        /// Skill id/name to use for the generated scaffold.
+        #[arg(long)]
+        name: Option<String>,
+        /// Number of command-log rows to collect when --workspace-log is omitted.
+        #[arg(long, default_value_t = 50)]
+        log_last: usize,
+        /// Pre-captured report from `rote workspace stats <workspace>`.
+        #[arg(long)]
+        workspace_stats_report: Option<PathBuf>,
+        /// Pre-captured command log from `rote workspace inspect log --last <n>`.
+        #[arg(long)]
+        workspace_log: Option<PathBuf>,
+        /// Pre-captured metadata from `rote workspace inspect meta`.
+        #[arg(long)]
+        workspace_meta: Option<PathBuf>,
+        /// Optional pre-captured dependency graph from `rote workspace inspect deps`.
+        #[arg(long)]
+        workspace_deps: Option<PathBuf>,
+        /// Overwrite an existing skill.spec.yml in the output folder.
+        #[arg(long)]
+        force: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
     },
     #[command(about = "Build a searchable skill catalog outside model context")]
     Index {
@@ -1277,6 +1316,39 @@ fn run() -> Result<()> {
             let imported = importer::import_skill_for_output(&path, &out)?;
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
+        }
+        Command::SynthesizeFromWorkspace {
+            workspace,
+            out,
+            task,
+            name,
+            log_last,
+            workspace_stats_report,
+            workspace_log,
+            workspace_meta,
+            workspace_deps,
+            force,
+            json,
+        } => {
+            let synthesis = workspace_synthesizer::synthesize_from_workspace(
+                workspace_synthesizer::SynthesizeOptions {
+                    workspace,
+                    task,
+                    out,
+                    name,
+                    log_last,
+                    workspace_stats_report,
+                    workspace_log,
+                    workspace_meta,
+                    workspace_deps,
+                    force,
+                },
+            )?;
+            if json {
+                report::json(&synthesis)?;
+            } else {
+                report::text(&workspace_synthesizer::render_report(&synthesis))?;
+            }
         }
         Command::Index {
             roots,

@@ -391,6 +391,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
     assert!(stdout(&top).contains("router"));
+    assert!(stdout(&top).contains("synthesize-from-workspace"));
 
     let trace = Command::new(bin())
         .arg("trace")
@@ -416,6 +417,20 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("--execution-trace <EXECUTION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--json"));
+
+    let synthesize = Command::new(bin())
+        .arg("synthesize-from-workspace")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&synthesize);
+    let synthesize_help = stdout(&synthesize);
+    assert!(synthesize_help.contains("rote-specific"));
+    assert!(synthesize_help.contains("durable execution evidence"));
+    assert!(synthesize_help.contains("rote workspace"));
+    assert!(synthesize_help.contains("--workspace-stats-report"));
+    assert!(synthesize_help.contains("--workspace-log"));
+    assert!(synthesize_help.contains("--workspace-meta"));
 }
 
 #[test]
@@ -1631,6 +1646,45 @@ tests:
         out.contains("skillspec capability search <capability> --domain <domain> --explain --json")
     );
     assert!(out.contains("query ranked local seeds"));
+}
+
+#[test]
+fn sensemake_teaches_rote_workspace_synthesis_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-rote-workspace");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Rote workspace synthesis fixture.
+commands:
+  synthesize_from_workspace:
+    description: Create a draft SkillSpec from durable rote workspace evidence.
+    template: skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>
+    safety: local_write
+    requires:
+      dependencies: [rote_cli]
+dependencies:
+  rote_cli:
+    kind: cli
+    command: rote
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("inspect rote workspace synthesis command"));
+    assert!(out.contains(
+        "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>"
+    ));
+    assert!(out.contains("synthesize_from_workspace is rote-specific"));
 }
 
 #[test]
@@ -3530,6 +3584,138 @@ fn importer_output_matches_golden_snapshot() {
         .path()
         .join("resources/imported-code/skill_code_1.sh")
         .is_file());
+}
+
+#[test]
+fn synthesize_from_workspace_generates_valid_review_scaffold() {
+    let dir = TempDir::new("synthesize-workspace");
+    let stats = dir.path().join("stats.txt");
+    let log = dir.path().join("log.json");
+    let meta = dir.path().join("meta.txt");
+    let deps = dir.path().join("deps.txt");
+    let out = dir.path().join("profile-enricher");
+
+    write_file(
+        &stats,
+        r#"
+Workspace: profile-enrichment
+Total tokens: 12000
+Source tokens: 9000
+Result tokens: 1200
+"#,
+    );
+    write_file(
+        &log,
+        r#"
+[
+  {"sequence":1,"command":"parallel web enrich --profile input.json --out enriched.json"},
+  {"sequence":2,"command":"jq . enriched.json"}
+]
+"#,
+    );
+    write_file(
+        &meta,
+        r#"
+name = profile-enrichment
+strategy = durable
+"#,
+    );
+    write_file(
+        &deps,
+        r#"
+1 -> 2
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("synthesize-from-workspace")
+        .arg("profile-enrichment")
+        .arg("--task")
+        .arg("use parallel web to enrich this profile")
+        .arg("--out")
+        .arg(&out)
+        .arg("--workspace-stats-report")
+        .arg(&stats)
+        .arg("--workspace-log")
+        .arg(&log)
+        .arg("--workspace-meta")
+        .arg(&meta)
+        .arg("--workspace-deps")
+        .arg(&deps)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["workspace"], "profile-enrichment");
+    assert_eq!(report["observed_command_candidates"], 2);
+    assert!(report["inferred_dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|dependency| dependency == "parallel_cli"));
+
+    let spec = out.join("skill.spec.yml");
+    assert!(spec.is_file());
+    assert!(out.join("resources/observed-workspace/report.md").is_file());
+    assert!(out.join("resources/observed-workspace/stats.txt").is_file());
+    assert!(out.join("resources/observed-workspace/log.txt").is_file());
+    assert!(out.join("resources/observed-workspace/meta.txt").is_file());
+    assert!(out.join("resources/observed-workspace/deps.txt").is_file());
+    assert!(out
+        .join("resources/observed-workspace/coverage-matrix.md")
+        .is_file());
+
+    let yaml = fs::read_to_string(&spec).unwrap();
+    assert!(yaml.contains("parallel_cli"));
+    assert!(yaml.contains("observed_workspace_report"));
+    assert!(yaml.contains("observed_command_1"));
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    let test = Command::new(bin()).arg("test").arg(&spec).output().unwrap();
+    assert_success(&test);
+    let imports = Command::new(bin())
+        .arg("imports")
+        .arg("check")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&imports);
+}
+
+#[test]
+fn synthesize_from_workspace_requires_command_log_entries() {
+    let dir = TempDir::new("synthesize-workspace-empty-log");
+    let stats = dir.path().join("stats.txt");
+    let log = dir.path().join("log.txt");
+    let meta = dir.path().join("meta.txt");
+    let out = dir.path().join("profile-enricher");
+
+    write_file(&stats, "Workspace: profile-enrichment\nTotal tokens: 10\n");
+    write_file(&log, "[]\n");
+    write_file(&meta, "name = profile-enrichment\n");
+
+    let output = Command::new(bin())
+        .arg("synthesize-from-workspace")
+        .arg("profile-enrichment")
+        .arg("--out")
+        .arg(&out)
+        .arg("--workspace-stats-report")
+        .arg(&stats)
+        .arg("--workspace-log")
+        .arg(&log)
+        .arg("--workspace-meta")
+        .arg(&meta)
+        .output()
+        .unwrap();
+    assert_failure(&output);
+    assert!(stderr(&output).contains("workspace command log evidence has no command entries"));
+    assert!(!out.join("skill.spec.yml").exists());
 }
 
 #[test]

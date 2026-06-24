@@ -36,6 +36,7 @@ skillspec <COMMAND>
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path>` | Create a mechanical draft SkillSpec from a local skill file or folder. |
+| `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
 | `index --roots <path>... --out <index-file-or-router-dir>` | Build a searchable skill catalog outside model context. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
@@ -560,6 +561,50 @@ Notes:
 - Fenced code blocks are materialized under `resources/imported-code/` next to
   the output draft and referenced from `code.source.file` with resource
   provenance.
+
+## `synthesize-from-workspace`
+
+```text
+skillspec synthesize-from-workspace <WORKSPACE> --out <OUT>
+```
+
+Arguments:
+
+- `<WORKSPACE>`: durable rote workspace name created by durable execution.
+
+Options:
+
+- `--out <OUT>`: output skill folder. The command writes `skill.spec.yml` and
+  `resources/observed-workspace/`.
+- `--task <TASK>`: original user task that created the durable workspace.
+- `--name <NAME>`: optional generated skill id/name.
+- `--log-last <N>`: number of command-log rows to collect when
+  `--workspace-log` is omitted. Defaults to `50`.
+- `--workspace-stats-report <PATH>`: pre-captured output from
+  `rote workspace stats <workspace>`.
+- `--workspace-log <PATH>`: pre-captured output from
+  `rote workspace inspect log --last <n>`.
+- `--workspace-meta <PATH>`: pre-captured output from
+  `rote workspace inspect meta`.
+- `--workspace-deps <PATH>`: optional pre-captured output from
+  `rote workspace inspect deps`.
+- `--force`: overwrite an existing `skill.spec.yml` in the output folder.
+- `--json`: emit JSON instead of a concise text report.
+
+Notes:
+
+- This is a rote-specific optional integration, not a generic SkillSpec
+  workspace importer. It hinges on durable execution having already created a
+  rote workspace.
+- Without pre-captured files, it collects evidence through `rote workspace
+  stats <workspace>`, `rote workspace inspect log --last <n>`, and
+  `rote workspace inspect meta`.
+- Synthesis fails when stats do not name the requested workspace, when the
+  command log has no entries, or when metadata is empty.
+- The generated SkillSpec is a reviewed scaffold. It preserves stats, log,
+  metadata, optional dependency graph, a workspace report, and a coverage matrix
+  under resources. Observed command templates and dependencies are inferred
+  conservatively and remain review-required before replay, install, or release.
 
 ## `install`
 

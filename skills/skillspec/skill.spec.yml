@@ -285,11 +285,56 @@ routes:
       phases:
         - id: elicit_observation_task
           owner_skill: skillspec
-          description: Ask for the task to run or identify the existing durable workspace to observe.
+          description: Ask for the task to run or identify the existing durable workspace to observe; when the prompt already includes the task, carry it forward without inventing a workspace.
           requires:
             - choose_observation_workspace
+            - capture_observation_task
           forbid:
             - observe_anonymous_workspace
+          jumps:
+            - when: existing_named_workspace_supplied
+              to_phase: observe_durable_workspace
+              reason: Existing durable workspaces can be observed directly without running another task.
+        - id: run_observation_task
+          owner_skill: durable-executor
+          description: Run the quoted observation task through durable-executor first, preserving the selected substrate, capability evidence, workspace name, artifacts, and return packet for synthesis.
+          tool_boundary:
+            allow:
+              - durable-executor
+              - skillspec_cli
+              - rote_exec
+              - local_trace_files
+            permission_required_for:
+              - any_unlisted_tool
+              - external_network_or_browser_action
+              - credentialed_or_private_data_access
+          requires:
+            - verify_durable_executor
+            - handoff_observation_task_to_durable_executor
+            - capture_observation_workspace
+            - record_capability_selection_ledger
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+            - observe_anonymous_workspace
+          handoff:
+            to_skill: durable-executor
+            boundary: resume_after_handoff
+            pass_context:
+              - user_intent
+              - observation_task
+              - workspace
+              - trace_dir
+              - return_to
+              - execution_policy
+              - evidence_context
+            forbid:
+              - direct_cli_without_rote_exec
+              - direct_shell_command_without_rote_exec
+              - direct_api_call_without_rote_adapter_or_rote_exec
+              - generated_skill_install_without_review
+            reason: The observed workflow must be created by durable execution evidence first; skillspec resumes only after a named workspace exists to inspect.
         - id: observe_durable_workspace
           owner_skill: skillspec
           description: Inspect rote workspace stats, command log, metadata, and artifacts without replaying unsafe actions.
@@ -314,6 +359,7 @@ routes:
           owner_skill: skillspec
           description: Build a reviewed skill.spec.yml from observed commands, dependencies, inputs, outputs, rules, elicitations, tests, and proof gaps.
           requires:
+            - synthesize_from_workspace
             - synthesize_observed_skill_spec
             - fill_coverage_matrix
             - produce_observed_workspace_spec
@@ -521,6 +567,12 @@ rules:
         - rote-exec workspace
         - durable execution workspace
         - observe workspace and create skill
+        - create from observed durable execution
+        - create skill from observed durable execution
+        - turn observed durable execution into a skill
+        - create skill by observing durable execution
+        - run task first and create skill
+        - observe durable execution and create skill
     prefer: observed_durable_workspace_to_skill
     elicit:
       - choose_observation_workspace
@@ -784,20 +836,20 @@ elicitations:
         description: Leave durable first-hop unavailable and report that router mode can still install.
     default: existing_installed
   choose_observation_workspace:
-    question: Which durable workspace should be observed?
+    question: Which durable execution evidence should be used?
     required_when:
       - route: observed_durable_workspace_to_skill
     choices:
+      - id: run_task_first
+        label: Run task first
+        description: Use the concrete task in the prompt, run it through durable-executor, then observe the resulting workspace.
       - id: current_workspace
         label: Current workspace
         description: Observe the named rote workspace already active in this session.
       - id: named_workspace
         label: Named workspace
         description: Use the workspace name provided by the user.
-      - id: run_task_first
-        label: Run task first
-        description: Ask for a concrete task, run it through durable-executor, then observe that workspace.
-    default: current_workspace
+    default: run_task_first
   approve_dependency_surface:
     question: Do you approve the inferred dependency surface for validation, proof, compile, or install?
     required_when:
@@ -1261,6 +1313,14 @@ commands:
     requires:
       dependencies:
         - rote_cli
+  synthesize_from_workspace:
+    description: Rote-specific synthesis command that creates a draft SkillSpec skill from a named durable rote workspace after stats, command log, and metadata evidence are available.
+    template: skillspec synthesize-from-workspace <workspace> --task '<observed-task>' --out <skill-folder>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
   install_dry_run:
     description: Preview install writes for the selected target without modifying harness roots.
     template: skillspec install skill <skill-folder> --target <target> --dry-run
@@ -1444,10 +1504,11 @@ recipes:
         - observed_skill_spec
     steps:
       - ask: choose_observation_workspace
+      - note: If the prompt contains a concrete task and no existing workspace, hand it to durable-executor first and resume with the returned workspace.
       - run_command: observe_workspace_stats
       - run_command: observe_workspace_log
       - run_command: observe_workspace_meta
-      - run_code: synthesize_observed_skill_spec
+      - run_command: synthesize_from_workspace
       - produce_artifact: observed_skill_spec
       - run_command: validate_spec
       - run_command: deps_check_all
@@ -1486,11 +1547,11 @@ code:
     language: text
     kind: transform
     source:
-      inline: "Read the durable workspace report, map observed user intent, commands, dependencies, files, prompts, errors, outputs, and proof gaps into a reviewed skill.spec.yml. Use observed facts as evidence, mark inferred behavior in the coverage matrix, and do not replay mutating workspace actions without approval."
+      inline: "Read the durable workspace report, map observed user intent, capability-selection evidence, commands, dependencies, files, prompts, errors, outputs, and proof gaps into a reviewed skill.spec.yml. Preserve why a substrate such as a Parallel CLI, rote adapter, browser handoff, or CLI fallback was selected, and record alternatives rejected by policy or readiness. Use observed facts as evidence, mark inferred behavior in the coverage matrix, do not turn a transcript into a brittle command list, and do not replay mutating workspace actions without approval."
     provenance:
       resource: source_skill_md
       heading: Post-install multiplexer
-    purpose: Convert a named durable rote workspace into a SkillSpec-backed skill contract.
+    purpose: Convert a named durable rote workspace into a SkillSpec-backed skill contract; this path is rote-specific and depends on rote workspace evidence.
     requires:
       dependencies:
         - skillspec_cli
@@ -1507,7 +1568,7 @@ code:
       writes_files: true
       network: false
       notes:
-        - Observes local workspace evidence and synthesizes a draft; it does not replay commands or install the result.
+        - Observes local rote workspace evidence and synthesizes a draft; it does not replay commands or install the result.
 states:
   start:
     do:
@@ -1597,8 +1658,17 @@ closures:
       - observe_workspace_stats
       - observe_workspace_log
       - observe_workspace_meta
+      - synthesize_from_workspace
       - validate_spec
       - test_spec
+  capture_observation_task:
+    description: Preserve the quoted or otherwise supplied real task that durable-executor should run before synthesis, without replacing it with a vague workspace placeholder.
+  handoff_observation_task_to_durable_executor:
+    description: Hand the observation task to durable-executor with return_to=skillspec so the task is executed once through rote-backed evidence before SkillSpec synthesis resumes.
+  capture_observation_workspace:
+    description: Record the durable workspace name, trace directory, artifacts, and return packet produced by durable-executor before inspecting logs or stats.
+  record_capability_selection_ledger:
+    description: Preserve why the execution substrate was chosen, including detected tools such as Parallel CLI, accepted or rejected adapter/browser options, readiness checks, and policy gates.
   report_alignment_status:
     description: Report trace alignment with Decision replay, Phase order, Requirements, Missing proof, Forbidden actions, and Alignment pass/partial/fail instead of a bare unproven label.
   report_degraded_status:
@@ -1711,6 +1781,22 @@ tests:
         - make_durable_executor_explicit_in_router_mode
   - name: observed durable workspace creates spec skill
     input: /skillspec observe durable workspace skillspec-demo and create a spec skill
+    expect:
+      route: observed_durable_workspace_to_skill
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_observed_workspace_to_spec
+      elicit:
+        - choose_observation_workspace
+      after_success:
+        - produce_observed_workspace_spec
+        - generate_value_report
+      forbid:
+        - observe_anonymous_workspace
+        - replay_workspace_actions_without_approval
+        - claim_workspace_tokens_without_stats
+  - name: observed durable execution task runs before skill synthesis
+    input: '/skillspec create from observed durable execution: "use parallel web to enrich this profile"'
     expect:
       route: observed_durable_workspace_to_skill
       matched_rules:
@@ -1861,7 +1947,7 @@ review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an existing skill or approved source path/URI.
-  - Observed-workspace spec creation depends on the quality of the durable workspace log and should mark inferred behavior in the coverage matrix.
+  - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
   - The optional Claude compile/install path should be verified in a Claude-compatible harness before release claims.
 metadata:
@@ -1884,9 +1970,9 @@ metadata:
     routes: 8
     rules: 16
     dependency_checks: 5
-    command_templates: 40
+    command_templates: 41
     recipes: 8
-    tests: 16
+    tests: 19
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:

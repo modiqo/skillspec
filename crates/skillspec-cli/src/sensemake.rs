@@ -100,6 +100,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_rote_workspace_synthesis(spec) {
+        items.push(
+            "synthesize_from_workspace is rote-specific: it requires durable rote workspace stats, command log, and metadata evidence before creating a draft skill"
+                .to_owned(),
+        );
+    }
     items
 }
 
@@ -387,6 +393,21 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_rote_workspace_synthesis(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "inspect rote workspace synthesis command",
+                command: format!(
+                    "skillspec query {spec_path} command:synthesize_from_workspace --view summary"
+                ),
+            },
+            NavigationHint {
+                intent: "synthesize from a rote durable workspace",
+                command: "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>"
+                    .to_owned(),
+            },
+        ]);
+    }
     hints
 }
 
@@ -399,6 +420,14 @@ fn has_capability_bootstrap(spec: &SkillSpec) -> bool {
             .commands
             .keys()
             .any(|id| id.contains("capability_seed"))
+}
+
+fn has_rote_workspace_synthesis(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("synthesize_from_workspace")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("synthesize-from-workspace"))
 }
 
 #[derive(Clone, Debug)]
