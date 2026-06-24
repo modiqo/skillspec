@@ -16,7 +16,7 @@ Use these paths when you do not need the whole sequence:
 | Newcomer | [Reliability Gap](00-skills-reliability-gap.md) | [Why SkillSpec](01-why-skillspec.md), [Prose Skills Vs SkillSpec-Backed Skills](02-prose-vs-skillspec.md), [visual explainers](design/explained/README.md) |
 | Skill author | [Why SkillSpec](01-why-skillspec.md) | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md), [Import To Release](design/explained/01-import-to-release.md), [Skill Authoring Lifecycle](design/04-skill-authoring-lifecycle.md), [Source Map Progressive Reader](design/18-source-map-progressive-reader.md) |
 | CLI tester | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | [Command Log](design/16-command-log.md), [Design Documentation QA Process](design/17-qa-process.md) |
-| Maintainer | [Design docs](design/README.md) | [Command Log](design/16-command-log.md), [spec reference](../spec/README.md), [conformance fixtures](../conformance/) |
+| Maintainer | [Design docs](design/README.md) | [Contract And Trace Methodology](08-contract-trace-methodology.md), [Command Log](design/16-command-log.md), [spec reference](../spec/README.md), [conformance fixtures](../conformance/) |
 | Visual reviewer | [Visual explainers](design/explained/README.md) | [Grammar atlas](grammar-atlas/README.md), [Grammar And Conformance](design/02-grammar-and-conformance.md) |
 
 ## Reading Order
@@ -31,6 +31,7 @@ Use these paths when you do not need the whole sequence:
 | 05 | [Good First Issues](05-good-first-issues.md) | Starter work for contributors. |
 | 06 | [Community Post Drafts](06-community-posts.md) | Short-form launch and discussion drafts. |
 | 07 | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | Reference runbook for testing the `/skillspec` setup multiplexer in Codex and Claude. |
+| 08 | [Contract And Trace Methodology](08-contract-trace-methodology.md) | Measurement methodology for static well-formedness, behavioral contracts, trace alignment, and unproven verdicts. |
 
 ## Subdirectories
 

@@ -4,6 +4,7 @@ mod capability;
 mod compiler;
 mod decision;
 mod deps;
+mod doctor;
 mod durable_lifecycle;
 mod error;
 mod grammar;
@@ -139,6 +140,17 @@ enum Command {
         /// Output detail level.
         #[arg(long, value_enum, default_value_t = SenseViewArg::Summary)]
         view: SenseViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Scan a prose skill for static reliability and context-burden debt",
+        long_about = "Scan a prose SKILL.md file, local single skill folder, or public GitHub single skill folder without executing tools or calling a model. Remote GitHub folders are staged with a temporary sparse checkout and cleaned up after the report. Doctor requires exactly one SKILL.md under the target so parent folders with many skills are rejected. Reports structural score, activation-loaded surface percentage, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
+    )]
+    Doctor {
+        /// Local SKILL.md file, local single skill folder, or public GitHub single skill folder URL.
+        path: String,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -1281,6 +1293,14 @@ fn run() -> Result<()> {
                 report::json(&report)?;
             } else {
                 report::text(&sensemake::render_refs(&report))?;
+            }
+        }
+        Command::Doctor { path, json } => {
+            let doctor_report = doctor::inspect_target(&path)?;
+            if json {
+                report::json(&doctor_report)?;
+            } else {
+                report::text(&doctor::render(&doctor_report))?;
             }
         }
         Command::Source { command } => match command {

@@ -162,10 +162,20 @@ Import it:
 
 ```sh
 skillspec grammar sensemake --view porting
-skillspec import-skill ./my-skill --out ./my-skill/skill.spec.yml
+skillspec doctor ./my-skill
+skillspec source map ./my-skill --out ./my-skill/.skillspec/source-map
+skillspec import-skill ./my-skill \
+  --out ./my-skill/skill.spec.yml \
+  --source-map ./my-skill/.skillspec/source-map/source-map.json
 skillspec validate ./my-skill/skill.spec.yml
 skillspec test ./my-skill/skill.spec.yml
 ```
+
+`skillspec doctor` can also qualify a public GitHub single skill folder before
+import, for example
+`skillspec doctor https://github.com/anthropics/skills/tree/main/skills/pdf`.
+It stages the requested folder temporarily and rejects parent folders that
+contain multiple `SKILL.md` files.
 
 Compile it for a harness:
 
@@ -254,6 +264,7 @@ This README is the fast path.
 - [Detailed README](README_DETAILED.md)
 - [Docs index and reader paths](docs/README.md)
 - [The Reliability Gap In Agent Skills](docs/00-skills-reliability-gap.md)
+- [Contract And Trace Methodology](docs/08-contract-trace-methodology.md)
 - [Design docs](docs/design/README.md)
 - [Why SkillSpec](docs/01-why-skillspec.md)
 - [Grammar](spec/grammar.md)

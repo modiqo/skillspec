@@ -40,6 +40,7 @@ activation:
     - prose skill to skillspec
     - skill.spec.yml
     - skillspec import-skill
+    - skillspec doctor
     - skillspec source map
     - skillspec source query
     - source-map.json
@@ -61,6 +62,7 @@ applies_when:
       - port a local skill folder into SkillSpec
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
+      - diagnose reliability debt and context burden in a prose skill before porting
       - preserve imported dependency mentions, package authority, install risk, and missing dependency proof gaps
       - install skill-router after SkillSpec is installed
       - install router mode after SkillSpec is installed
@@ -127,6 +129,7 @@ routes:
           description: Resolve the user-supplied local path to one skill folder and preserve sibling resources.
           requires:
             - inventory_source_folder
+            - doctor_source_skill
             - source_map_create
             - source_map_coverage
             - source_map_nodes
@@ -1204,6 +1207,18 @@ artifacts:
         id: import_skill_draft
       - kind: recipe
         id: local_porting_loop
+  doctor_report:
+    kind: report
+    path: .skillspec/reports/doctor.json
+    description: Static reliability-debt and context-burden diagnostic for exactly one prose source before semantic import; remote GitHub single skill folders may be qualified by temporary sparse checkout.
+    produced_by:
+      - kind: command
+        id: doctor_source_skill
+    consumed_by:
+      - kind: recipe
+        id: local_porting_loop
+      - kind: recipe
+        id: coverage_review_loop
   mechanical_draft:
     kind: file
     path: .skillspec/drafts/skill.spec.yml
@@ -1360,6 +1375,13 @@ commands:
     requires:
       dependencies:
         - rg_cli
+  doctor_source_skill:
+    description: Score exactly one prose skill's static reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps before import. The target may be a local skill folder or a public GitHub single skill folder; parent folders with multiple SKILL.md files are invalid.
+    template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
   source_map_create:
     description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span.
     template: skillspec source map <source-skill-folder> --out <draft-dir>/.skillspec/source-map
@@ -1708,11 +1730,14 @@ recipes:
         - source_skill_md
       artifacts:
         - source_map
+        - doctor_report
         - coverage_matrix
     steps:
       - run_command: source_map_nodes
       - run_command: source_map_code
+      - run_command: doctor_source_skill
       - note: Query exact source-map handles with --view full as needed; load the full source file only for bounded small sources.
+      - note: Use the doctor report to prioritize large activation surface, primacy-bias exposure, mixed code/instructions, ambiguous code fences, implicit dependency contracts, and missing proof surfaces.
       - note: Fill prose_span, obligation, skillspec_construct, confidence, status, and review_note for every mapped source section.
       - note: Use only the current source folder, embedded grammar, draft sensemake, and user-approved references; do not consult existing ports, repo history, memory, or examples unless the user explicitly asks.
       - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
@@ -1744,6 +1769,7 @@ recipes:
         - rg_cli
       artifacts:
         - preserved_source
+        - doctor_report
         - source_map
         - mechanical_draft
         - dependency_ledger
@@ -1751,6 +1777,7 @@ recipes:
         - value_report
     steps:
       - run_command: inventory_source_folder
+      - run_command: doctor_source_skill
       - run_command: source_map_create
       - run_command: source_map_coverage
       - run_command: source_map_nodes

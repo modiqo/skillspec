@@ -81,6 +81,11 @@ Accept these source forms:
 Remote sources must be staged locally before porting. Do not install directly
 from a remote checkout.
 
+For candidate qualification, `skillspec doctor` may be run directly against a
+public GitHub single skill folder. It stages the requested folder in a temporary
+sparse checkout, removes that checkout after the report, and rejects parent
+folders that contain multiple `SKILL.md` files.
+
 Use a temporary staging directory:
 
 ```bash
@@ -109,6 +114,7 @@ source skill folder
 
    ```bash
    skillspec --help
+   skillspec doctor --help
    skillspec source map --help
    skillspec source query --help
    skillspec source coverage --help
@@ -125,10 +131,10 @@ source skill folder
    skillspec deps check --help
    ```
 
-   Required capabilities are `source map`, `source query`, `source coverage`,
-   `source stale`, `grammar sensemake`, `grammar checklist`, `grammar schema`,
-   `import-skill`, `validate`, `imports check`, `test`, `compile`, and `deps
-   check`.
+   Required capabilities are `doctor`, `source map`, `source query`, `source
+   coverage`, `source stale`, `grammar sensemake`, `grammar checklist`,
+   `grammar schema`, `import-skill`, `validate`, `imports check`, `test`,
+   `compile`, and `deps check`.
 
    If `imports check` or `deps check` is unavailable, continue only in degraded
    draft mode:
@@ -142,10 +148,10 @@ source skill folder
    - do not install or release the generated skill
    - tell the user to upgrade the SkillSpec CLI before install/release
 
-   If `source map`, `source query`, `source coverage`, `source stale`,
-   `grammar sensemake`, `grammar checklist`, `import-skill`, `validate`,
-   `test`, or `compile` is unavailable, stop and ask the user to upgrade the
-   SkillSpec CLI before porting.
+   If `doctor`, `source map`, `source query`, `source coverage`,
+   `source stale`, `grammar sensemake`, `grammar checklist`, `import-skill`,
+   `validate`, `test`, or `compile` is unavailable, stop and ask the user to
+   upgrade the SkillSpec CLI before porting.
 
 2. Resolve the source to one local skill folder. A single `SKILL.md` is allowed,
    but a folder is preferred because referenced files, scripts, assets, and
@@ -166,6 +172,8 @@ source skill folder
      "must complete in order", and "if/otherwise"
 
    ```bash
+   skillspec doctor path/to/skill-folder --json
+   skillspec doctor https://github.com/owner/repo/tree/main/path/to/skill --json
    skillspec source map path/to/skill-folder --out <draft-dir>/.skillspec/source-map
    skillspec source coverage <draft-dir>/.skillspec/source-map/source-map.json
    skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
@@ -174,14 +182,21 @@ source skill folder
    skillspec source stale <draft-dir>/.skillspec/source-map/source-map.json --root path/to/skill-folder
    ```
 
-5. Use the source map as the progressive reader. Query exact source handles with
+5. Use the doctor report to prioritize reliability debt before semantic
+   promotion: large activation surface, primacy-bias exposure, mixed code and
+   instructions, ambiguous code fences, implicit dependency contracts, missing
+   references, and absent proof/trace surfaces. Treat it as a static risk
+   diagnostic, not evidence that a run failed. If the source is a parent folder
+   with multiple skills, choose one skill folder first; do not doctor the parent
+   as a blended candidate.
+6. Use the source map as the progressive reader. Query exact source handles with
    `--view full` when a heading, code block, dependency, local reference, or
    modal obligation needs semantic promotion. Do not load a large source file
    wholesale when a source-map handle can recover the exact span. For small
    sources, a full `SKILL.md` read is acceptable only after the map confirms the
    file is bounded and has no sibling resources that affect routing, commands,
    code, dependencies, or recipes.
-6. Teach the harness the current grammar before importing or editing the spec:
+7. Teach the harness the current grammar before importing or editing the spec:
 
    ```bash
    skillspec grammar sensemake --view index
@@ -191,13 +206,13 @@ source skill folder
    Use this output as the active grammar map. Do not infer the grammar from
    memory, Rust source, old examples, or generic YAML habits.
 
-7. Run the mechanical extractor for a draft:
+8. Run the mechanical extractor for a draft:
 
    ```bash
    skillspec import-skill path/to/skill-folder --out skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json
    ```
 
-8. Sensemake the draft and load the import checklist before semantic review:
+9. Sensemake the draft and load the import checklist before semantic review:
 
    ```bash
    skillspec sensemake skill.spec.yml --view index
@@ -467,6 +482,7 @@ surface before doing meaningful work:
 
 ```bash
 skillspec --help
+skillspec doctor --help
 skillspec source map --help
 skillspec source query --help
 skillspec source coverage --help
@@ -492,7 +508,7 @@ exist, continue only as a draft port. In draft mode:
   skills
 - tell the user to upgrade the CLI before release or installation
 
-If `source map`, `source query`, `source coverage`, `source stale`,
+If `doctor`, `source map`, `source query`, `source coverage`, `source stale`,
 `import-skill`, `validate`, `test`, or `compile` is missing, stop and ask the
 user to upgrade the SkillSpec CLI before porting.
 

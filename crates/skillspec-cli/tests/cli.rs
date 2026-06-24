@@ -414,6 +414,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("sensemake"));
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
+    assert!(stdout(&top).contains("doctor"));
     assert!(stdout(&top).contains("source"));
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
@@ -482,6 +483,18 @@ fn help_lists_trace_align_arguments() {
     let import_help = stdout(&import_skill);
     assert!(import_help.contains("--source-map"));
     assert!(import_help.contains("source-map.json"));
+
+    let doctor = Command::new(bin())
+        .arg("doctor")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&doctor);
+    let doctor_help = stdout(&doctor);
+    assert!(doctor_help.contains("structural score"));
+    assert!(doctor_help.contains("activation-loaded surface percentage"));
+    assert!(doctor_help.contains("single skill folder"));
+    assert!(doctor_help.contains("sparse checkout"));
 
     let durable = Command::new(bin())
         .arg("durable-executor")
@@ -2144,6 +2157,45 @@ dependencies:
         "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>"
     ));
     assert!(out.contains("synthesize_from_workspace is rote-specific"));
+}
+
+#[test]
+fn sensemake_teaches_doctor_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-doctor");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Doctor fixture.
+artifacts:
+  doctor_report:
+    kind: report
+    path: .skillspec/reports/doctor.json
+commands:
+  doctor_source_skill:
+    description: Diagnose prose reliability debt before import.
+    template: skillspec doctor <source-skill-folder> --json
+    safety: local_read
+  import_skill_draft:
+    description: Import a staged prose skill.
+    template: skillspec import-skill <source-skill-folder> --out <draft-dir>/skill.spec.yml
+    safety: local_write
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("diagnose prose reliability debt"));
+    assert!(out.contains("skillspec doctor <source-skill-folder-or-uri> --json"));
+    assert!(out.contains("run doctor before import"));
 }
 
 #[test]
@@ -3876,6 +3928,98 @@ import { chromium } from "playwright";
     assert_failure(&stale_import);
     assert!(stderr(&stale_import).contains("source map"));
     assert!(stderr(&stale_import).contains("stale"));
+}
+
+#[test]
+fn doctor_reports_prose_skill_context_and_reliability_debt() {
+    let dir = TempDir::new("doctor-prose");
+    let skill_dir = dir.path().join("source-skill");
+    let mut skill = String::from(
+        r#"---
+name: dense-prose
+description: Use when a dense prose skill mixes instructions, snippets, and dependency assumptions.
+---
+
+# Dense Prose Skill
+
+Use the shell and Python to inspect the project, fetch external data, create a report, and install missing packages when needed.
+See [missing local reference](missing.md).
+
+```
+pip install pypdf
+```
+
+```python
+import pypdf
+from reportlab.pdfgen import canvas
+```
+
+"#,
+    );
+    for index in 1..=520 {
+        skill.push_str(&format!(
+            "{index}. Always run verification step {index} before continuing.\n"
+        ));
+    }
+    skill.push_str("\nNever skip the final proof summary.\n");
+    write_file(&skill_dir.join("SKILL.md"), &skill);
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&skill_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert!(report["structural_score"].as_u64().unwrap() < 40);
+    assert!(report["large_surface_percentage"].as_u64().unwrap() >= 90);
+    assert_eq!(report["counts"]["unlabeled_code_blocks_in_skill"], 1);
+    assert!(report["counts"]["numbered_steps"].as_u64().unwrap() >= 520);
+
+    let issues_text = serde_json::to_string(&report["issues"]).unwrap();
+    assert!(issues_text.contains("large_activation_body"));
+    assert!(issues_text.contains("primacy_bias_late_obligations"));
+    assert!(issues_text.contains("code_mixed_with_activation_instructions"));
+    assert!(issues_text.contains("unlabeled_code_fences"));
+    assert!(issues_text.contains("implicit_dependency_contract"));
+    assert!(issues_text.contains("ambiguous_execution_substrate"));
+    assert!(issues_text.contains("missing_behavior_contract"));
+    assert!(issues_text.contains("missing_trace_proof_surface"));
+    assert!(issues_text.contains("missing_referenced_files"));
+
+    let text = Command::new(bin())
+        .arg("doctor")
+        .arg(&skill_dir)
+        .output()
+        .unwrap();
+    assert_success(&text);
+    let text = stdout(&text);
+    assert!(text.contains("large_surface:"));
+    assert!(text.contains("docs/00-skills-reliability-gap.md"));
+    assert!(text.contains("docs/08-contract-trace-methodology.md"));
+}
+
+#[test]
+fn doctor_rejects_parent_folder_with_multiple_skills() {
+    let dir = TempDir::new("doctor-multi");
+    let root = dir.path().join("skills");
+    write_file(
+        &root.join("pdf").join("SKILL.md"),
+        "---\nname: pdf\ndescription: PDF skill.\n---\n# PDF\n",
+    );
+    write_file(
+        &root.join("csv").join("SKILL.md"),
+        "---\nname: csv\ndescription: CSV skill.\n---\n# CSV\n",
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .output()
+        .unwrap();
+    assert_failure(&output);
+    assert!(stderr(&output).contains("requires exactly one SKILL.md"));
 }
 
 #[test]

@@ -29,6 +29,7 @@ skillspec <COMMAND>
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
+| `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
@@ -218,6 +219,42 @@ Options:
 
 `refs` reports outgoing references from an item, such as route checks, command
 dependencies, rule preferences, phase requirements, and transition edges.
+
+## `doctor`
+
+```text
+skillspec doctor <TARGET> [--json]
+```
+
+Arguments:
+
+- `<TARGET>`: local `SKILL.md` file, local single skill folder, or public
+  GitHub single skill folder URL/shorthand to inspect.
+
+Options:
+
+- `--json`: emit JSON instead of a concise human report.
+
+`doctor` is a static diagnostic. It reads files and Markdown AST structure; it
+does not execute scripts, call tools, invoke a model, or simulate a task. It
+reports a structural score, activation-loaded surface percentage,
+frontmatter/activation/deferred surface split, and issue list.
+
+For public GitHub targets, `doctor` performs a temporary sparse checkout of the
+requested folder and removes it after the report. Supported remote forms include
+`https://github.com/owner/repo/tree/main/path/to/skill` and
+`owner/repo/path/to/skill`. `doctor` requires exactly one `SKILL.md` under the
+target; parent folders with many skills are rejected for both local and remote
+inputs.
+
+The issue model is grounded in the reliability-gap and contract-trace
+methodology: instruction-density degradation, primacy-bias exposure, code mixed
+with activation instructions, ambiguous code fences, implicit dependency
+contracts, missing local references, missing behavior contracts, and missing
+trace/proof surfaces.
+
+The verdict is about context and reliability burden, not observed runtime
+failure. Dynamic behavior remains `unproven` until a trace can be aligned.
 
 ## `source`
 

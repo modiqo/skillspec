@@ -106,6 +106,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_doctor(spec) {
+        items.push(
+            "for prose skill diagnostics, run doctor before import to quantify activation-loaded surface, instruction density, primacy-bias exposure, code/instruction mixing, dependency ambiguity, and unproven proof surfaces"
+                .to_owned(),
+        );
+    }
     if has_source_import(spec) {
         items.push(
             "for prose imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
@@ -447,6 +453,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_source_import(spec) {
         hints.extend([
             NavigationHint {
+                intent: "diagnose prose reliability debt",
+                command: "skillspec doctor <source-skill-folder-or-uri> --json".to_owned(),
+            },
+            NavigationHint {
                 intent: "map import source",
                 command:
                     "skillspec source map <source-skill> --out <draft>/.skillspec/source-map"
@@ -510,6 +520,15 @@ fn has_source_import(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("import-skill"))
+}
+
+fn has_doctor(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("doctor_source_skill")
+        || spec.artifacts.contains_key("doctor_report")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("skillspec doctor"))
 }
 
 #[derive(Clone, Debug)]
