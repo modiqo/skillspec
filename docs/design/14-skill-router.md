@@ -75,6 +75,18 @@ When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a
 successful install, then performs the same preparedness check.
 
+If a skill is added outside `skillspec install skill`, the router cannot observe
+that filesystem change until a router command runs. `skillspec router index
+status` is the read-only detector: it reports new, changed, and missing skills,
+marks each changed entry as prose-only or SkillSpec-backed, and gives conversion
+advice for prose-only `SKILL.md` packages. `skillspec router index refresh` is
+the repair step: when router config is present it reapplies router-managed
+explicit invocation controls, preserves `durable-executor` as the implicit
+exception, rebuilds the index, and checks preparedness. SkillSpec-backed
+out-of-band additions are indexed directly; prose-only additions are still made
+explicit-only and indexed, but the report advises converting them with
+`skillspec import-skill`.
+
 ## Visibility Model
 
 The router uses native harness controls where available.

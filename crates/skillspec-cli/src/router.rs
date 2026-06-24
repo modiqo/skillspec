@@ -61,12 +61,22 @@ pub struct IndexStatusReport {
     pub missing_skills: Vec<IndexStatusEntry>,
     pub updated_at_unix: Option<u64>,
     pub warnings: Vec<String>,
+    pub advice: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct IndexStatusEntry {
     pub name: String,
     pub path: PathBuf,
+    pub has_skill_spec: bool,
+    pub advice: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum IndexStatusKind {
+    New,
+    Changed,
+    Missing,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -283,6 +293,14 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
         apply_visibility_manifest_overrides(&mut discovered, manifest, &mut warnings)?;
     }
     if !index.is_file() {
+        let new_skills: Vec<_> = discovered
+            .iter()
+            .map(|entry| status_entry(entry, IndexStatusKind::New))
+            .collect();
+        let mut advice = vec![
+            "router index is missing; run `skillspec router index refresh` to build it".to_owned(),
+        ];
+        advice.extend(status_advice(&new_skills, &[], &[]));
         return Ok(IndexStatusReport {
             index,
             exists: false,
@@ -290,11 +308,12 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
             roots: options.roots,
             indexed_skills: 0,
             discovered_skills: discovered.len(),
-            new_skills: discovered.iter().map(status_entry).collect(),
+            new_skills,
             changed_skills: Vec::new(),
             missing_skills: Vec::new(),
             updated_at_unix: None,
             warnings,
+            advice,
         });
     }
 
@@ -316,10 +335,10 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
                 if indexed_entry.checksum != discovered_entry.checksum
                     || indexed_entry.visibility != discovered_entry.visibility =>
             {
-                changed_skills.push(status_entry(discovered_entry));
+                changed_skills.push(status_entry(discovered_entry, IndexStatusKind::Changed));
             }
             Some(_) => {}
-            None => new_skills.push(status_entry(discovered_entry)),
+            None => new_skills.push(status_entry(discovered_entry, IndexStatusKind::New)),
         }
     }
 
@@ -329,11 +348,12 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
             .iter()
             .any(|discovered_entry| same_path(&indexed_entry.path, &discovered_entry.path))
         {
-            missing_skills.push(status_entry(indexed_entry));
+            missing_skills.push(status_entry(indexed_entry, IndexStatusKind::Missing));
         }
     }
 
     let stale = !new_skills.is_empty() || !changed_skills.is_empty() || !missing_skills.is_empty();
+    let advice = status_advice(&new_skills, &changed_skills, &missing_skills);
     Ok(IndexStatusReport {
         index,
         exists: true,
@@ -346,6 +366,7 @@ pub fn index_status(options: IndexStatusOptions) -> Result<IndexStatusReport> {
         missing_skills,
         updated_at_unix,
         warnings,
+        advice,
     })
 }
 
@@ -410,6 +431,12 @@ pub fn render_index_status(report: &IndexStatusReport) -> String {
     render_status_entries(&mut output, "New skills", &report.new_skills);
     render_status_entries(&mut output, "Changed skills", &report.changed_skills);
     render_status_entries(&mut output, "Missing skills", &report.missing_skills);
+    if !report.advice.is_empty() {
+        output.push_str("\nAdvice:\n");
+        for advice in &report.advice {
+            output.push_str(&format!("- {advice}\n"));
+        }
+    }
     if !report.warnings.is_empty() {
         output.push_str("\nWarnings:\n");
         for warning in &report.warnings {
@@ -425,7 +452,20 @@ fn render_status_entries(output: &mut String, label: &str, entries: &[IndexStatu
     }
     output.push_str(&format!("\n{label}:\n"));
     for entry in entries {
-        output.push_str(&format!("- {}: {}\n", entry.name, entry.path.display()));
+        let kind = if entry.has_skill_spec {
+            "skillspec"
+        } else {
+            "prose"
+        };
+        output.push_str(&format!(
+            "- {} [{}]: {}\n",
+            entry.name,
+            kind,
+            entry.path.display()
+        ));
+        if let Some(advice) = &entry.advice {
+            output.push_str(&format!("  advice: {advice}\n"));
+        }
     }
 }
 
@@ -460,10 +500,57 @@ pub fn render_audit(report: &AuditReport) -> String {
     output
 }
 
-fn status_entry(entry: &SkillEntry) -> IndexStatusEntry {
+fn status_entry(entry: &SkillEntry, kind: IndexStatusKind) -> IndexStatusEntry {
     IndexStatusEntry {
         name: entry.name.clone(),
         path: entry.path.clone(),
+        has_skill_spec: entry.has_skill_spec,
+        advice: Some(status_entry_advice(entry, kind)),
+    }
+}
+
+fn status_advice(
+    new_skills: &[IndexStatusEntry],
+    changed_skills: &[IndexStatusEntry],
+    missing_skills: &[IndexStatusEntry],
+) -> Vec<String> {
+    let mut advice = Vec::new();
+    if new_skills
+        .iter()
+        .chain(changed_skills.iter())
+        .any(|entry| !entry.has_skill_spec)
+    {
+        advice.push(
+            "prose skill detected outside SkillSpec; run `skillspec import-skill <skill-folder> --out <skill-folder>/skill.spec.yml`, review, validate, and test it"
+                .to_owned(),
+        );
+    }
+    if !new_skills.is_empty() || !changed_skills.is_empty() {
+        advice.push(
+            "run `skillspec router index refresh` to apply router-managed explicit invocation controls and rebuild the routing index"
+                .to_owned(),
+        );
+    }
+    if !missing_skills.is_empty() {
+        advice.push(
+            "run `skillspec router index refresh` to remove missing skills from the routing index, or restore the missing skill folders"
+                .to_owned(),
+        );
+    }
+    advice
+}
+
+fn status_entry_advice(entry: &SkillEntry, kind: IndexStatusKind) -> String {
+    match kind {
+        IndexStatusKind::New | IndexStatusKind::Changed if entry.has_skill_spec => {
+            "SkillSpec-backed skill detected outside the router workflow; refresh will apply explicit invocation controls and index it".to_owned()
+        }
+        IndexStatusKind::New | IndexStatusKind::Changed => {
+            "prose skill detected outside SkillSpec; convert with `skillspec import-skill` and refresh will still apply explicit invocation controls and index it".to_owned()
+        }
+        IndexStatusKind::Missing => {
+            "skill is indexed but missing from current roots; refresh will remove it from the routing index".to_owned()
+        }
     }
 }
 

@@ -29,6 +29,13 @@ pub struct RouterUninstallOptions {
     pub dry_run: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct RouterRefreshOptions {
+    pub roots: Vec<PathBuf>,
+    pub index: PathBuf,
+    pub visibility_manifest: Option<PathBuf>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct RouterInstallReport {
     pub router_name: String,
@@ -56,6 +63,20 @@ pub struct RouterUninstallReport {
     pub index_removed: bool,
     pub config_removed: bool,
     pub restore: VisibilityRestoreReport,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterRefreshReport {
+    pub config: Option<PathBuf>,
+    pub router_config_present: bool,
+    pub roots: Vec<PathBuf>,
+    pub index: PathBuf,
+    pub visibility_manifest: Option<PathBuf>,
+    pub status_before: IndexStatusReport,
+    pub visibility: Option<VisibilityApplyReport>,
+    pub index_report: IndexReport,
+    pub preparedness: Option<RouterPreparednessReport>,
+    pub advice: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -291,6 +312,68 @@ pub fn after_skill_install() -> Result<Option<RouterHookReport>> {
     }))
 }
 
+pub fn refresh(options: RouterRefreshOptions) -> Result<RouterRefreshReport> {
+    let config = read_config_optional()?;
+    let router_config_present = config.is_some();
+    let config_path = router_config_present.then(config_path).transpose()?;
+    let manifest = options
+        .visibility_manifest
+        .clone()
+        .or_else(|| config.as_ref().map(|config| config.manifest.clone()));
+    let index = router::normalize_index_path(options.index);
+    let status_before = router::index_status(router::IndexStatusOptions {
+        roots: options.roots.clone(),
+        index: index.clone(),
+        visibility_manifest: manifest.clone(),
+    })?;
+
+    let visibility = if router_config_present {
+        let Some(manifest) = manifest.clone() else {
+            return Err(Error::InvalidInput {
+                message: "router index refresh found router config but no visibility manifest"
+                    .to_owned(),
+            });
+        };
+        Some(visibility::apply(visibility::VisibilityApplyOptions {
+            roots: options.roots.clone(),
+            profile: visibility::VisibilityProfile::RouterManaged,
+            manifest,
+            dry_run: false,
+        })?)
+    } else {
+        None
+    };
+
+    let index_report = router::index(router::IndexOptions {
+        roots: options.roots.clone(),
+        out: index.clone(),
+        visibility_manifest: manifest.clone(),
+    })?;
+    let preparedness = match (&visibility, &manifest) {
+        (Some(visibility), Some(manifest)) => Some(check_preparedness(
+            &options.roots,
+            &index,
+            manifest,
+            visibility,
+            &index_report,
+        )?),
+        _ => None,
+    };
+
+    Ok(RouterRefreshReport {
+        config: config_path,
+        router_config_present,
+        roots: options.roots,
+        index,
+        visibility_manifest: manifest,
+        advice: status_before.advice.clone(),
+        status_before,
+        visibility,
+        index_report,
+        preparedness,
+    })
+}
+
 fn check_preparedness(
     roots: &[PathBuf],
     index: &Path,
@@ -385,6 +468,52 @@ pub fn render_install(report: &RouterInstallReport) -> String {
     output
 }
 
+pub fn render_refresh(report: &RouterRefreshReport) -> String {
+    let mut output = String::new();
+    output.push_str("Skill router index refresh\n\n");
+    output.push_str(&format!("Index: {}\n", report.index.display()));
+    output.push_str(&format!(
+        "Router config present: {}\n",
+        report.router_config_present
+    ));
+    if let Some(config) = &report.config {
+        output.push_str(&format!("Config: {}\n", config.display()));
+    }
+    if let Some(manifest) = &report.visibility_manifest {
+        output.push_str(&format!("Manifest: {}\n", manifest.display()));
+    }
+    output.push_str(&format!(
+        "Detected stale before refresh: {}\n",
+        report.status_before.stale
+    ));
+    output.push_str(&format!(
+        "Visibility changes: {}\n",
+        report
+            .visibility
+            .as_ref()
+            .map(|visibility| visibility.changes.len())
+            .unwrap_or(0)
+    ));
+    output.push_str(&format!(
+        "Skills indexed: {}\n",
+        report.index_report.skills_indexed
+    ));
+    if let Some(preparedness) = &report.preparedness {
+        output.push_str(&format!("Prepared: {}\n", preparedness.ready));
+        output.push_str(&format!(
+            "Index stale after build: {}\n",
+            preparedness.index_stale
+        ));
+    }
+    if !report.advice.is_empty() {
+        output.push_str("\nAdvice:\n");
+        for advice in &report.advice {
+            output.push_str(&format!("- {advice}\n"));
+        }
+    }
+    output
+}
+
 pub fn render_uninstall(report: &RouterUninstallReport) -> String {
     let mut output = String::new();
     output.push_str("Skill router uninstall\n\n");
@@ -476,6 +605,8 @@ activation:
     - install router
     - uninstall router
     - refresh skill index
+    - out-of-band skill
+    - prose skill added
     - skill visibility
     - disable implicit invocation
     - allow_implicit_invocation
@@ -491,6 +622,7 @@ applies_when:
       - install or uninstall the SkillSpec router
       - make skills explicit-only, manual-only, implicit, or off
       - refresh a skill index after skill additions or removals
+      - detect or repair skills added outside the SkillSpec install flow
 
 entry:
   prompt: Load this SkillSpec, route from the local index, then load only the selected skill or ask for direct versus durable execution.
@@ -519,7 +651,7 @@ routes:
       phases:
         - id: check_index_status
           owner_skill: {router_skill}
-          description: Check whether the router index exists and whether it is stale for the configured roots.
+          description: Check whether the router index exists, whether it is stale for the configured roots, and whether new or changed skills are prose-only or SkillSpec-backed.
           requires:
             - inspect_router_index_status
         - id: route_query
@@ -536,7 +668,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -547,7 +679,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router by applying visibility, building the index, and checking status.
+          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -597,6 +729,8 @@ rules:
         - router index
         - refresh index
         - index status
+        - out-of-band skill
+        - prose skill added
     prefer: manage_router_lifecycle
     reason: Router lifecycle changes must write a manifest, config, and index through dedicated commands.
 
@@ -631,7 +765,7 @@ elicitations:
 
 commands:
   inspect_router_index_status:
-    description: Compare the router index against current skill roots.
+    description: Compare the router index against current skill roots and report advice for out-of-band prose or SkillSpec-backed skills.
     template: {index_status_command}
     safety: local_read
 
@@ -646,7 +780,7 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command.
+    description: Apply the requested router lifecycle command. Use index refresh to apply explicit invocation controls and rebuild the index after out-of-band skill changes.
     template: 'skillspec router install|uninstall|index refresh|index status'
     safety: local_write
 

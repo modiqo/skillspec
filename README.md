@@ -95,7 +95,10 @@ target, install it, then look at the proof report. Router setup and optional
 durable-executor setup stay inside the same prompt surface. Router install
 applies explicit-only native controls across managed roots, builds the routing
 index, runs a clean status check, and preserves an installed durable-executor as
-the implicit first hop.
+the implicit first hop. If a skill is later added outside SkillSpec, `skillspec
+router index status` detects prose-only versus SkillSpec-backed additions and
+`skillspec router index refresh` reapplies explicit invocation controls and
+rebuilds the index.
 
 From source:
 

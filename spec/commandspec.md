@@ -671,6 +671,17 @@ refresh the configured index, and run the same preparedness check. `router
 uninstall` restores visibility from the manifest and removes only a generated
 router skill that contains the managed marker file.
 
+Out-of-band skill additions are detected by `router index status` and repaired
+by `router index refresh`. Status is read-only: it reports new, changed, and
+missing skills, annotates each changed entry as prose-only or SkillSpec-backed,
+and emits `skillspec import-skill` advice for prose-only packages. Refresh is
+the mutating repair path: when router config is present, it reapplies
+router-managed explicit invocation controls across the roots, preserves an
+installed `durable-executor` as the implicit exception, rebuilds the index, and
+runs the preparedness check. SkillSpec-backed additions are indexed directly;
+prose-only additions are also made explicit-only and indexed, with conversion
+advice retained in the report.
+
 ## `capability`
 
 ```text

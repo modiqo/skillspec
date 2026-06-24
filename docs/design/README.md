@@ -45,7 +45,7 @@ directory listings.
 | 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
 | 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
 | 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
-| 14 | [Skill Router](14-skill-router.md) | How the optional router indexes large skill libraries, applies native Codex and Claude visibility controls, and preserves a manifest-backed restore path. |
+| 14 | [Skill Router](14-skill-router.md) | How the optional router indexes large skill libraries, applies native Codex and Claude visibility controls, detects out-of-band skills, and preserves a manifest-backed restore path. |
 | 15 | [Capability Bootstrap](15-capability-bootstrap.md) | How durable-executor uses local capability seeds under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet. |
 | 16 | [Command Log](16-command-log.md) | A scannable command table with implemented command names, important args/options, explanations, and realistic examples. |
 | 17 | [Design Documentation QA Process](17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |

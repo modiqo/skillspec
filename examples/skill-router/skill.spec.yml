@@ -15,6 +15,8 @@ activation:
     - install router
     - uninstall router
     - refresh skill index
+    - out-of-band skill
+    - prose skill added
     - skill visibility
     - disable implicit invocation
     - allow_implicit_invocation
@@ -30,6 +32,7 @@ applies_when:
       - install or uninstall the SkillSpec router
       - make skills manual-only, name-only, implicit, or off
       - refresh a skill index after skill additions or removals
+      - detect or repair skills added outside the SkillSpec install flow
 
 entry:
   prompt: Route first, then load only the selected skill or ask for direct versus durable execution.
@@ -58,7 +61,7 @@ routes:
       phases:
         - id: check_index_status
           owner_skill: skill-router
-          description: Check whether the router index exists and whether it is stale for the configured roots.
+          description: Check whether the router index exists, whether it is stale for the configured roots, and whether new or changed skills are prose-only or SkillSpec-backed.
           requires:
             - inspect_router_index_status
         - id: route_query
@@ -75,7 +78,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -86,7 +89,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: skill-router
-          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router by applying visibility, building the index, and checking status.
+          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -138,6 +141,8 @@ rules:
         - router index
         - refresh index
         - index status
+        - out-of-band skill
+        - prose skill added
     prefer: manage_router_lifecycle
     reason: Router lifecycle changes must write a manifest, config, and index through dedicated commands.
 
@@ -171,7 +176,7 @@ elicitations:
 
 commands:
   inspect_router_index_status:
-    description: Compare the router index against current skill roots.
+    description: Compare the router index against current skill roots and report advice for out-of-band prose or SkillSpec-backed skills.
     template: "skillspec router index status --roots {{roots}} --index {{index}} --visibility-manifest {{manifest}} --json"
     safety: local_read
 
@@ -186,7 +191,7 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command.
+    description: Apply the requested router lifecycle command. Use index refresh to apply explicit invocation controls and rebuild the index after out-of-band skill changes.
     template: "skillspec router install|uninstall|index refresh|index status"
     safety: local_write
 

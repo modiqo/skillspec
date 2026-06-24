@@ -961,6 +961,190 @@ routes:
 }
 
 #[test]
+fn router_index_refresh_repairs_out_of_band_skills_and_advises_conversion() {
+    let dir = TempDir::new("router-out-of-band");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let manifest = skillspec_home.join("router/visibility-manifest.json");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images. Do not use for notes.
+---
+# PDF
+"#,
+    );
+    write_file(
+        &root.join("durable-executor/SKILL.md"),
+        r#"---
+name: durable-executor
+description: Use as the durable execution first-hop for tool-backed requests that need trace, evidence, and alignment.
+---
+# Durable Executor
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+
+    write_file(
+        &root.join("legacy-prose/SKILL.md"),
+        r#"---
+name: legacy-prose
+description: Use when a legacy prose-only workflow should be routed. Do not use for PDF extraction.
+---
+# Legacy Prose
+"#,
+    );
+    write_file(
+        &root.join("spec-backed/SKILL.md"),
+        r#"---
+name: spec-backed
+description: Use when a SkillSpec-backed out-of-band workflow should be routed. Do not use for PDF extraction.
+---
+# Spec Backed
+"#,
+    );
+    write_file(
+        &root.join("spec-backed/skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: spec.backed
+title: Spec Backed
+description: Fixture for out-of-band SkillSpec-backed routing.
+routes:
+  - id: local
+    label: Local
+"#,
+    );
+
+    let stale_status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&stale_status);
+    let stale_report = json_stdout(&stale_status);
+    assert_eq!(stale_report["stale"], true);
+    let new_skills = stale_report["new_skills"].as_array().unwrap();
+    let prose = new_skills
+        .iter()
+        .find(|entry| entry["name"] == "legacy-prose")
+        .unwrap();
+    assert_eq!(prose["has_skill_spec"], false);
+    assert!(prose["advice"].as_str().unwrap().contains("import-skill"));
+    let spec_backed = new_skills
+        .iter()
+        .find(|entry| entry["name"] == "spec-backed")
+        .unwrap();
+    assert_eq!(spec_backed["has_skill_spec"], true);
+    assert!(spec_backed["advice"]
+        .as_str()
+        .unwrap()
+        .contains("SkillSpec-backed"));
+    assert!(stale_report["advice"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|advice| advice
+            .as_str()
+            .is_some_and(|text| text.contains("router index refresh"))));
+    assert!(!root.join("legacy-prose/agents/openai.yaml").exists());
+    assert!(!fs::read_to_string(root.join("legacy-prose/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+
+    let refresh = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("refresh")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&refresh);
+    let refresh_report = json_stdout(&refresh);
+    assert_eq!(refresh_report["router_config_present"], true);
+    assert_eq!(refresh_report["status_before"]["stale"], true);
+    assert_eq!(refresh_report["preparedness"]["ready"], true);
+    assert_eq!(refresh_report["index_report"]["skills_indexed"], 5);
+    assert!(refresh_report["advice"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|advice| advice
+            .as_str()
+            .is_some_and(|text| text.contains("import-skill"))));
+    assert!(root.join("legacy-prose/agents/openai.yaml").is_file());
+    assert!(root.join("spec-backed/agents/openai.yaml").is_file());
+    assert!(fs::read_to_string(root.join("legacy-prose/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(fs::read_to_string(root.join("spec-backed/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(!root.join("durable-executor/agents/openai.yaml").exists());
+    assert!(!fs::read_to_string(root.join("durable-executor/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+
+    let clean_status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("index")
+        .arg("status")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--visibility-manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&clean_status);
+    let clean_report = json_stdout(&clean_status);
+    assert_eq!(clean_report["stale"], false);
+    assert_eq!(clean_report["indexed_skills"], 5);
+    assert!(clean_report["new_skills"].as_array().unwrap().is_empty());
+}
+
+#[test]
 fn router_install_reports_missing_optional_durable_executor() {
     let dir = TempDir::new("router-missing-durable");
     let home = dir.path().join("home");

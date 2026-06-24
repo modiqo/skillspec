@@ -99,7 +99,10 @@ so the prepared router is present and non-stale before use. Shared `.agents`
 roots receive both Codex and Claude visibility controls. durable-executor is
 optional: when present it remains the implicit first hop for router mode; when
 missing, SkillSpec reports that durable first-hop is unavailable unless the user
-supplies an approved source.
+supplies an approved source. When a skill is added outside `skillspec install
+skill`, `skillspec router index status` detects prose-only versus
+SkillSpec-backed additions and `skillspec router index refresh` reapplies
+explicit invocation controls before rebuilding the index.
 
 The mechanical importer is available directly when you only want a draft:
 

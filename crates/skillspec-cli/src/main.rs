@@ -223,7 +223,7 @@ enum Command {
         #[command(subcommand)]
         command: VisibilityCommand,
     },
-    #[command(about = "Install, uninstall, or refresh the optional skill router")]
+    #[command(about = "Install, uninstall, inspect, or repair the optional skill router")]
     Router {
         #[command(subcommand)]
         command: RouterCommand,
@@ -424,7 +424,7 @@ enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Refresh or inspect the router index")]
+    #[command(about = "Detect, repair, or inspect router index drift")]
     Index {
         #[command(subcommand)]
         command: RouterIndexCommand,
@@ -433,7 +433,7 @@ enum RouterCommand {
 
 #[derive(Debug, Subcommand)]
 enum RouterIndexCommand {
-    #[command(about = "Refresh the router index from current skill roots")]
+    #[command(about = "Repair router visibility and rebuild the index from current skill roots")]
     Refresh {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
@@ -441,14 +441,14 @@ enum RouterIndexCommand {
         /// SQLite index file to write, or a router directory containing skill-index.sqlite.
         #[arg(long)]
         index: PathBuf,
-        /// Visibility manifest whose final states should override native metadata.
+        /// Visibility manifest whose final states should override native metadata. Defaults from router config when installed.
         #[arg(long)]
         visibility_manifest: Option<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Compare router preparedness against current skill roots")]
+    #[command(about = "Detect out-of-band prose or SkillSpec-backed skill changes")]
     Status {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
@@ -1487,15 +1487,16 @@ fn run() -> Result<()> {
                     visibility_manifest,
                     json,
                 } => {
-                    let report = router::index(router::IndexOptions {
-                        roots,
-                        out: index,
-                        visibility_manifest,
-                    })?;
+                    let report =
+                        router_lifecycle::refresh(router_lifecycle::RouterRefreshOptions {
+                            roots,
+                            index,
+                            visibility_manifest,
+                        })?;
                     if json {
                         report::json(&report)?;
                     } else {
-                        report::text(&router::render_index(&report))?;
+                        report::text(&router_lifecycle::render_refresh(&report))?;
                     }
                 }
                 RouterIndexCommand::Status {
