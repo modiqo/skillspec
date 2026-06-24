@@ -703,12 +703,13 @@ skillspec router <COMMAND>
 Subcommands:
 
 - `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `update [--backup-dir <path>] [--dry-run] [--json]`
 - `uninstall [--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
 - `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 - `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 
 `router install` writes an explicit-only SkillSpec-backed `skill-router` skill
-into the first `--roots` path, a visibility manifest, a SQLite index, and a
+into every configured `--roots` path, a visibility manifest, a SQLite index, and a
 router config. The generated router package uses a thin `SKILL.md` loader plus
 `skill.spec.yml`; the YAML file is the router contract. The router-managed
 visibility profile makes every indexed skill explicit-only except
@@ -720,8 +721,16 @@ reports preparedness; a prepared router has a present, non-stale index whose
 indexed skill count matches the discovered skill count. Once that config exists,
 successful `skillspec install skill` calls reapply router-managed visibility,
 refresh the configured index, and run the same preparedness check. `router
-uninstall` restores visibility from the manifest and removes only a generated
-router skill that contains the managed marker file.
+uninstall` restores visibility from the manifest and removes only generated
+router skills that contain the managed marker file.
+
+`router update` is the maintenance path for an existing router config. It
+backs up the router config, visibility manifest, SQLite index, and managed
+router skill directories before rewriting the SkillSpec-backed router package in
+every recorded harness root. It then reapplies router-managed visibility,
+rebuilds the index, reruns the preparedness check, and prints a warning to
+restart active Codex, Claude, Agents, or vendor harness sessions so their loaded
+skill metadata is refreshed.
 
 Out-of-band skill additions are detected by `router index status` and repaired
 by `router index refresh`. Status is read-only: it reports new, changed, and

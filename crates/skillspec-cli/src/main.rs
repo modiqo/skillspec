@@ -463,6 +463,20 @@ enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Back up and update every managed skill-router install, visibility state, and index"
+    )]
+    Update {
+        /// Backup directory to create before mutation. Defaults under the router config directory.
+        #[arg(long)]
+        backup_dir: Option<PathBuf>,
+        /// Show changes without writing files, backups, index, manifest, or config.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(about = "Detect, repair, or inspect router index drift")]
     Index {
         #[command(subcommand)]
@@ -1550,6 +1564,21 @@ fn run() -> Result<()> {
                     report::json(&report)?;
                 } else {
                     report::text(&router_lifecycle::render_uninstall(&report))?;
+                }
+            }
+            RouterCommand::Update {
+                backup_dir,
+                dry_run,
+                json,
+            } => {
+                let report = router_lifecycle::update(router_lifecycle::RouterUpdateOptions {
+                    backup_dir,
+                    dry_run,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_update(&report))?;
                 }
             }
             RouterCommand::Index { command } => match command {

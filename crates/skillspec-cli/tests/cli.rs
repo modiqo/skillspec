@@ -976,6 +976,225 @@ routes:
 }
 
 #[test]
+#[cfg(unix)]
+fn router_install_tracks_symlinked_harness_roots_and_uninstalls_all() {
+    let dir = TempDir::new("router-symlink-roots");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let agents_root = home.join(".agents/skills");
+    let codex_root = home.join(".codex/skills");
+    let vendor_root = home.join(".vendor/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let manifest = skillspec_home.join("router/visibility-manifest.json");
+
+    fs::create_dir_all(&agents_root).unwrap();
+    fs::create_dir_all(codex_root.parent().unwrap()).unwrap();
+    fs::create_dir_all(vendor_root.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&agents_root, &codex_root).unwrap();
+    std::os::unix::fs::symlink(&agents_root, &vendor_root).unwrap();
+
+    write_file(
+        &agents_root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images. Do not use for notes.
+---
+# PDF
+"#,
+    );
+    write_file(
+        &agents_root.join("durable-executor/SKILL.md"),
+        r#"---
+name: durable-executor
+description: Use as the durable execution first-hop for tool-backed requests that need trace, evidence, and alignment.
+---
+# Durable Executor
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&agents_root)
+        .arg(&codex_root)
+        .arg(&vendor_root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+    let install_report = json_stdout(&install_router);
+    assert_eq!(install_report["router_skill_status"], "installed");
+    assert_eq!(
+        install_report["router_skill_dirs"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        install_report["router_skill_reports"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    for root in [&agents_root, &codex_root, &vendor_root] {
+        assert!(root.join("skill-router/SKILL.md").is_file());
+        assert!(root.join("skill-router/skill.spec.yml").is_file());
+        assert!(root
+            .join("skill-router/.skillspec-router-managed")
+            .is_file());
+    }
+
+    let config = fs::read_to_string(skillspec_home.join("router/config.json")).unwrap();
+    let config_json: Value = serde_json::from_str(&config).unwrap();
+    assert_eq!(config_json["roots"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        config_json["router_skill_dirs"].as_array().unwrap().len(),
+        3
+    );
+
+    let uninstall_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("uninstall")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&uninstall_router);
+    let uninstall_report = json_stdout(&uninstall_router);
+    assert_eq!(uninstall_report["router_skill_status"], "removed");
+    assert_eq!(
+        uninstall_report["router_skill_reports"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    for root in [&agents_root, &codex_root, &vendor_root] {
+        assert!(!root.join("skill-router").exists());
+    }
+    assert!(!index.exists());
+    assert!(!skillspec_home.join("router/config.json").exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn router_update_backs_up_and_repairs_all_recorded_router_roots() {
+    let dir = TempDir::new("router-update");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let agents_root = home.join(".agents/skills");
+    let codex_root = home.join(".codex/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let manifest = skillspec_home.join("router/visibility-manifest.json");
+    let backup_dir = skillspec_home.join("router/update-backup");
+
+    fs::create_dir_all(&agents_root).unwrap();
+    fs::create_dir_all(codex_root.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&agents_root, &codex_root).unwrap();
+
+    write_file(
+        &agents_root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images. Do not use for notes.
+---
+# PDF
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&agents_root)
+        .arg(&codex_root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+
+    write_file(
+        &agents_root.join("skill-router/SKILL.md"),
+        r#"---
+name: skill-router
+description: stale router text
+---
+# Skill Router
+
+Use this skill as the visible discovery surface for large local skill libraries.
+"#,
+    );
+    fs::remove_file(codex_root.join("skill-router/skill.spec.yml")).unwrap();
+
+    let update_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("update")
+        .arg("--backup-dir")
+        .arg(&backup_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&update_router);
+    let update_report = json_stdout(&update_router);
+    assert_eq!(
+        update_report["router_skill_reports"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        update_report["backup"]["path"].as_str().unwrap(),
+        backup_dir.to_string_lossy()
+    );
+    assert!(update_report["restart_warning"]
+        .as_str()
+        .unwrap()
+        .contains("Restart active"));
+    assert!(backup_dir.join("backup.json").is_file());
+    assert!(backup_dir.join("router-skill-0/SKILL.md").is_file());
+    assert!(
+        fs::read_to_string(backup_dir.join("router-skill-0/SKILL.md"))
+            .unwrap()
+            .contains("visible discovery surface")
+    );
+
+    for root in [&agents_root, &codex_root] {
+        let router_skill = fs::read_to_string(root.join("skill-router/SKILL.md")).unwrap();
+        assert!(router_skill.contains("explicit-only"));
+        assert!(!router_skill.contains("visible discovery surface"));
+        assert!(root.join("skill-router/skill.spec.yml").is_file());
+        assert!(root
+            .join("skill-router/.skillspec-router-managed")
+            .is_file());
+    }
+    let config = fs::read_to_string(skillspec_home.join("router/config.json")).unwrap();
+    let config_json: Value = serde_json::from_str(&config).unwrap();
+    assert_eq!(
+        config_json["router_skill_dirs"].as_array().unwrap().len(),
+        2
+    );
+}
+
+#[test]
 fn router_index_refresh_repairs_out_of_band_skills_and_advises_conversion() {
     let dir = TempDir::new("router-out-of-band");
     let home = dir.path().join("home");

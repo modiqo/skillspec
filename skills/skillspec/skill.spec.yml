@@ -19,6 +19,8 @@ activation:
     - local folder or uri
     - install router
     - install skill-router
+    - update router
+    - repair skill-router
     - router mode
     - install durable-executor
     - durable executor install
@@ -51,6 +53,7 @@ applies_when:
       - import an existing prose skill from a local folder or public URI
       - install skill-router after SkillSpec is installed
       - install router mode after SkillSpec is installed
+      - update or repair an installed skill-router mode
       - install durable-executor as an optional first-hop skill
       - create a SkillSpec skill by observing a durable-executor rote-exec workspace
       - revise an existing SkillSpec-backed skill
@@ -244,9 +247,45 @@ routes:
           description: Report which roots were changed, whether durable-executor stayed implicit, and whether durable first-hop is unavailable.
           requires:
             - verify_router_installed
+  - id: update_skill_router
+    label: Update router mode
+    rank: 4
+    description: Use when the user wants to update or repair an existing skill-router install, including stale generated text, missing router spec files, or recorded harness roots that need to be rewritten.
+    execution_plan:
+      mode: ordered
+      reason: Router update mutates recorded harness roots, so it must start from the saved router config, create a backup, rewrite every managed router skill, and warn the operator to restart active harness sessions.
+      phases:
+        - id: inspect_router_update
+          owner_skill: skillspec
+          description: Verify the SkillSpec CLI supports router update and that router mode has an existing config to update.
+          requires:
+            - router_help
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: update_router_surface
+          owner_skill: skillspec
+          description: Back up the existing router state, rewrite every recorded router skill, reapply visibility, rebuild the index, and check preparedness.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_update
+          forbid:
+            - update_router_without_backup
+            - mutate_unrecorded_router_roots
+        - id: report_router_update
+          owner_skill: skillspec
+          description: Report the backup path, updated router roots, preparedness status, durable-executor status, and restart warning.
+          requires:
+            - verify_router_updated
   - id: install_durable_executor
     label: Install durable-executor
-    rank: 4
+    rank: 5
     description: Use when the user wants the optional durable-executor first-hop skill installed or refreshed after SkillSpec itself is installed.
     execution_plan:
       mode: ordered
@@ -277,7 +316,7 @@ routes:
             - verify_durable_optional_status
   - id: observed_durable_workspace_to_skill
     label: Create skill from observed durable workspace
-    rank: 5
+    rank: 6
     description: Use when the user wants to ask for a real task, let durable-executor run it through rote-exec evidence, inspect the workspace, and synthesize a reviewed SkillSpec-backed skill from the observed workflow.
     execution_plan:
       mode: ordered
@@ -371,7 +410,7 @@ routes:
             - prove_value
   - id: revise_existing_skillspec
     label: Revise existing SkillSpec
-    rank: 6
+    rank: 7
     description: Use when a skill already has skill.spec.yml and the user wants to revise, improve, or update it.
     execution_plan:
       mode: ordered
@@ -409,7 +448,7 @@ routes:
             - prove_value
   - id: compile_and_install_reviewed_skill
     label: Compile and install reviewed skill
-    rank: 7
+    rank: 8
     description: Use only after a reviewed spec validates and the user explicitly approves install targets and dependency surface.
     execution_plan:
       mode: ordered
@@ -437,7 +476,7 @@ routes:
             - install_skill
   - id: prove_skill_value
     label: Prove skill value
-    rank: 8
+    rank: 9
     description: Use when the user asks to prove, demo, align, or value-report a ported SkillSpec skill.
     execution_plan:
       mode: ordered
@@ -501,6 +540,7 @@ rules:
         - installed skillspec
     route_order:
       - install_skill_router
+      - update_skill_router
       - install_durable_executor
       - observed_durable_workspace_to_skill
       - local_skill_port
@@ -537,6 +577,24 @@ rules:
     after_success:
       - verify_router_installed
     reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_router_update_to_router_maintenance
+    when:
+      user_says_any:
+        - update router
+        - router update
+        - update skill-router
+        - repair router
+        - repair skill-router
+        - stale router
+        - missing router spec
+        - restart harness
+    prefer: update_skill_router
+    forbid:
+      - update_router_without_backup
+      - mutate_unrecorded_router_roots
+    after_success:
+      - verify_router_updated
+    reason: Router update is backup-first maintenance for already-recorded harness roots, not a fresh install or index-only refresh.
   - id: route_durable_install_to_optional_durable
     when:
       user_says_any:
@@ -1271,6 +1329,13 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  router_update:
+    description: Back up and update every recorded skill-router install, visibility state, and index, then report the harness restart warning.
+    template: skillspec router update --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
   verify_router_install:
     description: Verify the generated skill-router files and visibility metadata under the selected roots.
     template: skillspec router index status --roots <skill-roots> --index <router-index>
@@ -1474,6 +1539,16 @@ recipes:
       - run_command: router_install
       - run_command: verify_router_install
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
+  router_update_loop:
+    description: Backup-first router maintenance through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: router_update
+      - note: Report the backup path, every updated router root, preparedness status, durable-executor status, and the harness restart warning.
   durable_executor_install_loop:
     description: Optional durable-executor setup through an existing installed skill or approved source path/URI.
     ordered: true
@@ -1647,6 +1722,10 @@ closures:
     commands:
       - router_install
       - verify_router_install
+  verify_router_updated:
+    description: Report the router update backup path, updated recorded roots, preparedness state, durable-executor status, and harness restart warning.
+    commands:
+      - router_update
   verify_durable_optional_status:
     description: Report whether durable-executor is installed, skipped, or unavailable, and whether it remains implicit under router mode.
     commands:
@@ -1765,6 +1844,18 @@ tests:
       forbid:
         - use_removed_router_root
         - make_router_implicit_when_durable_executor_missing
+  - name: router update routes to backup-first router maintenance
+    input: /skillspec update router and repair stale skill-router files
+    expect:
+      route: update_skill_router
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_update_to_router_maintenance
+      after_success:
+        - verify_router_updated
+      forbid:
+        - update_router_without_backup
+        - mutate_unrecorded_router_roots
   - name: durable executor install is optional and source aware
     input: /skillspec install durable-executor from /Users/me/.agents/skills/durable-executor
     expect:
@@ -1967,12 +2058,12 @@ metadata:
     note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
   extracted_value_targets:
     activation_triggers: 12
-    routes: 8
-    rules: 16
+    routes: 9
+    rules: 19
     dependency_checks: 5
-    command_templates: 41
-    recipes: 8
-    tests: 19
+    command_templates: 42
+    recipes: 9
+    tests: 20
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:

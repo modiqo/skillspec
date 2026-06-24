@@ -29,6 +29,7 @@ skillspec skills set-visibility <skill> manual-only --roots <skill-root>... --ma
 skillspec skills disable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec skills enable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec router install --roots <skill-root>... --index <index-file-or-router-dir>
+skillspec router update [--backup-dir <backup-dir>]
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall
@@ -37,7 +38,8 @@ skillspec router uninstall
 `skillspec router install` writes:
 
 - a SkillSpec-backed `skill-router` skill with a thin `SKILL.md`, a
-  `skill.spec.yml` contract, and a managed marker in the first `--roots` path;
+  `skill.spec.yml` contract, and a managed marker in every configured
+  `--roots` path;
 - a SQLite index;
 - a visibility manifest;
 - a router config under `SKILLSPEC_HOME/router/config.json`, or
@@ -74,6 +76,17 @@ primitive before handing off domain work.
 When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a
 successful install, then performs the same preparedness check.
+
+`skillspec router update` is for maintenance of an existing router install. It
+starts from `SKILLSPEC_HOME/router/config.json`, backs up the config, manifest,
+index, and every managed router skill directory, rewrites the generated
+SkillSpec-backed router package in each recorded root, reapplies visibility,
+rebuilds the index, and reports preparedness. Because Codex, Claude, Agents,
+and vendor harnesses load skill metadata at session start, the command warns the
+operator to restart active harness sessions after a successful update. This is
+the right repair path for stale generated router text, missing router
+`skill.spec.yml` files, or symlinked `.agents`/`.codex` roots that need every
+logical install path refreshed.
 
 If a skill is added outside `skillspec install skill`, the router cannot observe
 that filesystem change until a router command runs. `skillspec router index

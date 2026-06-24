@@ -30,6 +30,12 @@ pub struct RouterUninstallOptions {
 }
 
 #[derive(Clone, Debug)]
+pub struct RouterUpdateOptions {
+    pub backup_dir: Option<PathBuf>,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct RouterRefreshOptions {
     pub roots: Vec<PathBuf>,
     pub index: PathBuf,
@@ -40,11 +46,13 @@ pub struct RouterRefreshOptions {
 pub struct RouterInstallReport {
     pub router_name: String,
     pub router_skill_dir: PathBuf,
+    pub router_skill_dirs: Vec<PathBuf>,
     pub index: PathBuf,
     pub manifest: PathBuf,
     pub config: PathBuf,
     pub dry_run: bool,
     pub router_skill_status: RouterFileStatus,
+    pub router_skill_reports: Vec<RouterSkillReport>,
     pub durable_executor: DurableExecutorReport,
     pub visibility: VisibilityApplyReport,
     pub index_report: Option<IndexReport>,
@@ -55,14 +63,46 @@ pub struct RouterInstallReport {
 pub struct RouterUninstallReport {
     pub router_name: String,
     pub router_skill_dir: PathBuf,
+    pub router_skill_dirs: Vec<PathBuf>,
     pub manifest: PathBuf,
     pub index: Option<PathBuf>,
     pub config: PathBuf,
     pub dry_run: bool,
     pub router_skill_status: RouterFileStatus,
+    pub router_skill_reports: Vec<RouterSkillReport>,
     pub index_removed: bool,
     pub config_removed: bool,
     pub restore: VisibilityRestoreReport,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterUpdateReport {
+    pub router_name: String,
+    pub router_skill_dirs: Vec<PathBuf>,
+    pub index: PathBuf,
+    pub manifest: PathBuf,
+    pub config: PathBuf,
+    pub dry_run: bool,
+    pub backup: Option<RouterBackupReport>,
+    pub router_skill_reports: Vec<RouterSkillReport>,
+    pub durable_executor: DurableExecutorReport,
+    pub visibility: VisibilityApplyReport,
+    pub index_report: Option<IndexReport>,
+    pub preparedness: Option<RouterPreparednessReport>,
+    pub restart_warning: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterBackupReport {
+    pub path: PathBuf,
+    pub items: Vec<RouterBackupItem>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterBackupItem {
+    pub kind: &'static str,
+    pub source: PathBuf,
+    pub backup: PathBuf,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -82,9 +122,16 @@ pub struct RouterRefreshReport {
 #[derive(Clone, Debug, Serialize)]
 pub struct RouterHookReport {
     pub config: PathBuf,
+    pub router_skill_reports: Vec<RouterSkillReport>,
     pub visibility: VisibilityApplyReport,
     pub index_report: IndexReport,
     pub preparedness: RouterPreparednessReport,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterSkillReport {
+    pub path: PathBuf,
+    pub status: RouterFileStatus,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -122,6 +169,8 @@ struct RouterConfig {
     schema: String,
     created_at_unix: u64,
     roots: Vec<PathBuf>,
+    #[serde(default)]
+    router_skill_dirs: Vec<PathBuf>,
     index: PathBuf,
     manifest: PathBuf,
     #[serde(default, rename = "router_root", skip_serializing)]
@@ -144,8 +193,8 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         .router_name
         .unwrap_or_else(|| DEFAULT_ROUTER_NAME.to_owned());
     validate_router_name(&router_name)?;
-    let router_install_root = options.roots[0].clone();
-    let router_skill_dir = router_install_root.join(&router_name);
+    let router_skill_dirs = router_skill_dirs_for_roots(&options.roots, &router_name);
+    let router_skill_dir = router_skill_dirs[0].clone();
     let manifest = options
         .manifest
         .clone()
@@ -153,9 +202,8 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
     let config = config_path()?;
     let durable_executor = inspect_durable_executor(&options.roots)?;
 
-    if !options.dry_run {
-        write_router_skill(&router_skill_dir, &router_name, &index)?;
-    }
+    let router_skill_reports =
+        install_router_skills(&router_skill_dirs, &router_name, &index, options.dry_run)?;
     let visibility = visibility::apply(visibility::VisibilityApplyOptions {
         roots: options.roots.clone(),
         profile: visibility::VisibilityProfile::RouterManaged,
@@ -187,13 +235,21 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         })?;
         let preparedness =
             check_preparedness(&options.roots, &index, &manifest, &visibility, &report)?;
-        write_config(&config, &options.roots, &index, &manifest, &router_name)?;
+        write_config(
+            &config,
+            &options.roots,
+            &router_skill_dirs,
+            &index,
+            &manifest,
+            &router_name,
+        )?;
         (Some(report), preparedness)
     };
 
     Ok(RouterInstallReport {
         router_name,
         router_skill_dir,
+        router_skill_dirs,
         index,
         manifest,
         config,
@@ -203,6 +259,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         } else {
             RouterFileStatus::Installed
         },
+        router_skill_reports,
         durable_executor,
         visibility,
         index_report,
@@ -218,13 +275,19 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
         .or_else(|| config.as_ref().map(|config| config.router_name.clone()))
         .unwrap_or_else(|| DEFAULT_ROUTER_NAME.to_owned());
     validate_router_name(&router_name)?;
-    let router_install_root = config
+    let router_skill_dirs = config
         .as_ref()
-        .and_then(configured_router_install_root)
+        .map(|config| configured_router_skill_dirs(config, &router_name))
         .ok_or_else(|| Error::InvalidInput {
             message: "router uninstall requires router config to locate the managed router skill"
                 .to_owned(),
         })?;
+    if router_skill_dirs.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "router uninstall requires router config to locate the managed router skill"
+                .to_owned(),
+        });
+    }
     let manifest = options
         .manifest
         .or_else(|| config.as_ref().map(|config| config.manifest.clone()))
@@ -235,14 +298,15 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
         .index
         .map(router::normalize_index_path)
         .or_else(|| config.as_ref().map(|config| config.index.clone()));
-    let router_skill_dir = router_install_root.join(&router_name);
+    let router_skill_dir = router_skill_dirs[0].clone();
 
     let restore = visibility::restore(visibility::VisibilityRestoreOptions {
         manifest: manifest.clone(),
         dry_run: options.dry_run,
     })?;
 
-    let router_skill_status = remove_router_skill(&router_skill_dir, options.dry_run)?;
+    let router_skill_reports = remove_router_skills(&router_skill_dirs, options.dry_run)?;
+    let router_skill_status = aggregate_router_file_status(&router_skill_reports);
     let mut index_removed = false;
     if !options.keep_index {
         if let Some(index) = &index {
@@ -271,14 +335,95 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
     Ok(RouterUninstallReport {
         router_name,
         router_skill_dir,
+        router_skill_dirs,
         manifest,
         index,
         config: config_path,
         dry_run: options.dry_run,
         router_skill_status,
+        router_skill_reports,
         index_removed,
         config_removed,
         restore,
+    })
+}
+
+pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
+    let config = read_config_optional()?.ok_or_else(|| Error::InvalidInput {
+        message: "router update requires an existing router config; run router install first"
+            .to_owned(),
+    })?;
+    let config_path = config_path()?;
+    let router_skill_dirs = configured_router_skill_dirs(&config, &config.router_name);
+    if router_skill_dirs.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "router update requires router config to locate managed router skills"
+                .to_owned(),
+        });
+    }
+    let backup = if options.dry_run {
+        None
+    } else {
+        Some(create_router_backup(
+            options.backup_dir,
+            &config_path,
+            &config,
+            &router_skill_dirs,
+        )?)
+    };
+    let durable_executor = inspect_durable_executor(&config.roots)?;
+    let router_skill_reports = install_router_skills(
+        &router_skill_dirs,
+        &config.router_name,
+        &config.index,
+        options.dry_run,
+    )?;
+    let visibility = visibility::apply(visibility::VisibilityApplyOptions {
+        roots: config.roots.clone(),
+        profile: visibility::VisibilityProfile::RouterManaged,
+        manifest: config.manifest.clone(),
+        dry_run: options.dry_run,
+    })?;
+    let (index_report, preparedness) = if options.dry_run {
+        (None, None)
+    } else {
+        let report = router::index(router::IndexOptions {
+            roots: config.roots.clone(),
+            out: config.index.clone(),
+            visibility_manifest: Some(config.manifest.clone()),
+        })?;
+        let preparedness = check_preparedness(
+            &config.roots,
+            &config.index,
+            &config.manifest,
+            &visibility,
+            &report,
+        )?;
+        write_config(
+            &config_path,
+            &config.roots,
+            &router_skill_dirs,
+            &config.index,
+            &config.manifest,
+            &config.router_name,
+        )?;
+        (Some(report), Some(preparedness))
+    };
+
+    Ok(RouterUpdateReport {
+        router_name: config.router_name,
+        router_skill_dirs,
+        index: config.index,
+        manifest: config.manifest,
+        config: config_path,
+        dry_run: options.dry_run,
+        backup,
+        router_skill_reports,
+        durable_executor,
+        visibility,
+        index_report,
+        preparedness,
+        restart_warning: restart_warning(),
     })
 }
 
@@ -286,6 +431,12 @@ pub fn after_skill_install() -> Result<Option<RouterHookReport>> {
     let Some(config) = read_config_optional()? else {
         return Ok(None);
     };
+    let router_skill_reports = install_router_skills(
+        &configured_router_skill_dirs(&config, &config.router_name),
+        &config.router_name,
+        &config.index,
+        false,
+    )?;
     let visibility = visibility::apply(visibility::VisibilityApplyOptions {
         roots: config.roots.clone(),
         profile: visibility::VisibilityProfile::RouterManaged,
@@ -306,6 +457,7 @@ pub fn after_skill_install() -> Result<Option<RouterHookReport>> {
     )?;
     Ok(Some(RouterHookReport {
         config: config_path()?,
+        router_skill_reports,
         visibility,
         index_report,
         preparedness,
@@ -334,6 +486,14 @@ pub fn refresh(options: RouterRefreshOptions) -> Result<RouterRefreshReport> {
                     .to_owned(),
             });
         };
+        if let Some(config) = &config {
+            install_router_skills(
+                &configured_router_skill_dirs(config, &config.router_name),
+                &config.router_name,
+                &index,
+                false,
+            )?;
+        }
         Some(visibility::apply(visibility::VisibilityApplyOptions {
             roots: options.roots.clone(),
             profile: visibility::VisibilityProfile::RouterManaged,
@@ -436,6 +596,16 @@ pub fn render_install(report: &RouterInstallReport) -> String {
     let mut output = String::new();
     output.push_str("Skill router install\n\n");
     output.push_str(&format!("Router: {}\n", report.router_skill_dir.display()));
+    if report.router_skill_dirs.len() > 1 {
+        output.push_str("Router roots:\n");
+        for router_skill in &report.router_skill_reports {
+            output.push_str(&format!(
+                "- {} ({:?})\n",
+                router_skill.path.display(),
+                router_skill.status
+            ));
+        }
+    }
     output.push_str(&format!("Index: {}\n", report.index.display()));
     output.push_str(&format!("Manifest: {}\n", report.manifest.display()));
     output.push_str(&format!("Config: {}\n", report.config.display()));
@@ -514,10 +684,60 @@ pub fn render_refresh(report: &RouterRefreshReport) -> String {
     output
 }
 
+pub fn render_update(report: &RouterUpdateReport) -> String {
+    let mut output = String::new();
+    output.push_str("Skill router update\n\n");
+    output.push_str("Router roots:\n");
+    for router_skill in &report.router_skill_reports {
+        output.push_str(&format!(
+            "- {} ({:?})\n",
+            router_skill.path.display(),
+            router_skill.status
+        ));
+    }
+    output.push_str(&format!("Index: {}\n", report.index.display()));
+    output.push_str(&format!("Manifest: {}\n", report.manifest.display()));
+    output.push_str(&format!("Config: {}\n", report.config.display()));
+    output.push_str(&format!("Dry run: {}\n", report.dry_run));
+    if let Some(backup) = &report.backup {
+        output.push_str(&format!("Backup: {}\n", backup.path.display()));
+        output.push_str(&format!("Backup items: {}\n", backup.items.len()));
+    }
+    output.push_str(&format!(
+        "Durable executor: {}\n",
+        report.durable_executor.message
+    ));
+    if let Some(index_report) = &report.index_report {
+        output.push_str(&format!(
+            "Skills indexed: {}\n",
+            index_report.skills_indexed
+        ));
+    }
+    if let Some(preparedness) = &report.preparedness {
+        output.push_str(&format!("Prepared: {}\n", preparedness.ready));
+        output.push_str(&format!(
+            "Index stale after update: {}\n",
+            preparedness.index_stale
+        ));
+    }
+    output.push_str(&format!("Restart warning: {}\n", report.restart_warning));
+    output
+}
+
 pub fn render_uninstall(report: &RouterUninstallReport) -> String {
     let mut output = String::new();
     output.push_str("Skill router uninstall\n\n");
     output.push_str(&format!("Router: {}\n", report.router_skill_dir.display()));
+    if report.router_skill_dirs.len() > 1 {
+        output.push_str("Router roots:\n");
+        for router_skill in &report.router_skill_reports {
+            output.push_str(&format!(
+                "- {} ({:?})\n",
+                router_skill.path.display(),
+                router_skill.status
+            ));
+        }
+    }
     output.push_str(&format!("Manifest: {}\n", report.manifest.display()));
     if let Some(index) = &report.index {
         output.push_str(&format!("Index: {}\n", index.display()));
@@ -529,6 +749,180 @@ pub fn render_uninstall(report: &RouterUninstallReport) -> String {
     ));
     output.push_str(&format!("Index removed: {}\n", report.index_removed));
     output
+}
+
+fn router_skill_dirs_for_roots(roots: &[PathBuf], router_name: &str) -> Vec<PathBuf> {
+    roots.iter().map(|root| root.join(router_name)).collect()
+}
+
+fn install_router_skills(
+    skill_dirs: &[PathBuf],
+    router_name: &str,
+    index: &Path,
+    dry_run: bool,
+) -> Result<Vec<RouterSkillReport>> {
+    let mut reports = Vec::new();
+    for skill_dir in skill_dirs {
+        if !dry_run {
+            write_router_skill(skill_dir, router_name, index)?;
+        }
+        reports.push(RouterSkillReport {
+            path: skill_dir.clone(),
+            status: if dry_run {
+                RouterFileStatus::Planned
+            } else {
+                RouterFileStatus::Installed
+            },
+        });
+    }
+    Ok(reports)
+}
+
+fn create_router_backup(
+    backup_dir: Option<PathBuf>,
+    config_path: &Path,
+    config: &RouterConfig,
+    router_skill_dirs: &[PathBuf],
+) -> Result<RouterBackupReport> {
+    let backup_root = backup_dir.unwrap_or_else(|| default_update_backup_dir(config_path));
+    if backup_root.exists() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "router update backup directory already exists: {}",
+                backup_root.display()
+            ),
+        });
+    }
+    fs::create_dir_all(&backup_root).map_err(|source| Error::Write {
+        path: backup_root.clone(),
+        source,
+    })?;
+    let mut items = Vec::new();
+
+    backup_file_if_present(
+        "config",
+        config_path,
+        &backup_root.join("config.json"),
+        &mut items,
+    )?;
+    backup_file_if_present(
+        "manifest",
+        &config.manifest,
+        &backup_root.join("visibility-manifest.json"),
+        &mut items,
+    )?;
+    backup_file_if_present(
+        "index",
+        &config.index,
+        &backup_root.join("skill-index.sqlite"),
+        &mut items,
+    )?;
+
+    for (index, skill_dir) in router_skill_dirs.iter().enumerate() {
+        if skill_dir.exists() {
+            let destination = backup_root.join(format!("router-skill-{index}"));
+            copy_dir_recursive(skill_dir, &destination)?;
+            items.push(RouterBackupItem {
+                kind: "router_skill_dir",
+                source: skill_dir.clone(),
+                backup: destination,
+            });
+        }
+    }
+
+    let report = RouterBackupReport {
+        path: backup_root.clone(),
+        items,
+    };
+    let backup_manifest = backup_root.join("backup.json");
+    let json = serde_json::to_string_pretty(&report).map_err(Error::RenderJson)?;
+    write_file(&backup_manifest, &format!("{json}\n"))?;
+    Ok(report)
+}
+
+fn default_update_backup_dir(config_path: &Path) -> PathBuf {
+    let base = config_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("backups")
+        .join(format!("update-{}", now_unix()));
+    if !base.exists() {
+        return base;
+    }
+    for index in 1.. {
+        let candidate = base.with_file_name(format!(
+            "{}-{index}",
+            base.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("update")
+        ));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    base
+}
+
+fn restart_warning() -> String {
+    "Restart active Codex, Claude, Agents, or vendor harness sessions so they reload updated router skill files and native visibility metadata.".to_owned()
+}
+
+fn backup_file_if_present(
+    kind: &'static str,
+    source: &Path,
+    destination: &Path,
+    items: &mut Vec<RouterBackupItem>,
+) -> Result<()> {
+    if !source.is_file() {
+        return Ok(());
+    }
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|source| Error::Write {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    fs::copy(source, destination).map_err(|source_error| Error::Write {
+        path: destination.to_path_buf(),
+        source: source_error,
+    })?;
+    items.push(RouterBackupItem {
+        kind,
+        source: source.to_path_buf(),
+        backup: destination.to_path_buf(),
+    });
+    Ok(())
+}
+
+fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(destination).map_err(|source_error| Error::Write {
+        path: destination.to_path_buf(),
+        source: source_error,
+    })?;
+    for entry in fs::read_dir(source).map_err(|source_error| Error::Read {
+        path: source.to_path_buf(),
+        source: source_error,
+    })? {
+        let entry = entry.map_err(|source_error| Error::Read {
+            path: source.to_path_buf(),
+            source: source_error,
+        })?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let file_type = entry.file_type().map_err(|source_error| Error::Read {
+            path: source_path.clone(),
+            source: source_error,
+        })?;
+        if file_type.is_dir() {
+            copy_dir_recursive(&source_path, &destination_path)?;
+        } else if file_type.is_file() {
+            fs::copy(&source_path, &destination_path).map_err(|source_error| Error::Write {
+                path: destination_path,
+                source: source_error,
+            })?;
+        }
+    }
+    Ok(())
 }
 
 fn write_router_skill(skill_dir: &Path, router_name: &str, index: &Path) -> Result<()> {
@@ -666,9 +1060,9 @@ routes:
             - ask_direct_or_durable_when_needed
 
   - id: manage_router_lifecycle
-    label: Install, refresh, or uninstall router
+    label: Install, update, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into every managed root, back up and update recorded router installs, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -679,7 +1073,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
+          description: Run router install, update, uninstall, index refresh, or index status commands. Install prepares the router; update backs up and rewrites recorded router packages; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -849,6 +1243,18 @@ fn validate_router_name(router_name: &str) -> Result<()> {
     })
 }
 
+fn remove_router_skills(skill_dirs: &[PathBuf], dry_run: bool) -> Result<Vec<RouterSkillReport>> {
+    let mut reports = Vec::new();
+    for skill_dir in skill_dirs {
+        let status = remove_router_skill(skill_dir, dry_run)?;
+        reports.push(RouterSkillReport {
+            path: skill_dir.clone(),
+            status,
+        });
+    }
+    Ok(reports)
+}
+
 fn remove_router_skill(skill_dir: &Path, dry_run: bool) -> Result<RouterFileStatus> {
     if !skill_dir.exists() {
         return Ok(RouterFileStatus::Missing);
@@ -869,6 +1275,28 @@ fn remove_router_skill(skill_dir: &Path, dry_run: bool) -> Result<RouterFileStat
         })?;
     }
     Ok(RouterFileStatus::Removed)
+}
+
+fn aggregate_router_file_status(reports: &[RouterSkillReport]) -> RouterFileStatus {
+    if reports
+        .iter()
+        .any(|report| matches!(report.status, RouterFileStatus::Removed))
+    {
+        return RouterFileStatus::Removed;
+    }
+    if reports
+        .iter()
+        .any(|report| matches!(report.status, RouterFileStatus::Installed))
+    {
+        return RouterFileStatus::Installed;
+    }
+    if reports
+        .iter()
+        .any(|report| matches!(report.status, RouterFileStatus::Planned))
+    {
+        return RouterFileStatus::Planned;
+    }
+    RouterFileStatus::Missing
 }
 
 fn inspect_durable_executor(roots: &[PathBuf]) -> Result<DurableExecutorReport> {
@@ -904,16 +1332,27 @@ fn inspect_durable_executor(roots: &[PathBuf]) -> Result<DurableExecutorReport> 
     })
 }
 
-fn configured_router_install_root(config: &RouterConfig) -> Option<PathBuf> {
-    config
-        .legacy_router_root
-        .clone()
-        .or_else(|| config.roots.first().cloned())
+fn configured_router_skill_dirs(config: &RouterConfig, router_name: &str) -> Vec<PathBuf> {
+    if !config.router_skill_dirs.is_empty() {
+        return config.router_skill_dirs.clone();
+    }
+    let mut dirs = Vec::new();
+    if let Some(root) = &config.legacy_router_root {
+        dirs.push(root.join(router_name));
+    }
+    for root in &config.roots {
+        let dir = root.join(router_name);
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    dirs
 }
 
 fn write_config(
     path: &Path,
     roots: &[PathBuf],
+    router_skill_dirs: &[PathBuf],
     index: &Path,
     manifest: &Path,
     router_name: &str,
@@ -922,6 +1361,7 @@ fn write_config(
         schema: CONFIG_SCHEMA.to_owned(),
         created_at_unix: now_unix(),
         roots: roots.to_vec(),
+        router_skill_dirs: router_skill_dirs.to_vec(),
         index: index.to_path_buf(),
         manifest: manifest.to_path_buf(),
         legacy_router_root: None,
