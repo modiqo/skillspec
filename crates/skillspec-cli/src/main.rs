@@ -17,6 +17,7 @@ mod report;
 mod router;
 mod router_lifecycle;
 mod sensemake;
+mod source_map;
 mod trace;
 mod visibility;
 mod workspace_synthesizer;
@@ -141,6 +142,11 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Map and query source packages for progressive import")]
+    Source {
+        #[command(subcommand)]
+        command: SourceCommand,
+    },
     #[command(about = "Teach the embedded SkillSpec grammar and porting coverage workflow")]
     Grammar {
         #[command(subcommand)]
@@ -176,7 +182,7 @@ enum Command {
     },
     #[command(
         about = "Create a mechanical draft SkillSpec from a local skill file or folder",
-        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or folder. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
+        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or folder. For large or code-heavy sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
     )]
     ImportSkill {
         /// Local SKILL.md file or skill folder to import.
@@ -184,6 +190,9 @@ enum Command {
         /// Output path for the generated skill.spec.yml draft.
         #[arg(long)]
         out: PathBuf,
+        /// Fresh source-map.json produced by `skillspec source map` for the same source.
+        #[arg(long = "source-map")]
+        source_map: Option<PathBuf>,
     },
     #[command(
         about = "Synthesize a draft SkillSpec from a durable rote workspace (rote-specific)",
@@ -294,6 +303,55 @@ enum CompileTarget {
 enum RouterExecutionModeArg {
     Direct,
     Durable,
+}
+
+#[derive(Debug, Subcommand)]
+enum SourceCommand {
+    #[command(
+        about = "Create source-map.json and source-map.md from a SKILL.md file or skill folder"
+    )]
+    Map {
+        /// Source SKILL.md file or skill folder to map.
+        path: PathBuf,
+        /// Output directory for source-map.json and source-map.md.
+        #[arg(long)]
+        out: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Query one source-map handle or collection")]
+    Query {
+        /// Path to source-map.json.
+        map: PathBuf,
+        /// Query handle, such as files, nodes, dependencies, code, or heading:<file>.<slug>.
+        handle: String,
+        /// Output detail level.
+        #[arg(long, value_enum, default_value_t = SourceViewArg::Summary)]
+        view: SourceViewArg,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Show source-map coverage and review-required counts")]
+    Coverage {
+        /// Path to source-map.json.
+        map: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Check that source files still match source-map.json hashes")]
+    Stale {
+        /// Path to source-map.json.
+        map: PathBuf,
+        /// Source root to compare against. Defaults to the map's recorded source root.
+        #[arg(long)]
+        root: Option<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -985,6 +1043,13 @@ enum SenseViewArg {
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
+enum SourceViewArg {
+    Index,
+    Summary,
+    Full,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
 enum GrammarViewArg {
     Index,
     Summary,
@@ -1158,6 +1223,49 @@ fn run() -> Result<()> {
                 report::text(&sensemake::render_refs(&report))?;
             }
         }
+        Command::Source { command } => match command {
+            SourceCommand::Map { path, out, json } => {
+                let report = source_map::create_source_map(&path, &out)?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&source_map::render_write_report(&report))?;
+                }
+            }
+            SourceCommand::Query {
+                map,
+                handle,
+                view,
+                json,
+            } => {
+                let report = source_map::query(&map, &handle, view.into())?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&source_map::render_query(&report))?;
+                }
+            }
+            SourceCommand::Coverage { map, json } => {
+                let map = source_map::load(&map)?;
+                if json {
+                    report::json(&map.coverage)?;
+                } else {
+                    report::text(&source_map::render_coverage(&map.coverage))?;
+                }
+            }
+            SourceCommand::Stale { map, root, json } => {
+                let report = source_map::stale(&map, root.as_deref())?;
+                let ok = report.ok;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&source_map::render_stale(&report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
+        },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {
                 let report = grammar::sensemake(view.into());
@@ -1330,7 +1438,25 @@ fn run() -> Result<()> {
             let markdown = compiler::compile(&spec, target.into());
             std::io::stdout().lock().write_all(markdown.as_bytes())?;
         }
-        Command::ImportSkill { path, out } => {
+        Command::ImportSkill {
+            path,
+            out,
+            source_map,
+        } => {
+            if let Some(source_map_path) = source_map {
+                let source_root = source_map::source_root_for(&path);
+                let stale_report = source_map::stale(&source_map_path, Some(&source_root))?;
+                if !stale_report.ok {
+                    return Err(error::Error::InvalidInput {
+                        message: format!(
+                            "source map {} is stale for {}; rerun `skillspec source map {} --out <map-dir>` before import",
+                            source_map_path.display(),
+                            source_root.display(),
+                            path.display()
+                        ),
+                    });
+                }
+            }
             let imported = importer::import_skill_for_output(&path, &out)?;
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
@@ -1896,6 +2022,16 @@ impl From<SenseViewArg> for sensemake::View {
             SenseViewArg::Index => Self::Index,
             SenseViewArg::Summary => Self::Summary,
             SenseViewArg::Full => Self::Full,
+        }
+    }
+}
+
+impl From<SourceViewArg> for source_map::SourceView {
+    fn from(value: SourceViewArg) -> Self {
+        match value {
+            SourceViewArg::Index => Self::Index,
+            SourceViewArg::Summary => Self::Summary,
+            SourceViewArg::Full => Self::Full,
         }
     }
 }

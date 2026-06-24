@@ -40,7 +40,11 @@ SkillSpec is worth the overhead when:
 ## Migration Path
 
 ```sh
-skillspec import-skill path/to/SKILL.md --out skill.spec.yml
+skillspec source map path/to/SKILL.md --out .skillspec/source-map
+skillspec source coverage .skillspec/source-map/source-map.json
+skillspec source query .skillspec/source-map/source-map.json nodes --view index
+skillspec source stale .skillspec/source-map/source-map.json --root path/to
+skillspec import-skill path/to/SKILL.md --out skill.spec.yml --source-map .skillspec/source-map/source-map.json
 skillspec validate skill.spec.yml
 skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml

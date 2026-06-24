@@ -49,6 +49,7 @@ directory listings.
 | 15 | [Capability Bootstrap](15-capability-bootstrap.md) | How durable-executor uses local capability seeds under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet. |
 | 16 | [Command Log](16-command-log.md) | A scannable command table with implemented command names, important args/options, explanations, and realistic examples. |
 | 17 | [Design Documentation QA Process](17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |
+| 18 | [Source Map Progressive Reader](18-source-map-progressive-reader.md) | How `skillspec source map/query/coverage/stale` lets imports navigate large Markdown skill sources by exact handles before `import-skill --source-map`. |
 
 ## Evidence Map
 
@@ -66,6 +67,7 @@ Every design claim should be grounded in one or more of these sources:
 | Command log | `crates/skillspec-cli/src/main.rs`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/imports.rs`, `crates/skillspec-cli/src/parser.rs` |
 | Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/02-prose-vs-skillspec.md` |
+| Source-map progressive imports | `crates/skillspec-cli/src/source_map.rs`, `crates/skillspec-cli/src/main.rs`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
 | Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |

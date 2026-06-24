@@ -104,6 +104,10 @@ source skill folder
 
    ```bash
    skillspec --help
+   skillspec source map --help
+   skillspec source query --help
+   skillspec source coverage --help
+   skillspec source stale --help
    skillspec grammar sensemake --help
    skillspec grammar checklist --help
    skillspec grammar schema --help
@@ -116,9 +120,10 @@ source skill folder
    skillspec deps check --help
    ```
 
-   Required capabilities are `grammar sensemake`, `grammar checklist`,
-   `grammar schema`, `import-skill`, `validate`, `imports check`, `test`,
-   `compile`, and `deps check`.
+   Required capabilities are `source map`, `source query`, `source coverage`,
+   `source stale`, `grammar sensemake`, `grammar checklist`, `grammar schema`,
+   `import-skill`, `validate`, `imports check`, `test`, `compile`, and `deps
+   check`.
 
    If `imports check` or `deps check` is unavailable, continue only in degraded
    draft mode:
@@ -132,7 +137,8 @@ source skill folder
    - do not install or release the generated skill
    - tell the user to upgrade the SkillSpec CLI before install/release
 
-   If `grammar sensemake`, `grammar checklist`, `import-skill`, `validate`,
+   If `source map`, `source query`, `source coverage`, `source stale`,
+   `grammar sensemake`, `grammar checklist`, `import-skill`, `validate`,
    `test`, or `compile` is unavailable, stop and ask the user to upgrade the
    SkillSpec CLI before porting.
 
@@ -142,7 +148,7 @@ source skill folder
 3. If the source is remote, download or clone it into the staging directory.
    Preserve relative paths. Do not copy only `SKILL.md` unless the source truly
    has no sibling resources.
-4. Inventory the staged folder before importing:
+4. Inventory and map the staged folder before importing:
 
    - Markdown imports/resources: `SKILL.md`, `reference.md`, `forms.md`,
      examples, and other linked docs
@@ -154,9 +160,22 @@ source skill folder
    - required ordering language such as "first", "before", "then", "after",
      "must complete in order", and "if/otherwise"
 
-5. Read the entire `SKILL.md`; do not summarize from filenames. Then read every
-   directly referenced local resource that affects routing, commands, code,
-   dependencies, or recipes.
+   ```bash
+   skillspec source map path/to/skill-folder --out <draft-dir>/.skillspec/source-map
+   skillspec source coverage <draft-dir>/.skillspec/source-map/source-map.json
+   skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
+   skillspec source query <draft-dir>/.skillspec/source-map/source-map.json dependencies --view summary
+   skillspec source query <draft-dir>/.skillspec/source-map/source-map.json code --view summary
+   skillspec source stale <draft-dir>/.skillspec/source-map/source-map.json --root path/to/skill-folder
+   ```
+
+5. Use the source map as the progressive reader. Query exact source handles with
+   `--view full` when a heading, code block, dependency, local reference, or
+   modal obligation needs semantic promotion. Do not load a large source file
+   wholesale when a source-map handle can recover the exact span. For small
+   sources, a full `SKILL.md` read is acceptable only after the map confirms the
+   file is bounded and has no sibling resources that affect routing, commands,
+   code, dependencies, or recipes.
 6. Teach the harness the current grammar before importing or editing the spec:
 
    ```bash
@@ -170,7 +189,7 @@ source skill folder
 7. Run the mechanical extractor for a draft:
 
    ```bash
-   skillspec import-skill path/to/skill-folder --out skill.spec.yml
+   skillspec import-skill path/to/skill-folder --out skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json
    ```
 
 8. Sensemake the draft and load the import checklist before semantic review:
@@ -443,6 +462,10 @@ surface before doing meaningful work:
 
 ```bash
 skillspec --help
+skillspec source map --help
+skillspec source query --help
+skillspec source coverage --help
+skillspec source stale --help
 skillspec import-skill --help
 skillspec validate --help
 skillspec imports check --help
@@ -464,8 +487,9 @@ exist, continue only as a draft port. In draft mode:
   skills
 - tell the user to upgrade the CLI before release or installation
 
-If `import-skill`, `validate`, `test`, or `compile` is missing, stop and ask
-the user to upgrade the SkillSpec CLI before porting.
+If `source map`, `source query`, `source coverage`, `source stale`,
+`import-skill`, `validate`, `test`, or `compile` is missing, stop and ask the
+user to upgrade the SkillSpec CLI before porting.
 
 When working from this repository during development, prefer the checked-out
 binary if the installed binary is stale:
@@ -705,8 +729,16 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/anthropics/sk
 git -C /tmp/skillspec-port/anthropics-skills sparse-checkout set skills/pdf
 
 skillspec grammar sensemake --view porting
+skillspec source map /tmp/skillspec-port/anthropics-skills/skills/pdf \
+  --out /tmp/anthropic-pdf-source-map
+skillspec source coverage /tmp/anthropic-pdf-source-map/source-map.json
+skillspec source query /tmp/anthropic-pdf-source-map/source-map.json nodes --view index
+skillspec source query /tmp/anthropic-pdf-source-map/source-map.json dependencies --view summary
+skillspec source stale /tmp/anthropic-pdf-source-map/source-map.json \
+  --root /tmp/skillspec-port/anthropics-skills/skills/pdf
 skillspec import-skill /tmp/skillspec-port/anthropics-skills/skills/pdf \
-  --out /tmp/anthropic-pdf.skill.spec.yml
+  --out /tmp/anthropic-pdf.skill.spec.yml \
+  --source-map /tmp/anthropic-pdf-source-map/source-map.json
 
 skillspec sensemake /tmp/anthropic-pdf.skill.spec.yml --view index
 skillspec grammar checklist --for import-skill
@@ -776,7 +808,9 @@ Prioritize tests for harness drift:
 
 A created SkillSpec is ready for serious testing when:
 
-- the source `SKILL.md` was fully read
+- the source was mapped with `skillspec source map`, source coverage and
+  dependency/code summaries were inspected, and exact source spans were queried
+  with `--view full` where needed
 - the source was staged locally if remote
 - `skillspec grammar sensemake --view porting` was run
 - `skillspec grammar checklist --for import-skill` was used to fill or update

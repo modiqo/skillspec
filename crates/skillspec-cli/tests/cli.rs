@@ -388,6 +388,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("sensemake"));
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
+    assert!(stdout(&top).contains("source"));
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
     assert!(stdout(&top).contains("router"));
@@ -431,6 +432,29 @@ fn help_lists_trace_align_arguments() {
     assert!(synthesize_help.contains("--workspace-stats-report"));
     assert!(synthesize_help.contains("--workspace-log"));
     assert!(synthesize_help.contains("--workspace-meta"));
+
+    let source = Command::new(bin())
+        .arg("source")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&source);
+    let source_help = stdout(&source);
+    assert!(source_help.contains("Map and query source packages"));
+    assert!(source_help.contains("map"));
+    assert!(source_help.contains("query"));
+    assert!(source_help.contains("coverage"));
+    assert!(source_help.contains("stale"));
+
+    let import_skill = Command::new(bin())
+        .arg("import-skill")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&import_skill);
+    let import_help = stdout(&import_skill);
+    assert!(import_help.contains("--source-map"));
+    assert!(import_help.contains("source-map.json"));
 }
 
 #[test]
@@ -2053,7 +2077,16 @@ fn grammar_commands_teach_embedded_porting_workflow() {
     assert!(out.contains("embedded: grammar.md"));
     assert!(out.contains("Progressive command sequence:"));
     assert!(out.contains("skillspec grammar sensemake --view porting"));
-    assert!(out.contains("skillspec import-skill <source-skill> --out <draft>/skill.spec.yml"));
+    assert!(out.contains("skillspec source map <source-skill> --out <draft>/.skillspec/source-map"));
+    assert!(out.contains(
+        "skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary"
+    ));
+    assert!(out.contains(
+        "skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>"
+    ));
+    assert!(out.contains(
+        "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json"
+    ));
     assert!(out.contains("Prose-to-SkillSpec mappings:"));
     assert!(out.contains("Import coverage checklist:"));
     assert!(out.contains("Coverage matrix:"));
@@ -2851,7 +2884,7 @@ routes:
       phases:
         - id: extract_source
           owner_skill: skillspec
-          requires: [read_source_skill]
+          requires: [source_map_stale]
         - id: install_skill
           owner_skill: skillspec
           requires: [install_codex]
@@ -2887,7 +2920,7 @@ trace:
     write_file(
         &execution_trace,
         r#"{"event":"phase_started","phase":"extract_source","evidence":{"kind":"checklist","ref":"skillspec-act"}}
-{"event":"requirement_satisfied","phase":"extract_source","requirement":"read_source_skill","evidence":{"kind":"file","ref":"source/SKILL.md"}}
+{"event":"requirement_satisfied","phase":"extract_source","requirement":"source_map_stale","evidence":{"kind":"command","ref":"skillspec source stale source-map.json"}}
 {"event":"phase_completed","phase":"extract_source","evidence":{"kind":"trace","ref":"@phase-1"}}
 {"event":"stats_collected","workspace":"skillspec-align-progress","total_tokens":1234,"response_tokens_cached":500,"reduction_percent":28.5}
 "#,
@@ -3471,6 +3504,162 @@ print("hello")
         .unwrap();
     assert_success(&deps_check);
     assert!(stdout(&deps_check).contains("deps.toml exists"));
+}
+
+#[test]
+fn source_map_guides_progressive_import_and_stale_gate() {
+    let dir = TempDir::new("source-map");
+    let skill_dir = dir.path().join("source-skill");
+    let map_dir = dir.path().join("source-map");
+    let out = dir.path().join("draft").join("skill.spec.yml");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"---
+name: progressive-skill
+description: Use when a large Markdown skill must be mapped before import.
+---
+
+# Progressive Skill
+
+Always inspect dependencies before proof.
+
+See [reference](reference.md).
+
+```python
+import json
+import pypdf
+from reportlab.pdfgen import canvas
+```
+
+```ts
+import { chromium } from "playwright";
+```
+"#,
+    );
+    write_file(
+        &skill_dir.join("reference.md"),
+        "# Reference\n\nNever skip referenced local files.\n",
+    );
+
+    let map = Command::new(bin())
+        .arg("source")
+        .arg("map")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["files"], 2);
+    assert!(map_dir.join("source-map.json").is_file());
+    assert!(map_dir.join("source-map.md").is_file());
+
+    let nodes = Command::new(bin())
+        .arg("source")
+        .arg("query")
+        .arg(map_dir.join("source-map.json"))
+        .arg("nodes")
+        .arg("--view")
+        .arg("index")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&nodes);
+    let nodes = json_stdout(&nodes);
+    let nodes = nodes.as_array().unwrap();
+    assert!(nodes
+        .iter()
+        .any(|node| node["id"] == "frontmatter:skill-md"));
+    assert!(nodes
+        .iter()
+        .any(|node| node["id"] == "heading:skill-md.progressive-skill"));
+    assert!(nodes.iter().any(|node| node["kind"] == "code"));
+
+    let deps = Command::new(bin())
+        .arg("source")
+        .arg("query")
+        .arg(map_dir.join("source-map.json"))
+        .arg("dependencies")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&deps);
+    let deps = json_stdout(&deps);
+    let deps_text = serde_json::to_string(&deps).unwrap();
+    assert!(deps_text.contains("pypdf"));
+    assert!(deps_text.contains("reportlab"));
+    assert!(deps_text.contains("playwright"));
+    assert!(
+        !deps.as_array().unwrap().iter().any(|entry| entry["signals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|signal| signal == "json"))
+    );
+
+    let coverage = Command::new(bin())
+        .arg("source")
+        .arg("coverage")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&coverage);
+    let coverage = json_stdout(&coverage);
+    assert!(coverage["total_nodes"].as_u64().unwrap() > 0);
+    assert!(coverage["review_required"].as_u64().unwrap() > 0);
+
+    let import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&out)
+        .arg("--source-map")
+        .arg(map_dir.join("source-map.json"))
+        .output()
+        .unwrap();
+    assert_success(&import);
+    assert!(out.is_file());
+
+    let stale_fresh = Command::new(bin())
+        .arg("source")
+        .arg("stale")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&stale_fresh);
+    assert_eq!(json_stdout(&stale_fresh)["ok"], true);
+
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        "# Progressive Skill\n\nChanged after source map.\n",
+    );
+
+    let stale = Command::new(bin())
+        .arg("source")
+        .arg("stale")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&stale);
+    assert_eq!(json_stdout(&stale)["ok"], false);
+
+    let stale_import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(dir.path().join("stale").join("skill.spec.yml"))
+        .arg("--source-map")
+        .arg(map_dir.join("source-map.json"))
+        .output()
+        .unwrap();
+    assert_failure(&stale_import);
+    assert!(stderr(&stale_import).contains("source map"));
+    assert!(stderr(&stale_import).contains("stale"));
 }
 
 #[test]

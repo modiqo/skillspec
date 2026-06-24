@@ -29,13 +29,14 @@ skillspec <COMMAND>
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
+| `source <COMMAND>` | Map and query source packages for progressive import. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
 | `deps <COMMAND>` | Check declared SkillSpec dependencies. |
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
-| `import-skill <path> --out <path>` | Create a mechanical draft SkillSpec from a local skill file or folder. |
+| `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from a local skill file or folder, optionally gated by a fresh source map. |
 | `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
 | `index --roots <path>... --out <index-file-or-router-dir>` | Build a searchable skill catalog outside model context. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
@@ -216,6 +217,107 @@ Options:
 
 `refs` reports outgoing references from an item, such as route checks, command
 dependencies, rule preferences, phase requirements, and transition edges.
+
+## `source`
+
+```text
+skillspec source <COMMAND>
+```
+
+Subcommands:
+
+- `map <path> --out <dir> [--json]`
+- `query <source-map.json> <handle> [--view <index|summary|full>] [--json]`
+- `coverage <source-map.json> [--json]`
+- `stale <source-map.json> [--root <path>] [--json]`
+
+`source` is the progressive reader for prose skills and other import sources.
+It uses a Markdown AST with source positions to write `source-map.json` and a
+human-readable `source-map.md`. Agents should run it before importing large or
+resource-heavy skills, then query structural handles and exact spans instead of
+loading the entire source into model context.
+
+### `source map`
+
+```text
+skillspec source map <PATH> --out <OUT>
+```
+
+Arguments:
+
+- `<PATH>`: local `SKILL.md` file or skill folder to map.
+
+Options:
+
+- `--out <OUT>`: output directory for `source-map.json` and `source-map.md`.
+- `--json`: emit JSON instead of a concise human report.
+
+The generated map records files, hashes, Markdown nodes, frontmatter, byte and
+line ranges, local/external references, code blocks, dependency mentions, modal
+obligation language, and review-required classifications. It preserves
+frontmatter as a first-class node instead of treating it as Markdown prose.
+
+### `source query`
+
+```text
+skillspec source query <MAP> <HANDLE> [--view <VIEW>]
+```
+
+Arguments:
+
+- `<MAP>`: path to `source-map.json`.
+- `<HANDLE>`: collection or item handle. Common handles are `files`, `nodes`,
+  `classifications`, `references`, `dependencies`, `code`, `coverage`,
+  `coverage:review_required`, `frontmatter:<file>`, `heading:<file>.<slug>`,
+  and `code:<file>.<n>`.
+
+Options:
+
+- `--view <VIEW>`: output detail level. Values are `index`, `summary`, and
+  `full`. Defaults to `summary`.
+- `--json`: emit JSON instead of a concise human report.
+
+Use `--view index` to inspect structural headings and code blocks, `--view
+summary` to inspect compact classifications with line ranges and previews, and
+`--view full` on a specific node handle to recover the exact source span.
+
+### `source coverage`
+
+```text
+skillspec source coverage <MAP>
+```
+
+Arguments:
+
+- `<MAP>`: path to `source-map.json`.
+
+Options:
+
+- `--json`: emit JSON instead of a concise human report.
+
+Coverage summarizes mapped nodes, review-required classifications, and stale
+file counts. Import review should not proceed until the agent has inspected
+review-required source classifications that affect routes, rules, commands,
+dependencies, imports, resources, recipes, tests, or proof.
+
+### `source stale`
+
+```text
+skillspec source stale <MAP> [--root <ROOT>]
+```
+
+Arguments:
+
+- `<MAP>`: path to `source-map.json`.
+
+Options:
+
+- `--root <ROOT>`: source root to compare against. Defaults to the map's
+  recorded source root.
+- `--json`: emit JSON instead of a concise human report.
+
+`source stale` exits non-zero when any mapped file is missing or has a different
+hash. Run it before import, proof, or install when source files may have changed.
 
 ## `grammar`
 
@@ -544,7 +646,7 @@ Options:
 ## `import-skill`
 
 ```text
-skillspec import-skill <PATH> --out <OUT>
+skillspec import-skill <PATH> --out <OUT> [--source-map <SOURCE_MAP>]
 ```
 
 Arguments:
@@ -554,9 +656,15 @@ Arguments:
 Options:
 
 - `--out <OUT>`: output path for the generated `skill.spec.yml` draft.
+- `--source-map <SOURCE_MAP>`: optional fresh `source-map.json` produced by
+  `skillspec source map` for the same source. When supplied, import refuses to
+  run if any mapped file is stale or missing.
 
 Notes:
 
+- For large or code-heavy skills, first run `skillspec source map`, inspect
+  `source coverage`, query `nodes`, `dependencies`, `code`, and exact
+  `--view full` handles as needed, then pass `--source-map` to `import-skill`.
 - The generated file is a scaffold for semantic review, not a finished port.
 - Fenced code blocks are materialized under `resources/imported-code/` next to
   the output draft and referenced from `code.source.file` with resource

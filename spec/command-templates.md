@@ -45,7 +45,9 @@ them before execution.
 
 ## Import-Skill Strategy
 
-`skillspec import-skill SKILL.md --out skill.spec.yml` should not pretend to
+`skillspec source map SKILL.md --out .skillspec/source-map` should run before
+`skillspec import-skill SKILL.md --out skill.spec.yml --source-map
+.skillspec/source-map/source-map.json`. Import scaffolding should not pretend to
 understand all prose. It should:
 
 1. parse frontmatter

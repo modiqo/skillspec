@@ -62,11 +62,17 @@ The import path is for an existing `SKILL.md` or a directory of Markdown files.
 The CLI command is:
 
 ```sh
-skillspec import-skill <path> --out skill.spec.yml
+skillspec source map <path> --out <draft>/.skillspec/source-map
+skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
+skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
+skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <path>
+skillspec import-skill <path> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
 
-The current importer reads local Markdown source material and creates a
-SkillSpec scaffold. It can:
+The source-map step lets the agent inspect structure, dependencies, code blocks,
+references, and exact source spans before importing. The current importer reads
+local Markdown source material and creates a SkillSpec scaffold. It can:
 
 - read a single skill file or recursively collect Markdown from a directory;
 - skip dot directories, `target`, and `node_modules` during recursive collection;

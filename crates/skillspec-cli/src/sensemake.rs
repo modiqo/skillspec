@@ -106,6 +106,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_source_import(spec) {
+        items.push(
+            "for prose imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+                .to_owned(),
+        );
+    }
     items
 }
 
@@ -420,6 +426,34 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_source_import(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "map import source",
+                command:
+                    "skillspec source map <source-skill> --out <draft>/.skillspec/source-map"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "inspect source structure",
+                command:
+                    "skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "inspect source dependencies",
+                command:
+                    "skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "import from fresh source map",
+                command:
+                    "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json"
+                        .to_owned(),
+            },
+        ]);
+    }
     hints
 }
 
@@ -440,6 +474,14 @@ fn has_rote_workspace_synthesis(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("synthesize-from-workspace"))
+}
+
+fn has_source_import(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("import_skill_draft")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("import-skill"))
 }
 
 #[derive(Clone, Debug)]

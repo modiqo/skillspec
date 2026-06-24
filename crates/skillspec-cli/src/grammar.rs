@@ -346,9 +346,29 @@ fn progressive_sequence() -> Vec<CommandStep> {
             proves: "the harness sees prose-to-construct mappings and the coverage matrix",
         },
         CommandStep {
+            phase: "map source package",
+            command: "skillspec source map <source-skill> --out <draft>/.skillspec/source-map",
+            proves: "Markdown files, frontmatter, byte ranges, line ranges, references, code blocks, dependencies, and review-required spans were indexed without loading the full source into model context",
+        },
+        CommandStep {
+            phase: "inspect source map",
+            command: "skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index",
+            proves: "the harness sees the source structure and exact handles before opening detailed spans",
+        },
+        CommandStep {
+            phase: "review source obligations",
+            command: "skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary",
+            proves: "dependency mentions and imported package signals are visible before proof or install",
+        },
+        CommandStep {
+            phase: "check source freshness",
+            command: "skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>",
+            proves: "the source map still matches the staged source before mechanical import",
+        },
+        CommandStep {
             phase: "create mechanical draft",
-            command: "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml",
-            proves: "frontmatter, headings, materialized code resources, imports, deps, and review notes were extracted",
+            command: "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json",
+            proves: "frontmatter, headings, materialized code resources, imports, deps, and review notes were extracted from the fresh mapped source",
         },
         CommandStep {
             phase: "sensemake the draft",

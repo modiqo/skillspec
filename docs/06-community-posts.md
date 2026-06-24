@@ -25,7 +25,9 @@ A prose skill can explain intent, but it usually cannot prove behavior.
 SkillSpec adds the missing testable layer:
 
 ```sh
-skillspec import-skill path/to/SKILL.md --out skill.spec.yml
+skillspec source map path/to/SKILL.md --out .skillspec/source-map
+skillspec source coverage .skillspec/source-map/source-map.json
+skillspec import-skill path/to/SKILL.md --out skill.spec.yml --source-map .skillspec/source-map/source-map.json
 skillspec validate skill.spec.yml
 skillspec imports check skill.spec.yml
 skillspec test skill.spec.yml

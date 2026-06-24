@@ -36,6 +36,9 @@ activation:
     - prose skill to skillspec
     - skill.spec.yml
     - skillspec import-skill
+    - skillspec source map
+    - skillspec source query
+    - source-map.json
     - skillspec plan
     - skillspec act
     - skillspec progress
@@ -119,9 +122,15 @@ routes:
           description: Resolve the user-supplied local path to one skill folder and preserve sibling resources.
           requires:
             - inventory_source_folder
-            - read_source_skill
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
           forbid:
             - copy_only_skill_md_when_resources_exist
+            - load_large_source_without_source_map
         - id: grammar_preflight
           owner_skill: skillspec
           description: Run the grammar sensemaking and checklist commands before import or YAML editing.
@@ -1060,6 +1069,28 @@ artifacts:
     consumed_by:
       - kind: recipe
         id: local_porting_loop
+  source_map:
+    kind: file
+    path: .skillspec/source-map/source-map.json
+    description: Markdown AST-backed map of staged source files, byte ranges, line ranges, references, code blocks, dependency mentions, and review-required spans.
+    produced_by:
+      - kind: command
+        id: source_map_create
+    consumed_by:
+      - kind: command
+        id: source_map_coverage
+      - kind: command
+        id: source_map_nodes
+      - kind: command
+        id: source_map_dependencies
+      - kind: command
+        id: source_map_code
+      - kind: command
+        id: source_map_stale
+      - kind: command
+        id: import_skill_draft
+      - kind: recipe
+        id: local_porting_loop
   mechanical_draft:
     kind: file
     path: .skillspec/drafts/skill.spec.yml
@@ -1216,9 +1247,51 @@ commands:
     requires:
       dependencies:
         - rg_cli
+  source_map_create:
+    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span.
+    template: skillspec source map <source-skill-folder> --out <draft-dir>/.skillspec/source-map
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_coverage:
+    description: Summarize mapped nodes, review-required classifications, and stale counts before semantic promotion.
+    template: skillspec source coverage <draft-dir>/.skillspec/source-map/source-map.json
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_nodes:
+    description: Inspect structural source handles before opening detailed spans.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_dependencies:
+    description: Inspect dependency mentions and imported package signals from the mapped source before proof or install.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json dependencies --view summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_code:
+    description: Inspect mapped code block handles before deciding which snippets become resources, code, commands, recipes, or examples.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json code --view summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_stale:
+    description: Verify the source map still matches the staged source before import, proof, compile, or install.
+    template: skillspec source stale <draft-dir>/.skillspec/source-map/source-map.json --root <source-skill-folder>
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
   read_source_skill:
-    description: Read the full SKILL.md and directly referenced resources before semantic promotion; source code blocks and scripts are review material until declared as resources/code.
-    template: sed -n '1,999p' <source-skill-folder>/SKILL.md
+    description: Fallback for small sources only; prefer source-map handles and exact --view full queries for large or resource-heavy imports.
+    template: sed -n '1,240p' <source-skill-folder>/SKILL.md
     safety: local_read
   preserve_source_skill:
     description: Preserve the full prose source before compiling over the visible SKILL.md loader.
@@ -1239,8 +1312,8 @@ commands:
       dependencies:
         - rg_cli
   import_skill_draft:
-    description: Generate a deterministic draft from a local skill folder.
-    template: skillspec import-skill <source-skill-folder> --out <draft-dir>/skill.spec.yml
+    description: Generate a deterministic draft from a local skill folder after verifying the staged source map is fresh.
+    template: skillspec import-skill <source-skill-folder> --out <draft-dir>/skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json
     safety: local_write
     requires:
       dependencies:
@@ -1493,10 +1566,13 @@ recipes:
       resources:
         - source_skill_md
       artifacts:
+        - source_map
         - coverage_matrix
     steps:
-      - load_resource: source_skill_md
-      - note: Fill prose_span, obligation, skillspec_construct, confidence, status, and review_note for every source section.
+      - run_command: source_map_nodes
+      - run_command: source_map_code
+      - note: Query exact source-map handles with --view full as needed; load the full source file only for bounded small sources.
+      - note: Fill prose_span, obligation, skillspec_construct, confidence, status, and review_note for every mapped source section.
       - note: Use only the current source folder, embedded grammar, draft sensemake, and user-approved references; do not consult existing ports, repo history, memory, or examples unless the user explicitly asks.
       - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
       - produce_artifact: coverage_matrix
@@ -1507,9 +1583,10 @@ recipes:
       resources:
         - source_skill_md
       artifacts:
+        - source_map
         - dependency_ledger
     steps:
-      - load_resource: source_skill_md
+      - run_command: source_map_dependencies
       - note: Extract dependencies from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests; include source authority, package risk, local status, install candidate, required workflows, and degraded proof impact.
       - produce_artifact: dependency_ledger
       - run_command: inspect_dependency_ledger
@@ -1526,13 +1603,20 @@ recipes:
         - rg_cli
       artifacts:
         - preserved_source
+        - source_map
         - mechanical_draft
         - dependency_ledger
         - reviewed_spec
         - value_report
     steps:
       - run_command: inventory_source_folder
-      - run_command: read_source_skill
+      - run_command: source_map_create
+      - run_command: source_map_coverage
+      - run_command: source_map_nodes
+      - run_command: source_map_dependencies
+      - run_command: source_map_code
+      - run_command: source_map_stale
+      - note: Use source-map handles and --view full for exact spans instead of loading large source files wholesale.
       - run_command: preserve_source_skill
       - run_command: grammar_sensemake_index
       - run_command: grammar_sensemake_porting
@@ -1726,7 +1810,12 @@ states:
   resolve_source:
     do:
       - inventory_source_folder
-      - read_source_skill
+      - source_map_create
+      - source_map_coverage
+      - source_map_nodes
+      - source_map_dependencies
+      - source_map_code
+      - source_map_stale
     next: import_draft
   import_draft:
     do:
@@ -1867,7 +1956,7 @@ trace:
 proof:
   metrics:
     - grammar commands run before import or revision
-    - source SKILL.md fully read and preserved
+    - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
     - observed durable workspace synthesis uses named rote workspace stats and logs
