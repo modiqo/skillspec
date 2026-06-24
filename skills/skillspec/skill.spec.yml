@@ -1067,7 +1067,7 @@ artifacts:
   value_report:
     kind: report
     path: .skillspec/reports/value-report.md
-    description: User-facing summary of extracted triggers, routes, rules, deps, commands, tests, references moved out of the prompt path, context savings, trace, and alignment.
+    description: User-facing summary synthesized from sensemake, test, dependency, decision, progress, and alignment outputs; no native `skillspec skill value` command exists yet.
     produced_by:
       - kind: command
         id: value_report
@@ -1415,8 +1415,8 @@ commands:
       dependencies:
         - skillspec_cli
   value_report:
-    description: Print the concrete value extracted from the ported skill and its QA status.
-    template: skillspec skill value <skill-folder>
+    description: Print the structured SkillSpec map used as one input to the harness-synthesized value report; the final value report is assembled from existing command outputs and explicit proof gaps.
+    template: skillspec sensemake <skill-folder>/skill.spec.yml --view index
     safety: read_only
     requires:
       dependencies:
