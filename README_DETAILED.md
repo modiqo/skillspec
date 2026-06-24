@@ -64,22 +64,26 @@ skillspec refs --help
 skillspec capability --help
 ```
 
-## Create A SkillSpec From An Existing Skill
+## SkillSpec Prompt Setup
 
-For serious ports, use the creator skill:
+After installing SkillSpec, use the `skillspec` prompt skill as the setup and
+authoring multiplexer:
 
 ```text
-/skillspec-creator port <local-skill-folder-or-github-url>
+/skillspec import <local-skill-folder-or-github-url>
+/skillspec install router
+/skillspec install durable-executor from <local-skill-folder-or-github-url>
+/skillspec observe durable workspace <workspace> and create a spec skill
 ```
 
 Examples:
 
 ```text
-/skillspec-creator port /Users/me/.agents/skills/durable-executor
-/skillspec-creator port https://github.com/anthropics/skills/tree/main/skills/pdf
+/skillspec import /Users/me/.agents/skills/durable-executor
+/skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf
 ```
 
-The creator skill does the careful path:
+The `skillspec` prompt skill does the careful path:
 
 1. Stages remote sources locally.
 2. Reads the skill folder, not just `SKILL.md`.
@@ -88,6 +92,11 @@ The creator skill does the careful path:
    dependencies, rules, and tests into a reviewed `skill.spec.yml`.
 5. Validates and tests the spec.
 6. Optionally compiles and installs a generated harness skill.
+
+Router install stays in the selected roots. durable-executor is optional: when
+present it remains the implicit first hop for router mode; when missing,
+SkillSpec reports that durable first-hop is unavailable unless the user supplies
+an approved source.
 
 The mechanical importer is available directly when you only want a draft:
 
@@ -155,7 +164,7 @@ skillspec install skill my-skill --target agents --target codex
 skillspec install skill my-skill --all-detected
 ```
 
-The creator skill can prepare this folder after validation. Do not install a
+The `skillspec` skill can prepare this folder after validation. Do not install a
 generated skill until:
 
 ```sh

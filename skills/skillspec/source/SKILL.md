@@ -1,12 +1,48 @@
 ---
-name: skillspec-creator
-description: Use when creating a SkillSpec from an existing prose SKILL.md, whether the source is a local file, local skill folder, public GitHub repo, or public repo path. Stages remote sources locally, reads the old skill, creates a reviewed `skill.spec.yml`, proves it with validation/tests/explanations, compiles a smaller harness skill, and only then optionally installs it.
+name: skillspec
+description: Use as the SkillSpec post-install setup and skill-authoring multiplexer: import an existing prose SKILL.md from a local folder or public URI, install router mode, optionally install durable-executor, create a SkillSpec skill from an observed durable rote workspace, revise an existing SkillSpec, prove value, compile, and optionally install.
 ---
 
-# skillspec-creator
+# skillspec
 
-Use this skill when the user wants to create a `skill.spec.yml` from an
-existing prose `SKILL.md`.
+Use this skill as the main prompt entry point after SkillSpec is installed. It
+routes SkillSpec setup and skill-authoring requests without making the user
+remember several separate prompt skills.
+
+The main modes are:
+
+- import an existing prose `SKILL.md` from a local folder or public URI
+- install or refresh router mode
+- optionally install durable-executor from an existing skill or approved source
+- create a SkillSpec skill from an observed durable rote workspace
+- revise an existing `skill.spec.yml`
+- prove value, compile, and optionally install a reviewed SkillSpec-backed skill
+
+## Post-Install Multiplexer
+
+Use `/skillspec` as the prompt-level setup surface:
+
+```text
+/skillspec import /Users/me/.agents/skills/durable-executor
+/skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf
+/skillspec install router
+/skillspec install durable-executor from /path/or/public-uri
+/skillspec observe durable workspace <workspace> and create a spec skill
+```
+
+Router install must write the visible router skill into the selected roots and
+must not require a separate router root. In router mode, durable-executor is the
+managed implicit exception when present.
+
+durable-executor is optional. If it is already present in the selected roots,
+verify it and keep it implicit. If it is missing, ask for a source path or URI,
+or report that durable first-hop is unavailable.
+
+Observed-workspace skill creation starts from a named rote workspace. Inspect
+workspace stats, command logs, metadata, files, outputs, dependencies, errors,
+and token evidence. Synthesize a reviewed `skill.spec.yml` from observed facts,
+mark inferred behavior in the coverage matrix, and do not replay mutating
+actions without explicit approval.
 
 The source skill may be:
 
@@ -402,7 +438,7 @@ staging. Staging is read-only source acquisition.
 
 ## SkillSpec CLI Capability Preflight
 
-The creator skill requires a recent `skillspec` CLI. Check the available
+The `skillspec` skill requires a recent `skillspec` CLI. Check the available
 surface before doing meaningful work:
 
 ```bash

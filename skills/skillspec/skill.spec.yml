@@ -1,13 +1,31 @@
 schema: skillspec/v0
-id: skillspec.creator
-title: SkillSpec Creator
-description: SkillSpec-backed contract for porting prose SKILL.md folders and revising existing SkillSpec-backed skills into reviewed, tested packages with grammar-first sensemaking, phase planning, progress evidence, dependency review, compilation, optional install, and value reporting.
+id: skillspec
+title: SkillSpec
+description: SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, installing router mode, optionally installing durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
-  summary: Convert prose SKILL.md skills or revise existing SkillSpec YAML into reviewed SkillSpec packages, using grammar sensemaking, phase plans, progress ledgers, and value proof before install or release.
+  summary: >
+    Multiplex SkillSpec post-install setup: import existing SKILL.md skills from
+    local folders or public URIs, install router mode, optionally install
+    durable-executor, create specs from observed durable execution workspaces,
+    revise SkillSpec YAML, and prove value before install or release.
   keywords:
-    - skillspec creator
+    - skillspec
+    - /skillspec
+    - skillspec setup
+    - post install setup
     - import SKILL.md
+    - import existing skill
     - port skill
+    - local folder or uri
+    - install router
+    - install skill-router
+    - router mode
+    - install durable-executor
+    - durable executor install
+    - observe durable executor
+    - observed durable workspace
+    - create spec skill from workspace
+    - rote exec workspace
     - revise existing SkillSpec
     - update skill.spec.yml
     - prose skill to skillspec
@@ -26,15 +44,21 @@ activation:
   priority: domain
 applies_when:
   - user_intent:
+      - run SkillSpec post-install setup inside the harness prompt
       - convert a prose SKILL.md to skill.spec.yml
       - port a local skill folder into SkillSpec
       - import a public GitHub skill into SkillSpec
+      - import an existing prose skill from a local folder or public URI
+      - install skill-router after SkillSpec is installed
+      - install router mode after SkillSpec is installed
+      - install durable-executor as an optional first-hop skill
+      - create a SkillSpec skill by observing a durable-executor rote-exec workspace
       - revise an existing SkillSpec-backed skill
       - add phase planning and progress tracking to a SkillSpec-backed skill
       - compile and optionally install a reviewed SkillSpec-backed skill
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Teach the harness the current SkillSpec grammar, stage or map the source, import a draft only for prose ports, then semantically review, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, stage or map sources, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -51,6 +75,7 @@ entry:
       - local_repo_files
       - git
       - cargo
+      - rote_workspace
       - declared_commands_dependencies_imports_resources
     forbid:
       - edit_yaml_from_memory
@@ -74,7 +99,7 @@ routes:
       reason: Local ports need source preservation, grammar preflight, a mechanical draft, semantic promotion, QA, and a value report.
       phases:
         - id: resolve_local_source
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Resolve the user-supplied local path to one skill folder and preserve sibling resources.
           requires:
             - inventory_source_folder
@@ -82,7 +107,7 @@ routes:
           forbid:
             - copy_only_skill_md_when_resources_exist
         - id: grammar_preflight
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Run the grammar sensemaking and checklist commands before import or YAML editing.
           tool_boundary:
             allow:
@@ -98,14 +123,14 @@ routes:
           forbid:
             - infer_grammar_from_memory
         - id: mechanical_import
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Generate and inspect the draft spec without treating it as final truth.
           requires:
             - import_skill_draft
             - sensemake_draft
             - produce_mechanical_draft
         - id: semantic_promotion
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Fill the coverage matrix and promote routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
           tool_boundary:
             allow:
@@ -123,7 +148,7 @@ routes:
             - review_and_promote_draft
             - produce_reviewed_spec
         - id: qa_and_proof
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Validate, test, check imports and dependencies, run a demo phase plan/action checklist, record progress evidence, and align the trace.
           tool_boundary:
             allow:
@@ -142,7 +167,7 @@ routes:
             - progress_show
             - prove_value
         - id: report_value
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Print the value report and contract-quality grades.
           requires:
             - generate_value_report
@@ -154,11 +179,11 @@ routes:
       mode: ordered
       phases:
         - id: approve_remote_source
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - approve_remote_source_access
         - id: stage_remote_source
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - stage_remote_folder
             - find_skill_candidates
@@ -166,19 +191,136 @@ routes:
             - install_from_remote_checkout
             - execute_imported_snippets_during_staging
         - id: continue_as_local_port
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           route: local_skill_port
           requires:
             - local_porting_loop
+  - id: install_skill_router
+    label: Install router mode
+    rank: 3
+    description: Use when the user wants post-install setup to create or refresh the explicit-only skill-router surface in the configured skill roots.
+    execution_plan:
+      mode: ordered
+      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, and verify the explicit-only router surface.
+      phases:
+        - id: inspect_router_targets
+          owner_skill: skillspec
+          description: Identify the skill roots where router mode should be installed and verify the SkillSpec CLI supports router commands.
+          requires:
+            - list_install_targets
+            - router_help
+          forbid:
+            - infer_router_roots_without_check
+        - id: install_router_surface
+          owner_skill: skillspec
+          description: Install or refresh the router skill inside the selected roots without using a separate router root.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_install
+            - verify_router_install
+          forbid:
+            - use_removed_router_root
+            - make_router_implicit_when_durable_executor_missing
+        - id: report_router_mode
+          owner_skill: skillspec
+          description: Report which roots were changed, whether durable-executor stayed implicit, and whether durable first-hop is unavailable.
+          requires:
+            - verify_router_installed
+  - id: install_durable_executor
+    label: Install durable-executor
+    rank: 4
+    description: Use when the user wants the optional durable-executor first-hop skill installed or refreshed after SkillSpec itself is installed.
+    execution_plan:
+      mode: ordered
+      reason: Durable-executor is optional and may come from a local folder or URI, so the source and target must be explicit before writing skill roots.
+      phases:
+        - id: resolve_durable_source
+          owner_skill: skillspec
+          description: Determine whether durable-executor is already present or whether the user supplied a local folder or public URI source.
+          requires:
+            - find_durable_executor
+            - choose_durable_source
+          forbid:
+            - assume_bundled_durable_executor
+        - id: import_or_install_durable
+          owner_skill: skillspec
+          description: Port or install durable-executor from the approved source using the same reviewed import/install path as other skills.
+          requires:
+            - local_porting_loop
+            - install_skill
+            - verify_durable_executor
+          forbid:
+            - install_durable_without_source_or_existing_skill
+            - make_durable_executor_explicit_in_router_mode
+        - id: report_durable_status
+          owner_skill: skillspec
+          description: Report whether durable-executor is installed and remains the router-managed implicit exception.
+          requires:
+            - verify_durable_optional_status
+  - id: observed_durable_workspace_to_skill
+    label: Create skill from observed durable workspace
+    rank: 5
+    description: Use when the user wants to ask for a real task, let durable-executor run it through rote-exec evidence, inspect the workspace, and synthesize a reviewed SkillSpec-backed skill from the observed workflow.
+    execution_plan:
+      mode: ordered
+      reason: Observed-workflow creation depends on evidence from a named durable workspace rather than a pre-existing prose SKILL.md.
+      phases:
+        - id: elicit_observation_task
+          owner_skill: skillspec
+          description: Ask for the task to run or identify the existing durable workspace to observe.
+          requires:
+            - choose_observation_workspace
+          forbid:
+            - observe_anonymous_workspace
+        - id: observe_durable_workspace
+          owner_skill: skillspec
+          description: Inspect rote workspace stats, command log, metadata, and artifacts without replaying unsafe actions.
+          tool_boundary:
+            allow:
+              - rote_workspace
+              - rote_exec
+              - local_trace_files
+              - local_repo_files
+              - skillspec_cli
+            permission_required_for:
+              - replay_or_mutating_action
+              - any_unlisted_tool
+          requires:
+            - observe_workspace_stats
+            - observe_workspace_log
+            - observe_workspace_meta
+          forbid:
+            - replay_workspace_actions_without_approval
+            - claim_workspace_tokens_without_stats
+        - id: synthesize_observed_spec
+          owner_skill: skillspec
+          description: Build a reviewed skill.spec.yml from observed commands, dependencies, inputs, outputs, rules, elicitations, tests, and proof gaps.
+          requires:
+            - synthesize_observed_skill_spec
+            - fill_coverage_matrix
+            - produce_observed_workspace_spec
+        - id: qa_observed_spec
+          owner_skill: skillspec
+          description: Validate, test, decide, align, and value-report the observed-workflow spec before optional install.
+          requires:
+            - run_structural_qa
+            - prove_value
   - id: revise_existing_skillspec
     label: Revise existing SkillSpec
-    rank: 3
+    rank: 6
     description: Use when a skill already has skill.spec.yml and the user wants to revise, improve, or update it.
     execution_plan:
       mode: ordered
       phases:
         - id: grammar_and_current_map
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Learn the current grammar and summarize the existing SkillSpec before editing it.
           requires:
             - grammar_sensemake_index
@@ -188,7 +330,7 @@ routes:
           forbid:
             - patch_yaml_from_memory
         - id: inspect_active_handles
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Use query/refs plus the phase plan to inspect only active handles and execution order.
           requires:
             - plan_phase_order
@@ -196,13 +338,13 @@ routes:
             - query_active_handles
             - refs_active_handles
         - id: revise_reviewed_spec
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Patch only the reviewed SkillSpec constructs required by the requested change.
           requires:
             - fill_coverage_matrix
             - produce_reviewed_spec
         - id: rerun_qa
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           description: Re-run structural QA, phase progress, proof, compile, and value reporting after revision.
           requires:
             - run_structural_qa
@@ -210,54 +352,54 @@ routes:
             - prove_value
   - id: compile_and_install_reviewed_skill
     label: Compile and install reviewed skill
-    rank: 4
+    rank: 7
     description: Use only after a reviewed spec validates and the user explicitly approves install targets and dependency surface.
     execution_plan:
       mode: ordered
       phases:
         - id: dependency_surface
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - deps_check_all
             - show_dependency_surface
             - approve_dependency_surface
         - id: compile_targets
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - compile_codex_skill
             - compile_claude_skill
         - id: dry_run_install
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - list_install_targets
             - install_dry_run
             - approve_install_targets
         - id: install
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - install_skill
   - id: prove_skill_value
     label: Prove skill value
-    rank: 5
+    rank: 8
     description: Use when the user asks to prove, demo, align, or value-report a ported SkillSpec skill.
     execution_plan:
       mode: ordered
       phases:
         - id: run_demo_decision
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - plan_phase_order
             - act_named_phase
             - decide_demo
             - produce_decision_trace
         - id: align_trace
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - progress_show
             - trace_align
             - report_alignment_status
         - id: print_value
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires:
             - value_report
 rules:
@@ -291,6 +433,94 @@ rules:
       - install_from_remote_checkout
       - execute_imported_snippets_during_staging
     reason: Remote inputs must be staged locally before import and install.
+  - id: post_install_setup_routes_to_multiplexer
+    when:
+      user_says_any:
+        - post install
+        - post-install
+        - setup after install
+        - skillspec setup
+        - /skillspec
+        - installed skillspec
+    route_order:
+      - install_skill_router
+      - install_durable_executor
+      - observed_durable_workspace_to_skill
+      - local_skill_port
+      - remote_skill_port
+      - revise_existing_skillspec
+    reason: Once SkillSpec is installed, the prompt skill should be the single setup entry point for router, durable, import, observe, revise, and proof workflows.
+  - id: route_prompt_import_to_skill_port
+    when:
+      user_says_any:
+        - /skillspec import
+        - import existing skill
+        - import local skill
+        - import remote skill
+    route_order:
+      - local_skill_port
+      - remote_skill_port
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+    reason: The post-install prompt uses import language, but it should still enter the reviewed local or remote porting path.
+  - id: route_router_install_to_router_setup
+    when:
+      user_says_any:
+        - install router
+        - install skill-router
+        - router mode
+        - setup router
+        - explicit-only router
+        - skill-router explicit
+    prefer: install_skill_router
+    forbid:
+      - use_removed_router_root
+      - make_router_implicit_when_durable_executor_missing
+    after_success:
+      - verify_router_installed
+    reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_durable_install_to_optional_durable
+    when:
+      user_says_any:
+        - install durable-executor
+        - install durable executor
+        - durable first-hop
+        - durable first hop
+        - optional durable
+        - durable-executor setup
+    prefer: install_durable_executor
+    elicit:
+      - choose_durable_source
+      - approve_install_targets
+    forbid:
+      - assume_bundled_durable_executor
+      - install_durable_without_source_or_existing_skill
+      - make_durable_executor_explicit_in_router_mode
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable-executor is optional; install it only from an existing local skill or approved source, and keep it implicit when router mode is active.
+  - id: route_observed_workspace_to_spec
+    when:
+      user_says_any:
+        - observe durable workspace
+        - create spec from durable
+        - create specskill
+        - create spec skill
+        - rote-exec workspace
+        - durable execution workspace
+        - observe workspace and create skill
+    prefer: observed_durable_workspace_to_skill
+    elicit:
+      - choose_observation_workspace
+    forbid:
+      - observe_anonymous_workspace
+      - replay_workspace_actions_without_approval
+      - claim_workspace_tokens_without_stats
+    after_success:
+      - produce_observed_workspace_spec
+      - generate_value_report
+    reason: Observed-workflow skill creation starts from durable evidence, not prose source, so the workspace must be named and inspected before synthesis.
   - id: grammar_preflight_is_mandatory
     when:
       user_says_any:
@@ -345,7 +575,10 @@ rules:
   - id: dependency_surface_requires_review
     when:
       user_says_any:
-        - install
+        - install it
+        - install the result
+        - install generated skill
+        - install reviewed skill
         - release
         - compile
         - deps
@@ -364,10 +597,12 @@ rules:
   - id: install_requires_validated_reviewed_spec
     when:
       user_says_any:
-        - install
         - install codex
         - install agents
         - install it
+        - install the result
+        - install generated skill
+        - install reviewed skill
         - codex and agents
         - --install
         - install target
@@ -411,8 +646,7 @@ rules:
         - existing SkillSpec-backed
         - existing skillspec yaml
         - skillspec yaml
-        - update skillspec creator
-        - skillspec-creator
+        - update this skillspec spec
         - route coverage
         - improve this spec
         - update skill.spec.yml
@@ -428,7 +662,7 @@ rules:
       - skip_current_spec_sensemake
     after_success:
       - run_structural_qa
-    reason: Existing SkillSpecs, including skillspec-creator itself, must be revised from the current grammar, active handles, phase plan, and progress contract, not broad YAML edits or prose import.
+    reason: Existing SkillSpecs, including skillspec itself, must be revised from the current grammar, active handles, phase plan, and progress contract, not broad YAML edits or prose import.
   - id: durable_tool_work_uses_durable_substrate
     when:
       user_says_any:
@@ -489,6 +723,36 @@ elicitations:
         label: Use local source only
         description: Do not access the remote; wait for a local path.
     default: approve_read_only
+  choose_durable_source:
+    question: Which durable-executor source should be used?
+    required_when:
+      - route: install_durable_executor
+    choices:
+      - id: existing_installed
+        label: Existing installed
+        description: Use the durable-executor already present in a selected skill root.
+      - id: supplied_source
+        label: Supplied source
+        description: Use the local folder or public URI supplied in the prompt.
+      - id: skip_durable
+        label: Skip durable
+        description: Leave durable first-hop unavailable and report that router mode can still install.
+    default: existing_installed
+  choose_observation_workspace:
+    question: Which durable workspace should be observed?
+    required_when:
+      - route: observed_durable_workspace_to_skill
+    choices:
+      - id: current_workspace
+        label: Current workspace
+        description: Observe the named rote workspace already active in this session.
+      - id: named_workspace
+        label: Named workspace
+        description: Use the workspace name provided by the user.
+      - id: run_task_first
+        label: Run task first
+        description: Ask for a concrete task, run it through durable-executor, then observe that workspace.
+    default: current_workspace
   approve_dependency_surface:
     question: Do you approve the inferred dependency surface for validation, proof, compile, or install?
     required_when:
@@ -567,11 +831,21 @@ dependencies:
       required: true
       reason: Building from source writes local target artifacts.
       safety: local_write
+  rote_cli:
+    kind: cli
+    description: Required when creating a SkillSpec from observed durable execution evidence in a named rote workspace.
+    command: rote
+    check:
+      command: rote
+    permission:
+      required: true
+      reason: Observing a workspace reads local command logs, metadata, stats, and artifact references that may include sensitive user workflow evidence.
+      safety: local_read
 resources:
   source_skill_md:
     path: source/SKILL.md
     role: source_material
-    description: Preserved full prose source for the skillspec-creator skill before compilation replaces the visible loader.
+    description: Preserved full prose source for the skillspec skill before compilation replaces the visible loader.
     used_by:
       - kind: route
         id: local_skill_port
@@ -676,6 +950,32 @@ artifacts:
     consumed_by:
       - kind: command
         id: value_report
+  durable_workspace_report:
+    kind: report
+    path: .skillspec/reports/durable-workspace-report.md
+    description: Summary of the observed rote workspace commands, dependencies, inputs, outputs, stats, artifacts, and proof gaps.
+    produced_by:
+      - kind: command
+        id: observe_workspace_stats
+      - kind: command
+        id: observe_workspace_log
+      - kind: command
+        id: observe_workspace_meta
+    consumed_by:
+      - kind: code
+        id: synthesize_observed_skill_spec
+  observed_skill_spec:
+    kind: file
+    path: skill.spec.yml
+    description: Reviewed SkillSpec synthesized from a durable workspace observation rather than from a prose SKILL.md source.
+    produced_by:
+      - kind: code
+        id: synthesize_observed_skill_spec
+    consumed_by:
+      - kind: command
+        id: validate_spec
+      - kind: command
+        id: test_spec
 commands:
   grammar_sensemake_index:
     description: Learn the available grammar affordances without reading compiler source.
@@ -860,6 +1160,62 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  router_help:
+    description: Verify that the installed CLI exposes the router command surface.
+    template: skillspec router --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_install:
+    description: Install or refresh the explicit-only skill-router surface in the selected skill roots.
+    template: skillspec router install --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  verify_router_install:
+    description: Verify the generated skill-router files and visibility metadata under the selected roots.
+    template: skillspec router index status --roots <skill-roots> --index <router-index>
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  find_durable_executor:
+    description: Check whether durable-executor is already present in the selected skill roots or source path.
+    template: rg --files <skill-roots-or-source> | rg '(^|/)durable-executor/(SKILL.md|skill.spec.yml)$'
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  verify_durable_executor:
+    description: Verify durable-executor exists after install and remains available as the router-managed implicit first hop.
+    template: rg --files <skill-roots> | rg '(^|/)durable-executor/(SKILL.md|skill.spec.yml|agents/openai.yaml)$'
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  observe_workspace_stats:
+    description: Collect rote workspace stats for token and evidence accounting before synthesizing a SkillSpec.
+    template: rote workspace stats <workspace>
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
+  observe_workspace_log:
+    description: Inspect the rote workspace command log to recover observed commands, dependencies, files, and errors.
+    template: rote workspace inspect log --last <count>
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
+  observe_workspace_meta:
+    description: Inspect rote workspace metadata and variables that explain the observed workflow context.
+    template: rote workspace inspect meta
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
   install_dry_run:
     description: Preview install writes for the selected target without modifying harness roots.
     template: skillspec install skill <skill-folder> --target <target> --dry-run
@@ -997,6 +1353,60 @@ recipes:
       - run_command: install_dry_run
       - ask: approve_install_targets
       - run_command: install_skill
+  router_install_loop:
+    description: Post-install router setup through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: list_install_targets
+      - note: Choose roots explicitly; do not use or ask for a separate router root.
+      - run_command: router_install
+      - run_command: verify_router_install
+      - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
+  durable_executor_install_loop:
+    description: Optional durable-executor setup through an existing installed skill or approved source path/URI.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rg_cli
+    steps:
+      - run_command: find_durable_executor
+      - ask: choose_durable_source
+      - branch:
+          if: durable-executor already exists
+          then: verify_durable_executor
+          otherwise: local_porting_loop
+      - ask: approve_install_targets
+      - run_command: install_skill
+      - run_command: verify_durable_executor
+      - note: Keep durable-executor as the router-managed implicit exception.
+  observed_workspace_to_spec_loop:
+    description: Create a reviewed SkillSpec-backed skill from observed durable execution evidence.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+      artifacts:
+        - durable_workspace_report
+        - observed_skill_spec
+    steps:
+      - ask: choose_observation_workspace
+      - run_command: observe_workspace_stats
+      - run_command: observe_workspace_log
+      - run_command: observe_workspace_meta
+      - run_code: synthesize_observed_skill_spec
+      - produce_artifact: observed_skill_spec
+      - run_command: validate_spec
+      - run_command: deps_check_all
+      - run_command: test_spec
+      - run_command: decide_demo
+      - run_command: trace_align
+      - run_command: value_report
 code:
   review_and_promote_draft:
     language: text
@@ -1024,6 +1434,32 @@ code:
       network: false
       notes:
         - Produces a reviewed spec but does not install or run imported snippets.
+  synthesize_observed_skill_spec:
+    language: text
+    kind: transform
+    source:
+      inline: "Read the durable workspace report, map observed user intent, commands, dependencies, files, prompts, errors, outputs, and proof gaps into a reviewed skill.spec.yml. Use observed facts as evidence, mark inferred behavior in the coverage matrix, and do not replay mutating workspace actions without approval."
+    provenance:
+      resource: source_skill_md
+      heading: Post-install multiplexer
+    purpose: Convert a named durable rote workspace into a SkillSpec-backed skill contract.
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+      artifacts:
+        - durable_workspace_report
+        - coverage_matrix
+    inputs:
+      - durable_workspace_report
+    outputs:
+      - observed_skill_spec
+    safety:
+      mutates_input: false
+      writes_files: true
+      network: false
+      notes:
+        - Observes local workspace evidence and synthesizes a draft; it does not replay commands or install the result.
 states:
   start:
     do:
@@ -1095,6 +1531,24 @@ closures:
     description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
   show_dependency_surface:
     description: Show dependency ids, status, permission sensitivity, and provision choices before compile/install approval.
+  verify_router_installed:
+    description: Report the router install/index status, selected roots, router skill location, and whether a separate router root was avoided.
+    commands:
+      - router_install
+      - verify_router_install
+  verify_durable_optional_status:
+    description: Report whether durable-executor is installed, skipped, or unavailable, and whether it remains implicit under router mode.
+    commands:
+      - find_durable_executor
+      - verify_durable_executor
+  produce_observed_workspace_spec:
+    description: Produce a reviewed SkillSpec from durable workspace evidence, including observed commands, dependencies, artifacts, tests, token stats, and explicit proof gaps.
+    commands:
+      - observe_workspace_stats
+      - observe_workspace_log
+      - observe_workspace_meta
+      - validate_spec
+      - test_spec
   report_alignment_status:
     description: Report trace alignment with Decision replay, Phase order, Requirements, Missing proof, Forbidden actions, and Alignment pass/partial/fail instead of a bare unproven label.
   report_degraded_status:
@@ -1121,6 +1575,9 @@ proof:
   metrics:
     - grammar commands run before import or revision
     - source SKILL.md fully read and preserved
+    - post-install router setup avoids a separate router root and verifies the router index
+    - durable-executor install is optional and source-aware
+    - observed durable workspace synthesis uses named rote workspace stats and logs
     - mechanical draft sensemade before semantic edits
     - coverage matrix completed before install
     - validate/imports/deps/test pass
@@ -1163,6 +1620,59 @@ tests:
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
+  - name: prompt skill is named skillspec
+    input: /skillspec import /Users/me/.agents/skills/durable-executor
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_prompt_import_to_skill_port
+        - grammar_preflight_is_mandatory
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+  - name: router install routes to post install router setup
+    input: /skillspec install router mode into my skill roots
+    expect:
+      route: install_skill_router
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_install_to_router_setup
+      after_success:
+        - verify_router_installed
+      forbid:
+        - use_removed_router_root
+        - make_router_implicit_when_durable_executor_missing
+  - name: durable executor install is optional and source aware
+    input: /skillspec install durable-executor from /Users/me/.agents/skills/durable-executor
+    expect:
+      route: install_durable_executor
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_install_to_optional_durable
+      elicit:
+        - choose_durable_source
+        - approve_install_targets
+      forbid:
+        - assume_bundled_durable_executor
+        - install_durable_without_source_or_existing_skill
+        - make_durable_executor_explicit_in_router_mode
+  - name: observed durable workspace creates spec skill
+    input: /skillspec observe durable workspace skillspec-demo and create a spec skill
+    expect:
+      route: observed_durable_workspace_to_skill
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_observed_workspace_to_spec
+      elicit:
+        - choose_observation_workspace
+      after_success:
+        - produce_observed_workspace_spec
+        - generate_value_report
+      forbid:
+        - observe_anonymous_workspace
+        - replay_workspace_actions_without_approval
+        - claim_workspace_tokens_without_stats
   - name: mechanical draft cannot be installed directly
     input: Run skillspec import-skill and install the result
     expect:
@@ -1208,8 +1718,8 @@ tests:
       forbid:
         - patch_yaml_from_memory
         - skip_current_spec_sensemake
-  - name: update existing skillspec creator routes to revision
-    input: Update skillspec-creator existing skillspec yaml with plan act progress command goodness
+  - name: update existing skillspec routes to revision
+    input: Update skillspec existing skillspec yaml with plan act progress command goodness
     expect:
       route: revise_existing_skillspec
       matched_rules:
@@ -1264,13 +1774,15 @@ tests:
 review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
+  - durable-executor is optional and not assumed to be bundled with router mode; install requires an existing skill or approved source path/URI.
+  - Observed-workspace spec creation depends on the quality of the durable workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
   - The optional Claude compile/install path should be verified in a Claude-compatible harness before release claims.
 metadata:
   source:
     preserved_prose: source/SKILL.md
     source_lines: 756
-    imported_from: skills/skillspec-creator/SKILL.md
+    imported_from: skills/skillspec/SKILL.md
   mechanical_import_observation:
     routes: 0
     rules: 0
@@ -1283,12 +1795,12 @@ metadata:
     note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
   extracted_value_targets:
     activation_triggers: 12
-    routes: 5
-    rules: 11
-    dependency_checks: 4
-    command_templates: 32
-    recipes: 5
-    tests: 12
+    routes: 8
+    rules: 16
+    dependency_checks: 5
+    command_templates: 40
+    recipes: 8
+    tests: 16
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:
@@ -1335,3 +1847,9 @@ metadata:
       confidence: high
       status: proven_by_tests
       review_note: Execution alignment can remain unproven if no real execution ledger is available.
+    - prose_span: Post-install setup multiplexer
+      obligation: Provide one prompt entry point named skillspec that imports existing skills, installs router mode, optionally installs durable-executor, and creates SkillSpec-backed skills from observed durable rote workspaces.
+      skillspec_construct: routes.install_skill_router, routes.install_durable_executor, routes.observed_durable_workspace_to_skill, rules.post_install_setup_routes_to_multiplexer, rules.route_router_install_to_router_setup, rules.route_durable_install_to_optional_durable, rules.route_observed_workspace_to_spec, recipes.router_install_loop, recipes.durable_executor_install_loop, recipes.observed_workspace_to_spec_loop
+      confidence: high
+      status: reviewed
+      review_note: Router setup uses roots plus index and forbids a separate router root; durable-executor remains optional and source-aware.

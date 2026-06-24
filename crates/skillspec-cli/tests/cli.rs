@@ -2355,10 +2355,10 @@ routes:
       mode: ordered
       phases:
         - id: extract_source
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires: [read_source_skill]
         - id: install_skill
-          owner_skill: skillspec-creator
+          owner_skill: skillspec
           requires: [install_codex]
 rules:
   - id: port_request

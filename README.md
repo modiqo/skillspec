@@ -80,15 +80,19 @@ Alignment: partial
 
 Marketplace path:
 
-1. Install the `skillspec-creator` skill from your Codex or Claude skill marketplace.
-2. In the harness, ask it to port, compile, install, and prove the skill:
+1. Install the `skillspec` skill from your Codex or Claude skill marketplace.
+2. In the harness, ask it to run setup or import, compile, install, and prove a skill:
 
 ```text
-/skillspec-creator port ./my-skill, compile it for Codex, install it, and prove it
+/skillspec import ./my-skill, compile it for Codex, install it, and prove it
+/skillspec install router
+/skillspec install durable-executor from /path/or/public-uri
+/skillspec observe durable workspace <workspace> and create a spec skill
 ```
 
 That is the intended user experience: import the existing skill, choose the
-target, install it, then look at the proof report.
+target, install it, then look at the proof report. Router setup and optional
+durable-executor setup stay inside the same prompt surface.
 
 From source:
 

@@ -1,11 +1,11 @@
 ---
-name: skillspec-creator
-description: "Convert prose SKILL.md skills or revise existing SkillSpec YAML into reviewed SkillSpec packages, using grammar sensemaking, phase plans, progress ledgers, and value proof before install or release. Use for skillspec creator, import SKILL.md, port skill, revise existing SkillSpec, update skill.spec.yml, prose skill to skillspec, skill.spec.yml, skillspec import-skill, skillspec plan, skillspec act, skillspec progress and phase progress. Use when the task needs to convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, import a public GitHub skill into SkillSpec, revise an existing SkillSpec-backed skill, add phase planning and progress tracking to a SkillSpec-backed skill, compile and optionally install a reviewed SkillSpec-backed skill and run proof or value reporting for a ported skill. Handles dependency checks"
+name: skillspec
+description: "SkillSpec post-install setup and skill-authoring multiplexer. Use for skillspec, import existing SKILL.md, port skill, revise existing SkillSpec, update skill.spec.yml, install skill-router, install durable-executor, create a SkillSpec skill from an observed durable execution workspace, skillspec import-skill, skillspec router install, skillspec plan, skillspec act, skillspec progress and phase progress. Use when the task needs to convert a prose SKILL.md to skill.spec.yml, port a local skill folder or public URI into SkillSpec, install the explicit-only router surface, optionally install durable-executor, create a spec skill from durable rote-exec evidence, compile and optionally install a reviewed SkillSpec-backed skill, or run proof and value reporting."
 ---
 
-# SkillSpec Creator
+# SkillSpec
 
-SkillSpec-backed contract for porting prose SKILL.md folders and revising existing SkillSpec-backed skills into reviewed, tested packages with grammar-first sensemaking, phase planning, progress evidence, dependency review, compilation, optional install, and value reporting.
+SkillSpec-backed post-install setup and skill-authoring multiplexer for importing prose skills, installing router mode, optionally installing durable-executor, revising existing SkillSpecs, creating specs from durable execution evidence, compiling reviewed skills, optional install, and value reporting.
 
 ## Entry Gate
 
