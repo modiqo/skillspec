@@ -630,6 +630,15 @@ description: Use when deploying applications to production hosting targets. Do n
 # Deploy
 "#,
     );
+    write_file(
+        &codex_root.join("durable-executor/SKILL.md"),
+        r#"---
+name: durable-executor
+description: Use as the durable execution first-hop for tool-backed requests that need trace, evidence, and alignment.
+---
+# Durable Executor
+"#,
+    );
 
     let plan = Command::new(bin())
         .arg("visibility")
@@ -648,6 +657,11 @@ description: Use when deploying applications to production hosting targets. Do n
         .unwrap()
         .iter()
         .all(|change| change["after_visibility"] == "manual-only"));
+    assert!(!plan_report["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|change| change["skill"] == "durable-executor"));
 
     let apply = Command::new(bin())
         .arg("visibility")
@@ -677,6 +691,9 @@ description: Use when deploying applications to production hosting targets. Do n
         claude_settings["skillOverrides"]["deploy"],
         "user-invocable-only"
     );
+    assert!(!codex_root
+        .join("durable-executor/agents/openai.yaml")
+        .exists());
 
     let restore = Command::new(bin())
         .arg("visibility")
@@ -752,6 +769,15 @@ description: Use when extracting PDF text, tables, and images. Do not use for no
 # PDF
 "#,
     );
+    write_file(
+        &root.join("durable-executor/SKILL.md"),
+        r#"---
+name: durable-executor
+description: Use as the durable execution first-hop for tool-backed requests that need trace, evidence, and alignment.
+---
+# Durable Executor
+"#,
+    );
 
     let install_router = Command::new(bin())
         .env("HOME", &home)
@@ -759,8 +785,6 @@ description: Use when extracting PDF text, tables, and images. Do not use for no
         .arg("router")
         .arg("install")
         .arg("--roots")
-        .arg(&root)
-        .arg("--router-root")
         .arg(&root)
         .arg("--index")
         .arg(&index)
@@ -772,11 +796,29 @@ description: Use when extracting PDF text, tables, and images. Do not use for no
     assert_success(&install_router);
     let install_report = json_stdout(&install_router);
     assert_eq!(install_report["router_skill_status"], "installed");
+    assert_eq!(install_report["durable_executor"]["present"], true);
     assert!(root.join("skill-router/SKILL.md").is_file());
+    assert!(root.join("skill-router/skill.spec.yml").is_file());
     assert!(root
         .join("skill-router/.skillspec-router-managed")
         .is_file());
+    let router_skill = fs::read_to_string(root.join("skill-router/SKILL.md")).unwrap();
+    assert!(router_skill.contains("skill.spec.yml"));
+    assert!(router_skill.contains("explicit-only"));
+    assert!(router_skill.contains("durable-executor"));
+    assert!(!router_skill.contains("visible discovery surface"));
+    let router_spec = fs::read_to_string(root.join("skill-router/skill.spec.yml")).unwrap();
+    assert!(router_spec.contains("schema: skillspec/v0"));
+    assert!(!router_spec.contains("--router-root"));
+    let validate_router_spec = Command::new(bin())
+        .arg("validate")
+        .arg(root.join("skill-router/skill.spec.yml"))
+        .output()
+        .unwrap();
+    assert_success(&validate_router_spec);
     assert!(root.join("pdf/agents/openai.yaml").is_file());
+    assert!(root.join("skill-router/agents/openai.yaml").is_file());
+    assert!(!root.join("durable-executor/agents/openai.yaml").exists());
     assert!(index.is_file());
     assert!(skillspec_home.join("router/config.json").is_file());
 
@@ -798,7 +840,7 @@ description: Use when extracting PDF text, tables, and images. Do not use for no
     assert_success(&clean_status);
     let clean_report = json_stdout(&clean_status);
     assert_eq!(clean_report["stale"], false);
-    assert_eq!(clean_report["indexed_skills"], 2);
+    assert_eq!(clean_report["indexed_skills"], 3);
 
     write_file(
         &source.join("SKILL.md"),
@@ -854,7 +896,7 @@ routes:
     assert_success(&refreshed_status);
     let refreshed_report = json_stdout(&refreshed_status);
     assert_eq!(refreshed_report["stale"], false);
-    assert_eq!(refreshed_report["indexed_skills"], 3);
+    assert_eq!(refreshed_report["indexed_skills"], 4);
 
     let route_notes = Command::new(bin())
         .arg("route")
@@ -885,7 +927,90 @@ routes:
     assert!(!index.exists());
     assert!(!skillspec_home.join("router/config.json").exists());
     assert!(!root.join("pdf/agents/openai.yaml").exists());
+    assert!(!root.join("durable-executor/agents/openai.yaml").exists());
     assert!(!root.join("notes/agents/openai.yaml").exists());
+}
+
+#[test]
+fn router_install_reports_missing_optional_durable_executor() {
+    let dir = TempDir::new("router-missing-durable");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images.
+---
+# PDF
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+    let install_report = json_stdout(&install_router);
+    assert_eq!(install_report["durable_executor"]["present"], false);
+    assert!(install_report["durable_executor"]["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| warning
+            .as_str()
+            .is_some_and(|text| text.contains("durable first-hop is unavailable"))));
+    assert!(root.join("skill-router/SKILL.md").is_file());
+    assert!(root.join("skill-router/skill.spec.yml").is_file());
+    assert!(root.join("skill-router/agents/openai.yaml").is_file());
+    assert!(!root.join("durable-executor").exists());
+}
+
+#[test]
+fn router_install_rejects_invalid_router_name() {
+    let dir = TempDir::new("router-invalid-name");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images.
+---
+# PDF
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--router-name")
+        .arg("../skill-router")
+        .output()
+        .unwrap();
+    assert_failure(&install_router);
+    assert!(stderr(&install_router).contains("router name must start"));
+    assert!(!home.join(".agents/skill-router").exists());
 }
 
 #[test]

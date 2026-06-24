@@ -26,6 +26,10 @@ skillspec <COMMAND>
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
+| `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
+| `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
+| `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
+| `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
 | `deps <COMMAND>` | Check declared SkillSpec dependencies. |
@@ -149,6 +153,119 @@ Options:
 - `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
   should be written.
 
+## `sensemake`
+
+```text
+skillspec sensemake [OPTIONS] <PATH>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+
+Options:
+
+- `--view <VIEW>`: output detail level. Values are `index`, `summary`, and
+  `full`. Defaults to `index`.
+- `--json`: emit JSON instead of a concise human report.
+
+`sensemake` is the progressive-disclosure entry point for a spec. It reports
+section counts, ids, query handles, and navigation commands so an agent can
+inspect only the route, rule, command, state, dependency, or proof detail
+needed for the active task.
+
+## `query`
+
+```text
+skillspec query [OPTIONS] <PATH> <HANDLE>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+- `<HANDLE>`: collection, item, or field handle, such as `routes`,
+  `rule:<id>`, `command:<id>.requires`, or `state:<id>`.
+
+Options:
+
+- `--view <VIEW>`: output detail level. Values are `index`, `summary`, and
+  `full`. Defaults to `summary`.
+- `--json`: emit JSON instead of a concise human report.
+
+`query` lets harnesses retrieve specific pieces of a spec without loading the
+whole YAML into model context.
+
+## `refs`
+
+```text
+skillspec refs [OPTIONS] <PATH> <HANDLE>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+- `<HANDLE>`: item handle, such as `rule:<id>`, `command:<id>`,
+  `state:<id>`, or `recipe:<id>`.
+
+Options:
+
+- `--view <VIEW>`: output detail level. Values are `index`, `summary`, and
+  `full`. Defaults to `summary`.
+- `--json`: emit JSON instead of a concise human report.
+
+`refs` reports outgoing references from an item, such as route checks, command
+dependencies, rule preferences, phase requirements, and transition edges.
+
+## `grammar`
+
+```text
+skillspec grammar <COMMAND>
+```
+
+Subcommands:
+
+- `sensemake [--view <index|summary|porting|full>] [--json]`
+- `checklist [--for import-skill] [--json]`
+- `schema [--json]`
+
+### `grammar sensemake`
+
+```text
+skillspec grammar sensemake [OPTIONS]
+```
+
+Options:
+
+- `--view <VIEW>`: output detail level. Values are `index`, `summary`,
+  `porting`, and `full`. Defaults to `index`.
+- `--json`: emit JSON instead of a concise human report.
+
+### `grammar checklist`
+
+```text
+skillspec grammar checklist [OPTIONS]
+```
+
+Options:
+
+- `--for <SUBJECT>`: checklist workflow. The current value is
+  `import-skill`.
+- `--json`: emit JSON instead of a concise human report.
+
+### `grammar schema`
+
+```text
+skillspec grammar schema [OPTIONS]
+```
+
+Options:
+
+- `--json`: emit the embedded JSON Schema instead of the concise summary.
+
+The grammar commands are for authors and reviewers. They teach the current
+typed grammar, semantic porting checklist, and embedded JSON Schema before a
+harness imports or revises a SkillSpec.
+
 ## `trace`
 
 ```text
@@ -261,10 +378,10 @@ Arguments:
 
 - `<RUN>`: trace run directory containing `execution.jsonl`.
 - `<EVENT>`: one of `phase-started`, `requirement-started`,
-  `requirement-satisfied`, `requirement-failed`, `obligation-satisfied`,
-  `route-fulfilled`, `after-success-completed`, `evidence-attached`,
-  `handoff-started`, `handoff-completed`, `phase-completed`, or
-  `phase-blocked`.
+  `requirement-satisfied`, `requirement-failed`, `stats-collected`,
+  `obligation-satisfied`, `route-fulfilled`, `after-success-completed`,
+  `evidence-attached`, `handoff-started`, `handoff-completed`,
+  `phase-completed`, or `phase-blocked`.
 - `[PHASE]`: phase id for phase or requirement events.
 - `[REQUIREMENT]`: requirement id for requirement events.
 
@@ -446,7 +563,7 @@ skillspec install <COMMAND>
 Subcommands:
 
 - `targets`
-- `skill <folder> [--target <target>...] [--all-detected] [--dry-run] [--name <name>]`
+- `skill <folder> [--target <target>...] [--all-detected] [--dry-run] [--name <name>] [--force]`
 
 ## `index`
 
@@ -531,13 +648,20 @@ skillspec router <COMMAND>
 
 Subcommands:
 
-- `install --roots <path>... --index <index-file-or-router-dir> [--router-root <path>] [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
-- `uninstall [--manifest <path>] [--router-root <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
+- `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `uninstall [--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
 - `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 - `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 
-`router install` writes a visible `skill-router` skill, a visibility manifest, a
-SQLite index, and a router config. Once that config exists, successful
+`router install` writes an explicit-only SkillSpec-backed `skill-router` skill
+into the first `--roots` path, a visibility manifest, a SQLite index, and a
+router config. The generated router package uses a thin `SKILL.md` loader plus
+`skill.spec.yml`; the YAML file is the router contract. The router-managed
+visibility profile makes every indexed skill explicit-only except
+`durable-executor`. If `durable-executor` is present in the managed roots, it is
+kept implicit. If it is missing, install still succeeds and reports that durable
+first-hop execution is unavailable until durable-executor is installed
+separately. Once that config exists, successful
 `skillspec install skill` calls reapply router-managed visibility and refresh the
 configured index. `router uninstall` restores visibility from the manifest and
 removes only a generated router skill that contains the managed marker file.
@@ -707,4 +831,5 @@ Options:
   - `claude-local`
 - `--all-detected`: install into every harness root detected on this machine.
 - `--dry-run`: show the install plan without writing files.
+- `--force`: overwrite an existing installed skill folder without prompting.
 - `--name <NAME>`: override the installed skill folder name.

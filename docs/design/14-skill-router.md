@@ -28,7 +28,7 @@ skillspec visibility restore --manifest <manifest> --json
 skillspec skills set-visibility <skill> manual-only --roots <skill-root>... --manifest <manifest>
 skillspec skills disable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec skills enable <skill> --roots <skill-root>... --manifest <manifest>
-skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index-file-or-router-dir>
+skillspec router install --roots <skill-root>... --index <index-file-or-router-dir>
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall
@@ -36,7 +36,8 @@ skillspec router uninstall
 
 `skillspec router install` writes:
 
-- a visible `skill-router` skill with a managed marker;
+- a SkillSpec-backed `skill-router` skill with a thin `SKILL.md`, a
+  `skill.spec.yml` contract, and a managed marker in the first `--roots` path;
 - a SQLite index;
 - a visibility manifest;
 - a router config under `SKILLSPEC_HOME/router/config.json`, or
@@ -44,6 +45,28 @@ skillspec router uninstall
 
 Any index argument can be either the SQLite file itself or the router directory;
 directory paths resolve to `skill-index.sqlite`.
+
+Router mode is the managed state created by `skillspec router install`:
+
+- indexed skills are made explicit-only/manual-only unless they are already
+  `off`;
+- `durable-executor` is the only implicit exception when it is already present
+  in the managed roots;
+- the generated `skill-router` skill is explicit-only and still directly
+  invocable;
+- the index remains searchable by `skillspec route`;
+- the manifest is the only rollback authority.
+
+Router install does not install or copy `durable-executor`. If
+`durable-executor` is found in the managed roots, router mode preserves it as the
+implicit first-hop. If it is missing, router install still succeeds and reports
+that durable first-hop execution is unavailable until durable-executor is
+installed separately.
+
+This differs from the original proposal where the router itself was the visible
+implicit skill. In the implemented mode, `durable-executor` remains the implicit
+first-hop for tool-backed work and can call `skillspec route` as a discovery
+primitive before handing off domain work.
 
 When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a
@@ -105,12 +128,62 @@ or durable execution mode.
 
 ## Durable Execution
 
-Durability is not a per-skill or per-tool index flag. The router returns the best
-domain skill. If the task is tool-backed and the user has not already chosen an
-execution mode, the agent asks whether to run direct or durable. If the user
-chooses durable execution, the selected skill and user task are handed to
-`durable-executor`, which owns workspace evidence, rote execution policy,
-alignment, token stats, and final closure.
+The router and durable-executor are separate layers.
+
+Router mode answers:
+
+```text
+Which local skill best matches this request?
+```
+
+Durable-executor mode answers:
+
+```text
+How should tool-backed work execute and prove itself?
+```
+
+Durability is a global execution envelope, not a per-skill or per-tool index
+flag. The index should not accumulate flags such as `git_requires_durable`,
+`browser_requires_durable`, or `npm_requires_durable`. `skillspec route`
+returns the best domain skill plus an execution-mode hint when appropriate.
+
+Normal routing:
+
+```text
+user task
+-> durable-executor implicit first-hop, or explicit skill-router invocation
+-> skillspec route
+-> selected domain skill
+-> normal execution when direct mode is selected
+```
+
+Durable routing:
+
+```text
+tool-backed user task
+-> skillspec route selects a domain skill
+-> user has explicitly chosen durable mode, or durable-executor was invoked
+-> durable-executor creates the execution envelope
+-> selected skill supplies domain interpretation
+-> durable-executor owns substrate, evidence, alignment, token stats, and closure
+```
+
+When the user has not already chosen direct or durable execution, route output
+may include:
+
+```json
+{
+  "elicitation": "execution_mode_direct_or_durable"
+}
+```
+
+The harness then asks whether to run direct or durable. Skip that question when
+the user already chose durable/direct mode, the task is pure discussion, or the
+selected skill is `durable-executor` itself.
+
+When durable mode is active, the durable envelope wins on execution substrate.
+For example, if the selected domain skill says to run `git status`, the durable
+envelope still requires the actual process to run through `rote exec`.
 
 ## Safety Boundaries
 

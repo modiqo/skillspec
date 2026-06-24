@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MANIFEST_SCHEMA: &str = "skillspec/visibility-manifest/v1";
+pub(crate) const ROUTER_MANAGED_IMPLICIT_EXCEPTION: &str = "durable-executor";
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -325,7 +326,7 @@ fn prepare_profile_changes(
     for entry in entries {
         let target = match profile {
             VisibilityProfile::RouterManaged => {
-                if entry.name == "skill-router" {
+                if entry.name == ROUTER_MANAGED_IMPLICIT_EXCEPTION {
                     Visibility::Implicit
                 } else if entry.visibility == Visibility::Off {
                     Visibility::Off

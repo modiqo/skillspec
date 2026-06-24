@@ -213,8 +213,8 @@ when the harness discovery path is known.
 This README is the fast path.
 
 - [Detailed README](README_DETAILED.md)
-- [Grammar visuals](docs/grammar-visuals.md)
+- [Docs index](docs/README.md)
 - [Design docs](docs/design/README.md)
-- [Why SkillSpec](docs/why-skillspec.md)
+- [Why SkillSpec](docs/01-why-skillspec.md)
 - [Grammar](spec/grammar.md)
 - [Schema](spec/skill.spec.schema.json)

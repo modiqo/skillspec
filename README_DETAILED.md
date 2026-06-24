@@ -541,22 +541,22 @@ skillspec deps check skill.spec.yml
 
 ## Community And RFC
 
-- [docs/rfc-v0.md](docs/rfc-v0.md) is the RFC-style announcement draft.
-- [docs/why-skillspec.md](docs/why-skillspec.md) explains why structured
+- [docs/03-rfc-v0.md](docs/03-rfc-v0.md) is the RFC-style announcement draft.
+- [docs/01-why-skillspec.md](docs/01-why-skillspec.md) explains why structured
   behavior contracts help.
-- [docs/why_skillspec/](docs/why_skillspec/) contains a demo-ready prose versus
+- [docs/why-skillspec-demo/](docs/why-skillspec-demo/) contains a demo-ready prose versus
   SkillSpec comparison.
-- [docs/prose-vs-skillspec.md](docs/prose-vs-skillspec.md) compares prose-only
+- [docs/02-prose-vs-skillspec.md](docs/02-prose-vs-skillspec.md) compares prose-only
   skills with SkillSpec-backed skills.
-- [docs/community-outreach.md](docs/community-outreach.md) names the launch
+- [docs/04-community-outreach.md](docs/04-community-outreach.md) names the launch
   audiences and the specific ask.
 - [DISCUSSIONS.md](DISCUSSIONS.md) defines recommended GitHub Discussions
   categories.
 - [CONTRIBUTING.md](CONTRIBUTING.md) describes local development, spec changes,
   and golden snapshot updates.
-- [docs/good-first-issues.md](docs/good-first-issues.md) lists starter issues
+- [docs/05-good-first-issues.md](docs/05-good-first-issues.md) lists starter issues
   for contributors.
-- [docs/community-posts.md](docs/community-posts.md) contains short launch post
+- [docs/06-community-posts.md](docs/06-community-posts.md) contains short launch post
   drafts.
 
 Repo-local skills live in `.claude/skills/<name>/` and are checked in despite

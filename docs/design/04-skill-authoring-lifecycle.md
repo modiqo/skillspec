@@ -234,5 +234,5 @@ This doc is grounded in:
   `compile`, `import-skill`, and `trace align`;
 - `crates/skillspec-cli/src/decision.rs`, `imports.rs`, `deps.rs`, and
   `align.rs`, which implement the runtime and review surfaces;
-- `docs/prose-vs-skillspec.md`, which states that import is conservative and
+- `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.

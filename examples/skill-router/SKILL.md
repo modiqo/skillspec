@@ -17,7 +17,10 @@ metadata:
 
 # Skill Router
 
-This skill is the visible discovery surface for large local skill libraries.
+This skill is a thin native harness loader for the SkillSpec router.
+Load and follow `./skill.spec.yml`; that file is the router contract.
+This router is explicit-only; `durable-executor` remains the implicit first-hop
+when it is installed separately in the managed roots.
 
 The router does not execute task work. It selects a likely skill, reports confidence and candidate paths, and asks for direct or durable execution when the task will use tools and the user has not already chosen an execution mode.
 
@@ -41,7 +44,7 @@ The router does not execute task work. It selects a likely skill, reports confid
 Use lifecycle commands for managed installation:
 
 ```bash
-skillspec router install --roots <skill-root>... --router-root <skill-root> --index <index-file-or-router-dir>
+skillspec router install --roots <skill-root>... --index <index-file-or-router-dir>
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall

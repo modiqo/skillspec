@@ -24,51 +24,31 @@ This order matters because SkillSpec is a contract. A design document may explai
 intent, but only the model, parser, schema, tests, and reference docs can define
 what the current implementation accepts.
 
-## Document Map
+## Reading Order
 
-The intended design-doc set is:
+Read the numbered docs in filename order. `README.md` is the index and stays
+unnumbered; every other file is prefixed to preserve the intended sequence in
+directory listings.
 
-- `spec-as-contract.md`: why SkillSpec is a behavior contract rather than prose
-  instructions, a prompt language, or a workflow engine.
-- `skill-authoring-lifecycle.md`: how a skill moves from prose to structured
-  SkillSpec, including import, review, execution, and iteration.
-- `package-anatomy.md`: how the thin `SKILL.md` loader, `skill.spec.yml`, and
-  dependency manifests fit together.
-- `progressive-sensemaking.md`: how an agent should orient through `sensemake`,
-  `decide`, `query`, and `refs` instead of loading the whole spec file.
-- `runtime-plan-act-progress-loop.md`: how `plan`, `act`, `progress record`,
-  `progress show`, and `trace align` form the visible runtime loop for a
-  SkillSpec-backed run.
-- `execution-progress-ledger.md`: how `execution.jsonl` records phase,
-  requirement, handoff, route, and closure proof for progress and alignment.
-- `phase-tool-boundaries.md`: how `tool_boundary` is rendered by `act` as a hard
-  per-phase permission boundary for tools, data sources, substrates, providers,
-  adapters, APIs, CLIs, browser modes, and skills.
-- `completion-alignment-and-token-reporting.md`: how final responses should
-  render alignment summaries, missing proof rows, trace paths, and measured
-  token consumption and savings.
-- `skill-router.md`: how the optional router indexes large skill libraries,
-  applies native Codex and Claude visibility controls, and preserves a
-  manifest-backed restore path.
-- `command-log.md`: a scannable command table with implemented command names,
-  important args/options, explanations, and realistic examples.
-- `grammar-and-conformance.md`: the grammar surface, typed fields, references,
-  validation rules, schema strictness, and conformance expectations.
-- `../grammar-visuals.md`: a visual companion to `spec/grammar.md` with
-  lexical cards for every top-level grammar section.
-- `rules-routes-and-decision-algebra.md`: how routes, rules, predicates, forbids,
-  allows, elicitations, route order, and after-success closures combine.
-- `state-machines-handoffs-and-jumps.md`: how lifecycle states, route execution
-  plans, handoffs, and phase jumps are represented without turning SkillSpec into
-  an execution engine.
-- `imports-resources-code-and-recipes.md`: how runtime-loadable imports differ
-  from resources, code blocks, artifacts, commands, and recipes.
-- `traces-and-alignment.md`: how decision traces and alignment reports support
-  review, replay, and self-reflection.
-- `capability-bootstrap.md`: how durable-executor uses local capability seeds
-  under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet.
-- `qa-process.md`: the detailed review checklist used to keep the docs aligned
-  with implementation.
+| Order | Doc | Purpose |
+| --- | --- | --- |
+| 01 | [SkillSpec As Contract](01-spec-as-contract.md) | Why SkillSpec is a behavior contract rather than prose instructions, a prompt language, or a workflow engine. |
+| 02 | [Grammar And Conformance](02-grammar-and-conformance.md) | The grammar surface, typed fields, references, validation rules, schema strictness, and conformance expectations. |
+| 03 | [Package Anatomy](03-package-anatomy.md) | How the thin `SKILL.md` loader, `skill.spec.yml`, and dependency manifests fit together. |
+| 04 | [Skill Authoring Lifecycle](04-skill-authoring-lifecycle.md) | How a skill moves from prose to structured SkillSpec, including import, review, execution, and iteration. |
+| 05 | [Progressive Sensemaking](05-progressive-sensemaking.md) | How an agent should orient through `sensemake`, `decide`, `query`, and `refs` instead of loading the whole spec file. |
+| 06 | [Rules, Routes, And Decision Algebra](06-rules-routes-and-decision-algebra.md) | How routes, rules, predicates, forbids, allows, elicitations, route order, and after-success closures combine. |
+| 07 | [State Machines, Handoffs, And Jumps](07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
+| 08 | [Imports, Resources, Code, And Recipes](08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
+| 09 | [Phase Tool Boundaries](09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
+| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, `progress record`, `progress show`, and `trace align` form the visible runtime loop for a SkillSpec-backed run. |
+| 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
+| 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
+| 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
+| 14 | [Skill Router](14-skill-router.md) | How the optional router indexes large skill libraries, applies native Codex and Claude visibility controls, and preserves a manifest-backed restore path. |
+| 15 | [Capability Bootstrap](15-capability-bootstrap.md) | How durable-executor uses local capability seeds under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet. |
+| 16 | [Command Log](16-command-log.md) | A scannable command table with implemented command names, important args/options, explanations, and realistic examples. |
+| 17 | [Design Documentation QA Process](17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |
 
 ## Evidence Map
 
@@ -76,7 +56,7 @@ Every design claim should be grounded in one or more of these sources:
 
 | Topic | Primary implementation and reference sources |
 | --- | --- |
-| Contract semantics and non-goals | `spec/README.md`, `spec/semantics.md`, `spec/grammar.md`, `docs/why-skillspec.md`, `docs/prose-vs-skillspec.md` |
+| Contract semantics and non-goals | `spec/README.md`, `spec/semantics.md`, `spec/grammar.md`, `docs/01-why-skillspec.md`, `docs/02-prose-vs-skillspec.md` |
 | Top-level grammar shape | `crates/skillspec-cli/src/model.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Validation behavior | `crates/skillspec-cli/src/parser.rs`, `conformance/valid/`, `conformance/invalid/` |
 | Route and rule decisions | `crates/skillspec-cli/src/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
@@ -85,7 +65,7 @@ Every design claim should be grounded in one or more of these sources:
 | Phase tool boundaries | `crates/skillspec-cli/src/model.rs`, `crates/skillspec-cli/src/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Command log | `crates/skillspec-cli/src/main.rs`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/imports.rs`, `crates/skillspec-cli/src/parser.rs` |
-| Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/prose-vs-skillspec.md` |
+| Prose import scaffolding | `crates/skillspec-cli/src/importer.rs`, `docs/02-prose-vs-skillspec.md` |
 | Thin loader generation | `crates/skillspec-cli/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |

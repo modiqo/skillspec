@@ -1,6 +1,7 @@
 # Prose Says It. SkillSpec Proves It.
 
-This folder is a demo script in document form. It compares the same browser
+This folder is the runnable demo package for
+[`../01-why-skillspec.md`](../01-why-skillspec.md). It compares the same browser
 research skill written two ways:
 
 - [prose_only/SKILL.md](prose_only/SKILL.md): a normal prose-heavy skill.
@@ -47,11 +48,11 @@ lives in `skill.spec.yml`:
 The demo is powerful because it is not a claim. It is runnable.
 
 ```sh
-skillspec validate docs/why_skillspec/skillspec_backed/skill.spec.yml
-skillspec imports check docs/why_skillspec/skillspec_backed/skill.spec.yml
-skillspec test docs/why_skillspec/skillspec_backed/skill.spec.yml
-skillspec deps check docs/why_skillspec/skillspec_backed/skill.spec.yml
-skillspec decide docs/why_skillspec/skillspec_backed/skill.spec.yml \
+skillspec validate docs/why-skillspec-demo/skillspec_backed/skill.spec.yml
+skillspec imports check docs/why-skillspec-demo/skillspec_backed/skill.spec.yml
+skillspec test docs/why-skillspec-demo/skillspec_backed/skill.spec.yml
+skillspec deps check docs/why-skillspec-demo/skillspec_backed/skill.spec.yml
+skillspec decide docs/why-skillspec-demo/skillspec_backed/skill.spec.yml \
   --input='browse https://example.com and take a snapshot' \
   --trace-dir /tmp/skillspec-demo-traces
 ```
@@ -102,8 +103,8 @@ following.
 Then run the SkillSpec-backed version:
 
 ```sh
-skillspec test docs/why_skillspec/skillspec_backed/skill.spec.yml
-skillspec decide docs/why_skillspec/skillspec_backed/skill.spec.yml \
+skillspec test docs/why-skillspec-demo/skillspec_backed/skill.spec.yml
+skillspec decide docs/why-skillspec-demo/skillspec_backed/skill.spec.yml \
   --input='browse https://example.com and take a snapshot' \
   --trace-dir /tmp/skillspec-demo-traces
 ```

@@ -38,10 +38,11 @@ Research and platform guidance point to several recurring limits in prose-only p
 
 SkillSpec applies that lesson to skills: keep the human instructions, but move the high-stakes behavioral contract into a format that validators, tests, compilers, and traces can understand.
 
-For a demo-ready side-by-side comparison, see
-[docs/why_skillspec/README.md](why_skillspec/README.md). It includes a
-prose-only `SKILL.md`, a SkillSpec-backed loader, a runnable `skill.spec.yml`,
-and a table designed for launch/demo material.
+This document is the conceptual argument. For a runnable side-by-side demo of
+the same argument, see
+[docs/why-skillspec-demo/README.md](why-skillspec-demo/README.md). The demo
+package includes a prose-only `SKILL.md`, a SkillSpec-backed loader, a runnable
+`skill.spec.yml`, and a table designed for launch/demo material.
 
 ## What SkillSpec Is Not
 

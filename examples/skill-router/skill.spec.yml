@@ -75,7 +75,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the visible router skill, manage its index and manifest, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into the first managed root, manage its index and manifest, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -182,7 +182,7 @@ commands:
 
   show_router_lifecycle_plan:
     description: Preview router lifecycle changes before writing files.
-    template: "skillspec router install --roots {{roots}} --router-root {{router_root}} --index {{index}} --manifest {{manifest}} --dry-run --json"
+    template: "skillspec router install --roots {{roots}} --index {{index}} --manifest {{manifest}} --dry-run --json"
     safety: local_read
 
   run_router_lifecycle_command:

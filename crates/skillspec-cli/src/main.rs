@@ -102,7 +102,7 @@ enum Command {
         #[arg(long)]
         trace_dir: Option<PathBuf>,
     },
-    #[command(about = "Teach the SkillSpec grammar map and progressive navigation handles")]
+    #[command(about = "Teach one SkillSpec map and progressive navigation handles")]
     Sensemake {
         /// Path to a skill.spec.yml file.
         path: PathBuf,
@@ -380,7 +380,7 @@ enum VisibilityProfileArg {
 
 #[derive(Debug, Subcommand)]
 enum RouterCommand {
-    #[command(about = "Install the visible skill-router surface and managed index")]
+    #[command(about = "Install the explicit-only SkillSpec-backed skill-router and managed index")]
     Install {
         /// Skill roots to scan and manage.
         #[arg(long = "roots", num_args = 1.., required = true)]
@@ -391,10 +391,7 @@ enum RouterCommand {
         /// Reversible visibility manifest path. Defaults beside the index.
         #[arg(long)]
         manifest: Option<PathBuf>,
-        /// Root where the visible skill-router skill should be installed. Defaults to the first root.
-        #[arg(long)]
-        router_root: Option<PathBuf>,
-        /// Visible router skill folder/name.
+        /// Router skill folder/name.
         #[arg(long, default_value = router_lifecycle::default_router_name())]
         router_name: String,
         /// Show changes without writing files, index, manifest, or config.
@@ -404,15 +401,12 @@ enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Restore visibility and remove the managed skill-router surface")]
+    #[command(about = "Restore visibility and remove the managed skill-router")]
     Uninstall {
         /// Reversible visibility manifest path. Defaults from router config.
         #[arg(long)]
         manifest: Option<PathBuf>,
-        /// Root containing the visible skill-router skill. Defaults from router config.
-        #[arg(long)]
-        router_root: Option<PathBuf>,
-        /// Visible router skill folder/name.
+        /// Router skill folder/name.
         #[arg(long, default_value = router_lifecycle::default_router_name())]
         router_name: String,
         /// SQLite index file or router directory to remove unless --keep-index is set. Defaults from router config.
@@ -1445,7 +1439,6 @@ fn run() -> Result<()> {
                 roots,
                 index,
                 manifest,
-                router_root,
                 router_name,
                 dry_run,
                 json,
@@ -1454,7 +1447,6 @@ fn run() -> Result<()> {
                     roots,
                     index,
                     manifest,
-                    router_root,
                     router_name: Some(router_name),
                     dry_run,
                 })?;
@@ -1466,7 +1458,6 @@ fn run() -> Result<()> {
             }
             RouterCommand::Uninstall {
                 manifest,
-                router_root,
                 router_name,
                 index,
                 keep_index,
@@ -1476,7 +1467,6 @@ fn run() -> Result<()> {
                 let report =
                     router_lifecycle::uninstall(router_lifecycle::RouterUninstallOptions {
                         manifest,
-                        router_root,
                         router_name: Some(router_name),
                         index,
                         keep_index,
