@@ -797,6 +797,17 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     let install_report = json_stdout(&install_router);
     assert_eq!(install_report["router_skill_status"], "installed");
     assert_eq!(install_report["durable_executor"]["present"], true);
+    assert_eq!(
+        install_report["visibility"]["changes"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    assert_eq!(install_report["preparedness"]["ready"], true);
+    assert_eq!(install_report["preparedness"]["status_checked"], true);
+    assert_eq!(install_report["preparedness"]["index_stale"], false);
+    assert_eq!(install_report["preparedness"]["indexed_skills"], 3);
     assert!(root.join("skill-router/SKILL.md").is_file());
     assert!(root.join("skill-router/skill.spec.yml").is_file());
     assert!(root
@@ -819,6 +830,15 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     assert!(root.join("pdf/agents/openai.yaml").is_file());
     assert!(root.join("skill-router/agents/openai.yaml").is_file());
     assert!(!root.join("durable-executor/agents/openai.yaml").exists());
+    assert!(fs::read_to_string(root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(fs::read_to_string(root.join("skill-router/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(!fs::read_to_string(root.join("durable-executor/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
     assert!(index.is_file());
     assert!(skillspec_home.join("router/config.json").is_file());
 
@@ -897,6 +917,9 @@ routes:
     let refreshed_report = json_stdout(&refreshed_status);
     assert_eq!(refreshed_report["stale"], false);
     assert_eq!(refreshed_report["indexed_skills"], 4);
+    assert!(fs::read_to_string(root.join("notes/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
 
     let route_notes = Command::new(bin())
         .arg("route")
@@ -929,6 +952,12 @@ routes:
     assert!(!root.join("pdf/agents/openai.yaml").exists());
     assert!(!root.join("durable-executor/agents/openai.yaml").exists());
     assert!(!root.join("notes/agents/openai.yaml").exists());
+    assert!(!fs::read_to_string(root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(!fs::read_to_string(root.join("notes/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
 }
 
 #[test]
@@ -964,6 +993,7 @@ description: Use when extracting PDF text, tables, and images.
     assert_success(&install_router);
     let install_report = json_stdout(&install_router);
     assert_eq!(install_report["durable_executor"]["present"], false);
+    assert_eq!(install_report["preparedness"]["ready"], true);
     assert!(install_report["durable_executor"]["warnings"]
         .as_array()
         .unwrap()
@@ -974,6 +1004,12 @@ description: Use when extracting PDF text, tables, and images.
     assert!(root.join("skill-router/SKILL.md").is_file());
     assert!(root.join("skill-router/skill.spec.yml").is_file());
     assert!(root.join("skill-router/agents/openai.yaml").is_file());
+    assert!(fs::read_to_string(root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(fs::read_to_string(root.join("skill-router/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
     assert!(!root.join("durable-executor").exists());
 }
 

@@ -380,7 +380,9 @@ enum VisibilityProfileArg {
 
 #[derive(Debug, Subcommand)]
 enum RouterCommand {
-    #[command(about = "Install the explicit-only SkillSpec-backed skill-router and managed index")]
+    #[command(
+        about = "Install the explicit-only SkillSpec-backed skill-router, managed index, and preparedness check"
+    )]
     Install {
         /// Skill roots to scan and manage.
         #[arg(long = "roots", num_args = 1.., required = true)]
@@ -446,7 +448,7 @@ enum RouterIndexCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Compare the router index against current skill roots")]
+    #[command(about = "Compare router preparedness against current skill roots")]
     Status {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]

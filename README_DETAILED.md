@@ -93,10 +93,13 @@ The `skillspec` prompt skill does the careful path:
 5. Validates and tests the spec.
 6. Optionally compiles and installs a generated harness skill.
 
-Router install stays in the selected roots. durable-executor is optional: when
-present it remains the implicit first hop for router mode; when missing,
-SkillSpec reports that durable first-hop is unavailable unless the user supplies
-an approved source.
+Router install stays in the selected roots. It applies explicit-only native
+controls across managed roots, writes the routing index, and runs a status check
+so the prepared router is present and non-stale before use. Shared `.agents`
+roots receive both Codex and Claude visibility controls. durable-executor is
+optional: when present it remains the implicit first hop for router mode; when
+missing, SkillSpec reports that durable first-hop is unavailable unless the user
+supplies an approved source.
 
 The mechanical importer is available directly when you only want a draft:
 

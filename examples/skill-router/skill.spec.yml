@@ -75,7 +75,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, manage its index and manifest, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -86,12 +86,12 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: skill-router
-          description: Run router install, uninstall, index refresh, or index status commands.
+          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router by applying visibility, building the index, and checking status.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
           owner_skill: skill-router
-          description: Verify router skill files, manifest, config, and index status after the lifecycle change.
+          description: Verify router skill files, manifest, config, preparedness.ready, and index status after the lifecycle change.
           requires:
             - verify_router_lifecycle_result
 

@@ -55,6 +55,9 @@ Router mode is the managed state created by `skillspec router install`:
 - the generated `skill-router` skill is explicit-only and still directly
   invocable;
 - the index remains searchable by `skillspec route`;
+- install and install-hook refreshes run an immediate status check after
+  indexing; preparedness requires a present, non-stale index whose indexed
+  skill count matches the discovered skill count;
 - the manifest is the only rollback authority.
 
 Router install does not install or copy `durable-executor`. If
@@ -70,7 +73,7 @@ primitive before handing off domain work.
 
 When that config exists, `skillspec install skill` automatically reapplies the
 router-managed visibility profile and refreshes the configured index after a
-successful install.
+successful install, then performs the same preparedness check.
 
 ## Visibility Model
 
@@ -94,6 +97,17 @@ Claude roots use `skillOverrides` in the nearest `.claude/settings.json`:
   }
 }
 ```
+
+Shared `.agents/skills` roots also get Claude-compatible SKILL.md frontmatter,
+because those roots may be symlinked into more than one harness:
+
+```yaml
+disable-model-invocation: true
+```
+
+That header can represent implicit versus manual-only. For `name-only` and
+`off`, SkillSpec writes the closest native manual-only control and relies on the
+visibility manifest to preserve the exact router state.
 
 The conceptual states are:
 

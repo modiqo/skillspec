@@ -582,9 +582,9 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 The indexer scans `SKILL.md` frontmatter, optional `agents/openai.yaml`, Claude
-`.claude/settings.json` skill overrides, and optional `skill.spec.yml` routing
-metadata. It stores skill text, routing hints, visibility, checksums, and source
-paths in SQLite.
+`.claude/settings.json` skill overrides, Claude `disable-model-invocation`
+frontmatter, and optional `skill.spec.yml` routing metadata. It stores skill
+text, routing hints, visibility, checksums, and source paths in SQLite.
 
 ## `route`
 
@@ -623,7 +623,9 @@ Subcommands:
 
 Visibility values are `implicit`, `manual-only`, `name-only`, and `off`.
 Visibility commands use native Codex or Claude controls where available and
-write a reversible manifest.
+write a reversible manifest. Shared `.agents/skills` roots receive both Codex
+`agents/openai.yaml` controls and Claude `disable-model-invocation`
+frontmatter, because those roots may be symlinked into more than one harness.
 
 ## `visibility`
 
@@ -661,10 +663,13 @@ visibility profile makes every indexed skill explicit-only except
 `durable-executor`. If `durable-executor` is present in the managed roots, it is
 kept implicit. If it is missing, install still succeeds and reports that durable
 first-hop execution is unavailable until durable-executor is installed
-separately. Once that config exists, successful
-`skillspec install skill` calls reapply router-managed visibility and refresh the
-configured index. `router uninstall` restores visibility from the manifest and
-removes only a generated router skill that contains the managed marker file.
+separately. After building the index, install runs `index status` internally and
+reports preparedness; a prepared router has a present, non-stale index whose
+indexed skill count matches the discovered skill count. Once that config exists,
+successful `skillspec install skill` calls reapply router-managed visibility,
+refresh the configured index, and run the same preparedness check. `router
+uninstall` restores visibility from the manifest and removes only a generated
+router skill that contains the managed marker file.
 
 ## `capability`
 

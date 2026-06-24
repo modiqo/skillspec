@@ -92,7 +92,10 @@ Marketplace path:
 
 That is the intended user experience: import the existing skill, choose the
 target, install it, then look at the proof report. Router setup and optional
-durable-executor setup stay inside the same prompt surface.
+durable-executor setup stay inside the same prompt surface. Router install
+applies explicit-only native controls across managed roots, builds the routing
+index, runs a clean status check, and preserves an installed durable-executor as
+the implicit first hop.
 
 From source:
 

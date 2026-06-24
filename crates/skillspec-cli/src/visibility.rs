@@ -33,6 +33,13 @@ pub enum HarnessKind {
     Claude,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HarnessFileTarget {
+    CodexOpenai,
+    ClaudeSettings,
+    ClaudeFrontmatter,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VisibilityChangeStatus {
@@ -191,11 +198,11 @@ pub fn set_visibility(options: SetVisibilityOptions) -> Result<VisibilityApplyRe
 
     let mut prepared = Vec::new();
     for entry in matches {
-        if let Some(change) =
-            prepare_change(entry, options.visibility, VisibilityProfile::Explicit)?
-        {
-            prepared.push(change);
-        }
+        prepared.extend(prepare_changes(
+            entry,
+            options.visibility,
+            VisibilityProfile::Explicit,
+        )?);
     }
     for change in &mut prepared {
         change.report.status = if options.dry_run {
@@ -336,7 +343,19 @@ fn prepare_profile_changes(
             }
             VisibilityProfile::Explicit => entry.visibility,
         };
-        if let Some(change) = prepare_change(entry, target, profile)? {
+        changes.extend(prepare_changes(entry, target, profile)?);
+    }
+    Ok(changes)
+}
+
+fn prepare_changes(
+    entry: &SkillEntry,
+    target: Visibility,
+    profile: VisibilityProfile,
+) -> Result<Vec<PreparedChange>> {
+    let mut changes = Vec::new();
+    for target_file in harness_file_targets_for(entry) {
+        if let Some(change) = prepare_change(entry, target, profile, target_file)? {
             changes.push(change);
         }
     }
@@ -347,15 +366,20 @@ fn prepare_change(
     entry: &SkillEntry,
     target: Visibility,
     _profile: VisibilityProfile,
+    target_file: HarnessFileTarget,
 ) -> Result<Option<PreparedChange>> {
-    if entry.visibility == target {
+    let (file_snapshot, note) = match target_file {
+        HarnessFileTarget::CodexOpenai => prepare_codex_file(entry, target)?,
+        HarnessFileTarget::ClaudeSettings => prepare_claude_settings_file(entry, target)?,
+        HarnessFileTarget::ClaudeFrontmatter => prepare_claude_frontmatter_file(entry, target)?,
+    };
+    if !visibility_target_requires_manifest(target)
+        && file_snapshot.before_present == file_snapshot.after_present
+        && file_snapshot.before_content == file_snapshot.after_content
+    {
         return Ok(None);
     }
-    let harness = harness_for(entry);
-    let (file_snapshot, note) = match harness {
-        HarnessKind::Codex => prepare_codex_file(entry, target)?,
-        HarnessKind::Claude => prepare_claude_file(entry, target)?,
-    };
+    let harness = harness_kind(target_file);
     let files = vec![file_snapshot.path.clone()];
     Ok(Some(PreparedChange {
         report: VisibilityChangeReport {
@@ -380,12 +404,34 @@ fn prepare_change(
     }))
 }
 
-fn harness_for(entry: &SkillEntry) -> HarnessKind {
+fn harness_file_targets_for(entry: &SkillEntry) -> Vec<HarnessFileTarget> {
     if router::claude_settings_path(&entry.skill_dir).is_some() {
-        HarnessKind::Claude
-    } else {
-        HarnessKind::Codex
+        return vec![HarnessFileTarget::ClaudeSettings];
     }
+
+    let mut targets = vec![HarnessFileTarget::CodexOpenai];
+    if has_ancestor_named(&entry.skill_dir, ".agents") {
+        targets.push(HarnessFileTarget::ClaudeFrontmatter);
+    }
+    targets
+}
+
+fn harness_kind(target: HarnessFileTarget) -> HarnessKind {
+    match target {
+        HarnessFileTarget::CodexOpenai => HarnessKind::Codex,
+        HarnessFileTarget::ClaudeSettings | HarnessFileTarget::ClaudeFrontmatter => {
+            HarnessKind::Claude
+        }
+    }
+}
+
+fn visibility_target_requires_manifest(target: Visibility) -> bool {
+    matches!(target, Visibility::NameOnly | Visibility::Off)
+}
+
+fn has_ancestor_named(path: &Path, name: &str) -> bool {
+    path.ancestors()
+        .any(|ancestor| ancestor.file_name().and_then(|part| part.to_str()) == Some(name))
 }
 
 fn prepare_codex_file(
@@ -394,6 +440,18 @@ fn prepare_codex_file(
 ) -> Result<(FileSnapshot, Option<String>)> {
     let path = entry.skill_dir.join("agents/openai.yaml");
     let before_content = read_optional(&path)?;
+    if before_content.is_none() && target == Visibility::Implicit {
+        return Ok((
+            FileSnapshot {
+                path,
+                before_present: false,
+                before_content: None,
+                after_present: false,
+                after_content: None,
+            },
+            None,
+        ));
+    }
     let allow_implicit = target == Visibility::Implicit;
     let after_content = render_openai_yaml(&path, before_content.as_deref(), allow_implicit)?;
     let note = match target {
@@ -419,7 +477,7 @@ fn prepare_codex_file(
     ))
 }
 
-fn prepare_claude_file(
+fn prepare_claude_settings_file(
     entry: &SkillEntry,
     target: Visibility,
 ) -> Result<(FileSnapshot, Option<String>)> {
@@ -446,6 +504,54 @@ fn prepare_claude_file(
             after_content: Some(after_content),
         },
         None,
+    ))
+}
+
+fn prepare_claude_frontmatter_file(
+    entry: &SkillEntry,
+    target: Visibility,
+) -> Result<(FileSnapshot, Option<String>)> {
+    let path = entry.path.clone();
+    let before_content = Some(fs::read_to_string(&path).map_err(|source| Error::Read {
+        path: path.clone(),
+        source,
+    })?);
+    if target == Visibility::Implicit
+        && !claude_frontmatter_disables_invocation(&path, before_content.as_deref())?
+    {
+        return Ok((
+            FileSnapshot {
+                path,
+                before_present: true,
+                before_content: before_content.clone(),
+                after_present: true,
+                after_content: before_content,
+            },
+            None,
+        ));
+    }
+    let after_content =
+        render_claude_frontmatter(&path, before_content.as_deref().unwrap_or_default(), target)?;
+    let note = match target {
+        Visibility::NameOnly => Some(
+            "Claude SKILL.md frontmatter has no native name-only state; disable-model-invocation=true is used and the manifest preserves name-only for the router."
+                .to_owned(),
+        ),
+        Visibility::Off => Some(
+            "Claude SKILL.md frontmatter has no native off state; disable-model-invocation=true is used and the manifest excludes the skill from router results."
+                .to_owned(),
+        ),
+        _ => None,
+    };
+    Ok((
+        FileSnapshot {
+            path,
+            before_present: true,
+            before_content,
+            after_present: true,
+            after_content: Some(after_content),
+        },
+        note,
     ))
 }
 
@@ -523,6 +629,70 @@ fn claude_override_state(target: Visibility) -> &'static str {
         Visibility::NameOnly => "name-only",
         Visibility::Off => "off",
     }
+}
+
+fn claude_frontmatter_disables_invocation(path: &Path, before: Option<&str>) -> Result<bool> {
+    let Some(before) = before else {
+        return Ok(false);
+    };
+    let Some(rest) = before.strip_prefix("---") else {
+        return Err(Error::InvalidInput {
+            message: format!("missing YAML frontmatter in {}", path.display()),
+        });
+    };
+    let Some((frontmatter, _body)) = rest.split_once("\n---") else {
+        return Err(Error::InvalidInput {
+            message: format!("unterminated YAML frontmatter in {}", path.display()),
+        });
+    };
+    let value = serde_yaml::from_str::<serde_yaml::Value>(frontmatter).map_err(|source| {
+        Error::ParseYaml {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
+    Ok(value
+        .get("disable-model-invocation")
+        .and_then(serde_yaml::Value::as_bool)
+        .unwrap_or(false))
+}
+
+fn render_claude_frontmatter(path: &Path, before: &str, target: Visibility) -> Result<String> {
+    let Some(rest) = before.strip_prefix("---") else {
+        return Err(Error::InvalidInput {
+            message: format!("missing YAML frontmatter in {}", path.display()),
+        });
+    };
+    let Some((frontmatter, body)) = rest.split_once("\n---") else {
+        return Err(Error::InvalidInput {
+            message: format!("unterminated YAML frontmatter in {}", path.display()),
+        });
+    };
+    let value = serde_yaml::from_str::<serde_yaml::Value>(frontmatter).map_err(|source| {
+        Error::ParseYaml {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
+    let mut root = match value {
+        serde_yaml::Value::Mapping(mapping) => mapping,
+        _ => YamlMapping::new(),
+    };
+    root.insert(
+        serde_yaml::Value::String("disable-model-invocation".to_owned()),
+        serde_yaml::Value::Bool(target != Visibility::Implicit),
+    );
+    let mut rendered =
+        serde_yaml::to_string(&serde_yaml::Value::Mapping(root)).map_err(|source| {
+            Error::RenderYaml {
+                path: path.to_path_buf(),
+                source,
+            }
+        })?;
+    if !rendered.ends_with('\n') {
+        rendered.push('\n');
+    }
+    Ok(format!("---\n{rendered}---{body}"))
 }
 
 fn write_prepared_changes(changes: &[PreparedChange]) -> Result<()> {

@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::router::{self, IndexReport};
+use crate::router::{self, IndexReport, IndexStatusReport};
 use crate::visibility::{self, VisibilityApplyReport, VisibilityRestoreReport};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -41,6 +41,7 @@ pub struct RouterInstallReport {
     pub durable_executor: DurableExecutorReport,
     pub visibility: VisibilityApplyReport,
     pub index_report: Option<IndexReport>,
+    pub preparedness: RouterPreparednessReport,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -62,6 +63,7 @@ pub struct RouterHookReport {
     pub config: PathBuf,
     pub visibility: VisibilityApplyReport,
     pub index_report: IndexReport,
+    pub preparedness: RouterPreparednessReport,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -69,6 +71,19 @@ pub struct DurableExecutorReport {
     pub present: bool,
     pub skill_dir: Option<PathBuf>,
     pub message: String,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterPreparednessReport {
+    pub ready: bool,
+    pub visibility_checked: bool,
+    pub index_built: bool,
+    pub status_checked: bool,
+    pub index_exists: bool,
+    pub index_stale: bool,
+    pub indexed_skills: usize,
+    pub discovered_skills: usize,
     pub warnings: Vec<String>,
 }
 
@@ -126,16 +141,33 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         manifest: manifest.clone(),
         dry_run: options.dry_run,
     })?;
-    let index_report = if options.dry_run {
-        None
+    let (index_report, preparedness) = if options.dry_run {
+        (
+            None,
+            RouterPreparednessReport {
+                ready: false,
+                visibility_checked: true,
+                index_built: false,
+                status_checked: false,
+                index_exists: false,
+                index_stale: true,
+                indexed_skills: 0,
+                discovered_skills: 0,
+                warnings: vec![
+                    "dry run did not write files, build the index, or check status".to_owned(),
+                ],
+            },
+        )
     } else {
         let report = router::index(router::IndexOptions {
             roots: options.roots.clone(),
             out: index.clone(),
             visibility_manifest: Some(manifest.clone()),
         })?;
+        let preparedness =
+            check_preparedness(&options.roots, &index, &manifest, &visibility, &report)?;
         write_config(&config, &options.roots, &index, &manifest, &router_name)?;
-        Some(report)
+        (Some(report), preparedness)
     };
 
     Ok(RouterInstallReport {
@@ -153,6 +185,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         durable_executor,
         visibility,
         index_report,
+        preparedness,
     })
 }
 
@@ -239,15 +272,81 @@ pub fn after_skill_install() -> Result<Option<RouterHookReport>> {
         dry_run: false,
     })?;
     let index_report = router::index(router::IndexOptions {
-        roots: config.roots,
-        out: config.index,
-        visibility_manifest: Some(config.manifest),
+        roots: config.roots.clone(),
+        out: config.index.clone(),
+        visibility_manifest: Some(config.manifest.clone()),
     })?;
+    let preparedness = check_preparedness(
+        &config.roots,
+        &config.index,
+        &config.manifest,
+        &visibility,
+        &index_report,
+    )?;
     Ok(Some(RouterHookReport {
         config: config_path()?,
         visibility,
         index_report,
+        preparedness,
     }))
+}
+
+fn check_preparedness(
+    roots: &[PathBuf],
+    index: &Path,
+    manifest: &Path,
+    visibility: &VisibilityApplyReport,
+    index_report: &IndexReport,
+) -> Result<RouterPreparednessReport> {
+    let status = router::index_status(router::IndexStatusOptions {
+        roots: roots.to_vec(),
+        index: index.to_path_buf(),
+        visibility_manifest: Some(manifest.to_path_buf()),
+    })?;
+    let report = preparedness_from_status(visibility, index_report, &status);
+    if !report.ready {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "router preparedness check failed after indexing: exists={}, stale={}, indexed={}, discovered={}",
+                report.index_exists,
+                report.index_stale,
+                report.indexed_skills,
+                report.discovered_skills
+            ),
+        });
+    }
+    Ok(report)
+}
+
+fn preparedness_from_status(
+    visibility: &VisibilityApplyReport,
+    index_report: &IndexReport,
+    status: &IndexStatusReport,
+) -> RouterPreparednessReport {
+    let visibility_checked = visibility
+        .changes
+        .iter()
+        .all(|change| matches!(change.status, visibility::VisibilityChangeStatus::Applied));
+    let index_built = index_report.skills_indexed == status.indexed_skills;
+    let mut warnings = status.warnings.clone();
+    warnings.extend(index_report.warnings.iter().cloned());
+    warnings.extend(visibility.warnings.iter().cloned());
+    let ready = visibility_checked
+        && index_built
+        && status.exists
+        && !status.stale
+        && status.indexed_skills == status.discovered_skills;
+    RouterPreparednessReport {
+        ready,
+        visibility_checked,
+        index_built,
+        status_checked: true,
+        index_exists: status.exists,
+        index_stale: status.stale,
+        indexed_skills: status.indexed_skills,
+        discovered_skills: status.discovered_skills,
+        warnings,
+    }
 }
 
 pub fn render_install(report: &RouterInstallReport) -> String {
@@ -278,6 +377,11 @@ pub fn render_install(report: &RouterInstallReport) -> String {
             index_report.skills_indexed
         ));
     }
+    output.push_str(&format!("Prepared: {}\n", report.preparedness.ready));
+    output.push_str(&format!(
+        "Index stale after build: {}\n",
+        report.preparedness.index_stale
+    ));
     output
 }
 
@@ -432,7 +536,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, manage its index and manifest, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -443,12 +547,12 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, uninstall, index refresh, or index status commands.
+          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router by applying visibility, building the index, and checking status.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
           owner_skill: {router_skill}
-          description: Verify router skill files, manifest, config, and index status after the lifecycle change.
+          description: Verify router skill files, manifest, config, preparedness.ready, and index status after the lifecycle change.
           requires:
             - verify_router_lifecycle_result
 
