@@ -10,6 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+const PRESERVED_SOURCE_SKILL_PATH: &str = "source/SKILL_md.old";
+
 pub fn import_skill(path: &Path) -> Result<SkillSpec> {
     let source = SkillSource::read(path)?;
     let analysis = SkillAnalysis::from_source(&source);
@@ -132,6 +134,7 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
 
 pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
     let mut spec = import_skill(path)?;
+    let source = SkillSource::read(path)?;
     let source_root = source_root(path);
     let out_dir = out.parent().unwrap_or_else(|| Path::new("."));
     for import in spec.imports.values_mut() {
@@ -140,9 +143,41 @@ pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
             import.path = relative.display().to_string();
         }
     }
+    materialize_preserved_source_skill(&mut spec, &source, out_dir)?;
     import_dependency_ledger::materialize(&spec, out_dir)?;
     materialize_inline_code_resources(&mut spec, out_dir)?;
     Ok(spec)
+}
+
+fn materialize_preserved_source_skill(
+    spec: &mut SkillSpec,
+    source: &SkillSource,
+    out_dir: &Path,
+) -> Result<()> {
+    let Some(document) = source.primary_skill_document() else {
+        return Ok(());
+    };
+    let relative_path = PathBuf::from(PRESERVED_SOURCE_SKILL_PATH);
+    let destination = out_dir.join(&relative_path);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|source| Error::Write {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    fs::write(&destination, &document.content).map_err(|source| Error::Write {
+        path: destination,
+        source,
+    })?;
+
+    if let Some(resource) = spec.resources.get_mut(&document.resource_id) {
+        resource.path = path_to_spec_string(&relative_path);
+        resource.description = Some(format!(
+            "Preserved original prose source from {} under a non-discoverable filename.",
+            document.relative_path.display()
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -732,6 +767,26 @@ impl SkillSource {
         } else {
             "file"
         }
+    }
+
+    fn primary_skill_document(&self) -> Option<&SourceDocument> {
+        self.documents
+            .iter()
+            .find(|document| {
+                document
+                    .relative_path
+                    .to_str()
+                    .is_some_and(|path| path.eq_ignore_ascii_case("SKILL.md"))
+            })
+            .or_else(|| {
+                self.documents.iter().find(|document| {
+                    document
+                        .relative_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
+                })
+            })
     }
 }
 

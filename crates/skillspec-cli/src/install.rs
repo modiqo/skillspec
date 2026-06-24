@@ -396,6 +396,14 @@ fn insert_declared_package_file(
             ),
         });
     }
+    if is_nested_skill_md(relative_path) {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "declared package file {} would create a nested discoverable SKILL.md; preserve original prose as source/SKILL_md.old or another non-discoverable, non-Markdown filename",
+                relative_path.display()
+            ),
+        });
+    }
 
     if !skill_folder.join(relative_path).is_file() {
         return Err(Error::InvalidInput {
@@ -408,6 +416,18 @@ fn insert_declared_package_file(
 
     paths.insert(relative_path.to_path_buf());
     Ok(())
+}
+
+fn is_nested_skill_md(relative_path: &Path) -> bool {
+    relative_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
+        && relative_path
+            .components()
+            .filter(|component| matches!(component, Component::Normal(_)))
+            .count()
+            > 1
 }
 
 fn copy_relative_file(skill_folder: &Path, install_dir: &Path, relative_path: &Path) -> Result<()> {

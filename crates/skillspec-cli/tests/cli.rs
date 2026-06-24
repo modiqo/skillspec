@@ -3723,6 +3723,8 @@ print("hello")
         .unwrap();
     assert_success(&import);
     assert!(out.is_file());
+    assert!(dir.path().join("source/SKILL_md.old").is_file());
+    assert!(!dir.path().join("source/SKILL.md").is_file());
     let import_out = stdout(&import);
     assert!(import_out.contains("review note"));
     assert!(import_out.contains("skillspec grammar sensemake --view porting"));
@@ -3746,6 +3748,7 @@ print("hello")
     assert!(content.contains("command_block_1"));
     assert!(content.contains("python3"));
     assert!(content.contains("dependency_ledger"));
+    assert!(content.contains("path: source/SKILL_md.old"));
 
     let draft_sensemake = Command::new(bin())
         .arg("sensemake")
@@ -4110,6 +4113,10 @@ fn install_skill_supports_dry_run_and_claude_local_install() {
     );
     write_file(&skill.join("deps.toml"), "# dependency manifest\n");
     write_file(
+        &skill.join("source/SKILL_md.old"),
+        "# Original Skill\n\nPreserved source material.\n",
+    );
+    write_file(
         &skill.join("source/reference.md"),
         "# Reference
 ",
@@ -4141,6 +4148,12 @@ imports:
       - kind: route
         id: local
 resources:
+  preserved_source:
+    path: source/SKILL_md.old
+    role: source_material
+    used_by:
+      - kind: route
+        id: local
   helper_script:
     path: resources/helper.py
     role: script
@@ -4199,11 +4212,61 @@ code:
         .join(".claude/skills/installed-skill/deps.toml")
         .is_file());
     assert!(repo
+        .join(".claude/skills/installed-skill/source/SKILL_md.old")
+        .is_file());
+    assert!(repo
         .join(".claude/skills/installed-skill/source/reference.md")
         .is_file());
     assert!(repo
         .join(".claude/skills/installed-skill/resources/helper.py")
         .is_file());
+}
+
+#[test]
+fn install_skill_rejects_nested_discoverable_skill_md_support_file() {
+    let dir = TempDir::new("install-nested-skill-md");
+    let home = dir.path().join("home");
+    let skill = dir.path().join("skill-source");
+    fs::create_dir_all(home.join(".agents/skills")).unwrap();
+    write_file(
+        &skill.join("SKILL.md"),
+        "# Installable Skill\n\nThin loader for skill.spec.yml.\n",
+    );
+    write_file(
+        &skill.join("source/SKILL.md"),
+        "# Original Skill\n\nThis nested name should not be installable.\n",
+    );
+    write_file(
+        &skill.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: installable.skill
+title: Installable Skill
+description: Install target fixture.
+routes:
+  - id: local
+    label: Local
+resources:
+  preserved_source:
+    path: source/SKILL.md
+    role: source_material
+    used_by:
+      - kind: route
+        id: local
+"#,
+    );
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .arg("install")
+        .arg("skill")
+        .arg(&skill)
+        .arg("--target")
+        .arg("agents")
+        .output()
+        .unwrap();
+    assert_failure(&install);
+    assert!(stderr(&install).contains("nested discoverable SKILL.md"));
 }
 
 #[test]

@@ -707,6 +707,10 @@ Notes:
 - Fenced code blocks are materialized under `resources/imported-code/` next to
   the output draft and referenced from `code.source.file` with resource
   provenance.
+- The original prose `SKILL.md` is preserved beside the draft as
+  `source/SKILL_md.old` and referenced as source material. Do not preserve it as
+  `source/SKILL.md` or another Markdown-looking `SKILL*.md` file, because
+  harnesses and scanners may discover or rank Markdown skill-looking files.
 - The command writes a scaffolded `deps.toml` beside the generated
   `skill.spec.yml`, declares it as a file dependency/artifact, and infers simple
   CLI plus fenced-code package dependencies from Python and JavaScript/TypeScript
@@ -1099,3 +1103,9 @@ Options:
 - `--dry-run`: show the install plan without writing files.
 - `--force`: overwrite an existing installed skill folder without prompting.
 - `--name <NAME>`: override the installed skill folder name.
+
+`install skill` copies declared package-local files from imports, resources,
+code sources, and file dependencies. It rejects support files named nested
+`SKILL.md`, because those become additional harness-discoverable skills. Preserve
+old prose as `source/SKILL_md.old` or another non-discoverable, non-Markdown
+filename.

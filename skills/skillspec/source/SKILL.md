@@ -189,14 +189,18 @@ source skill folder
    diagnostic, not evidence that a run failed. If the source is a parent folder
    with multiple skills, choose one skill folder first; do not doctor the parent
    as a blended candidate.
-6. Use the source map as the progressive reader. Query exact source handles with
+6. Preserve the original prose skill under a non-discoverable, non-Markdown
+   filename such as `source/SKILL_md.old`. Do not keep a copied original as
+   `source/SKILL.md` or `SKILL.old.md`; harnesses and scanners can treat those
+   as additional skill-like Markdown files.
+7. Use the source map as the progressive reader. Query exact source handles with
    `--view full` when a heading, code block, dependency, local reference, or
    modal obligation needs semantic promotion. Do not load a large source file
    wholesale when a source-map handle can recover the exact span. For small
    sources, a full `SKILL.md` read is acceptable only after the map confirms the
    file is bounded and has no sibling resources that affect routing, commands,
    code, dependencies, or recipes.
-7. Teach the harness the current grammar before importing or editing the spec:
+8. Teach the harness the current grammar before importing or editing the spec:
 
    ```bash
    skillspec grammar sensemake --view index

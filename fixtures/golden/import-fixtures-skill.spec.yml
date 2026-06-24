@@ -38,9 +38,9 @@ dependencies:
 imports: {}
 resources:
   skill:
-    path: SKILL.md
+    path: source/SKILL_md.old
     role: source_material
-    description: Imported source material from SKILL.md.
+    description: Preserved original prose source from SKILL.md under a non-discoverable filename.
     used_by:
     - kind: code
       id: skill_code_1

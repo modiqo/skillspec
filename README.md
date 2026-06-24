@@ -197,7 +197,8 @@ That gives you:
 my-skill/
   SKILL.md          # small trampoline for the harness
   skill.spec.yml    # routes, rules, phases, checks, proof
-  source/           # preserved original material, when present
+  source/
+    SKILL_md.old    # preserved original prose; not SKILL.md and not .md
 ```
 
 ## Prove It Worked

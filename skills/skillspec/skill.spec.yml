@@ -1162,9 +1162,9 @@ dependencies:
       safety: local_read
 resources:
   source_skill_md:
-    path: source/SKILL.md
+    path: source/SKILL_md.old
     role: source_material
-    description: Preserved full prose source for the skillspec skill before compilation replaces the visible loader.
+    description: Preserved full prose source for the skillspec skill before compilation replaces the visible loader; stored as SKILL_md.old so harnesses do not list it as another skill or Markdown source.
     used_by:
       - kind: route
         id: local_skill_port
@@ -1177,8 +1177,8 @@ resources:
 artifacts:
   preserved_source:
     kind: file
-    path: source/SKILL.md
-    description: Full prose SKILL.md retained for provenance and future review.
+    path: source/SKILL_md.old
+    description: Full prose source retained for provenance and future review under the non-discoverable SKILL_md.old filename.
     produced_by:
       - kind: command
         id: preserve_source_skill
@@ -1430,7 +1430,7 @@ commands:
     safety: local_read
   preserve_source_skill:
     description: Preserve the full prose source before compiling over the visible SKILL.md loader.
-    template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL.md
+    template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
     safety: local_write
   stage_remote_folder:
     description: Stage a public GitHub repository path locally with sparse checkout when possible.
@@ -2463,7 +2463,7 @@ review_required:
   - The optional Claude compile/install path should be verified in a Claude-compatible harness before release claims.
 metadata:
   source:
-    preserved_prose: source/SKILL.md
+    preserved_prose: source/SKILL_md.old
     source_lines: 756
     imported_from: skills/skillspec/SKILL.md
   mechanical_import_observation:
