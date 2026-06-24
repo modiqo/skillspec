@@ -3440,6 +3440,96 @@ print("hello")
     assert!(content.contains("import: reference"));
     assert!(content.contains("command_block_1"));
     assert!(content.contains("python3"));
+    assert!(content.contains("dependency_ledger"));
+
+    let ledger = dir.path().join("deps.toml");
+    assert!(ledger.is_file());
+    let ledger_content = fs::read_to_string(&ledger).unwrap();
+    assert!(ledger_content.contains("schema_version = 1"));
+    assert!(ledger_content.contains("dependency_count = "));
+    assert!(ledger_content.contains("id = \"python3\""));
+
+    let deps_check = Command::new(bin())
+        .arg("deps")
+        .arg("check")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&deps_check);
+    assert!(stdout(&deps_check).contains("deps.toml exists"));
+}
+
+#[test]
+fn import_skill_scaffolds_dependency_ledger_from_code_imports() {
+    let dir = TempDir::new("import-deps-ledger");
+    let skill_dir = dir.path().join("source-skill");
+    let out = dir.path().join("draft").join("skill.spec.yml");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"# Imported Dependencies
+
+```python
+import json
+import pypdf
+from reportlab.pdfgen import canvas
+```
+
+```ts
+import { chromium } from "playwright";
+import fs from "fs";
+const helper = require("@scope/helper/path");
+```
+"#,
+    );
+
+    let import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let ledger = out.parent().unwrap().join("deps.toml");
+    assert!(ledger.is_file());
+    let ledger_content = fs::read_to_string(&ledger).unwrap();
+    assert!(ledger_content.contains("id = \"python3\""));
+    assert!(ledger_content.contains("id = \"deno\""));
+    assert!(ledger_content.contains("id = \"pypdf\""));
+    assert!(ledger_content.contains("id = \"reportlab\""));
+    assert!(ledger_content.contains("id = \"playwright\""));
+    assert!(ledger_content.contains("id = \"@scope/helper\""));
+    assert!(!ledger_content.contains("id = \"json\""));
+    assert!(!ledger_content.contains("id = \"fs\""));
+}
+
+#[test]
+fn import_skill_writes_relative_out_without_parent() {
+    let dir = TempDir::new("import-relative-out");
+    let skill_dir = dir.path().join("source-skill");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"# Relative Output
+
+```python
+print("hello")
+```
+"#,
+    );
+
+    let import = Command::new(bin())
+        .current_dir(dir.path())
+        .arg("import-skill")
+        .arg("source-skill")
+        .arg("--out")
+        .arg("skill.spec.yml")
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    assert!(dir.path().join("skill.spec.yml").is_file());
+    assert!(dir.path().join("deps.toml").is_file());
 }
 
 #[test]

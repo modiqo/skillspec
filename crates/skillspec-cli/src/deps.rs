@@ -3,6 +3,7 @@ use crate::model::{Dependency, DependencyKind, SkillSpec};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Serialize)]
@@ -148,6 +149,17 @@ fn check_file(
     let resolved_path = resolve_spec_path(spec_dir, path);
 
     if resolved_path.exists() {
+        if path.ends_with("deps.toml")
+            && fs::metadata(&resolved_path)
+                .map(|metadata| metadata.len() == 0)
+                .unwrap_or(false)
+        {
+            return (
+                DependencyStatus::Missing,
+                DependencyCheckMethod::FileExists,
+                format!("{path} exists but is empty"),
+            );
+        }
         (
             DependencyStatus::Present,
             DependencyCheckMethod::FileExists,
@@ -233,6 +245,31 @@ mod tests {
         assert_eq!(status, DependencyStatus::Present);
         assert_eq!(method, DependencyCheckMethod::FileExists);
         assert_eq!(message, "source/requirements.txt exists");
+    }
+
+    #[test]
+    fn deps_toml_file_dependencies_reject_empty_ledgers() {
+        let root = unique_temp_dir("skillspec-deps-empty-ledger");
+        let spec_dir = root.join("skill");
+        fs::create_dir_all(&spec_dir).unwrap();
+        fs::write(spec_dir.join("deps.toml"), "").unwrap();
+
+        let dependency = Dependency {
+            kind: DependencyKind::File,
+            description: None,
+            command: None,
+            path: Some("deps.toml".to_owned()),
+            env: None,
+            check: None,
+            permission: None,
+            provision: None,
+        };
+
+        let (status, method, message) = check_file("dependency_ledger", &dependency, &spec_dir);
+
+        assert_eq!(status, DependencyStatus::Missing);
+        assert_eq!(method, DependencyCheckMethod::FileExists);
+        assert_eq!(message, "deps.toml exists but is empty");
     }
 
     #[test]

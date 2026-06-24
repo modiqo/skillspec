@@ -6,6 +6,7 @@ mod decision;
 mod deps;
 mod error;
 mod grammar;
+mod import_dependency_ledger;
 mod importer;
 mod imports;
 mod install;
@@ -173,7 +174,10 @@ enum Command {
         #[arg(long)]
         target: CompileTarget,
     },
-    #[command(about = "Create a mechanical draft SkillSpec from a local skill file or folder")]
+    #[command(
+        about = "Create a mechanical draft SkillSpec from a local skill file or folder",
+        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or folder. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
+    )]
     ImportSkill {
         /// Local SKILL.md file or skill folder to import.
         path: PathBuf,

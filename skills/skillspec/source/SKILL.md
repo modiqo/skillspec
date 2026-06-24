@@ -643,7 +643,7 @@ depend on. Use this shape:
 Inferred dependency surface:
 - gh: present, network/auth-sensitive, provisionable via user_global
 - rote: present, required for workspace evidence
-- deps.toml: missing, required only for release/replay checks
+- deps.toml: generated scaffold present, review required before proof/install
 
 I will not install or connect anything unless you approve the provision option.
 ```

@@ -53,10 +53,12 @@ understand all prose. It should:
 3. extract fenced commands
 4. materialize fenced code into package-local `resources/imported-code/`
    files and reference them from `code.source.file`
-5. extract tables
-6. identify always/never/forbid/required language
-7. identify examples and trigger phrases
-8. write a scaffold with `review_required`
+5. write scaffolded `deps.toml`, declare it as a file dependency/artifact, and
+   seed CLI plus Python/JavaScript/TypeScript package imports
+6. extract tables
+7. identify always/never/forbid/required language
+8. identify examples and trigger phrases
+9. write a scaffold with `review_required`
 
 An agent-assisted pass may improve the scaffold, but uncertainty must remain
 visible.

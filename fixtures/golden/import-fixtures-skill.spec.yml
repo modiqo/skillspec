@@ -11,6 +11,18 @@ states: {}
 elicitations: {}
 trace: null
 dependencies:
+  dependency_ledger:
+    kind: file
+    description: Generated dependency ledger for imported package evidence.
+    command: null
+    path: deps.toml
+    env: null
+    check:
+      command: null
+      path: deps.toml
+      env: null
+    permission: null
+    provision: null
   rote:
     kind: cli
     description: 'Inferred CLI dependency from imported skill material: rote'
@@ -75,7 +87,14 @@ code:
       network: false
       notes: []
     use_when: []
-artifacts: {}
+artifacts:
+  dependency_ledger:
+    kind: file
+    description: Generated dependency ledger preserving dependency evidence from imported skill material.
+    path: deps.toml
+    schema: null
+    produced_by: []
+    consumed_by: []
 recipes: {}
 commands:
   command_block_1:
@@ -102,6 +121,7 @@ review_required:
 - Review command blocks and decide which should become command templates.
 - Review extracted resources and code snippets; promote only intentional snippets into runnable recipes.
 - Review inferred command dependencies and add permission/provision choices where needed.
+- Review deps.toml and preserve required, optional, script import, and inferred dependency evidence before proof or install.
 - Add scenario tests before trusting this structured skill.
 metadata:
   code_block_count: 1

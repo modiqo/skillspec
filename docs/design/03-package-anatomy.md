@@ -180,9 +180,12 @@ needs. The spec can connect to those manifests explicitly, but it should not
 hide them as implicit package behavior.
 
 For imported or shareable skills, `deps.toml` is also the dependency provenance
-ledger. It should preserve every dependency mention found in `SKILL.md`,
-referenced docs, helper scripts, fenced code imports, command examples, and
-package manifests. A dependency record should include:
+ledger. `skillspec import-skill` creates a scaffolded ledger beside the draft
+spec and declares it as a file dependency/artifact, so `skillspec deps check`
+can report a missing or byte-empty ledger. The review pass must complete that
+scaffold by preserving every dependency mention found in `SKILL.md`, referenced
+docs, helper scripts, fenced code imports, command examples, and package
+manifests. A dependency record should include:
 
 - dependency id and ecosystem;
 - authority such as `source_required`, `source_recommended`,

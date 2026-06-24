@@ -28,7 +28,10 @@ pub fn load_spec_unresolved(path: &Path) -> Result<SkillSpec> {
 }
 
 pub fn write_spec(path: &Path, spec: &SkillSpec) -> Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
             path: parent.to_path_buf(),
             source,

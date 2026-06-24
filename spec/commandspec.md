@@ -561,12 +561,14 @@ Notes:
 - Fenced code blocks are materialized under `resources/imported-code/` next to
   the output draft and referenced from `code.source.file` with resource
   provenance.
-- The command infers simple CLI dependencies, but it does not replace the
-  review-time dependency ledger. Imported/shareable skills should add
-  `deps.toml` beside `skill.spec.yml` and preserve package mentions from source
-  prose, references, helper scripts, fenced code imports, command examples, and
-  manifests with authority, local status, install risk, and degraded proof
-  impact.
+- The command writes a scaffolded `deps.toml` beside the generated
+  `skill.spec.yml`, declares it as a file dependency/artifact, and infers simple
+  CLI plus fenced-code package dependencies from Python and JavaScript/TypeScript
+  imports.
+- The generated ledger is review scaffolding. Before proof or install, complete
+  it with package mentions from source prose, references, helper scripts,
+  command examples, and manifests, preserving authority, local status, install
+  risk, and degraded proof impact.
 
 ## `synthesize-from-workspace`
 

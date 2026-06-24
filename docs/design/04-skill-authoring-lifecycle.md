@@ -76,23 +76,27 @@ SkillSpec scaffold. It can:
 - extract fenced code blocks into package-local resource files and `code`
   entries;
 - infer simple CLI dependencies from command blocks and code languages;
+- infer package dependencies from Python and JavaScript/TypeScript imports in
+  fenced code blocks;
+- generate `deps.toml` beside the output draft and declare it as a file
+  dependency/artifact;
 - attach provenance to imported code blocks;
 - create a `source_summary` snippet;
 - add `metadata` counts for source kind, documents, headings, command blocks,
   code blocks, and strong directives;
 - add `review_required` notes.
 
-The importer does not yet create a full dependency ledger. For imported or
-shareable skills, the review pass must create `deps.toml` beside
-`skill.spec.yml` and preserve dependency mentions from `SKILL.md`, referenced
-docs, helper scripts, fenced code imports, command examples, and package
-manifests. Each entry should record source authority, local status, install
-risk, proposed provision command, required workflows, and degraded proof impact.
+The importer creates a dependency ledger scaffold, not a complete dependency
+review. For imported or shareable skills, the review pass must complete
+`deps.toml` by preserving dependency mentions from `SKILL.md`, referenced docs,
+helper scripts, fenced code imports, command examples, and package manifests.
+Each entry should record source authority, local status, install risk, proposed
+provision command, required workflows, and degraded proof impact.
 
 The importer deliberately does not finish the behavioral contract. The generated
 spec starts with empty `applies_when`, `entry`, `routes`, `rules`, `states`,
-`elicitations`, `trace`, `artifacts`, `recipes`, `closures`, `proof`, and
-`tests`.
+`elicitations`, `trace`, `recipes`, `closures`, `proof`, and `tests`, while
+`artifacts` contains the generated dependency ledger.
 
 That empty structure is intentional. The importer cannot prove that prose
 instructions have become correct routing rules, bounded questions, safety
