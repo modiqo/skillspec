@@ -17,6 +17,7 @@ indexes.
 | 04 | [Community Outreach](04-community-outreach.md) | Launch positioning, communities, and outreach steps. |
 | 05 | [Good First Issues](05-good-first-issues.md) | Starter work for contributors. |
 | 06 | [Community Post Drafts](06-community-posts.md) | Short-form launch and discussion drafts. |
+| 07 | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | Reference runbook for testing the `/skillspec` setup multiplexer in Codex and Claude. |
 
 ## Subdirectories
 
