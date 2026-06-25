@@ -69,16 +69,32 @@ non-compliance detectable, and the gateable parts enforceable by a harness.
 
 ## How SkillSpec Works
 
-SkillSpec is a CLI plus a skill you install into your agent environment. It
-helps create planned skills: a normal `SKILL.md` plus a `skill.spec.yml` that
-spells out when to use the skill, what steps to follow, what to check, and what
-proof to show.
+SkillSpec gives you two pieces:
 
-The CLI does the structured work: it can create `skill.spec.yml`, validate and
-test it, compile a small `SKILL.md` loader, install the skill, plan a run,
-record progress, and produce proof.
+- a CLI that does the structured work
+- a `skillspec` skill you install into your agent environment
 
-The installed `skillspec` skill is the chat entry point. It lets you use that
+Together, they help create planned skills: a normal `SKILL.md` plus a
+`skill.spec.yml`.
+
+The `skill.spec.yml` spells out:
+
+- when to use the skill
+- what steps to follow
+- what to check
+- what proof to show
+
+The CLI can:
+
+- create or update `skill.spec.yml`
+- validate and test the contract
+- compile a small `SKILL.md` loader
+- install the skill into a harness
+- plan a run
+- record progress
+- produce proof
+
+The installed `skillspec` skill is the chat entry point. It lets you use the
 CLI from inside Codex, Claude, or Agents without thinking about every command.
 You stay in the harness, ask for the outcome, and let the skill use its own
 contract to choose the route and run the right steps.
