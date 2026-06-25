@@ -89,6 +89,27 @@ sequence, and proof that the value was delivered.
 | "I designed a new CLI, API, or MCP for my product and I want to distribute skills that use it in alignment with real use cases." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"`<br>`/skillspec disable durable-executor`<br><br>Captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, preserves command and dependency proof, and lets you turn the durable first-hop back off after synthesis. |
 | "I have too many skills and I am seeing: Skill descriptions were shortened to fit the 2% skills context budget." | `/skillspec install router`<br><br>Installs the SkillSpec router so the harness can keep every skill discoverable without loading every long description. It builds an index, routes to the right skill on demand, and frees context for the skill that actually matters. |
 
+### Powered By SkillSpec
+
+The `/skillspec` chat multiplexer is not a hand-written exception. SkillSpec is
+powered by its own contract: [`skills/skillspec/skill.spec.yml`](skills/skillspec/skill.spec.yml).
+
+That YAML file is the engine behind the prompt surface. It declares the routes,
+rules, phase plans, dependency checks, router lifecycle, optional
+durable-executor lifecycle, observed-workspace synthesis, and proof obligations
+that `/skillspec` follows.
+
+```text
+/skillspec chat request
+  -> skills/skillspec/skill.spec.yml
+  -> selected route and phase checklist
+  -> commands, checks, progress, and alignment proof
+```
+
+That is the important claim: the tool uses the same SkillSpec machinery it gives
+to user skills. The multiplexer is itself a working example of a large prompt
+surface compressed into a reviewable, testable contract.
+
 ### Core Workflows
 
 | Goal | Chat prompt | What SkillSpec does |
