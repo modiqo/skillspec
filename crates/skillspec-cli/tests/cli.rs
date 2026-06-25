@@ -460,6 +460,7 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("refs"));
     assert!(stdout(&top).contains("doctor"));
     assert!(stdout(&top).contains("source"));
+    assert!(stdout(&top).contains("workspace"));
     assert!(stdout(&top).contains("capability"));
     assert!(stdout(&top).contains("visibility"));
     assert!(stdout(&top).contains("router"));
@@ -518,6 +519,17 @@ fn help_lists_trace_align_arguments() {
     assert!(source_help.contains("query"));
     assert!(source_help.contains("coverage"));
     assert!(source_help.contains("stale"));
+
+    let workspace = Command::new(bin())
+        .arg("workspace")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&workspace);
+    let workspace_help = stdout(&workspace);
+    assert!(workspace_help.contains("Map and validate multi-skill workspaces"));
+    assert!(workspace_help.contains("map"));
+    assert!(workspace_help.contains("validate"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -4836,6 +4848,179 @@ fn doctor_rejects_parent_folder_with_multiple_skills() {
         .unwrap();
     assert_failure(&output);
     assert!(stderr(&output).contains("requires exactly one SKILL.md"));
+}
+
+#[test]
+fn workspace_map_and_validate_reports_package_graph() {
+    let dir = TempDir::new("workspace-map");
+    let root = dir.path().join("skills");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    write_file(
+        &root.join("coding-standards").join("SKILL.md"),
+        r#"---
+name: coding-standards
+description: TypeScript coding standards package.
+---
+# Coding Standards
+"#,
+    );
+    write_file(
+        &root.join("coding-standards").join("TESTING.md"),
+        "# Testing\n",
+    );
+    write_file(
+        &root.join("code-review").join("SKILL.md"),
+        r#"---
+name: code-review
+description: Review code.
+disable-model-invocation: true
+---
+# Code Review
+
+Treat `../coding-standards/` as the standards package.
+Read `../coding-standards/SKILL.md`.
+"#,
+    );
+    write_file(
+        &root.join("review-wrapper").join("SKILL.md"),
+        r#"---
+name: review-wrapper
+description: Wrapper skill.
+---
+# Review Wrapper
+
+Run `/coding-standards` before the wrapper.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["package_count"], 3);
+    let edges = map_report["dependency_edges"].as_array().unwrap();
+    assert!(edges
+        .iter()
+        .any(|edge| edge["from"] == "code-review" && edge["to"] == "coding-standards"));
+    assert!(edges
+        .iter()
+        .any(|edge| edge["from"] == "review-wrapper" && edge["to"] == "coding-standards"));
+    let references = map_report["references"].as_array().unwrap();
+    assert!(references
+        .iter()
+        .any(|reference| reference["from_package"] == "review-wrapper"
+            && reference["raw"] == "/coding-standards"));
+    assert!(!references
+        .iter()
+        .any(|reference| reference["from_package"] == "code-review"
+            && reference["raw"] == "/coding-standards"));
+    assert!(manifest.is_file());
+    assert!(PathBuf::from(format!("{}.report.md", manifest.display())).is_file());
+
+    let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("install_slug: skills--code-review"));
+    assert!(manifest_yaml.contains("install_slug: skills--review-wrapper"));
+    assert!(manifest_yaml.contains("depends_on:\n    - coding-standards"));
+
+    let validate = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    let validate_report = json_stdout(&validate);
+    assert_eq!(validate_report["ok"], true);
+}
+
+#[test]
+fn workspace_validate_rejects_cycles() {
+    let dir = TempDir::new("workspace-cycle");
+    let root = dir.path().join("skills");
+    write_file(
+        &root.join("a").join("SKILL.md"),
+        "---\nname: a\ndescription: A.\n---\n# A\n",
+    );
+    write_file(
+        &root.join("b").join("SKILL.md"),
+        "---\nname: b\ndescription: B.\n---\n# B\n",
+    );
+    let manifest = dir.path().join("skillspec.workspace.yml");
+    write_file(
+        &manifest,
+        &format!(
+            r#"schema: skillspec/workspace/v0
+source_root: {}
+workspace_slug: skills
+output_root: {}/.skillspec/workspace-build
+packages:
+  a:
+    package_id: a
+    path: a
+    kind: helper
+    entrypoint: SKILL.md
+    public_name: a
+    install_slug: skills--a
+    depends_on:
+      - b
+  b:
+    package_id: b
+    path: b
+    kind: helper
+    entrypoint: SKILL.md
+    public_name: b
+    install_slug: skills--b
+    depends_on:
+      - a
+"#,
+            root.display(),
+            root.display()
+        ),
+    );
+
+    let validate = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert_failure(&validate);
+    assert!(stdout(&validate).contains("dependency cycle"));
+}
+
+#[test]
+fn import_skill_rejects_parent_folder_with_multiple_skills() {
+    let dir = TempDir::new("import-multi");
+    let root = dir.path().join("skills");
+    let out = dir.path().join("draft").join("skill.spec.yml");
+    write_file(
+        &root.join("pdf").join("SKILL.md"),
+        "---\nname: pdf\ndescription: PDF skill.\n---\n# PDF\n",
+    );
+    write_file(
+        &root.join("csv").join("SKILL.md"),
+        "---\nname: csv\ndescription: CSV skill.\n---\n# CSV\n",
+    );
+
+    let import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&root)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_failure(&import);
+    let err = stderr(&import);
+    assert!(err.contains("expects one atomic skill package"));
+    assert!(err.contains("skillspec workspace map"));
 }
 
 #[test]

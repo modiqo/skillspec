@@ -146,6 +146,11 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: SourceCommand,
     },
+    #[command(about = "Map and validate multi-skill workspaces before import")]
+    Workspace {
+        #[command(subcommand)]
+        command: WorkspaceCommand,
+    },
     #[command(about = "Teach the embedded SkillSpec grammar and porting coverage workflow")]
     Grammar {
         #[command(subcommand)]
@@ -181,7 +186,7 @@ pub(super) enum Command {
     },
     #[command(
         about = "Create a mechanical draft SkillSpec from a local skill file or folder",
-        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or folder. For large or code-heavy sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
+        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or single skill folder. Parent folders with multiple SKILL.md files are workspaces and are rejected; run `skillspec workspace map <source-root> --out <build-dir>/skillspec.workspace.yml` first. For large or code-heavy single-skill sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
     )]
     ImportSkill {
         /// Local SKILL.md file or skill folder to import.
@@ -355,6 +360,35 @@ pub(super) enum SourceCommand {
         /// Source root to compare against. Defaults to the map's recorded source root.
         #[arg(long)]
         root: Option<PathBuf>,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(super) enum WorkspaceCommand {
+    #[command(
+        about = "Create a skillspec.workspace.yml graph from a folder with one or more SKILL.md packages",
+        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, public names, deterministic install slugs, cross-package references, inferred dependencies, duplicate public names, and duplicate install slugs before fanout import."
+    )]
+    Map {
+        /// Local source root containing one or more skill packages.
+        source_root: PathBuf,
+        /// Output path for skillspec.workspace.yml.
+        #[arg(long)]
+        out: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Validate a skillspec.workspace.yml package graph",
+        long_about = "Validate a skillspec.workspace.yml package graph before fanout import. Checks package paths, one SKILL.md per package, dependency references, self-dependencies, cycles, duplicate install slugs, uncovered cross-package references, and public-name collision warnings."
+    )]
+    Validate {
+        /// Path to skillspec.workspace.yml.
+        manifest: PathBuf,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

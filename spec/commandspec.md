@@ -31,6 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
+| `workspace <COMMAND>` | Map and validate multi-skill workspaces before fanout import. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -318,6 +319,66 @@ Options:
 Use `--view index` to inspect structural headings and code blocks, `--view
 summary` to inspect compact classifications with line ranges and previews, and
 `--view full` on a specific node handle to recover the exact source span.
+
+## `workspace`
+
+```text
+skillspec workspace <COMMAND>
+```
+
+Subcommands:
+
+- `map <source-root> --out <skillspec.workspace.yml> [--json]`
+- `validate <skillspec.workspace.yml> [--json]`
+
+`workspace` is the authoring-side structure recon surface for repositories that
+contain multiple atomic skill packages. It is separate from `skillspec index`,
+which remains router/runtime catalog infrastructure.
+
+### `workspace map`
+
+```text
+skillspec workspace map <SOURCE_ROOT> --out <OUT>
+```
+
+Arguments:
+
+- `<SOURCE_ROOT>`: local folder containing one or more skill packages.
+
+Options:
+
+- `--out <OUT>`: output path for `skillspec.workspace.yml`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace map` discovers every folder with `SKILL.md`, parses frontmatter names
+and invocation visibility, assigns package ids, assigns deterministic install
+slugs, scans Markdown for cross-package references such as
+`../coding-standards/...`, infers `depends_on` edges, and writes a markdown
+report beside the manifest.
+
+It does not import skills, compile loaders, install files, or build a router
+index.
+
+### `workspace validate`
+
+```text
+skillspec workspace validate <MANIFEST>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to `skillspec.workspace.yml`.
+
+Options:
+
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace validate` checks the package graph before fanout import. It verifies
+that package paths exist, each package has exactly one `SKILL.md`, dependencies
+resolve, self-dependencies are absent, the graph is acyclic, install slugs are
+unique, and cross-package references are covered by declared dependencies.
+Duplicate public names are reported as warnings until an install target is
+being planned.
 
 ### `source coverage`
 
@@ -721,6 +782,9 @@ Notes:
   risk, and degraded proof impact.
 - If no dependencies are found after review, keep the generated ledger with
   `dependency_count = 0`; do not replace it with a byte-empty `deps.toml`.
+- Parent folders containing multiple `SKILL.md` files are rejected. Run
+  `skillspec workspace map` first so SkillSpec can identify atomic packages,
+  dependency edges, and name collisions before fanout import.
 
 ## `synthesize-from-workspace`
 

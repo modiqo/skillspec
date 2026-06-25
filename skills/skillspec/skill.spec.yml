@@ -1,10 +1,10 @@
 schema: skillspec/v0
 id: skillspec
 title: SkillSpec
-description: SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, inspecting SkillSpec status, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
   summary: >
-    Multiplex SkillSpec post-install setup: import existing SKILL.md skills from
+    Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from
     local folders or public URIs, inspect installed status, install/update/enable/disable router mode, optionally
     install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
     revise SkillSpec YAML, and prove value before install or release.
@@ -16,6 +16,18 @@ activation:
     - import SKILL.md
     - import existing skill
     - port skill
+    - workspace map
+    - workspace validate
+    - skillspec workspace
+    - skillspec.workspace.yml
+    - multi-skill repo
+    - multi-skill workspace
+    - many SKILL.md files
+    - parent folder with multiple skills
+    - fanout converge
+    - cross-skill references
+    - skill dependency graph
+    - shared standards package
     - local folder or uri
     - dependency ledger
     - deps.toml
@@ -76,6 +88,9 @@ applies_when:
       - run SkillSpec post-install setup inside the harness prompt
       - convert a prose SKILL.md to skill.spec.yml
       - port a local skill folder into SkillSpec
+      - map a skills repository that contains multiple SKILL.md packages before import
+      - validate a multi-skill workspace graph before fanout import
+      - detect cross-skill references, shared standards packages, and skill dependency edges
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
       - diagnose reliability debt and context burden in a prose skill before porting
@@ -93,7 +108,7 @@ applies_when:
       - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, stage or map sources, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill workspaces before import, stage or map single-skill sources, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -252,6 +267,51 @@ routes:
           route: local_skill_port
           requires:
             - local_porting_loop
+  - id: workspace_skill_authoring
+    label: Map multi-skill workspace
+    rank: 3
+    description: Use when the source root may contain multiple atomic skill packages, shared standards packages, wrapper skills, or cross-skill references that must be mapped before fanout import.
+    execution_plan:
+      mode: ordered
+      reason: Multi-skill repositories need structure recon before import so each SKILL.md becomes an atomic package and cross-skill dependencies are explicit.
+      phases:
+        - id: inventory_workspace_source
+          owner_skill: skillspec
+          description: Inventory the source root and confirm it is a workspace candidate, not one ordinary skill package.
+          requires:
+            - inventory_source_folder
+          forbid:
+            - use_router_index_for_authoring_recon
+            - import_workspace_root_as_single_skill
+        - id: map_workspace_graph
+          owner_skill: skillspec
+          description: Generate skillspec.workspace.yml and a markdown recon report from the source tree.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_map_source
+            - produce_workspace_manifest
+          forbid:
+            - use_router_index_for_authoring_recon
+        - id: validate_workspace_graph
+          owner_skill: skillspec
+          description: Validate package boundaries, deterministic install slugs, dependency edges, missing targets, and cycles before fanout import planning.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+          forbid:
+            - proceed_with_circular_skill_dependencies
+            - ignore_install_slug_collision
+        - id: report_workspace_recon
+          owner_skill: skillspec
+          description: Explain the package map, dependency graph, warnings, and the next fanout/converge implementation phase without importing yet.
+          requires:
+            - report_workspace_recon
   - id: install_skill_router
     label: Install router mode
     rank: 3
@@ -724,6 +784,31 @@ routes:
           requires:
             - value_report
 rules:
+  - id: route_multi_skill_repos_to_workspace_recon
+    when:
+      user_says_any:
+        - workspace map
+        - workspace validate
+        - skillspec workspace
+        - skillspec.workspace.yml
+        - multiple SKILL.md
+        - many SKILL.md
+        - multi-skill repo
+        - multi-skill workspace
+        - parent folder with multiple skills
+        - fanout converge
+        - shared standards package
+        - cross-skill references
+        - skill dependency graph
+        - skill depends on another skill
+    prefer: workspace_skill_authoring
+    forbid:
+      - use_router_index_for_authoring_recon
+      - import_workspace_root_as_single_skill
+      - proceed_with_circular_skill_dependencies
+    after_success:
+      - report_workspace_recon
+    reason: A folder containing multiple SKILL.md packages must be mapped as a workspace before any single-skill import or fanout/converge plan.
   - id: route_local_sources_to_local_port
     when:
       user_says_any:
@@ -733,7 +818,9 @@ rules:
         - /skills/
         - ~/.codex/skills
         - ~/.agents/skills
-    prefer: local_skill_port
+    route_order:
+      - local_skill_port
+      - remote_skill_port
     after_success:
       - local_porting_loop
       - generate_value_report
@@ -764,6 +851,7 @@ rules:
         - /skillspec
         - installed skillspec
     route_order:
+      - workspace_skill_authoring
       - install_skill_router
       - update_skill_router
       - install_durable_executor
@@ -1050,7 +1138,6 @@ rules:
         - deps
         - dependency
         - dependencies
-        - package
         - missing package
     route_order:
       - compile_and_install_reviewed_skill
@@ -1419,6 +1506,28 @@ artifacts:
         id: import_skill_draft
       - kind: recipe
         id: local_porting_loop
+  workspace_manifest:
+    kind: file
+    path: .skillspec/workspace/skillspec.workspace.yml
+    description: Authoring-side package graph for a multi-skill source root, including atomic package ids, deterministic install slugs, package kinds, cross-skill references, and inferred dependencies.
+    produced_by:
+      - kind: command
+        id: workspace_map_source
+    consumed_by:
+      - kind: command
+        id: workspace_validate_manifest
+      - kind: recipe
+        id: workspace_recon_loop
+  workspace_map_report:
+    kind: report
+    path: .skillspec/workspace/skillspec.workspace.yml.report.md
+    description: Human-readable structure recon report for the multi-skill workspace graph, duplicate-name warnings, unresolved references, and next validation command.
+    produced_by:
+      - kind: command
+        id: workspace_map_source
+    consumed_by:
+      - kind: recipe
+        id: workspace_recon_loop
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
@@ -1632,6 +1741,20 @@ commands:
   source_map_stale:
     description: Verify the source map still matches the staged source before import, proof, compile, or install.
     template: skillspec source stale <draft-dir>/.skillspec/source-map/source-map.json --root <source-skill-folder>
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_map_source:
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages. This is structure recon before fanout import, not router indexing.
+    template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_validate_manifest:
+    description: Validate workspace package boundaries, deterministic install slugs, dependency edges, cross-skill references, and cycles before fanout import planning.
+    template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
     safety: local_read
     requires:
       dependencies:
@@ -2014,6 +2137,26 @@ recipes:
       - run_command: inspect_dependency_ledger
       - ask: approve_dependency_surface
       - note: Do not delete or soften dependency records to pass QA. Missing required dependencies must be present in deps.toml as missing, provisionable, deferred, or required_but_unproven with explicit proof impact.
+  workspace_recon_loop:
+    description: "Phase 1-3 multi-skill workspace processing: inventory a source root, map atomic skill packages, validate the package graph, and report the next fanout/converge plan without importing yet."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rg_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_map_report
+    steps:
+      - run_command: inventory_source_folder
+      - run_command: workspace_map_source
+      - produce_artifact: workspace_manifest
+      - produce_artifact: workspace_map_report
+      - run_command: workspace_validate_manifest
+      - note: Treat every folder containing SKILL.md as one atomic skill package. Do not import the parent root as a single skill.
+      - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
+      - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
+      - note: Report the package map, dependency graph, warnings, and next fanout/converge phase from the validated workspace manifest.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
     ordered: true
@@ -2351,6 +2494,19 @@ closures:
     description: When source material contains scripts or code blocks, preserve each durable code surface as a package-local resource file, declare matching resources/code entries with provenance, and reference them from commands, recipes, tests, artifacts, or review notes.
   preserve_dependency_ledger:
     description: Keep the scaffolded deps.toml beside skill.spec.yml for imported/shareable skills, preserving every dependency mention with authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver.
+  produce_workspace_manifest:
+    description: Write skillspec.workspace.yml with every atomic skill package, deterministic install slug, package kind, cross-skill reference, and inferred depends_on edge found during structure recon.
+    commands:
+      - workspace_map_source
+  validate_workspace_graph:
+    description: Check that the workspace graph has valid package paths, one SKILL.md per package, unique install slugs, no self-dependencies, no cycles, and no uncovered cross-package references.
+    commands:
+      - workspace_validate_manifest
+  report_workspace_recon:
+    description: Summarize the workspace package map, dependency graph, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
+    commands:
+      - workspace_map_source
+      - workspace_validate_manifest
   produce_mechanical_draft:
     description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
   produce_reviewed_spec:
@@ -2443,6 +2599,7 @@ trace:
 proof:
   metrics:
     - grammar commands run before import or revision
+    - multi-skill source roots are mapped with skillspec.workspace.yml and validated before fanout import planning
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
@@ -2478,6 +2635,17 @@ tests:
         - route_local_sources_to_local_port
       after_success:
         - local_porting_loop
+  - name: multi-skill repo maps before fanout import
+    input: /skillspec map /Users/me/tulving/skills with many SKILL.md files, shared standards package, and cross-skill references
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
   - name: public github source stages before import
     input: Import https://github.com/org/repo/tree/main/skills/pdf as a SkillSpec skill
     expect:

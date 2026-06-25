@@ -1,12 +1,12 @@
 use super::args::{
     CapabilityCommand, Command, DepsCommand, DurableExecutorCommand, GrammarCommand,
     ImportsCommand, InstallCommand, ProgressCommand, RouterCommand, RouterIndexCommand,
-    SkillsCommand, SourceCommand, TraceCommand, VisibilityCommand,
+    SkillsCommand, SourceCommand, TraceCommand, VisibilityCommand, WorkspaceCommand,
 };
 use skillspec::{
     act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
     importer, imports, install, model, parser, progress, report, router, router_lifecycle,
-    sensemake, source_map, status, trace, visibility, workspace_synthesizer,
+    sensemake, source_map, status, trace, visibility, workspace, workspace_synthesizer,
 };
 use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
@@ -206,6 +206,33 @@ pub(super) fn run(command: Command) -> Result<()> {
                 }
             }
         },
+        Command::Workspace { command } => match command {
+            WorkspaceCommand::Map {
+                source_root,
+                out,
+                json,
+            } => {
+                let workspace_report = workspace::map_workspace(&source_root, &out)?;
+                if json {
+                    report::json(&workspace_report)?;
+                } else {
+                    let manifest = workspace::load_manifest(&out)?;
+                    report::text(&workspace::render_map_report(&workspace_report, &manifest))?;
+                }
+            }
+            WorkspaceCommand::Validate { manifest, json } => {
+                let validation_report = workspace::validate_workspace(&manifest)?;
+                let ok = validation_report.ok;
+                if json {
+                    report::json(&validation_report)?;
+                } else {
+                    report::text(&workspace::render_validation_report(&validation_report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
+        },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {
                 let report = grammar::sensemake(view.into());
@@ -383,6 +410,7 @@ pub(super) fn run(command: Command) -> Result<()> {
             out,
             source_map,
         } => {
+            workspace::guard_single_skill_source(&path, "skillspec import-skill")?;
             if let Some(source_map_path) = source_map {
                 let source_root = source_map::source_root_for(&path);
                 let stale_report = source_map::stale(&source_map_path, Some(&source_root))?;
