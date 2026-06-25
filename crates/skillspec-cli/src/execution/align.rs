@@ -1565,6 +1565,9 @@ fn report_status(checks: &[AlignCheck], obligations: &[AlignObligation]) -> Alig
     if checks
         .iter()
         .any(|check| check.status == AlignCheckStatus::Fail)
+        || obligations
+            .iter()
+            .any(|obligation| obligation.status == AlignCheckStatus::Fail)
     {
         return AlignStatus::Fail;
     }

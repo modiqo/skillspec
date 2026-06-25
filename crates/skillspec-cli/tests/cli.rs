@@ -4350,6 +4350,65 @@ fn trace_align_uses_execution_ledger_without_leaking_command_args() {
 }
 
 #[test]
+fn trace_align_fails_when_execution_obligation_is_violated() {
+    let dir = TempDir::new("align-execution-violation");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    let execution_trace = dir.path().join("execution.jsonl");
+    write_file(&spec, alignment_spec());
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=run gh PR status as a tracked background process")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    write_file(
+        &execution_trace,
+        r#"{"event":"workspace_created","workspace":"gh-pr-checks-conikeec","anonymous":false}
+{"event":"process_started","workspace":"gh-pr-checks-conikeec","command":"gh pr status --repo private/repo --author secret-user","executor":"direct_cli","through_rote":false,"stdout_captured":true,"stderr_captured":true}
+"#,
+    );
+
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&align);
+    let out = stdout(&align);
+    assert!(!out.contains("private/repo"));
+    assert!(!out.contains("secret-user"));
+    let report: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["status"], "fail");
+    assert_eq!(report["summary"]["execution_alignment"], "fail");
+    assert_eq!(report["summary"]["completion"]["alignment"], "fail");
+    assert!(report["proof_rows"].as_array().unwrap().iter().any(|row| {
+        row["requirement"] == "CLI work must be captured through rote exec"
+            && row["status"] == "violated"
+    }));
+}
+
+#[test]
 fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     let dir = TempDir::new("deps");
     let spec = dir.path().join("skill.spec.yml");

@@ -2,35 +2,49 @@
   <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
 </p>
 
-# SkillSpec makes agent skills followable, testable, and provable.
+# Stop guessing whether your agent followed the skill.
 
 [![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
 
-It turns messy skill instructions into a small contract an agent can follow,
-check, and prove.
+Do any of these sound familiar?
 
-Agent skills made reusable prompts portable. SkillSpec is the next layer: a tiny
-behavior contract that keeps agents on track, measures what happened, and makes
-missed steps visible.
+- You are building a skill for a CLI, API, MCP server, or product workflow.
+- Your skill has step-by-step instructions, scripts, code blocks, or extra
+  reference files.
+- You have too many skills and need the agent to pick the right one.
+- You need to know whether the agent skipped a step.
+- You need to control which tools the agent can use.
+- You need dependency checks before the agent acts.
+- You need proof of what happened after the run.
 
-It does not compete with skills. It makes skills stronger.
+If even two of these sound familiar, SkillSpec matters.
 
-## What It Is
+It keeps your normal `SKILL.md`: instructions, examples, scripts, and references
+still work.
 
-SkillSpec is a grammar for agent skills.
+SkillSpec adds a small contract beside it so the agent can plan the work, follow
+the right steps, stay inside tool boundaries, check dependencies, record
+progress, and show proof at the end.
 
-It turns prose into:
+No new agent runtime. No orchestration platform. Just a `skill.spec.yml`, a
+small generated `SKILL.md` loader, and a CLI that validates, plans, records, and
+reports.
 
-- routes the agent can choose
-- phases the agent can execute in order
-- tool boundaries the agent should not cross without permission
-- checks the harness can run
-- progress events the run can record
-- proof reports the user can inspect
+## What SkillSpec Adds
 
-No heavyweight agent runtime. No new orchestration system. Just a
-`skill.spec.yml`, a tiny `SKILL.md` trampoline, and a CLI that validates,
-plans, records, and reports.
+A regular skill tells the agent what to do.
+
+SkillSpec makes the important parts checkable:
+
+- when the skill should be used
+- which route the agent should take
+- which phases must run in order
+- which tools are allowed or blocked
+- which dependencies must be checked
+- which progress events should be recorded
+- which proof should exist after the run
+
+It does not compete with skills. It makes important skills easier to trust.
 
 ## Why It Exists
 
