@@ -271,7 +271,7 @@ struct PendingInstall {
     backup_path: Option<PathBuf>,
 }
 
-fn selected_roots(targets: &[HarnessTarget], all_detected: bool) -> Result<Vec<HarnessRoot>> {
+pub fn selected_roots(targets: &[HarnessTarget], all_detected: bool) -> Result<Vec<HarnessRoot>> {
     let detected = detect_targets()?;
     if all_detected {
         return Ok(detected

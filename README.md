@@ -294,6 +294,7 @@ skillspec workspace validate ./build/skillspec.workspace.yml
 skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
 skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
 skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
 ```
 
 The workspace manifest names each atomic skill package, records deterministic
@@ -302,7 +303,9 @@ packages before fanout import. The import step writes one generated package per
 atomic skill under the build root; it does not compile, install, or refresh the
 router. The converge step verifies those generated package drafts against the
 workspace graph. The compile step writes harness-ready `SKILL.md` loaders for
-ready packages only; it still does not install or refresh the router.
+ready packages only. The install step plans every harness write first, uses the
+manifest `install_slug` folders, blocks collisions, and writes install proof; it
+still does not refresh the router.
 
 ### 2. Map And Import
 

@@ -146,7 +146,7 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: SourceCommand,
     },
-    #[command(about = "Map, validate, and import multi-skill workspaces")]
+    #[command(about = "Map, validate, import, compile, and install multi-skill workspaces")]
     Workspace {
         #[command(subcommand)]
         command: WorkspaceCommand,
@@ -440,6 +440,32 @@ pub(super) enum WorkspaceCommand {
         /// Harness loader target to generate.
         #[arg(long, value_enum)]
         target: WorkspaceCompileTarget,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Install compiled workspace packages into harness roots",
+        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names, blocks folder and public-name collisions unless explicitly retired where supported, installs dependencies before dependents, writes workspace-install.report.md, and does not refresh router indexes."
+    )]
+    Install {
+        /// Path to skillspec.workspace.yml.
+        manifest: PathBuf,
+        /// Build root containing compiled workspace package outputs.
+        #[arg(long = "build-root")]
+        build_root: PathBuf,
+        /// Harness target to install into. Repeat for multiple targets.
+        #[arg(long, value_enum)]
+        target: Vec<InstallTargetArg>,
+        /// Install into every harness root detected on this machine.
+        #[arg(long)]
+        all_detected: bool,
+        /// Show the full workspace install plan without writing harness files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Back up and remove an existing active install folder before installing this workspace package.
+        #[arg(long)]
+        retire_existing: bool,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
