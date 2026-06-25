@@ -6,8 +6,6 @@ use crate::visibility;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -619,64 +617,7 @@ fn rote_preflight_report() -> RotePreflightReport {
 }
 
 fn command_on_path(command: &str) -> bool {
-    if command.contains(std::path::MAIN_SEPARATOR) {
-        return is_executable_file(Path::new(command));
-    }
-    let Some(path) = env::var_os("PATH") else {
-        return false;
-    };
-    let candidates = command_candidates(command);
-    env::split_paths(&path).any(|directory| {
-        candidates
-            .iter()
-            .any(|candidate| is_executable_file(&directory.join(candidate)))
-    })
-}
-
-#[cfg(unix)]
-fn is_executable_file(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable_file(path: &Path) -> bool {
-    path.is_file()
-}
-
-fn command_candidates(command: &str) -> Vec<String> {
-    #[cfg(windows)]
-    {
-        let path_ext = env::var_os("PATHEXT")
-            .map(|value| {
-                value
-                    .to_string_lossy()
-                    .split(';')
-                    .filter(|extension| !extension.is_empty())
-                    .map(|extension| extension.to_owned())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_else(|| {
-                vec![
-                    ".COM".to_owned(),
-                    ".EXE".to_owned(),
-                    ".BAT".to_owned(),
-                    ".CMD".to_owned(),
-                ]
-            });
-        let mut candidates = vec![command.to_owned()];
-        candidates.extend(
-            path_ext
-                .into_iter()
-                .map(|extension| format!("{command}{extension}")),
-        );
-        candidates
-    }
-    #[cfg(not(windows))]
-    {
-        vec![command.to_owned()]
-    }
+    crate::command_path::find_on_path(command).is_some()
 }
 
 fn frontmatter_names_durable_executor(text: &str) -> bool {

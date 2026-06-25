@@ -301,7 +301,8 @@ fn collect_required(
 }
 
 fn run_rote(args: &[&str], cwd: &Path) -> std::result::Result<String, RoteAttempt> {
-    let output = ProcessCommand::new("rote")
+    let rote = crate::command_path::find_on_path("rote").unwrap_or_else(|| PathBuf::from("rote"));
+    let output = ProcessCommand::new(rote)
         .args(args)
         .current_dir(cwd)
         .output()

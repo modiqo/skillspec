@@ -113,6 +113,16 @@ fn write_failing_rote(path: &Path) -> std::ffi::OsString {
     std::env::join_paths(paths).unwrap()
 }
 
+fn write_success_cli(bin_dir: &Path, name: &str) {
+    #[cfg(unix)]
+    write_executable(&bin_dir.join(name), "#!/bin/sh\nexit 0\n");
+    #[cfg(windows)]
+    write_file(
+        &bin_dir.join(format!("{name}.cmd")),
+        "@echo off\r\nexit /B 0\r\n",
+    );
+}
+
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -4344,7 +4354,7 @@ fn deps_check_distinguishes_missing_deferred_and_command_scope() {
     let dir = TempDir::new("deps");
     let spec = dir.path().join("skill.spec.yml");
     let cli_dir = dir.path().join("bin");
-    write_file(&cli_dir.join("present-cli"), "");
+    write_success_cli(&cli_dir, "present-cli");
     let test_path = std::env::join_paths([cli_dir]).unwrap();
     write_file(&spec, deps_spec());
 
@@ -5443,11 +5453,7 @@ fn synthesize_from_workspace_generates_valid_review_scaffold() {
     let deps = dir.path().join("deps.txt");
     let out = dir.path().join("profile-enricher");
     let path = write_failing_rote(dir.path());
-    #[cfg(unix)]
-    write_executable(
-        &dir.path().join("bin").join("parallel-cli"),
-        "#!/bin/sh\nexit 0\n",
-    );
+    write_success_cli(&dir.path().join("bin"), "parallel-cli");
 
     write_file(
         &stats,

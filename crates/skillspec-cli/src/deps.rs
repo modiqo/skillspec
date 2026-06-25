@@ -120,7 +120,7 @@ fn check_cli(
         .unwrap_or(id);
     let program = command.split_whitespace().next().unwrap_or(command);
 
-    if find_on_path(program).is_some() {
+    if crate::command_path::find_on_path(program).is_some() {
         (
             DependencyStatus::Present,
             DependencyCheckMethod::PathLookup,
@@ -207,13 +207,6 @@ fn check_env(
             format!("{env_name} is not set"),
         )
     }
-}
-
-fn find_on_path(program: &str) -> Option<PathBuf> {
-    let path = env::var_os("PATH")?;
-    env::split_paths(&path)
-        .map(|dir| dir.join(program))
-        .find(|candidate| candidate.is_file())
 }
 
 #[cfg(test)]

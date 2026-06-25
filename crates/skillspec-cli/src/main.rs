@@ -1,6 +1,7 @@
 mod act;
 mod align;
 mod capability;
+mod command_path;
 mod compiler;
 mod decision;
 mod deps;
