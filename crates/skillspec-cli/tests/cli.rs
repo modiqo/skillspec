@@ -93,6 +93,26 @@ fn write_fake_rote(path: &Path) -> std::ffi::OsString {
     std::env::join_paths(paths).unwrap()
 }
 
+fn write_failing_rote(path: &Path) -> std::ffi::OsString {
+    let bin_dir = path.join("bin");
+    #[cfg(unix)]
+    write_executable(
+        &bin_dir.join("rote"),
+        "#!/bin/sh\necho live rote should not be called >&2\nexit 42\n",
+    );
+    #[cfg(windows)]
+    write_file(
+        &bin_dir.join("rote.cmd"),
+        "@echo off\r\necho live rote should not be called 1>&2\r\nexit /B 42\r\n",
+    );
+
+    let mut paths = vec![bin_dir];
+    if let Some(existing) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing));
+    }
+    std::env::join_paths(paths).unwrap()
+}
+
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -474,6 +494,7 @@ fn help_lists_trace_align_arguments() {
     assert!(synthesize_help.contains("--workspace-stats-report"));
     assert!(synthesize_help.contains("--workspace-log"));
     assert!(synthesize_help.contains("--workspace-meta"));
+    assert!(synthesize_help.contains("--observation-approved"));
 
     let source = Command::new(bin())
         .arg("source")
@@ -2699,7 +2720,7 @@ description: Rote workspace synthesis fixture.
 commands:
   synthesize_from_workspace:
     description: Create a draft SkillSpec from durable rote workspace evidence.
-    template: skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>
+    template: skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder> --observation-approved
     safety: local_write
     requires:
       dependencies: [rote_cli]
@@ -2719,7 +2740,7 @@ dependencies:
     let out = stdout(&output);
     assert!(out.contains("inspect rote workspace synthesis command"));
     assert!(out.contains(
-        "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>"
+        "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder> --observation-approved"
     ));
     assert!(out.contains("synthesize_from_workspace is rote-specific"));
 }
@@ -5317,6 +5338,7 @@ fn synthesize_from_workspace_generates_valid_review_scaffold() {
     let meta = dir.path().join("meta.txt");
     let deps = dir.path().join("deps.txt");
     let out = dir.path().join("profile-enricher");
+    let path = write_failing_rote(dir.path());
 
     write_file(
         &stats,
@@ -5331,8 +5353,9 @@ Result tokens: 1200
         &log,
         r#"
 [
-  {"sequence":1,"command":"parallel web enrich --profile input.json --out enriched.json"},
-  {"sequence":2,"command":"jq . enriched.json"}
+  {"sequence":1,"command":"rote exec -- parallel web enrich --profile input.json --out enriched.json"},
+  {"sequence":2,"command":"rote query @22 '.json' -r"},
+  {"sequence":3,"command":"jq . enriched.json"}
 ]
 "#,
     );
@@ -5365,7 +5388,9 @@ strategy = durable
         .arg(&meta)
         .arg("--workspace-deps")
         .arg(&deps)
+        .arg("--observation-approved")
         .arg("--json")
+        .env("PATH", &path)
         .output()
         .unwrap();
     assert_success(&output);
@@ -5388,11 +5413,21 @@ strategy = durable
     assert!(out
         .join("resources/observed-workspace/coverage-matrix.md")
         .is_file());
+    assert!(out
+        .join("resources/observed-workspace/parameterization.md")
+        .is_file());
+    assert!(out
+        .join("resources/observed-workspace/privacy-and-ambiguity.md")
+        .is_file());
 
     let yaml = fs::read_to_string(&spec).unwrap();
     assert!(yaml.contains("parallel_cli"));
     assert!(yaml.contains("observed_workspace_report"));
     assert!(yaml.contains("observed_command_1"));
+    assert!(yaml.contains("approve_observed_result_for_synthesis"));
+    assert!(yaml.contains("synthesize_without_observation_approval"));
+    assert!(!yaml.contains("rote exec -- parallel"));
+    assert!(!yaml.contains("rote query @22"));
 
     let validate = Command::new(bin())
         .arg("validate")
@@ -5409,6 +5444,45 @@ strategy = durable
         .output()
         .unwrap();
     assert_success(&imports);
+}
+
+#[test]
+fn synthesize_from_workspace_requires_observation_approval() {
+    let dir = TempDir::new("synthesize-workspace-approval");
+    let stats = dir.path().join("stats.txt");
+    let log = dir.path().join("log.txt");
+    let meta = dir.path().join("meta.txt");
+    let out = dir.path().join("profile-enricher");
+
+    write_file(&stats, "Workspace: profile-enrichment\nTotal tokens: 10\n");
+    write_file(
+        &log,
+        r#"[{"sequence":1,"command":"parallel web enrich --profile input.json --out enriched.json"}]"#,
+    );
+    write_file(&meta, "name = profile-enrichment\n");
+
+    let output = Command::new(bin())
+        .arg("synthesize-from-workspace")
+        .arg("profile-enrichment")
+        .arg("--task")
+        .arg("use parallel web to enrich this profile")
+        .arg("--out")
+        .arg(&out)
+        .arg("--workspace-stats-report")
+        .arg(&stats)
+        .arg("--workspace-log")
+        .arg(&log)
+        .arg("--workspace-meta")
+        .arg(&meta)
+        .output()
+        .unwrap();
+    assert_failure(&output);
+    assert!(stderr(&output).contains("observed output approval is required"));
+    assert!(
+        stderr(&output).contains("Is this satisfactory enough to synthesize a reusable SkillSpec")
+    );
+    assert!(stderr(&output).contains("--observation-approved"));
+    assert!(!out.join("skill.spec.yml").exists());
 }
 
 #[test]
@@ -5434,11 +5508,38 @@ fn synthesize_from_workspace_requires_command_log_entries() {
         .arg(&log)
         .arg("--workspace-meta")
         .arg(&meta)
+        .arg("--observation-approved")
         .output()
         .unwrap();
     assert_failure(&output);
     assert!(stderr(&output).contains("workspace command log evidence has no command entries"));
     assert!(!out.join("skill.spec.yml").exists());
+}
+
+#[test]
+fn synthesize_from_workspace_live_collection_reports_context() {
+    let dir = TempDir::new("synthesize-workspace-live-failure");
+    let path = write_failing_rote(dir.path());
+    let out = dir.path().join("profile-enricher");
+
+    let output = Command::new(bin())
+        .current_dir(dir.path())
+        .arg("synthesize-from-workspace")
+        .arg("profile-enrichment")
+        .arg("--out")
+        .arg(&out)
+        .arg("--observation-approved")
+        .env("PATH", &path)
+        .output()
+        .unwrap();
+    assert_failure(&output);
+    let error = stderr(&output);
+    assert!(error.contains("`rote workspace stats profile-enrichment` failed"));
+    assert!(error.contains("workspace: profile-enrichment"));
+    assert!(error.contains("invocation cwd:"));
+    assert!(error.contains("evidence overrides: stats=live, log=live, meta=live, deps=live"));
+    assert!(error.contains("Fallback without workspace name also failed"));
+    assert!(error.contains("live rote should not be called"));
 }
 
 #[test]

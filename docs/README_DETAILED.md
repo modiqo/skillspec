@@ -352,6 +352,23 @@ skillspec progress show path/to/skill.spec.yml \
 section roles, counts, ids, and query handles without dumping the whole YAML.
 Use it when the spec shape is unfamiliar.
 
+For `/skillspec create from observed durable execution: "..."`, the prompt
+multiplexer collects durable rote workspace evidence and then calls the
+rote-specific CLI only after the observed result and evidence summary have been
+shown and approved:
+
+```sh
+skillspec synthesize-from-workspace <workspace> \
+  --task '<observed task>' \
+  --out <skill-folder> \
+  --observation-approved
+```
+
+If live workspace lookup is unreliable, capture `rote workspace stats`, `rote
+workspace inspect log`, and `rote workspace inspect meta` from inside the
+workspace and pass them with `--workspace-stats-report`, `--workspace-log`, and
+`--workspace-meta`.
+
 `plan` fits the actual task to a selected route, writes the decision trace, and
 prints the ordered phase names before any substrate tool is used. Reuse the
 `run_dir` printed by `plan` for the rest of the loop. `act` expands the current

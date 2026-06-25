@@ -158,12 +158,13 @@ flowchart LR
     A --> C[workspace log]
     A --> D[workspace metadata]
     A --> E[workspace deps]
-    B --> F[synthesize-from-workspace]
+    B --> F[observed result approval]
     C --> F
     D --> F
     E --> F
-    F --> G[draft skill.spec.yml]
-    G --> H[review, QA, release]
+    F --> G[synthesize-from-workspace]
+    G --> H[draft skill.spec.yml]
+    H --> I[review, QA, release]
 ```
 
 Grounded command:
@@ -171,12 +172,18 @@ Grounded command:
 ```sh
 skillspec synthesize-from-workspace <workspace> \
   --task '<observed task>' \
-  --out <skill-folder>
+  --out <skill-folder> \
+  --observation-approved
 ```
 
 Review check:
 
 - Synthesis depends on real workspace evidence.
+- The observed result and evidence summary must be shown and approved before
+  synthesis writes a scaffold.
+- If live rote workspace lookup fails, capture stats, log, and metadata from
+  inside the workspace and pass `--workspace-stats-report`, `--workspace-log`,
+  and `--workspace-meta`.
 - Inferred behavior is marked for review.
 - The resulting draft still needs validation, tests, dependency review, and
   proof before release.

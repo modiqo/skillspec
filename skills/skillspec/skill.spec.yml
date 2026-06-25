@@ -617,12 +617,15 @@ routes:
             - claim_workspace_tokens_without_stats
         - id: synthesize_observed_spec
           owner_skill: skillspec
-          description: Build a reviewed skill.spec.yml from observed commands, dependencies, inputs, outputs, rules, elicitations, tests, and proof gaps.
+          description: Show the observed result and evidence summary for approval, then build a reviewed skill.spec.yml from observed commands, dependencies, inputs, outputs, rules, elicitations, tests, and proof gaps.
           requires:
+            - approve_observed_result_for_synthesis
             - synthesize_from_workspace
             - synthesize_observed_skill_spec
             - fill_coverage_matrix
             - produce_observed_workspace_spec
+          forbid:
+            - synthesize_without_observation_approval
         - id: qa_observed_spec
           owner_skill: skillspec
           description: Validate, test, decide, align, and value-report the observed-workflow spec before optional install.
@@ -1251,6 +1254,18 @@ elicitations:
         label: Named workspace
         description: Use the workspace name provided by the user.
     default: run_task_first
+  approve_observed_result_for_synthesis:
+    question: Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?
+    required_when:
+      - route: observed_durable_workspace_to_skill
+    choices:
+      - id: satisfactory_for_skill_synthesis
+        label: Satisfactory for synthesis
+        description: Proceed only after the observed output, workspace stats, command log, metadata, dependency evidence, artifacts, and proof gaps have been shown and accepted.
+      - id: rerun_or_refine_observation
+        label: Rerun or refine
+        description: Do not synthesize yet; rerun the durable observation or collect better evidence first.
+    default: rerun_or_refine_observation
   approve_dependency_surface:
     question: Do you approve the imported dependency ledger and any missing dependency decisions for validation, proof, compile, or install?
     required_when:
@@ -1902,8 +1917,8 @@ commands:
       dependencies:
         - rote_cli
   synthesize_from_workspace:
-    description: Rote-specific synthesis command that creates a draft SkillSpec skill from a named durable rote workspace after stats, command log, and metadata evidence are available.
-    template: skillspec synthesize-from-workspace <workspace> --task '<observed-task>' --out <skill-folder>
+    description: Rote-specific synthesis command that creates a draft SkillSpec skill from a named durable rote workspace after observed output has been shown and approved, and stats, command log, and metadata evidence are available. If live workspace resolution fails, first capture --workspace-stats-report, --workspace-log, and --workspace-meta files from inside the workspace and pass them explicitly.
+    template: skillspec synthesize-from-workspace <workspace> --task '<observed-task>' --out <skill-folder> --observation-approved
     safety: local_write
     requires:
       dependencies:
@@ -2206,6 +2221,7 @@ recipes:
       - run_command: observe_workspace_stats
       - run_command: observe_workspace_log
       - run_command: observe_workspace_meta
+      - ask: approve_observed_result_for_synthesis
       - run_command: synthesize_from_workspace
       - produce_artifact: observed_skill_spec
       - run_command: validate_spec

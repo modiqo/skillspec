@@ -102,7 +102,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_rote_workspace_synthesis(spec) {
         items.push(
-            "synthesize_from_workspace is rote-specific: it requires durable rote workspace stats, command log, and metadata evidence before creating a draft skill"
+            "synthesize_from_workspace is rote-specific: show the observed result and evidence summary first, then run it with --observation-approved and durable rote workspace stats, command log, and metadata evidence; pass explicit evidence files when live workspace lookup is unreliable"
                 .to_owned(),
         );
     }
@@ -433,7 +433,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
             NavigationHint {
                 intent: "synthesize from a rote durable workspace",
-                command: "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder>"
+                command: "skillspec synthesize-from-workspace <workspace> --task '<task>' --out <skill-folder> --observation-approved"
                     .to_owned(),
             },
         ]);

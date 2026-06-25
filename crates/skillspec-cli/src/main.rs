@@ -221,7 +221,7 @@ enum Command {
     },
     #[command(
         about = "Synthesize a draft SkillSpec from a durable rote workspace (rote-specific)",
-        long_about = "Synthesize a draft SkillSpec from rote-specific durable execution evidence. This optional integration requires a rote workspace name and validates `rote workspace stats`, `rote workspace inspect log`, and `rote workspace inspect meta` evidence before writing a scaffold."
+        long_about = "Synthesize a draft SkillSpec from rote-specific durable execution evidence. This optional integration requires a rote workspace name and validates workspace stats, command log, and metadata evidence. If pre-captured evidence files are supplied, synthesis does not need live rote workspace lookup. The command refuses to write the scaffold until --observation-approved confirms the observed result and evidence summary were shown and accepted."
     )]
     SynthesizeFromWorkspace {
         /// Durable rote workspace name that was created by durable execution.
@@ -250,6 +250,9 @@ enum Command {
         /// Optional pre-captured dependency graph from `rote workspace inspect deps`.
         #[arg(long)]
         workspace_deps: Option<PathBuf>,
+        /// Confirm the observed result and evidence summary were shown and accepted before synthesis.
+        #[arg(long)]
+        observation_approved: bool,
         /// Overwrite an existing skill.spec.yml in the output folder.
         #[arg(long)]
         force: bool,
@@ -1639,6 +1642,7 @@ fn run() -> Result<()> {
             workspace_log,
             workspace_meta,
             workspace_deps,
+            observation_approved,
             force,
             json,
         } => {
@@ -1653,6 +1657,7 @@ fn run() -> Result<()> {
                     workspace_log,
                     workspace_meta,
                     workspace_deps,
+                    observation_approved,
                     force,
                 },
             )?;

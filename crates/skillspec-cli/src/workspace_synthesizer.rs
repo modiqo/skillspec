@@ -11,6 +11,7 @@ use crate::model::{
 use serde::Serialize;
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,8 @@ const LOG_PATH: &str = "resources/observed-workspace/log.txt";
 const META_PATH: &str = "resources/observed-workspace/meta.txt";
 const DEPS_PATH: &str = "resources/observed-workspace/deps.txt";
 const COVERAGE_PATH: &str = "resources/observed-workspace/coverage-matrix.md";
+const PARAMETERS_PATH: &str = "resources/observed-workspace/parameterization.md";
+const SAFETY_PATH: &str = "resources/observed-workspace/privacy-and-ambiguity.md";
 
 #[derive(Debug)]
 pub struct SynthesizeOptions {
@@ -34,6 +37,7 @@ pub struct SynthesizeOptions {
     pub workspace_log: Option<PathBuf>,
     pub workspace_meta: Option<PathBuf>,
     pub workspace_deps: Option<PathBuf>,
+    pub observation_approved: bool,
     pub force: bool,
 }
 
@@ -48,6 +52,8 @@ pub struct SynthesisReport {
     pub meta_path: PathBuf,
     pub deps_path: Option<PathBuf>,
     pub coverage_path: PathBuf,
+    pub parameters_path: PathBuf,
+    pub safety_path: PathBuf,
     pub inferred_dependencies: Vec<String>,
     pub observed_command_candidates: usize,
     pub review_required: Vec<String>,
@@ -101,6 +107,13 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
     let skill_id = skill_id(options.name.as_deref(), task, &workspace);
     let title = title_from_id(&skill_id);
     let commands = infer_observed_commands(&evidence.log);
+
+    if !options.observation_approved {
+        return Err(Error::InvalidInput {
+            message: render_observation_approval_required(&workspace, task, &evidence, &commands),
+        });
+    }
+
     let spec = build_spec(&skill_id, &title, &workspace, task, &evidence, &commands);
     crate::parser::validate_spec(&spec)?;
 
@@ -118,6 +131,14 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
     }
     let coverage = render_coverage_matrix(&workspace, task, &commands, &evidence);
     write_file(&options.out.join(COVERAGE_PATH), &coverage)?;
+    write_file(
+        &options.out.join(PARAMETERS_PATH),
+        &render_parameterization_guide(&commands),
+    )?;
+    write_file(
+        &options.out.join(SAFETY_PATH),
+        &render_privacy_and_ambiguity_guide(),
+    )?;
     let report = render_workspace_report(&workspace, task, &commands, &evidence);
     write_file(&options.out.join(REPORT_PATH), &report)?;
     crate::parser::write_spec(&spec_path, &spec)?;
@@ -132,6 +153,8 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
         meta_path: options.out.join(META_PATH),
         deps_path: evidence.deps.as_ref().map(|_| options.out.join(DEPS_PATH)),
         coverage_path: options.out.join(COVERAGE_PATH),
+        parameters_path: options.out.join(PARAMETERS_PATH),
+        safety_path: options.out.join(SAFETY_PATH),
         inferred_dependencies: dependency_ids(&commands),
         observed_command_candidates: commands.len(),
         review_required: spec.review_required.clone(),
@@ -145,7 +168,7 @@ pub fn render_report(report: &SynthesisReport) -> String {
         report.inferred_dependencies.join(", ")
     };
     format!(
-        "SkillSpec workspace synthesis\n\nWorkspace: {}\nSpec: {}\nReport: {}\nObserved command candidates: {}\nInferred dependencies: {}\n\nNext: review {}, then run `skillspec validate {}` and `skillspec test {}`.\n",
+        "SkillSpec workspace synthesis\n\nWorkspace: {}\nSpec: {}\nReport: {}\nObserved command candidates: {}\nInferred dependencies: {}\n\nNext: show the observed result and evidence summary to the user, confirm it remains satisfactory, review {}, then run `skillspec validate {}` and `skillspec test {}`.\n",
         report.workspace,
         report.spec_path.display(),
         report.report_path.display(),
@@ -158,30 +181,34 @@ pub fn render_report(report: &SynthesisReport) -> String {
 }
 
 fn collect_evidence(options: &SynthesizeOptions, workspace: &str) -> Result<WorkspaceEvidence> {
+    let context = EvidenceCollectionContext::new(options, workspace);
     let uses_live_required_evidence = options.workspace_stats_report.is_none()
         || options.workspace_log.is_none()
         || options.workspace_meta.is_none();
-    let stats = read_or_collect(
-        options.workspace_stats_report.as_deref(),
-        "workspace stats",
-        &["workspace", "stats", workspace],
-    )?;
+    let stats = match options.workspace_stats_report.as_deref() {
+        Some(path) => read_file(path, "workspace stats")?,
+        None => collect_stats(workspace, &context)?,
+    };
     let log_last = options.log_last.to_string();
     let log = read_or_collect(
         options.workspace_log.as_deref(),
         "workspace command log",
         &["workspace", "inspect", "log", "--last", &log_last],
+        &context,
     )?;
     let meta = read_or_collect(
         options.workspace_meta.as_deref(),
         "workspace metadata",
         &["workspace", "inspect", "meta"],
+        &context,
     )?;
     let deps = match options.workspace_deps.as_deref() {
         Some(path) => Some(read_file(path, "workspace dependency graph")?),
-        None if uses_live_required_evidence => collect_optional(&["workspace", "inspect", "deps"])
-            .ok()
-            .filter(|content| !content.trim().is_empty()),
+        None if uses_live_required_evidence => {
+            collect_optional(&["workspace", "inspect", "deps"], &context)
+                .ok()
+                .filter(|content| !content.trim().is_empty())
+        }
         None => None,
     };
 
@@ -193,10 +220,71 @@ fn collect_evidence(options: &SynthesizeOptions, workspace: &str) -> Result<Work
     })
 }
 
-fn read_or_collect(path: Option<&Path>, label: &str, rote_args: &[&str]) -> Result<String> {
+#[derive(Debug)]
+struct EvidenceCollectionContext {
+    workspace: String,
+    invocation_cwd: String,
+    overrides: String,
+    candidate_cwds: Vec<PathBuf>,
+}
+
+impl EvidenceCollectionContext {
+    fn new(options: &SynthesizeOptions, workspace: &str) -> Self {
+        let current_dir = env::current_dir().ok();
+        let invocation_cwd = current_dir
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned());
+        let mut candidate_cwds = Vec::new();
+        if let Some(path) = current_dir {
+            candidate_cwds.push(path);
+        }
+        candidate_cwds.extend(discover_workspace_dirs(workspace));
+        dedupe_paths(&mut candidate_cwds);
+        Self {
+            workspace: workspace.to_owned(),
+            invocation_cwd,
+            overrides: evidence_override_summary(options),
+            candidate_cwds,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RoteAttempt {
+    cwd: PathBuf,
+    exit: Option<i32>,
+    stderr: String,
+    stdout_empty: bool,
+}
+
+fn read_or_collect(
+    path: Option<&Path>,
+    label: &str,
+    rote_args: &[&str],
+    context: &EvidenceCollectionContext,
+) -> Result<String> {
     match path {
         Some(path) => read_file(path, label),
-        None => collect_required(rote_args, label),
+        None => collect_required(rote_args, label, context),
+    }
+}
+
+fn collect_stats(workspace: &str, context: &EvidenceCollectionContext) -> Result<String> {
+    let primary = ["workspace", "stats", workspace];
+    match collect_required(&primary, "workspace stats", context) {
+        Ok(stats) => Ok(stats),
+        Err(primary_error) => {
+            match collect_required(&["workspace", "stats"], "workspace stats", context) {
+                Ok(stats) => Ok(stats),
+                Err(fallback_error) => Err(Error::InvalidInput {
+                    message: format!(
+                        "{}\n\nFallback without workspace name also failed:\n{}",
+                        primary_error, fallback_error
+                    ),
+                }),
+            }
+        }
     }
 }
 
@@ -217,48 +305,140 @@ fn read_file(path: &Path, label: &str) -> Result<String> {
         })
 }
 
-fn collect_required(args: &[&str], label: &str) -> Result<String> {
-    let output = ProcessCommand::new("rote")
-        .args(args)
-        .output()
-        .map_err(|source| Error::InvalidInput {
-            message: format!(
-                "failed to run `rote {}` for {label}: {source}",
-                args.join(" ")
-            ),
-        })?;
-    if !output.status.success() {
-        return Err(Error::InvalidInput {
-            message: format!(
-                "`rote {}` failed while collecting {label}: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        });
+fn collect_required(
+    args: &[&str],
+    label: &str,
+    context: &EvidenceCollectionContext,
+) -> Result<String> {
+    let mut attempts = Vec::new();
+    for cwd in &context.candidate_cwds {
+        match run_rote(args, cwd) {
+            Ok(stdout) => {
+                if stdout.trim().is_empty() {
+                    attempts.push(RoteAttempt {
+                        cwd: cwd.clone(),
+                        exit: Some(0),
+                        stderr: String::new(),
+                        stdout_empty: true,
+                    });
+                } else {
+                    return Ok(stdout);
+                }
+            }
+            Err(attempt) => attempts.push(attempt),
+        }
     }
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    if stdout.trim().is_empty() {
-        return Err(Error::InvalidInput {
-            message: format!("`rote {}` produced empty {label} evidence", args.join(" ")),
-        });
-    }
-    Ok(stdout)
+    Err(Error::InvalidInput {
+        message: render_collect_failure(args, label, context, &attempts),
+    })
 }
 
-fn collect_optional(args: &[&str]) -> Result<String> {
+fn run_rote(args: &[&str], cwd: &Path) -> std::result::Result<String, RoteAttempt> {
     let output = ProcessCommand::new("rote")
         .args(args)
+        .current_dir(cwd)
         .output()
-        .map_err(|source| Error::InvalidInput {
-            message: format!("failed to run `rote {}`: {source}", args.join(" ")),
+        .map_err(|source| RoteAttempt {
+            cwd: cwd.to_path_buf(),
+            exit: None,
+            stderr: source.to_string(),
+            stdout_empty: false,
         })?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     } else {
-        Err(Error::InvalidInput {
-            message: format!("`rote {}` failed", args.join(" ")),
+        Err(RoteAttempt {
+            cwd: cwd.to_path_buf(),
+            exit: output.status.code(),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            stdout_empty: false,
         })
     }
+}
+
+fn collect_optional(args: &[&str], context: &EvidenceCollectionContext) -> Result<String> {
+    collect_required(args, "optional workspace dependency graph", context)
+}
+
+fn render_collect_failure(
+    args: &[&str],
+    label: &str,
+    context: &EvidenceCollectionContext,
+    attempts: &[RoteAttempt],
+) -> String {
+    let mut message = format!(
+        "`rote {}` failed while collecting {label}.\nworkspace: {}\ninvocation cwd: {}\nevidence overrides: {}",
+        args.join(" "),
+        context.workspace,
+        context.invocation_cwd,
+        context.overrides
+    );
+    if attempts.is_empty() {
+        message.push_str("\nattempts: none; no candidate workspace cwd could be resolved");
+    } else {
+        message.push_str("\nattempts:");
+        for attempt in attempts {
+            let exit = attempt
+                .exit
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "not-started".to_owned());
+            let stderr = if attempt.stderr.is_empty() {
+                "<empty>".to_owned()
+            } else {
+                attempt.stderr.clone()
+            };
+            let empty = if attempt.stdout_empty {
+                "; stdout was empty"
+            } else {
+                ""
+            };
+            message.push_str(&format!(
+                "\n- cwd: {}; exit: {exit}{empty}; stderr: {stderr}",
+                attempt.cwd.display()
+            ));
+        }
+    }
+    message.push_str(
+        "\nhint: run from the durable workspace directory, or pass --workspace-stats-report, --workspace-log, and --workspace-meta files captured from inside that workspace.",
+    );
+    message
+}
+
+fn evidence_override_summary(options: &SynthesizeOptions) -> String {
+    format!(
+        "stats={}, log={}, meta={}, deps={}",
+        evidence_source(options.workspace_stats_report.as_deref()),
+        evidence_source(options.workspace_log.as_deref()),
+        evidence_source(options.workspace_meta.as_deref()),
+        evidence_source(options.workspace_deps.as_deref())
+    )
+}
+
+fn evidence_source(path: Option<&Path>) -> String {
+    path.map(|path| format!("file:{}", path.display()))
+        .unwrap_or_else(|| "live".to_owned())
+}
+
+fn discover_workspace_dirs(workspace: &str) -> Vec<PathBuf> {
+    let Some(home) = env::var_os("HOME") else {
+        return Vec::new();
+    };
+    let home = PathBuf::from(home);
+    ["cursor", "http", "claude", "custom", "rote"]
+        .iter()
+        .map(|vendor| {
+            home.join(".rote")
+                .join(vendor)
+                .join("workspaces")
+                .join(workspace)
+        })
+        .filter(|path| path.is_dir())
+        .collect()
+}
+
+fn dedupe_paths(paths: &mut Vec<PathBuf>) {
+    let mut seen = BTreeSet::new();
+    paths.retain(|path| seen.insert(path.clone()));
 }
 
 fn validate_evidence(workspace: &str, evidence: &WorkspaceEvidence) -> Result<()> {
@@ -280,6 +460,23 @@ fn validate_evidence(workspace: &str, evidence: &WorkspaceEvidence) -> Result<()
         });
     }
     Ok(())
+}
+
+fn render_observation_approval_required(
+    workspace: &str,
+    task: &str,
+    evidence: &WorkspaceEvidence,
+    commands: &[ObservedCommand],
+) -> String {
+    format!(
+        "observed output approval is required before synthesizing a reusable SkillSpec.\n\nHere is the observed result and evidence summary.\nWorkspace: {workspace}\nObserved task: {task}\nStats evidence: present and names the workspace\nCommand log entries: present\nMetadata: present\nDependency graph: {}\nObserved command candidates: {}\n\nIs this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?\n\nIf satisfactory, rerun with --observation-approved. If not, rerun or refine the durable observation before synthesis.",
+        if evidence.deps.is_some() {
+            "present"
+        } else {
+            "not supplied"
+        },
+        commands.len()
+    )
 }
 
 fn mentions_workspace(text: &str, workspace: &str) -> bool {
@@ -490,6 +687,16 @@ fn build_spec(
             COVERAGE_PATH,
             "Coverage matrix for observed facts, inferred behavior, and review status.",
         ),
+        (
+            "parameterization_guide",
+            PARAMETERS_PATH,
+            "Review guide for turning observed literal values into reusable SkillSpec parameters.",
+        ),
+        (
+            "privacy_and_ambiguity_guide",
+            SAFETY_PATH,
+            "Review guide for privacy, identity ambiguity, and source-claim boundaries.",
+        ),
     ] {
         resources.insert(
             id.to_owned(),
@@ -560,6 +767,39 @@ fn build_spec(
 
     let mut elicitations = BTreeMap::new();
     elicitations.insert(
+        "approve_observed_result_for_synthesis".to_owned(),
+        Elicitation {
+            question: "Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?".to_owned(),
+            required_when: vec![ElicitationCondition {
+                route: Some(RouteId("observed_workflow".to_owned())),
+                missing: None,
+                predicate: None,
+            }],
+            choices: vec![
+                ElicitationChoice {
+                    id: "satisfactory_for_skill_synthesis".to_owned(),
+                    label: "Satisfactory for synthesis".to_owned(),
+                    description: Some("Proceed only after observed outputs, evidence coverage, and proof gaps have been shown and accepted.".to_owned()),
+                    sets: BTreeMap::new(),
+                    route: None,
+                    next: None,
+                    safety: Some(SafetyClass::LocalWrite),
+                },
+                ElicitationChoice {
+                    id: "rerun_or_refine_observation".to_owned(),
+                    label: "Rerun or refine".to_owned(),
+                    description: Some("Do not synthesize yet; collect better durable workspace evidence first.".to_owned()),
+                    sets: BTreeMap::new(),
+                    route: None,
+                    next: None,
+                    safety: Some(SafetyClass::ReadOnly),
+                },
+            ],
+            default: Some("rerun_or_refine_observation".to_owned()),
+            max_choices: None,
+        },
+    );
+    elicitations.insert(
         "approve_observed_dependency_surface".to_owned(),
         Elicitation {
             question: "Do you approve promoting the observed dependency and command surface from this durable workspace?".to_owned(),
@@ -606,6 +846,8 @@ fn build_spec(
                     "observed_workspace_log".to_owned(),
                     "observed_workspace_meta".to_owned(),
                     "coverage_matrix".to_owned(),
+                    "parameterization_guide".to_owned(),
+                    "privacy_and_ambiguity_guide".to_owned(),
                 ],
                 dependencies: vec!["rote_cli".to_owned()],
                 ..RecipeRequires::default()
@@ -617,8 +859,14 @@ fn build_spec(
                 RecipeStep::LoadResource(RecipeStepLoadResource {
                     load_resource: "coverage_matrix".to_owned(),
                 }),
+                RecipeStep::LoadResource(RecipeStepLoadResource {
+                    load_resource: "parameterization_guide".to_owned(),
+                }),
+                RecipeStep::LoadResource(RecipeStepLoadResource {
+                    load_resource: "privacy_and_ambiguity_guide".to_owned(),
+                }),
                 RecipeStep::Note(RecipeStepNote {
-                    note: "Promote only stable observed behavior. Keep inferred or unsafe behavior in review_required until validated.".to_owned(),
+                    note: "Show the observed result and evidence summary before promotion. Promote only stable observed behavior. Keep inferred or unsafe behavior in review_required until validated.".to_owned(),
                 }),
             ],
         },
@@ -637,6 +885,18 @@ fn build_spec(
             mode: ExecutionPlanMode::Ordered,
             reason: Some("Observed workflows require evidence review and dependency approval before replay.".to_owned()),
             phases: vec![
+                ExecutionPhase {
+                    id: "approve_observed_output".to_owned(),
+                    owner_skill: skill_id.to_owned(),
+                    route: None,
+                    description: Some("Show the observed result and evidence summary, then confirm whether the observation is satisfactory enough for reusable skill synthesis.".to_owned()),
+                    requires: vec!["approve_observed_result_for_synthesis".to_owned()],
+                    checks: Vec::new(),
+                    forbid: vec!["synthesize_without_observation_approval".to_owned()],
+                    handoff: None,
+                    jumps: Vec::new(),
+                    tool_boundary: None,
+                },
                 ExecutionPhase {
                     id: "review_workspace_evidence".to_owned(),
                     owner_skill: skill_id.to_owned(),
@@ -696,12 +956,16 @@ fn build_spec(
         prefer: Some(RouteId("observed_workflow".to_owned())),
         route_order: Vec::new(),
         forbid: vec![
+            "synthesize_without_observation_approval".to_owned(),
             "replay_mutating_actions_without_review".to_owned(),
             "use_unobserved_substrate_without_approval".to_owned(),
             "claim_workspace_tokens_without_stats".to_owned(),
         ],
         allow: BTreeMap::new(),
-        elicit: vec!["approve_observed_dependency_surface".to_owned()],
+        elicit: vec![
+            "approve_observed_result_for_synthesis".to_owned(),
+            "approve_observed_dependency_surface".to_owned(),
+        ],
         after_success: vec!["prove_observed_workflow".to_owned()],
         reason: Some("The generated skill is grounded in durable workspace evidence and must stay draft-only until reviewed.".to_owned()),
     };
@@ -788,11 +1052,15 @@ fn build_spec(
             expect: Expectation {
                 route: Some(RouteId("observed_workflow".to_owned())),
                 forbid: vec![
+                    "synthesize_without_observation_approval".to_owned(),
                     "replay_mutating_actions_without_review".to_owned(),
                     "use_unobserved_substrate_without_approval".to_owned(),
                     "claim_workspace_tokens_without_stats".to_owned(),
                 ],
-                elicit: vec!["approve_observed_dependency_surface".to_owned()],
+                elicit: vec![
+                    "approve_observed_result_for_synthesis".to_owned(),
+                    "approve_observed_dependency_surface".to_owned(),
+                ],
                 after_success: vec!["prove_observed_workflow".to_owned()],
                 ..Expectation::default()
             },
@@ -808,6 +1076,7 @@ fn review_notes(
 ) -> Vec<String> {
     let mut notes = vec![
         "Review the workspace report and coverage matrix before treating this scaffold as an installable skill.".to_owned(),
+        "Confirm the observed result and evidence summary were shown and approved before synthesis; otherwise rerun or refine the durable observation.".to_owned(),
         "Promote observed command candidates only after parameterizing inputs, outputs, safety, and approvals.".to_owned(),
         "Review inferred dependencies and permission classes; the synthesizer marks them conservatively.".to_owned(),
         "Add domain-specific scenario tests before install or release.".to_owned(),
@@ -871,6 +1140,8 @@ fn render_workspace_report(
     }
     report.push_str("\n## Synthesis Policy\n\n");
     report.push_str("Observed evidence is not automatic replay permission. Keep inferred behavior in review until dependencies, resources, commands, safety, tests, and proof are explicitly reviewed.\n");
+    report.push_str("\n## Observation Approval Gate\n\n");
+    report.push_str("Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?\n");
     report
 }
 
@@ -891,8 +1162,53 @@ fn render_coverage_matrix(
         "draft"
     };
     format!(
-        "prose_span | obligation | skillspec_construct | confidence | status | review_note\n--- | --- | --- | --- | --- | ---\nworkspace `{workspace}` | Preserve durable workspace provenance | metadata.synthesized_from_workspace, resources.observed_workspace_* | high | present | Stats, log, and meta are required before synthesis.\nobserved task `{task}` | Route matching tasks to reviewed workflow | activation, rules.route_observed_task_to_reviewed_workflow, tests | medium | draft | Review trigger precision before install.\ncommand log | Promote stable commands only after review | commands.observed_command_* | medium | {commands_status} | Raw command log may include one-off or unsafe actions.\ndependency graph | Preserve dependency evidence when available | resources.observed_workspace_deps | medium | {deps_status} | Missing deps evidence should be collected with `rote workspace inspect deps` when possible.\n"
+        "prose_span | obligation | skillspec_construct | confidence | status | review_note\n--- | --- | --- | --- | --- | ---\nworkspace `{workspace}` | Preserve durable workspace provenance | metadata.synthesized_from_workspace, resources.observed_workspace_* | high | present | Stats, log, and meta are required before synthesis.\nobserved task `{task}` | Route matching tasks to reviewed workflow | activation, rules.route_observed_task_to_reviewed_workflow, tests | medium | draft | Review trigger precision before install.\nobservation approval | Show observed result before synthesis | elicitations.approve_observed_result_for_synthesis | high | present | Synthesis should proceed only after satisfactory observation confirmation.\ncommand log | Promote stable commands only after review | commands.observed_command_* | medium | {commands_status} | Raw command log may include one-off or unsafe actions.\ndependency graph | Preserve dependency evidence when available | resources.observed_workspace_deps | medium | {deps_status} | Missing deps evidence should be collected with `rote workspace inspect deps` when possible.\nparameterization | Replace literals with reusable inputs | resources.parameterization_guide | medium | review_required | Do not preserve one-off paths, people data, or output names as fixed runtime behavior.\nprivacy and ambiguity | Preserve privacy and identity boundaries | resources.privacy_and_ambiguity_guide | medium | review_required | Do not merge same-name identities or claim source URLs without evidence.\n"
     )
+}
+
+fn render_parameterization_guide(commands: &[ObservedCommand]) -> String {
+    let mut guide = String::new();
+    guide.push_str("# Parameterization Guide\n\n");
+    guide.push_str("Convert observed literals into reusable SkillSpec parameters before replay or install.\n\n");
+    guide.push_str("Required parameter review:\n\n");
+    for parameter in [
+        "people_json",
+        "profile_enrichment_intent",
+        "processor",
+        "json_output",
+        "csv_output",
+        "search_objective",
+        "search_query",
+        "max_results",
+        "summary_output",
+        "selected_cli_path_or_binary_name",
+    ] {
+        guide.push_str(&format!("- `{parameter}`\n"));
+    }
+    guide.push_str("\nObserved command candidates to parameterize:\n\n");
+    if commands.is_empty() {
+        guide.push_str(
+            "- No stable command candidates were inferred; add reviewed commands manually.\n",
+        );
+    } else {
+        for command in commands {
+            guide.push_str(&format!("- `{}`: `{}`\n", command.id, command.template));
+        }
+    }
+    guide
+}
+
+fn render_privacy_and_ambiguity_guide() -> String {
+    [
+        "# Privacy And Ambiguity Rules",
+        "",
+        "- Exclude unnecessary people-search address PII from professional profile summaries.",
+        "- Do not merge same-name results into one identity without a distinguishing affiliation, URL, or user confirmation.",
+        "- Do not claim source URLs if enrichment output lacks them; run source-oriented searches first.",
+        "- Treat rote response ids, storage handles, and token units as provenance only, not as runtime skill behavior.",
+        "",
+    ]
+    .join("\n")
 }
 
 fn infer_observed_commands(log: &str) -> Vec<ObservedCommand> {
@@ -905,7 +1221,7 @@ fn infer_observed_commands(log: &str) -> Vec<ObservedCommand> {
     let mut seen = BTreeSet::new();
     raw.into_iter()
         .filter_map(|command| normalize_command(&command))
-        .filter(|command| !command.starts_with("rote workspace "))
+        .filter_map(|command| command_without_rote_provenance(&command))
         .filter(|command| seen.insert(command.clone()))
         .take(20)
         .enumerate()
@@ -919,6 +1235,48 @@ fn infer_observed_commands(log: &str) -> Vec<ObservedCommand> {
             }
         })
         .collect()
+}
+
+fn command_without_rote_provenance(command: &str) -> Option<String> {
+    if is_rote_provenance_command(command) {
+        return None;
+    }
+    if let Some(inner) = command.strip_prefix("rote exec ") {
+        if let Some(after_delimiter) = inner.strip_prefix("-- ") {
+            let unwrapped = unwrap_shell_command(after_delimiter.trim());
+            if is_rote_provenance_command(&unwrapped) {
+                return None;
+            }
+            return Some(unwrapped);
+        }
+        if let Some((_, after_delimiter)) = inner.split_once(" -- ") {
+            let unwrapped = unwrap_shell_command(after_delimiter.trim());
+            if is_rote_provenance_command(&unwrapped) {
+                return None;
+            }
+            return Some(unwrapped);
+        }
+    }
+    Some(command.to_owned())
+}
+
+fn is_rote_provenance_command(command: &str) -> bool {
+    let command = command.trim();
+    command.starts_with('@')
+        || command.starts_with("rote workspace ")
+        || command.starts_with("rote stats")
+        || command.starts_with("rote query ")
+        || command.starts_with("rote inspect ")
+        || command.starts_with("rote cd ")
+}
+
+fn unwrap_shell_command(command: &str) -> String {
+    for shell in ["sh -lc ", "bash -lc "] {
+        if let Some(inner) = command.strip_prefix(shell) {
+            return inner.trim().trim_matches('"').trim_matches('\'').to_owned();
+        }
+    }
+    command.to_owned()
 }
 
 fn collect_json_commands(value: &serde_json::Value, output: &mut Vec<String>) {

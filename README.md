@@ -73,7 +73,7 @@ The broader use cases are:
 | Inspect installed state | `/skillspec status` | Reports router and durable-executor installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy prose skills. |
 | Route large skill libraries | `/skillspec install router` | Installs an implicit router surface, marks routed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves `durable-executor` as implicit only when durable is enabled. |
 | Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop skill after checking `rote` is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
-| Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable rote workspace as evidence, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
+| Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable rote workspace as evidence, shows the observed result for approval, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
 | Revise an existing contract | `/skillspec revise this spec to add router setup checks` | Starts from the current grammar and active handles, patches the reviewed contract, then reruns structural QA. |
 | Prove value before release | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
 
@@ -115,6 +115,9 @@ checks `rote` on `PATH` before making it implicit again. If a skill is later
 added outside SkillSpec, `skillspec router index status` detects
 prose-only versus SkillSpec-backed additions and `skillspec router index
 refresh` reapplies explicit invocation controls and rebuilds the index.
+Observed-workspace synthesis refuses to write until the observed result and
+evidence summary are approved; if live rote workspace lookup is unreliable, pass
+pre-captured stats, log, and metadata files explicitly.
 
 From source:
 
