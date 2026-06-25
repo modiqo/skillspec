@@ -463,7 +463,9 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace compile` rechecks convergence, then compiles every ready package spec
-into a generated `SKILL.md` loader under its package folder. It blocks
+into a generated `SKILL.md` loader under its package folder. The loader
+frontmatter uses the manifest `public_name`, not the importer scaffold id, so
+installed packages remain addressable by their workspace names. It blocks
 dependents whose dependencies did not compile and writes:
 
 - `<BUILD_ROOT>/workspace-compile.report.md`
@@ -491,6 +493,14 @@ Options:
 - `--dry-run`: show the full install plan without writing harness files.
 - `--retire-existing`: back up and remove an existing active install folder
   before installing the package with the same `install_slug`.
+- `--visibility-policy <POLICY>`: workspace visibility policy to report and,
+  when requested, apply. Values are `entry-implicit`, `all-implicit`,
+  `all-manual`, and `none`. Defaults to `entry-implicit`.
+- `--apply-visibility`: after a successful non-dry-run install, write native
+  harness visibility metadata for the selected policy.
+- `--visibility-manifest <PATH>`: reversible visibility manifest path used by
+  `--apply-visibility`. Defaults to
+  `<BUILD_ROOT>/workspace-visibility.manifest.json`.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace install` preflights the whole workspace before copying package
@@ -504,9 +514,15 @@ dependency order and the command writes:
 
 - `<BUILD_ROOT>/workspace-install.report.md`
 - `<BUILD_ROOT>/workspace-install.manifest.json`
+- `<BUILD_ROOT>/workspace-visibility.manifest.json` when `--apply-visibility`
+  is used without an explicit `--visibility-manifest`
 
-It does not refresh router indexes. Router refresh remains a separate runtime
-operation.
+The default visibility policy is `entry-implicit`: entry packages remain
+available for normal selection, while shared/helper/wrapper packages are treated
+as manual-only support packages when `--apply-visibility` is used. The install
+report and manifest record the intended visibility even when visibility is only
+planned. It does not refresh router indexes. Router refresh remains a separate
+runtime operation.
 
 ### `source coverage`
 

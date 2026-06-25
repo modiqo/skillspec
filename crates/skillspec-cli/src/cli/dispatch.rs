@@ -289,6 +289,9 @@ pub(super) fn run(command: Command) -> Result<()> {
                 all_detected,
                 dry_run,
                 retire_existing,
+                visibility_policy,
+                apply_visibility,
+                visibility_manifest,
                 json,
             } => {
                 let targets = target
@@ -302,6 +305,9 @@ pub(super) fn run(command: Command) -> Result<()> {
                     all_detected,
                     dry_run,
                     retire_existing,
+                    visibility_policy.into(),
+                    apply_visibility,
+                    visibility_manifest.as_deref(),
                 )?;
                 let ok = install_report.ok;
                 if json {

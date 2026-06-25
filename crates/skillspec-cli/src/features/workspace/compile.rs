@@ -291,7 +291,8 @@ fn compile_one_package(
             } else {
                 match parser::load_spec(&spec_path) {
                     Ok(spec) => {
-                        let compiled = compiler::compile(&spec, target);
+                        let compiled =
+                            compiler::compile_with_skill_name(&spec, target, &package.public_name);
                         write_text(&loader_path, &compiled)?;
                         (WorkspaceCompileStatus::Compiled, None)
                     }

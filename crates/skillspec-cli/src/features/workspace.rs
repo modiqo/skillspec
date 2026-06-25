@@ -14,7 +14,9 @@ mod install;
 pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileReport};
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
 pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
-pub use install::{install_workspace, render_install_report, WorkspaceInstallReport};
+pub use install::{
+    install_workspace, render_install_report, WorkspaceInstallReport, WorkspaceVisibilityPolicy,
+};
 
 pub const WORKSPACE_SCHEMA: &str = "skillspec/workspace/v0";
 

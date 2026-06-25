@@ -25,8 +25,16 @@ pub enum Target {
 }
 
 pub fn compile(spec: &SkillSpec, target: Target) -> String {
+    compile_with_name(spec, target, None)
+}
+
+pub fn compile_with_skill_name(spec: &SkillSpec, target: Target, skill_name: &str) -> String {
+    compile_with_name(spec, target, Some(skill_name))
+}
+
+fn compile_with_name(spec: &SkillSpec, target: Target, skill_name: Option<&str>) -> String {
     let mut output = String::new();
-    write_frontmatter(&mut output, spec, target);
+    write_frontmatter(&mut output, spec, target, skill_name);
     if matches!(target, Target::CodexSkill | Target::ClaudeSkill) {
         write_loader_skill(&mut output, spec);
         trim_trailing_blank_lines(&mut output);

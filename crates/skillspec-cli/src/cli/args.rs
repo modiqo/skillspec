@@ -317,6 +317,14 @@ pub(super) enum WorkspaceCompileTarget {
     ClaudeSkill,
 }
 
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(super) enum WorkspaceVisibilityPolicyArg {
+    EntryImplicit,
+    AllImplicit,
+    AllManual,
+    None,
+}
+
 #[derive(Clone, Debug, clap::ValueEnum)]
 pub(super) enum RouterExecutionModeArg {
     Direct,
@@ -446,7 +454,7 @@ pub(super) enum WorkspaceCommand {
     },
     #[command(
         about = "Install compiled workspace packages into harness roots",
-        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names, blocks folder and public-name collisions unless explicitly retired where supported, installs dependencies before dependents, writes workspace-install.report.md, and does not refresh router indexes."
+        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names, blocks folder and public-name collisions unless explicitly retired where supported, installs dependencies before dependents, reports workspace visibility policy, optionally applies native visibility metadata, writes workspace-install.report.md, and does not refresh router indexes."
     )]
     Install {
         /// Path to skillspec.workspace.yml.
@@ -466,6 +474,15 @@ pub(super) enum WorkspaceCommand {
         /// Back up and remove an existing active install folder before installing this workspace package.
         #[arg(long)]
         retire_existing: bool,
+        /// Visibility policy recorded for installed packages.
+        #[arg(long, value_enum, default_value_t = WorkspaceVisibilityPolicyArg::EntryImplicit)]
+        visibility_policy: WorkspaceVisibilityPolicyArg,
+        /// Apply native harness visibility metadata after successful install.
+        #[arg(long)]
+        apply_visibility: bool,
+        /// Reversible visibility manifest to write when --apply-visibility is used. Defaults under the build root.
+        #[arg(long)]
+        visibility_manifest: Option<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -1351,6 +1368,17 @@ impl From<WorkspaceCompileTarget> for compiler::Target {
         match value {
             WorkspaceCompileTarget::CodexSkill => compiler::Target::CodexSkill,
             WorkspaceCompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
+        }
+    }
+}
+
+impl From<WorkspaceVisibilityPolicyArg> for skillspec::workspace::WorkspaceVisibilityPolicy {
+    fn from(value: WorkspaceVisibilityPolicyArg) -> Self {
+        match value {
+            WorkspaceVisibilityPolicyArg::EntryImplicit => Self::EntryImplicit,
+            WorkspaceVisibilityPolicyArg::AllImplicit => Self::AllImplicit,
+            WorkspaceVisibilityPolicyArg::AllManual => Self::AllManual,
+            WorkspaceVisibilityPolicyArg::None => Self::None,
         }
     }
 }

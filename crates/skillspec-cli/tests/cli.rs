@@ -4968,6 +4968,7 @@ Use strict tests.
         r#"---
 name: code-review
 description: Review code.
+disable-model-invocation: true
 ---
 # Code Review
 
@@ -5071,6 +5072,7 @@ Read `../coding-standards/SKILL.md`.
     let review_loader = build.join("code-review").join("SKILL.md");
     assert!(review_loader.is_file());
     let loader = fs::read_to_string(review_loader).unwrap();
+    assert!(loader.contains("name: code-review"));
     assert!(loader.contains("thin loader"));
     assert!(loader.contains("skill.spec.yml"));
 
@@ -5131,7 +5133,22 @@ Read `../coding-standards/SKILL.md`.
     let install_plan = json_stdout(&install_dry_run);
     assert_eq!(install_plan["ok"], true);
     assert_eq!(install_plan["dry_run"], true);
+    assert_eq!(install_plan["visibility_policy"], "entry-implicit");
     assert_eq!(install_plan["planned"].as_array().unwrap().len(), 2);
+    assert!(
+        install_plan["visibility"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["package_id"] == "code-review"
+                && item["target_visibility"] == "implicit")
+    );
+    assert!(install_plan["visibility"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["package_id"] == "coding-standards"
+            && item["target_visibility"] == "manual-only"));
     assert!(build.join("workspace-install.report.md").is_file());
     assert!(!home
         .join(".agents/skills/skills--code-review/SKILL.md")
@@ -5146,6 +5163,7 @@ Read `../coding-standards/SKILL.md`.
         .arg(&build)
         .arg("--target")
         .arg("agents")
+        .arg("--apply-visibility")
         .arg("--json")
         .output()
         .unwrap();
@@ -5153,8 +5171,12 @@ Read `../coding-standards/SKILL.md`.
     let install_report = json_stdout(&install);
     assert_eq!(install_report["ok"], true);
     assert_eq!(install_report["dry_run"], false);
+    assert_eq!(install_report["apply_visibility"], true);
     assert_eq!(install_report["installed"].as_array().unwrap().len(), 2);
     assert!(install_report["planned"].as_array().unwrap().is_empty());
+    assert!(install_report["router_refresh_recommended"]
+        .as_bool()
+        .unwrap());
     assert!(home
         .join(".agents/skills/skills--coding-standards/SKILL.md")
         .is_file());
@@ -5167,7 +5189,21 @@ Read `../coding-standards/SKILL.md`.
     assert!(home
         .join(".agents/skills/skills--code-review/skill.spec.yml")
         .is_file());
+    let support_visibility =
+        fs::read_to_string(home.join(".agents/skills/skills--coding-standards/agents/openai.yaml"))
+            .unwrap();
+    assert!(support_visibility.contains("allow_implicit_invocation: false"));
+    let entry_visibility = home.join(".agents/skills/skills--code-review/agents/openai.yaml");
+    assert!(
+        !entry_visibility.exists(),
+        "entry package should remain implicit without a disabling sidecar"
+    );
     assert!(build.join("workspace-install.manifest.json").is_file());
+    assert!(build.join("workspace-visibility.manifest.json").is_file());
+    let install_manifest =
+        fs::read_to_string(build.join("workspace-install.manifest.json")).unwrap();
+    assert!(install_manifest.contains("\"visibility\""));
+    assert!(install_manifest.contains("\"target\": \"manual-only\""));
 }
 
 #[test]
