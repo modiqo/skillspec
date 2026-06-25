@@ -4947,6 +4947,206 @@ Run `/coding-standards` before the wrapper.
 }
 
 #[test]
+fn workspace_map_preserves_plugin_namespaces() {
+    let dir = TempDir::new("workspace-plugin-map");
+    let root = dir.path().join("claude-for-legal");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"commercial-legal","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"privacy-legal","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+        r#"---
+name: cold-start-interview
+description: Commercial intake.
+---
+# Commercial Intake
+"#,
+    );
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+        r#"---
+name: review
+description: Review a commercial agreement.
+---
+# Review
+
+Run `/cold-start-interview`.
+Use `/privacy-legal:use-case-triage` when privacy review is needed.
+Read `../cold-start-interview/SKILL.md`.
+"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+        r#"---
+name: cold-start-interview
+description: Privacy intake.
+---
+# Privacy Intake
+"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join("skills")
+            .join("use-case-triage")
+            .join("SKILL.md"),
+        r#"---
+name: use-case-triage
+description: Privacy use-case triage.
+---
+# Use Case Triage
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["package_count"], 4);
+    assert!(map_report["duplicate_public_names"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    let namespaces = map_report["plugin_namespaces"].as_array().unwrap();
+    assert!(namespaces.iter().any(|namespace| {
+        namespace["namespace"] == "commercial-legal"
+            && namespace["path"] == "commercial-legal"
+            && namespace["packages"].as_array().unwrap().len() == 2
+    }));
+    assert!(namespaces.iter().any(|namespace| {
+        namespace["namespace"] == "privacy-legal"
+            && namespace["path"] == "privacy-legal"
+            && namespace["packages"].as_array().unwrap().len() == 2
+    }));
+
+    let references = map_report["references"].as_array().unwrap();
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "/cold-start-interview"
+            && reference["kind"] == "skill_invocation"
+            && reference["target_package"] == "commercial-legal.skills.cold-start-interview"
+    }));
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "/privacy-legal:use-case-triage"
+            && reference["kind"] == "skill_invocation"
+            && reference["target_package"] == "privacy-legal.skills.use-case-triage"
+    }));
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "../cold-start-interview/SKILL.md"
+            && reference["kind"] == "file"
+            && reference["target_package"] == "commercial-legal.skills.cold-start-interview"
+    }));
+
+    let edges = map_report["dependency_edges"].as_array().unwrap();
+    assert!(edges.iter().any(|edge| {
+        edge["from"] == "commercial-legal.skills.review"
+            && edge["to"] == "commercial-legal.skills.cold-start-interview"
+    }));
+    assert!(!edges.iter().any(|edge| {
+        edge["from"] == "commercial-legal.skills.review"
+            && edge["to"] == "privacy-legal.skills.use-case-triage"
+    }));
+
+    let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("namespace: commercial-legal"));
+    assert!(manifest_yaml.contains("local_name: review"));
+    assert!(manifest_yaml.contains("public_name: commercial-legal-review"));
+    assert!(manifest_yaml.contains("public_name: privacy-legal-cold-start-interview"));
+
+    let validate = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    let validate_report = json_stdout(&validate);
+    assert_eq!(validate_report["ok"], true);
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&compile);
+    let compile_report = json_stdout(&compile);
+    assert_eq!(compile_report["ok"], true);
+
+    let commercial_loader = fs::read_to_string(
+        build
+            .join("commercial-legal")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+    )
+    .unwrap();
+    assert!(commercial_loader.contains("name: commercial-legal-review"));
+    let privacy_loader = fs::read_to_string(
+        build
+            .join("privacy-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+    )
+    .unwrap();
+    assert!(privacy_loader.contains("name: privacy-legal-cold-start-interview"));
+}
+
+#[test]
 fn workspace_import_fans_out_packages_under_build_root() {
     let dir = TempDir::new("workspace-import");
     let root = dir.path().join("skills");

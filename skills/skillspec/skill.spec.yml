@@ -1,10 +1,10 @@
 schema: skillspec/v0
 id: skillspec
 title: SkillSpec
-description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
   summary: >
-    Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from
+    Multiplex SkillSpec post-install setup: map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from
     local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally
     install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
     revise SkillSpec YAML, and prove value before install or release.
@@ -27,6 +27,16 @@ activation:
     - skillspec.workspace.yml
     - multi-skill repo
     - multi-skill workspace
+    - plugin-shaped repo
+    - plugin-shaped workspace
+    - plugin namespace
+    - plugin namespaces
+    - namespaced skills
+    - namespaced skill packages
+    - .claude-plugin/plugin.json
+    - .mcp.json
+    - plugin slash command
+    - claude plugin skills
     - many SKILL.md files
     - parent folder with multiple skills
     - fanout converge
@@ -111,6 +121,7 @@ applies_when:
       - convert a prose SKILL.md to skill.spec.yml
       - port a local skill folder into SkillSpec
       - map a skills repository that contains multiple SKILL.md packages before import
+      - map a plugin-shaped skills repository without flattening repeated skill names
       - validate a multi-skill workspace graph before fanout import
       - fanout-import a validated workspace graph into one generated package draft per atomic skill
       - converge generated workspace package drafts against the workspace graph before compile or install
@@ -134,7 +145,7 @@ applies_when:
       - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill workspaces before import, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill and plugin-shaped workspaces before import, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -296,10 +307,10 @@ routes:
   - id: workspace_skill_authoring
     label: Map multi-skill workspace
     rank: 3
-    description: Use when the source root may contain multiple atomic skill packages, shared standards packages, wrapper skills, or cross-skill references that must be mapped before fanout import.
+    description: Use when the source root may contain multiple atomic skill packages, plugin-shaped skill folders, shared standards packages, wrapper skills, or cross-skill references that must be mapped before fanout import.
     execution_plan:
       mode: ordered
-      reason: Multi-skill repositories need structure recon before import so each SKILL.md becomes an atomic package and cross-skill dependencies are explicit.
+      reason: Multi-skill and plugin-shaped repositories need structure recon before import so each SKILL.md becomes an atomic package, plugin namespaces are preserved, file dependencies are explicit, and slash-command workflow links do not create false cycles.
       phases:
         - id: inventory_workspace_source
           owner_skill: skillspec
@@ -311,7 +322,7 @@ routes:
             - import_workspace_root_as_single_skill
         - id: map_workspace_graph
           owner_skill: skillspec
-          description: Generate skillspec.workspace.yml and a markdown recon report from the source tree.
+          description: Generate skillspec.workspace.yml and a markdown recon report from the source tree, preserving plugin namespaces when plugin-shaped roots are present.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -326,7 +337,7 @@ routes:
             - use_router_index_for_authoring_recon
         - id: validate_workspace_graph
           owner_skill: skillspec
-          description: Validate package boundaries, deterministic install slugs, dependency edges, missing targets, and cycles before fanout import planning.
+          description: Validate package boundaries, plugin namespace naming, deterministic install slugs, dependency edges, missing targets, and cycles before fanout import planning.
           requires:
             - workspace_validate_manifest
             - validate_workspace_graph
@@ -335,7 +346,7 @@ routes:
             - ignore_install_slug_collision
         - id: report_workspace_recon
           owner_skill: skillspec
-          description: Explain the package map, dependency graph, warnings, and the next fanout/converge implementation phase without importing yet.
+          description: Explain plugin namespaces, package map, dependency graph, workflow references, warnings, and the next fanout/converge implementation phase without importing yet.
           requires:
             - report_workspace_recon
   - id: workspace_fanout_import
@@ -981,6 +992,13 @@ rules:
         - many SKILL.md
         - multi-skill repo
         - multi-skill workspace
+        - plugin-shaped repo
+        - plugin-shaped workspace
+        - claude plugin
+        - claude plugin skills
+        - plugin namespace
+        - namespaced skills
+        - repeated skill names
         - parent folder with multiple skills
         - fanout converge
         - shared standards package
@@ -994,7 +1012,7 @@ rules:
       - proceed_with_circular_skill_dependencies
     after_success:
       - report_workspace_recon
-    reason: A folder containing multiple SKILL.md packages must be mapped as a workspace before any single-skill import or fanout/converge plan.
+    reason: A folder containing multiple SKILL.md packages or plugin-shaped skill roots must be mapped as a workspace before any single-skill import or fanout/converge plan.
   - id: route_workspace_import_to_fanout
     when:
       user_says_any:
@@ -1776,7 +1794,7 @@ artifacts:
   workspace_manifest:
     kind: file
     path: .skillspec/workspace/skillspec.workspace.yml
-    description: Authoring-side package graph for a multi-skill source root, including atomic package ids, deterministic install slugs, package kinds, cross-skill references, and inferred dependencies.
+    description: Authoring-side package graph for a multi-skill source root, including atomic package ids, plugin namespaces, skill-safe public names, deterministic install slugs, package kinds, cross-skill references, and inferred hard dependencies.
     produced_by:
       - kind: command
         id: workspace_map_source
@@ -1788,7 +1806,7 @@ artifacts:
   workspace_map_report:
     kind: report
     path: .skillspec/workspace/skillspec.workspace.yml.report.md
-    description: Human-readable structure recon report for the multi-skill workspace graph, duplicate-name warnings, unresolved references, and next validation command.
+    description: Human-readable structure recon report for the multi-skill workspace graph, plugin namespaces, duplicate-name warnings, unresolved references, dependency edges, workflow references, and next validation command.
     produced_by:
       - kind: command
         id: workspace_map_source
@@ -2109,14 +2127,14 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_map_source:
-    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages. This is structure recon before fanout import, not router indexing.
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing.
     template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_validate_manifest:
-    description: Validate workspace package boundaries, deterministic install slugs, dependency edges, cross-skill references, and cycles before fanout import planning.
+    description: Validate workspace package boundaries, plugin namespace names, deterministic install slugs, hard dependency edges, cross-skill references, and cycles before fanout import planning.
     template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
     safety: local_read
     requires:
@@ -2543,7 +2561,7 @@ recipes:
       - ask: approve_dependency_surface
       - note: Do not delete or soften dependency records to pass QA. Missing required dependencies must be present in deps.toml as missing, provisionable, deferred, or required_but_unproven with explicit proof impact.
   workspace_recon_loop:
-    description: "Phase 1-3 multi-skill workspace processing: inventory a source root, map atomic skill packages, validate the package graph, and report the next fanout/converge plan without importing yet."
+    description: "Phase 1-3 multi-skill workspace processing: inventory a source root, map atomic skill packages and plugin namespaces, validate the package graph, and report the next fanout/converge plan without importing yet."
     ordered: true
     requires:
       dependencies:
@@ -2559,9 +2577,11 @@ recipes:
       - produce_artifact: workspace_map_report
       - run_command: workspace_validate_manifest
       - note: Treat every folder containing SKILL.md as one atomic skill package. Do not import the parent root as a single skill.
+      - note: Preserve plugin-shaped roots as namespaces when a folder has skills/ plus .claude-plugin/plugin.json, .mcp.json, or CLAUDE.md; use skill-safe public names to avoid collisions instead of flattening repeated local names.
+      - note: Treat relative file references as hard dependencies. Treat plugin slash-command references as workflow links unless the manifest records a hard file dependency.
       - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
       - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
-      - note: Report the package map, dependency graph, warnings, and next fanout/converge phase from the validated workspace manifest.
+      - note: Report plugin namespaces, package map, hard dependency graph, workflow references, warnings, and next fanout/converge phase from the validated workspace manifest.
   workspace_import_loop:
     description: "Phase 4 workspace fanout import: validate the workspace manifest, run per-package doctor/source-map/import-skill, preserve successful package outputs, and report failed or blocked packages."
     ordered: true
@@ -2979,11 +2999,11 @@ closures:
   preserve_dependency_ledger:
     description: Keep the scaffolded deps.toml beside skill.spec.yml for imported/shareable skills, preserving every dependency mention with authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver.
   produce_workspace_manifest:
-    description: Write skillspec.workspace.yml with every atomic skill package, deterministic install slug, package kind, cross-skill reference, and inferred depends_on edge found during structure recon.
+    description: Write skillspec.workspace.yml with every atomic skill package, plugin namespace, skill-safe public name, deterministic install slug, package kind, cross-skill reference, and inferred hard depends_on edge found during structure recon.
     commands:
       - workspace_map_source
   validate_workspace_graph:
-    description: Check that the workspace graph has valid package paths, one SKILL.md per package, unique install slugs, no self-dependencies, no cycles, and no uncovered cross-package references.
+    description: Check that the workspace graph has valid package paths, one SKILL.md per package, unique install slugs, no self-dependencies, no cycles, and no uncovered hard cross-package references; plugin slash-command workflow references may cross packages without depends_on edges.
     commands:
       - workspace_validate_manifest
   produce_workspace_import_report:
@@ -3034,7 +3054,7 @@ closures:
       - workspace_install_packages
       - workspace_install_apply_visibility
   report_workspace_recon:
-    description: Summarize the workspace package map, dependency graph, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
+    description: Summarize plugin namespaces, workspace package map, hard dependency graph, workflow references, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
     commands:
       - workspace_map_source
       - workspace_validate_manifest
@@ -3130,7 +3150,7 @@ trace:
 proof:
   metrics:
     - grammar commands run before import or revision
-    - multi-skill source roots are mapped with skillspec.workspace.yml and validated before fanout import planning
+    - multi-skill and plugin-shaped source roots are mapped with skillspec.workspace.yml, preserving plugin namespaces and validating before fanout import planning
     - workspace fanout import writes one generated package draft per atomic skill and reports built, failed, skipped, and blocked packages
     - workspace converge validates generated package drafts against the workspace graph and reports ready, failed, blocked, missing, validation warnings, and dependency-readiness proof before compile or install
     - workspace compile rechecks convergence, writes SKILL.md loaders only for ready packages whose dependencies compiled, and reports compiled, failed, blocked, missing, and skipped packages before install
@@ -3172,6 +3192,17 @@ tests:
         - local_porting_loop
   - name: multi-skill repo maps before fanout import
     input: /skillspec map /Users/me/tulving/skills with many SKILL.md files, shared standards package, and cross-skill references
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
+  - name: plugin-shaped repo maps with namespaces
+    input: /skillspec map /Users/me/tulving/claude-for-legal plugin namespace repo with repeated skill names and plugin slash commands
     expect:
       route: workspace_skill_authoring
       matched_rules:

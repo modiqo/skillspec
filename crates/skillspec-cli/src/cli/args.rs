@@ -384,7 +384,7 @@ pub(super) enum SourceCommand {
 pub(super) enum WorkspaceCommand {
     #[command(
         about = "Create a skillspec.workspace.yml graph from a folder with one or more SKILL.md packages",
-        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, public names, deterministic install slugs, cross-package references, inferred dependencies, duplicate public names, and duplicate install slugs before fanout import."
+        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
     )]
     Map {
         /// Local source root containing one or more skill packages.
@@ -398,7 +398,7 @@ pub(super) enum WorkspaceCommand {
     },
     #[command(
         about = "Validate a skillspec.workspace.yml package graph",
-        long_about = "Validate a skillspec.workspace.yml package graph before fanout import. Checks package paths, one SKILL.md per package, dependency references, self-dependencies, cycles, duplicate install slugs, uncovered cross-package references, and public-name collision warnings."
+        long_about = "Validate a skillspec.workspace.yml package graph before fanout import. Checks package paths, one SKILL.md per package, dependency references, self-dependencies, cycles, duplicate install slugs, uncovered hard cross-package references, and public-name collision warnings. Plugin slash-command workflow references are allowed without depends_on edges; file references still require dependency coverage."
     )]
     Validate {
         /// Path to skillspec.workspace.yml.

@@ -356,9 +356,21 @@ Options:
 
 `workspace map` discovers every folder with `SKILL.md`, parses frontmatter names
 and invocation visibility, assigns package ids, assigns deterministic install
-slugs, scans Markdown for cross-package references such as
-`../coding-standards/...`, infers `depends_on` edges, and writes a markdown
-report beside the manifest.
+slugs, scans Markdown for cross-package references, and writes a markdown report
+beside the manifest.
+
+When the source has plugin-shaped folders, the mapper preserves those boundaries
+as namespaces instead of flattening names. A folder with `skills/` plus
+`.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` is treated as a plugin
+root. Its `plugin.json` name, or the folder slug when no plugin name exists, is
+used to create skill-safe public names such as
+`commercial-legal-cold-start-interview`. Same-plugin slash references such as
+`/cold-start-interview` resolve inside that namespace, while explicit references
+such as `/privacy-legal:use-case-triage` resolve across namespaces.
+
+Relative file references such as `../coding-standards/...` infer hard
+`depends_on` edges. Plugin slash-command references are recorded as workflow
+references without becoming hard dependency edges.
 
 It does not import skills, compile loaders, install files, or build a router
 index.
@@ -380,9 +392,10 @@ Options:
 `workspace validate` checks the package graph before fanout import. It verifies
 that package paths exist, each package has exactly one `SKILL.md`, dependencies
 resolve, self-dependencies are absent, the graph is acyclic, install slugs are
-unique, and cross-package references are covered by declared dependencies.
-Duplicate public names are reported as warnings until an install target is
-being planned.
+unique, and hard cross-package references are covered by declared dependencies.
+Duplicate public names are reported as warnings until an install target is being
+planned. Plugin slash-command workflow references may cross packages without a
+`depends_on` edge; file references still require dependency coverage.
 
 ### `workspace import`
 
@@ -928,7 +941,8 @@ Notes:
   `dependency_count = 0`; do not replace it with a byte-empty `deps.toml`.
 - Parent folders containing multiple `SKILL.md` files are rejected. Run
   `skillspec workspace map` first so SkillSpec can identify atomic packages,
-  dependency edges, and name collisions before fanout import.
+  plugin namespaces, hard dependency edges, workflow references, and name
+  collisions before fanout import.
 
 ## `synthesize-from-workspace`
 

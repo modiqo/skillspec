@@ -311,6 +311,18 @@ entry skills stay visible, while shared/helper/wrapper packages become
 manual-only support skills when `--apply-visibility` is used. Router index
 refresh is still separate runtime work.
 
+Plugin-shaped repos are preserved instead of flattened. If a folder has
+`skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`,
+`workspace map` treats that folder as a plugin namespace. Repeated skill names
+are made skill-safe by prefixing the plugin name, so
+`commercial-legal/skills/cold-start-interview` becomes
+`commercial-legal-cold-start-interview` and does not collide with
+`privacy-legal-cold-start-interview`. Inside a plugin, `/cold-start-interview`
+resolves to that plugin's skill; `/privacy-legal:use-case-triage` resolves
+across plugins. Those slash-command links are recorded as workflow references.
+Relative file links such as `../coding-standards/SKILL.md` remain hard
+dependencies.
+
 ### 2. Map And Import
 
 These commands preserve source structure before generating the first contract
