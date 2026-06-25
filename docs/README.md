@@ -13,7 +13,7 @@ Use these paths when you do not need the whole sequence:
 
 | Reader | Start Here | Then Read |
 | --- | --- | --- |
-| Newcomer | [Reliability Gap](00-skills-reliability-gap.md) | [Why SkillSpec](01-why-skillspec.md), [Prose Skills Vs SkillSpec-Backed Skills](02-prose-vs-skillspec.md), [visual explainers](design/explained/README.md) |
+| Newcomer | [Detailed README](README_DETAILED.md) | [Reliability Gap](00-skills-reliability-gap.md), [Why SkillSpec](01-why-skillspec.md), [Prose Skills Vs SkillSpec-Backed Skills](02-prose-vs-skillspec.md), [visual explainers](design/explained/README.md) |
 | Skill author | [Why SkillSpec](01-why-skillspec.md) | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md), [Import To Release](design/explained/01-import-to-release.md), [Skill Authoring Lifecycle](design/04-skill-authoring-lifecycle.md), [Source Map Progressive Reader](design/18-source-map-progressive-reader.md) |
 | CLI tester | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | [Command Log](design/16-command-log.md), [Design Documentation QA Process](design/17-qa-process.md) |
 | Maintainer | [Design docs](design/README.md) | [Contract And Trace Methodology](08-contract-trace-methodology.md), [Command Log](design/16-command-log.md), [spec reference](../spec/README.md), [conformance fixtures](../conformance/) |

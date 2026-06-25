@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
+  <img src="../assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
 </p>
 
 # SkillSpec
@@ -32,6 +32,35 @@ tested, traced, compiled, and reviewed.
 The result should be a smaller, more durable skill: a tiny loader for the
 harness, a structured contract for decisions, runtime imports for active
 guidance, and original prose/resources preserved as source material.
+
+## How It Works
+
+<p align="center">
+  <img src="../assets/skillspec-grammar-plan-loop.svg" alt="SkillSpec converts prose skills into routed plans, progress ledgers, verifiers, and proof reports." width="860">
+</p>
+
+The loop is intentionally visible:
+
+```text
+import existing skill -> compile for harness -> install -> run -> prove value
+```
+
+Inside a harness run:
+
+```text
+sensemake -> plan -> act -> progress -> align -> value report
+```
+
+The user sees concrete proof, not vague confidence:
+
+```text
+Decision replay: pass
+Phase order: pass
+Requirements: 4/5 proven
+Missing proof: requirement `install_codex` has no progress event
+Forbidden actions: no violations recorded
+Alignment: partial
+```
 
 ## Install The CLI
 
@@ -498,12 +527,12 @@ fixtures/   sample skills and expected outputs
 
 Useful examples:
 
-- [examples/rote-computer/skill.spec.yml](examples/rote-computer/skill.spec.yml)
-- [examples/durable-executor/skill.spec.yml](examples/durable-executor/skill.spec.yml)
-- [examples/generic-skill-creator/skill.spec.yml](examples/generic-skill-creator/skill.spec.yml)
-- [examples/local-csv-report/skill.spec.yml](examples/local-csv-report/skill.spec.yml)
-- [examples/pdf-processing/skill.spec.yml](examples/pdf-processing/skill.spec.yml)
-- [examples/before-after/](examples/before-after/) shows a prose skill before
+- [examples/rote-computer/skill.spec.yml](../examples/rote-computer/skill.spec.yml)
+- [examples/durable-executor/skill.spec.yml](../examples/durable-executor/skill.spec.yml)
+- [examples/generic-skill-creator/skill.spec.yml](../examples/generic-skill-creator/skill.spec.yml)
+- [examples/local-csv-report/skill.spec.yml](../examples/local-csv-report/skill.spec.yml)
+- [examples/pdf-processing/skill.spec.yml](../examples/pdf-processing/skill.spec.yml)
+- [examples/before-after/](../examples/before-after/) shows a prose skill before
   and after a SkillSpec-backed port.
 
 Installable examples are folder-shaped and include a generated `SKILL.md`
@@ -555,22 +584,22 @@ skillspec deps check skill.spec.yml
 
 ## Community And RFC
 
-- [docs/03-rfc-v0.md](docs/03-rfc-v0.md) is the RFC-style announcement draft.
-- [docs/01-why-skillspec.md](docs/01-why-skillspec.md) explains why structured
+- [docs/03-rfc-v0.md](03-rfc-v0.md) is the RFC-style announcement draft.
+- [docs/01-why-skillspec.md](01-why-skillspec.md) explains why structured
   behavior contracts help.
-- [docs/why-skillspec-demo/](docs/why-skillspec-demo/) contains a demo-ready prose versus
+- [docs/why-skillspec-demo/](why-skillspec-demo/) contains a demo-ready prose versus
   SkillSpec comparison.
-- [docs/02-prose-vs-skillspec.md](docs/02-prose-vs-skillspec.md) compares prose-only
+- [docs/02-prose-vs-skillspec.md](02-prose-vs-skillspec.md) compares prose-only
   skills with SkillSpec-backed skills.
-- [docs/04-community-outreach.md](docs/04-community-outreach.md) names the launch
+- [docs/04-community-outreach.md](04-community-outreach.md) names the launch
   audiences and the specific ask.
-- [DISCUSSIONS.md](DISCUSSIONS.md) defines recommended GitHub Discussions
+- [DISCUSSIONS.md](../DISCUSSIONS.md) defines recommended GitHub Discussions
   categories.
-- [CONTRIBUTING.md](CONTRIBUTING.md) describes local development, spec changes,
+- [CONTRIBUTING.md](../CONTRIBUTING.md) describes local development, spec changes,
   and golden snapshot updates.
-- [docs/05-good-first-issues.md](docs/05-good-first-issues.md) lists starter issues
+- [docs/05-good-first-issues.md](05-good-first-issues.md) lists starter issues
   for contributors.
-- [docs/06-community-posts.md](docs/06-community-posts.md) contains short launch post
+- [docs/06-community-posts.md](06-community-posts.md) contains short launch post
   drafts.
 
 Repo-local skills live in `.claude/skills/<name>/` and are checked in despite
@@ -587,15 +616,15 @@ common global ignores for `.claude*`. Each one keeps:
 
 SkillSpec v0 has a formal grammar and relationship model:
 
-- [spec/grammar.md](spec/grammar.md) defines the v0 tree.
-- [spec/relationships.md](spec/relationships.md) explains how concepts
+- [spec/grammar.md](../spec/grammar.md) defines the v0 tree.
+- [spec/relationships.md](../spec/relationships.md) explains how concepts
   associate.
-- [spec/rules.md](spec/rules.md) defines rule evaluation and negative
+- [spec/rules.md](../spec/rules.md) defines rule evaluation and negative
   steering.
-- [spec/trace.md](spec/trace.md) defines append-only decision traces.
-- [spec/imports.md](spec/imports.md) defines import resolution, sections, and
+- [spec/trace.md](../spec/trace.md) defines append-only decision traces.
+- [spec/imports.md](../spec/imports.md) defines import resolution, sections, and
   nesting.
-- [spec/skill.spec.schema.json](spec/skill.spec.schema.json) is the strict JSON
+- [spec/skill.spec.schema.json](../spec/skill.spec.schema.json) is the strict JSON
   schema for typed v0 fields.
 
 The core association is:
@@ -623,5 +652,5 @@ still moving. The current focus is proving that existing prose skills can be
 ported into structured, testable, cross-harness behavior without losing their
 source material.
 
-See [roadmap.md](roadmap.md) for what is distinctive today and where the project
+See [roadmap.md](../roadmap.md) for what is distinctive today and where the project
 is not yet outstanding.

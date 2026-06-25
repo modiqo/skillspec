@@ -2,9 +2,12 @@
   <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
 </p>
 
-# Skills load instructions. SkillSpec turns them into a plan the agent can prove.
+# SkillSpec makes agent skills followable, testable, and provable.
 
 [![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
+
+It turns messy skill instructions into a small contract an agent can follow,
+check, and prove.
 
 Agent skills made reusable prompts portable. SkillSpec is the next layer: a tiny
 behavior contract that keeps agents on track, measures what happened, and makes
@@ -46,35 +49,6 @@ The honest guarantee:
 
 SkillSpec does not make a model obey. It makes the contract checkable,
 non-compliance detectable, and the gateable parts enforceable by a harness.
-
-## How It Works
-
-<p align="center">
-  <img src="assets/skillspec-grammar-plan-loop.svg" alt="SkillSpec converts prose skills into routed plans, progress ledgers, verifiers, and proof reports." width="860">
-</p>
-
-The loop is intentionally visible:
-
-```text
-import existing skill -> compile for harness -> install -> run -> prove value
-```
-
-Inside a harness run:
-
-```text
-sensemake -> plan -> act -> progress -> align -> value report
-```
-
-The user sees concrete proof, not vague confidence:
-
-```text
-Decision replay: pass
-Phase order: pass
-Requirements: 4/5 proven
-Missing proof: requirement `install_codex` has no progress event
-Forbidden actions: no violations recorded
-Alignment: partial
-```
 
 ## What `/skillspec` Does In Chat
 
@@ -280,7 +254,7 @@ when the harness discovery path is known.
 
 This README is the fast path.
 
-- [Detailed README](README_DETAILED.md)
+- [Detailed README](docs/README_DETAILED.md)
 - [Docs index and reader paths](docs/README.md)
 - [The Reliability Gap In Agent Skills](docs/00-skills-reliability-gap.md)
 - [Contract And Trace Methodology](docs/08-contract-trace-methodology.md)
