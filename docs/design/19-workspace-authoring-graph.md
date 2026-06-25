@@ -10,6 +10,292 @@ answers "which installed skill should handle this task?" Workspace mapping
 answers "what packages exist in this source tree, how are they named, what do
 they reference, and what can be imported safely?"
 
+## Compatibility Boundary
+
+The workspace flow must not change the simple single-skill path.
+
+A normal skill folder such as:
+
+```text
+pdf/
+  SKILL.md
+  references/
+  scripts/
+```
+
+is still one atomic skill package. It continues to use the ordinary commands:
+
+```bash
+skillspec source map ./pdf --out ./pdf/.skillspec/source-map/source-map.json
+skillspec import-skill ./pdf --out ./pdf/skill.spec.yml --source-map ./pdf/.skillspec/source-map/source-map.json
+skillspec compile ./pdf/skill.spec.yml --target codex-skill > ./pdf/SKILL.md
+skillspec install skill ./pdf --target codex --dry-run
+```
+
+`import-skill` calls a workspace guard before importing. The guard counts
+`SKILL.md` files under the source root:
+
+- zero or one `SKILL.md`: proceed to command-specific single-skill validation;
+- more than one `SKILL.md`: stop and tell the operator to run
+  `skillspec workspace map`.
+
+That boundary is intentional. Workspace code is for structure recon, fanout,
+converge, and grouped install. It should not reinterpret a plain folder with
+one `SKILL.md` and resources.
+
+## Detected Shapes
+
+SkillSpec recognizes three practical source shapes.
+
+### Single Atomic Skill
+
+Example:
+
+```text
+source-root/
+  SKILL.md
+  references/
+  resources/
+  scripts/
+```
+
+Detection:
+
+- exactly one `SKILL.md` exists below the selected source root;
+- no workspace manifest is required;
+- all sibling folders are treated as package-local resources for that one skill.
+
+Activation:
+
+- `import-skill` creates one `skill.spec.yml`;
+- `compile` creates one harness-facing `SKILL.md` loader;
+- `install skill` installs one generated skill folder into the selected harness
+  root;
+- router indexing, if desired, happens later through the router/index commands.
+
+### Ordinary Multi-Skill Workspace
+
+Example:
+
+```text
+skills/
+  coding-standards/
+    SKILL.md
+  code-review/
+    SKILL.md
+    review.md          # may reference ../coding-standards/SKILL.md
+  test-driven-fix/
+    SKILL.md           # may invoke /code-review
+```
+
+Detection:
+
+- more than one `SKILL.md` exists below the selected source root;
+- no plugin marker is needed;
+- every folder containing `SKILL.md` becomes one package;
+- package names keep legacy non-plugin behavior.
+
+Activation:
+
+- `workspace map` creates one manifest entry per package;
+- relative file references such as `../coding-standards/SKILL.md` become hard
+  dependency edges;
+- non-plugin slash-command references such as `/code-review` continue to infer
+  hard dependencies for legacy repositories;
+- `workspace import` fans out one draft `skill.spec.yml` per package in
+  dependency order;
+- `workspace converge` checks that generated drafts still line up with the
+  workspace graph;
+- `workspace compile` creates one loader per ready package;
+- `workspace install` installs the compiled package set using deterministic
+  install slugs so the workspace cannot accidentally overwrite a separately
+  installed single skill with the same public name.
+
+### Plugin-Shaped Workspace
+
+Example:
+
+```text
+legal-plugins/
+  commercial-legal/
+    .claude-plugin/
+      plugin.json      # { "name": "commercial-legal" }
+    skills/
+      review/
+        SKILL.md
+      cold-start-interview/
+        SKILL.md
+  privacy-legal/
+    .claude-plugin/
+      plugin.json      # { "name": "privacy-legal" }
+    skills/
+      review/
+        SKILL.md
+      cold-start-interview/
+        SKILL.md
+```
+
+Detection:
+
+- a directory is a plugin root when it has a `skills/` subdirectory plus
+  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`;
+- packages below `<plugin-root>/skills/` inherit that plugin namespace;
+- the namespace comes from `.claude-plugin/plugin.json` field `name` when
+  present, otherwise from the plugin folder name;
+- repeated local names are allowed because public names are namespaced.
+
+Activation:
+
+- `commercial-legal/skills/review/SKILL.md` becomes public skill
+  `commercial-legal-review`;
+- `privacy-legal/skills/review/SKILL.md` becomes public skill
+  `privacy-legal-review`;
+- `/cold-start-interview` inside `commercial-legal` resolves to
+  `commercial-legal-cold-start-interview`;
+- `/privacy-legal:cold-start-interview` resolves across plugins;
+- plugin slash-command references are recorded as workflow references, not hard
+  dependency edges, because they often mean "run this other plugin skill later"
+  rather than "load this package before compiling me";
+- relative file references are still hard dependencies.
+
+This protects plugin boundaries without requiring installed harness skill names
+to contain colons.
+
+## Shape Detection Workflow
+
+`skillspec workspace map <source-root>` performs structure recon in this order.
+
+1. Normalize the source root.
+
+   The selected path is resolved into the workspace source root used in the
+   manifest. All package paths are recorded relative to that root.
+
+2. Discover plugin roots.
+
+   The mapper recursively scans directories, skipping ignored build and VCS
+   folders. A directory is recorded as a plugin root when it has `skills/` and
+   at least one supported plugin marker:
+
+   - `.claude-plugin/plugin.json`
+   - `.mcp.json`
+   - `CLAUDE.md`
+
+   Plugin roots are sorted deepest first so package classification chooses the
+   most specific plugin root if nested plugin-shaped folders ever appear.
+
+3. Discover atomic skill packages.
+
+   The mapper recursively finds every `SKILL.md`. Each parent directory becomes
+   one package. The mapper does not merge neighboring skills and does not treat a
+   parent folder as a skill just because it contains children.
+
+4. Classify each package.
+
+   For each `SKILL.md`, SkillSpec reads frontmatter and records:
+
+   - package root path relative to the workspace;
+   - `package_id`, derived from the relative path;
+   - raw public name from frontmatter `name`, falling back to the folder name;
+   - package kind, currently inferred as `shared`, `entry`, or `helper`;
+   - namespace and local name when the package lives under a plugin root.
+
+5. Assign install identity.
+
+   Every package receives a deterministic `install_slug` based on the workspace
+   slug plus the package path. Install identity is path-based, not just
+   display-name-based, so two packages with similar names do not overwrite each
+   other during grouped workspace install.
+
+6. Build the skill invocation index.
+
+   Non-plugin packages are indexed globally by public name and path tail.
+   Plugin packages are indexed globally only by namespaced public name, and
+   indexed locally by `(namespace, local_name)`.
+
+   This means:
+
+   - `/code-review` can resolve globally in an ordinary workspace;
+   - `/commercial-legal-review` can resolve globally in a plugin workspace;
+   - `/review` inside `commercial-legal` resolves only inside that plugin;
+   - `/privacy-legal:review` resolves explicitly across plugin namespaces;
+   - duplicate unqualified plugin-local names do not pollute the global name
+     space.
+
+7. Scan package Markdown for references.
+
+   The mapper scans package-local Markdown files, excluding nested child skill
+   packages and fenced code blocks.
+
+   It records two reference kinds:
+
+   - `file`: relative Markdown references such as
+     `../coding-standards/SKILL.md`;
+   - `skill_invocation`: slash-command references such as `/code-review` or
+     `/privacy-legal:review`.
+
+8. Infer hard dependencies.
+
+   Dependency edges are inferred from references that must be ready before the
+   current package can be safely imported, converged, compiled, or installed.
+
+   - file reference across packages: hard dependency;
+   - non-plugin slash-command reference: hard dependency for legacy behavior;
+   - plugin slash-command reference: workflow reference only;
+   - self-reference: ignored.
+
+9. Write the workspace manifest and map report.
+
+   The manifest becomes the stable input for `validate`, `import`, `converge`,
+   `compile`, and `install`. The map report is the human-readable explanation of
+   what was discovered: packages, plugin namespaces, references, dependency
+   edges, duplicate names, duplicate install slugs, and unresolved references.
+
+## Activation Workflow
+
+Activation means "what becomes visible or usable to the agent harness after the
+source shape has been analyzed and compiled."
+
+For a single atomic skill:
+
+1. the source folder is imported into one `skill.spec.yml`;
+2. the spec is compiled into one small `SKILL.md` loader;
+3. the generated folder is installed as one harness skill;
+4. any additional resources remain package-local beside that skill.
+
+For an ordinary multi-skill workspace:
+
+1. `workspace map` decides the package graph;
+2. `workspace validate` blocks broken paths, cycles, self-dependencies, and
+   install slug collisions;
+3. `workspace import` creates one generated package folder per atomic source
+   skill;
+4. packages are processed in dependency order, so shared packages such as
+   `coding-standards` are handled before dependents;
+5. `workspace converge` checks that all generated specs exist and that
+   dependents are not released while dependencies are missing or failed;
+6. `workspace compile` creates one harness loader per ready package;
+7. `workspace install` installs the grouped package set using manifest
+   `install_slug` folders.
+
+For a plugin-shaped workspace:
+
+1. plugin roots define namespaces;
+2. every package below each plugin's `skills/` folder gets a namespaced public
+   name;
+3. plugin-local invocations resolve inside their own namespace first;
+4. explicit namespace invocations can cross plugin boundaries;
+5. plugin workflow links are preserved as references for reports and alignment
+   without turning the whole plugin library into one cyclic dependency graph;
+6. install uses namespaced public names plus path-based install slugs.
+
+Workspace install can optionally apply visibility. With the default
+`entry-implicit` policy, entry packages stay implicitly visible and shared,
+helper, or wrapper packages become manual-only. Other policies are explicit:
+`all-implicit`, `all-manual`, and `none`.
+
+Router activation is a separate step. Installing a workspace writes skills into
+harness roots; it does not rebuild the router index.
+
 ## Command Flow
 
 The expected authoring flow is:
