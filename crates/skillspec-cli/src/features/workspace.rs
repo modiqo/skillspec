@@ -6,6 +6,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+mod import;
+
+pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
+
 pub const WORKSPACE_SCHEMA: &str = "skillspec/workspace/v0";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -371,7 +375,15 @@ fn validate_manifest(path: &Path, manifest: &WorkspaceManifest) -> WorkspaceVali
             ));
         }
 
-        let package_root = source_root.join(&package.path);
+        let Some(relative_package_path) = manifest_relative_path(&package.path) else {
+            errors.push(format!(
+                "package {} path must be a relative workspace path without parent components: {}",
+                package.package_id, package.path
+            ));
+            continue;
+        };
+
+        let package_root = source_root.join(&relative_package_path);
         if !package_root.is_dir() {
             errors.push(format!(
                 "package {} path is not a directory: {}",
@@ -721,7 +733,7 @@ fn map_report(
     }
 }
 
-fn dependency_edges(manifest: &WorkspaceManifest) -> Vec<WorkspaceDependencyEdge> {
+pub(super) fn dependency_edges(manifest: &WorkspaceManifest) -> Vec<WorkspaceDependencyEdge> {
     let mut edges = Vec::new();
     for package in manifest.packages.values() {
         for dependency in &package.depends_on {
@@ -948,6 +960,22 @@ fn normalize_relative_path(path: &Path) -> Option<PathBuf> {
         normalized.push(component);
     }
     Some(normalized)
+}
+
+pub(super) fn manifest_relative_path(value: &str) -> Option<PathBuf> {
+    let path = Path::new(value);
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(part) => normalized.push(part),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+    (!normalized.as_os_str().is_empty()).then_some(normalized)
 }
 
 fn trim_reference(raw: &str) -> &str {

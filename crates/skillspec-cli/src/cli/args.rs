@@ -146,7 +146,7 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: SourceCommand,
     },
-    #[command(about = "Map and validate multi-skill workspaces before import")]
+    #[command(about = "Map, validate, and import multi-skill workspaces")]
     Workspace {
         #[command(subcommand)]
         command: WorkspaceCommand,
@@ -389,6 +389,20 @@ pub(super) enum WorkspaceCommand {
     Validate {
         /// Path to skillspec.workspace.yml.
         manifest: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Import every package in a validated skillspec.workspace.yml graph",
+        long_about = "Run the existing single-package doctor, source map, and import-skill pipeline for every package in a validated skillspec.workspace.yml graph. Outputs are written under one mirrored build root. Successful package outputs are preserved when another package fails; dependents of failed packages are reported as blocked."
+    )]
+    Import {
+        /// Path to skillspec.workspace.yml.
+        manifest: PathBuf,
+        /// Build root where mirrored package outputs should be written.
+        #[arg(long)]
+        out: PathBuf,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

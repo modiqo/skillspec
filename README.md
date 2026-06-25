@@ -291,11 +291,14 @@ workspace first. This is authoring-side structure recon, not router indexing:
 ```sh
 skillspec workspace map ./skills --out ./build/skillspec.workspace.yml
 skillspec workspace validate ./build/skillspec.workspace.yml
+skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
 ```
 
 The workspace manifest names each atomic skill package, records deterministic
 install slugs, and captures cross-skill references such as shared standards
-packages before any fanout import work begins.
+packages before fanout import. The import step writes one generated package per
+atomic skill under the build root; it does not compile, install, or refresh the
+router.
 
 ### 2. Map And Import
 

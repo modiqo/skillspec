@@ -31,7 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
-| `workspace <COMMAND>` | Map and validate multi-skill workspaces before fanout import. |
+| `workspace <COMMAND>` | Map, validate, and fanout-import multi-skill workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -330,6 +330,7 @@ Subcommands:
 
 - `map <source-root> --out <skillspec.workspace.yml> [--json]`
 - `validate <skillspec.workspace.yml> [--json]`
+- `import <skillspec.workspace.yml> --out <build-root> [--json]`
 
 `workspace` is the authoring-side structure recon surface for repositories that
 contain multiple atomic skill packages. It is separate from `skillspec index`,
@@ -379,6 +380,40 @@ resolve, self-dependencies are absent, the graph is acyclic, install slugs are
 unique, and cross-package references are covered by declared dependencies.
 Duplicate public names are reported as warnings until an install target is
 being planned.
+
+### `workspace import`
+
+```text
+skillspec workspace import <MANIFEST> --out <BUILD_ROOT>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--out <BUILD_ROOT>`: parent folder where mirrored package outputs are
+  written.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace import` runs the existing single-package pipeline for each workspace
+package in topological order:
+
+```text
+doctor -> source map -> import-skill
+```
+
+It writes package outputs under one mirrored build root, preserves successful
+packages if another package fails, and marks dependents of failed packages as
+blocked. It also writes:
+
+- `<BUILD_ROOT>/skillspec.workspace.yml`
+- `<BUILD_ROOT>/workspace-import.report.md`
+- `<BUILD_ROOT>/<package>/.skillspec/workspace-import.json`
+- per-package doctor reports and source maps
+
+It does not compile loaders, install skills, or refresh router indexes.
 
 ### `source coverage`
 

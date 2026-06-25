@@ -1,6 +1,6 @@
 ---
 name: skillspec
-description: "Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, skillspec workspace, skillspec.workspace.yml and multi-skill repo. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, map a skills repository that contains multiple SKILL.md packages before import"
+description: "Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, workspace import, skillspec workspace and skillspec.workspace.yml. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, map a skills repository that contains multiple SKILL.md packages before import"
 ---
 
 # SkillSpec
@@ -135,6 +135,7 @@ Minimum final response shape:
 - `remote_skill_port`: Port remote skill
 - `workspace_skill_authoring`: Map multi-skill workspace
 - `install_skill_router`: Install router mode
+- `workspace_fanout_import`: Fanout import workspace
 - `update_skill_router`: Update router mode
 - `switch_skill_router_mode`: Enable or disable router mode
 - `inspect_skillspec_status`: Inspect SkillSpec status

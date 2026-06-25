@@ -527,9 +527,10 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&workspace);
     let workspace_help = stdout(&workspace);
-    assert!(workspace_help.contains("Map and validate multi-skill workspaces"));
+    assert!(workspace_help.contains("Map, validate, and import multi-skill workspaces"));
     assert!(workspace_help.contains("map"));
     assert!(workspace_help.contains("validate"));
+    assert!(workspace_help.contains("import"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -4939,6 +4940,164 @@ Run `/coding-standards` before the wrapper.
     assert_success(&validate);
     let validate_report = json_stdout(&validate);
     assert_eq!(validate_report["ok"], true);
+}
+
+#[test]
+fn workspace_import_fans_out_packages_under_build_root() {
+    let dir = TempDir::new("workspace-import");
+    let root = dir.path().join("skills");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+    write_file(
+        &root.join("coding-standards").join("SKILL.md"),
+        r#"---
+name: coding-standards
+description: TypeScript coding standards package.
+---
+# Coding Standards
+
+Use strict tests.
+"#,
+    );
+    write_file(
+        &root.join("code-review").join("SKILL.md"),
+        r#"---
+name: code-review
+description: Review code.
+---
+# Code Review
+
+Read `../coding-standards/SKILL.md`.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&import);
+    let report = json_stdout(&import);
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["built"].as_array().unwrap().len(), 2);
+    assert!(report["failed"].as_array().unwrap().is_empty());
+    assert!(report["blocked"].as_array().unwrap().is_empty());
+
+    let shared_spec = build.join("coding-standards").join("skill.spec.yml");
+    let review_spec = build.join("code-review").join("skill.spec.yml");
+    assert!(shared_spec.is_file());
+    assert!(review_spec.is_file());
+    assert!(build.join("skillspec.workspace.yml").is_file());
+    assert!(build.join("workspace-import.report.md").is_file());
+    assert!(build
+        .join("code-review")
+        .join(".skillspec/source-map/source-map.json")
+        .is_file());
+    assert!(build
+        .join("code-review")
+        .join(".skillspec/reports/doctor.json")
+        .is_file());
+    assert!(build
+        .join("code-review")
+        .join(".skillspec/workspace-import.json")
+        .is_file());
+
+    let validate_shared = Command::new(bin())
+        .arg("validate")
+        .arg(&shared_spec)
+        .output()
+        .unwrap();
+    assert_success(&validate_shared);
+    let validate_review = Command::new(bin())
+        .arg("validate")
+        .arg(&review_spec)
+        .output()
+        .unwrap();
+    assert_success(&validate_review);
+}
+
+#[test]
+fn workspace_import_preserves_successes_and_blocks_dependents() {
+    let dir = TempDir::new("workspace-import-failure");
+    let root = dir.path().join("skills");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+    write_file(
+        &root.join("bad").join("SKILL.md"),
+        "---\nname: bad\ndescription: Bad.\n---\n# Bad\n",
+    );
+    write_file(
+        &root.join("good").join("SKILL.md"),
+        "---\nname: good\ndescription: Good.\n---\n# Good\n",
+    );
+    write_file(
+        &root.join("uses-bad").join("SKILL.md"),
+        r#"---
+name: uses-bad
+description: Uses bad.
+---
+# Uses Bad
+
+Read `../bad/SKILL.md`.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    fs::write(root.join("bad").join("SKILL.md"), [0xff, 0xfe]).unwrap();
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&import);
+    let report = json_stdout(&import);
+    assert_eq!(report["ok"], false);
+    assert!(report["built"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "good"));
+    assert!(report["failed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "bad"));
+    assert!(report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "uses-bad"));
+    assert!(build.join("good").join("skill.spec.yml").is_file());
+    assert!(!build.join("uses-bad").join("skill.spec.yml").is_file());
+    assert!(build.join("workspace-import.report.md").is_file());
 }
 
 #[test]

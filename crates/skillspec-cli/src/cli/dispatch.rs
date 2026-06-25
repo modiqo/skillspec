@@ -232,6 +232,22 @@ pub(super) fn run(command: Command) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+            WorkspaceCommand::Import {
+                manifest,
+                out,
+                json,
+            } => {
+                let import_report = workspace::import_workspace(&manifest, &out)?;
+                let ok = import_report.ok;
+                if json {
+                    report::json(&import_report)?;
+                } else {
+                    report::text(&workspace::render_import_report(&import_report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
         },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {

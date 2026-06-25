@@ -18,6 +18,7 @@ activation:
     - port skill
     - workspace map
     - workspace validate
+    - workspace import
     - skillspec workspace
     - skillspec.workspace.yml
     - multi-skill repo
@@ -25,6 +26,8 @@ activation:
     - many SKILL.md files
     - parent folder with multiple skills
     - fanout converge
+    - fanout import
+    - import workspace packages
     - cross-skill references
     - skill dependency graph
     - shared standards package
@@ -90,6 +93,7 @@ applies_when:
       - port a local skill folder into SkillSpec
       - map a skills repository that contains multiple SKILL.md packages before import
       - validate a multi-skill workspace graph before fanout import
+      - fanout-import a validated workspace graph into one generated package draft per atomic skill
       - detect cross-skill references, shared standards packages, and skill dependency edges
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
@@ -312,6 +316,44 @@ routes:
           description: Explain the package map, dependency graph, warnings, and the next fanout/converge implementation phase without importing yet.
           requires:
             - report_workspace_recon
+  - id: workspace_fanout_import
+    label: Fanout import workspace
+    rank: 4
+    description: Use when a validated skillspec.workspace.yml should be imported into one generated package draft per atomic skill under a mirrored build root.
+    execution_plan:
+      mode: ordered
+      reason: Fanout import must preserve the validated workspace graph, process dependencies before dependents, and keep successful package outputs when another package fails.
+      phases:
+        - id: validate_workspace_before_import
+          owner_skill: skillspec
+          description: Validate the workspace graph before writing generated package outputs.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+          forbid:
+            - proceed_with_circular_skill_dependencies
+            - import_workspace_root_as_single_skill
+        - id: import_workspace_packages
+          owner_skill: skillspec
+          description: Run per-package doctor, source map, and import-skill through the workspace import command, preserving built packages and blocking dependents of failed packages.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_import_packages
+            - produce_workspace_import_report
+          forbid:
+            - use_router_index_for_authoring_recon
+            - compile_or_install_during_workspace_import
+        - id: report_workspace_import
+          owner_skill: skillspec
+          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next converge command.
+          requires:
+            - report_workspace_import
   - id: install_skill_router
     label: Install router mode
     rank: 3
@@ -809,6 +851,24 @@ rules:
     after_success:
       - report_workspace_recon
     reason: A folder containing multiple SKILL.md packages must be mapped as a workspace before any single-skill import or fanout/converge plan.
+  - id: route_workspace_import_to_fanout
+    when:
+      user_says_any:
+        - workspace import
+        - skillspec workspace import
+        - fanout import
+        - import workspace packages
+        - import skillspec.workspace.yml
+        - generate workspace package drafts
+        - run fanout import
+    prefer: workspace_fanout_import
+    forbid:
+      - use_router_index_for_authoring_recon
+      - import_workspace_root_as_single_skill
+      - compile_or_install_during_workspace_import
+    after_success:
+      - report_workspace_import
+    reason: Fanout import starts from a validated workspace manifest and writes one generated package draft per atomic skill; it must not compile, install, or refresh router indexes.
   - id: route_local_sources_to_local_port
     when:
       user_says_any:
@@ -852,6 +912,7 @@ rules:
         - installed skillspec
     route_order:
       - workspace_skill_authoring
+      - workspace_fanout_import
       - install_skill_router
       - update_skill_router
       - install_durable_executor
@@ -1528,6 +1589,26 @@ artifacts:
     consumed_by:
       - kind: recipe
         id: workspace_recon_loop
+  workspace_import_report:
+    kind: report
+    path: workspace-build/workspace-import.report.md
+    description: Fanout import report naming built, failed, skipped, and blocked packages, per-package evidence paths, and the next converge command.
+    produced_by:
+      - kind: command
+        id: workspace_import_packages
+    consumed_by:
+      - kind: recipe
+        id: workspace_import_loop
+  workspace_package_drafts:
+    kind: file
+    path: workspace-build/<package>/skill.spec.yml
+    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import.
+    produced_by:
+      - kind: command
+        id: workspace_import_packages
+    consumed_by:
+      - kind: recipe
+        id: workspace_import_loop
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
@@ -1756,6 +1837,13 @@ commands:
     description: Validate workspace package boundaries, deterministic install slugs, dependency edges, cross-skill references, and cycles before fanout import planning.
     template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
     safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_import_packages:
+    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages.
+    template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root>
+    safety: local_write
     requires:
       dependencies:
         - skillspec_cli
@@ -2157,6 +2245,24 @@ recipes:
       - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
       - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
       - note: Report the package map, dependency graph, warnings, and next fanout/converge phase from the validated workspace manifest.
+  workspace_import_loop:
+    description: "Phase 4 workspace fanout import: validate the workspace manifest, run per-package doctor/source-map/import-skill, preserve successful package outputs, and report failed or blocked packages."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_import_report
+        - workspace_package_drafts
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_import_packages
+      - produce_artifact: workspace_import_report
+      - produce_artifact: workspace_package_drafts
+      - note: Do not compile loaders, install skills, or refresh router indexes during workspace import.
+      - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
+      - note: Report built, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
     ordered: true
@@ -2502,6 +2608,14 @@ closures:
     description: Check that the workspace graph has valid package paths, one SKILL.md per package, unique install slugs, no self-dependencies, no cycles, and no uncovered cross-package references.
     commands:
       - workspace_validate_manifest
+  produce_workspace_import_report:
+    description: Run workspace fanout import and write a report that names built, failed, skipped, and blocked packages plus per-package evidence paths.
+    commands:
+      - workspace_import_packages
+  report_workspace_import:
+    description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
+    commands:
+      - workspace_import_packages
   report_workspace_recon:
     description: Summarize the workspace package map, dependency graph, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
     commands:
@@ -2600,6 +2714,7 @@ proof:
   metrics:
     - grammar commands run before import or revision
     - multi-skill source roots are mapped with skillspec.workspace.yml and validated before fanout import planning
+    - workspace fanout import writes one generated package draft per atomic skill and reports built, failed, skipped, and blocked packages
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
@@ -2646,6 +2761,19 @@ tests:
       forbid:
         - use_router_index_for_authoring_recon
         - import_workspace_root_as_single_skill
+  - name: workspace manifest fanout imports package drafts
+    input: /skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
+    expect:
+      route: workspace_fanout_import
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_import_to_fanout
+      after_success:
+        - report_workspace_import
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
+        - compile_or_install_during_workspace_import
   - name: public github source stages before import
     input: Import https://github.com/org/repo/tree/main/skills/pdf as a SkillSpec skill
     expect:
