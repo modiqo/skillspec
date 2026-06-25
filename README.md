@@ -86,7 +86,7 @@ sequence, and proof that the value was delivered.
 | --- | --- |
 | "My skill is over 1000+ lines and the agent is not following instructions." | `/skillspec import ./my-skill, compile it for [Codex, Claude, Agents], install it, and prove it`<br><br>Turns a long prose skill into a smaller, followable contract: routes, rules, dependencies, tests, installed harness files, and an alignment report that shows what the agent actually followed. |
 | "I switched from Codex to Claude and need my skill to follow instructions and create alignment proof at the end of execution." | `/skillspec complete the task and print an alignment report`<br><br>Runs the task through the same contract shape across harnesses, then prints the proof: selected route, required steps, missing evidence if any, and final alignment status. |
-| "I designed a new CLI, API, or MCP for my product and I want to distribute skills that use it in alignment with real use cases." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"`<br>`/skillspec disable durable-executor`<br><br>Captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, preserves command and dependency proof, and lets you turn the durable first-hop back off after synthesis. |
+| "I designed a new CLI, API, or MCP for my product and I want to distribute skills that use it in alignment with real use cases." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"`<br>`/skillspec disable durable-executor`<br><br>Uses [Rote by ModiQo](https://www.modiqo.ai) as the trace substrate, captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, preserves command and dependency proof, and lets you turn the [durable-executor](#rote-prerequisite-for-agent-traces) first-hop back off after synthesis. |
 | "I have too many skills and I am seeing: Skill descriptions were shortened to fit the 2% skills context budget." | `/skillspec install router`<br><br>Installs the SkillSpec router so the harness can keep every skill discoverable without loading every long description. It builds an index, routes to the right skill on demand, and frees context for the skill that actually matters. |
 
 ### Powered By SkillSpec
@@ -96,8 +96,8 @@ powered by its own contract: [`skills/skillspec/skill.spec.yml`](skills/skillspe
 
 That YAML file is the engine behind the prompt surface. It declares the routes,
 rules, phase plans, dependency checks, router lifecycle, optional
-durable-executor lifecycle, observed-workspace synthesis, and proof obligations
-that `/skillspec` follows.
+[durable-executor](#rote-prerequisite-for-agent-traces) lifecycle,
+observed-workspace synthesis, and proof obligations that `/skillspec` follows.
 
 ```text
 /skillspec chat request
@@ -110,15 +110,34 @@ That is the important claim: the tool uses the same SkillSpec machinery it gives
 to user skills. The multiplexer is itself a working example of a large prompt
 surface compressed into a reviewable, testable contract.
 
+### Rote Prerequisite For Agent Traces
+
+The [durable-executor](#rote-prerequisite-for-agent-traces) path is optional,
+but it depends on [Rote by ModiQo](https://www.modiqo.ai). Rote is the trace
+substrate SkillSpec uses to run tool-backed work, preserve command logs,
+capture agent evidence, and report token stats outside the prompt.
+
+Install Rote before enabling or installing the
+[durable-executor](#rote-prerequisite-for-agent-traces):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modiqo/rote-releases/main/install.sh | bash
+```
+
+After `rote` is on `PATH`, SkillSpec can safely use the
+[durable-executor](#rote-prerequisite-for-agent-traces) first-hop for workflows
+that need durable traces, evidence handles, replayable command history, and
+alignment proof.
+
 ### Core Workflows
 
 | Goal | Chat prompt | What SkillSpec does |
 | --- | --- | --- |
 | Make skills verifiable | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` | Converts a prose `SKILL.md` into routes, rules, phases, dependencies, resources, commands, tests, progress tracking, and alignment proof. |
-| Inspect installed state | `/skillspec status` | Reports router and durable-executor installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy prose skills. |
-| Route large skill libraries | `/skillspec install router` | Installs an implicit router surface, marks routed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves `durable-executor` as implicit only when durable is enabled. |
-| Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop skill after checking `rote` is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
-| Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable rote workspace as evidence, shows the observed result for approval, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
+| Inspect installed state | `/skillspec status` | Reports router and [durable-executor](#rote-prerequisite-for-agent-traces) installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy prose skills. |
+| Route large skill libraries | `/skillspec install router` | Installs an implicit router surface, marks routed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves [durable-executor](#rote-prerequisite-for-agent-traces) as implicit only when durable mode is enabled. |
+| Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional [durable-executor](#rote-prerequisite-for-agent-traces) first-hop after checking [Rote by ModiQo](https://www.modiqo.ai) is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
+| Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable [Rote by ModiQo](https://www.modiqo.ai) workspace as evidence, shows the observed result for approval, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
 | Revise an existing contract | `/skillspec revise this spec to add router setup checks` | Starts from the current grammar and active handles, patches the reviewed contract, then reruns structural QA. |
 | Prove value before release | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
 
@@ -136,9 +155,9 @@ surface compressed into a reviewable, testable contract.
 | Route a large skill library | `/skillspec install router` |
 | Temporarily turn router mode off | `/skillspec disable router` |
 | Turn router mode back on | `/skillspec enable router` |
-| Capture a tool-backed workflow | `/skillspec install durable-executor from /path/or/public-uri` |
+| Capture a tool-backed workflow | `/skillspec install durable-executor from /path/or/public-uri`<br>Requires [Rote by ModiQo](https://www.modiqo.ai) for agent traces. |
 | Synthesize a skill from observed work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` |
-| Turn durable first-hop off | `/skillspec disable durable-executor` |
+| Turn durable first-hop off | `/skillspec disable durable-executor`<br>Keeps the [durable-executor](#rote-prerequisite-for-agent-traces) files installed but stops automatic routing. |
 
 The intended user experience is simple: import the existing skill, choose the
 target, install it, then look at the proof report.
@@ -147,21 +166,22 @@ target, install it, then look at the proof report.
 
 | Command | What changes |
 | --- | --- |
-| `/skillspec status` | Read-only inventory of router state, durable-executor state, supported roots, router index freshness, and SkillSpec-backed versus legacy prose skills. |
+| `/skillspec status` | Read-only inventory of router state, [durable-executor](#rote-prerequisite-for-agent-traces) state, supported roots, router index freshness, and SkillSpec-backed versus legacy prose skills. |
 | `/skillspec install router` | Installs the router, makes the router implicit, makes routed skills explicit-only, builds the routing index, and runs a clean status check. |
 | `/skillspec disable router` | Keeps router files installed but makes the router explicit-only and restores routed skills to implicit/default discovery. |
 | `/skillspec enable router` | Turns router mode back on and rebuilds the index from current roots. |
 | `/skillspec update router` | Backs up config, manifest, index, and generated router skills, rewrites recorded harness roots, preserves enabled/disabled state, and warns you to restart active sessions. |
-| `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop after checking `rote` is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
-| `/skillspec disable durable-executor` | Keeps durable-executor installed but makes it explicit-only. |
-| `/skillspec enable durable-executor` | Checks `rote` on `PATH` before making durable-executor implicit again. |
+| `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional [durable-executor](#rote-prerequisite-for-agent-traces) first-hop after checking [Rote by ModiQo](https://www.modiqo.ai) is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
+| `/skillspec disable durable-executor` | Keeps [durable-executor](#rote-prerequisite-for-agent-traces) installed but makes it explicit-only. |
+| `/skillspec enable durable-executor` | Checks [Rote by ModiQo](https://www.modiqo.ai) on `PATH` before making [durable-executor](#rote-prerequisite-for-agent-traces) implicit again. |
 
 If a skill is later added outside SkillSpec, `skillspec router index status`
 detects prose-only versus SkillSpec-backed additions and
 `skillspec router index refresh` reapplies explicit invocation controls and
 rebuilds the index. Observed-workspace synthesis refuses to write until the
-observed result and evidence summary are approved; if live rote workspace lookup
-is unreliable, pass pre-captured stats, log, and metadata files explicitly.
+observed result and evidence summary are approved; if live
+[Rote by ModiQo](https://www.modiqo.ai) workspace lookup is unreliable, pass
+pre-captured stats, log, and metadata files explicitly.
 
 ### From Source
 
