@@ -31,7 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
-| `workspace <COMMAND>` | Map, validate, and fanout-import multi-skill workspaces. |
+| `workspace <COMMAND>` | Map, validate, fanout-import, and converge multi-skill workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -331,6 +331,7 @@ Subcommands:
 - `map <source-root> --out <skillspec.workspace.yml> [--json]`
 - `validate <skillspec.workspace.yml> [--json]`
 - `import <skillspec.workspace.yml> --out <build-root> [--json]`
+- `converge <skillspec.workspace.yml> --build-root <build-root> [--json]`
 
 `workspace` is the authoring-side structure recon surface for repositories that
 contain multiple atomic skill packages. It is separate from `skillspec index`,
@@ -412,6 +413,32 @@ blocked. It also writes:
 - `<BUILD_ROOT>/workspace-import.report.md`
 - `<BUILD_ROOT>/<package>/.skillspec/workspace-import.json`
 - per-package doctor reports and source maps
+
+It does not compile loaders, install skills, or refresh router indexes.
+
+### `workspace converge`
+
+```text
+skillspec workspace converge <MANIFEST> --build-root <BUILD_ROOT>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: parent folder containing mirrored package
+  outputs from `workspace import`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace converge` verifies the generated package drafts against the manifest
+before compile or install. It checks that each manifest package has either a
+ready generated `skill.spec.yml` or explicit package-level failure evidence,
+validates generated specs and package-local imports/resources, blocks dependents
+whose dependencies are not ready, and writes:
+
+- `<BUILD_ROOT>/workspace-converge.report.md`
 
 It does not compile loaders, install skills, or refresh router indexes.
 

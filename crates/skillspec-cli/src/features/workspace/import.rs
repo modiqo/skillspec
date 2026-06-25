@@ -1,11 +1,12 @@
 use super::{
-    dependency_edges, load_manifest, manifest_relative_path, validate_workspace,
-    WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
+    dependency_edges, load_manifest, manifest_relative_path, output_package_dir, path_to_string,
+    topological_package_order, validate_workspace, write_text, WorkspaceDependencyEdge,
+    WorkspaceManifest, WorkspacePackage,
 };
 use crate::error::{Error, Result};
 use crate::{doctor, importer, parser, source_map};
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -320,48 +321,6 @@ fn write_package_report(report: &WorkspaceImportPackageReport) -> Result<()> {
     write_json(&path, &evidence)
 }
 
-fn topological_package_order(manifest: &WorkspaceManifest) -> Vec<String> {
-    let mut dependents = BTreeMap::<String, BTreeSet<String>>::new();
-    let mut remaining_dependency_counts = BTreeMap::<String, usize>::new();
-    for package in manifest.packages.values() {
-        remaining_dependency_counts.insert(package.package_id.clone(), package.depends_on.len());
-        for dependency in &package.depends_on {
-            dependents
-                .entry(dependency.clone())
-                .or_default()
-                .insert(package.package_id.clone());
-        }
-    }
-
-    let mut ready = remaining_dependency_counts
-        .iter()
-        .filter_map(|(package_id, count)| (*count == 0).then_some(package_id.clone()))
-        .collect::<BTreeSet<_>>();
-    let mut order = Vec::new();
-    while let Some(package_id) = ready.pop_first() {
-        order.push(package_id.clone());
-        if let Some(children) = dependents.get(&package_id) {
-            for child in children {
-                if let Some(count) = remaining_dependency_counts.get_mut(child) {
-                    *count = count.saturating_sub(1);
-                    if *count == 0 {
-                        ready.insert(child.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    if order.len() != manifest.packages.len() {
-        for package_id in manifest.packages.keys() {
-            if !order.contains(package_id) {
-                order.push(package_id.clone());
-            }
-        }
-    }
-    order
-}
-
 fn package_ids_by_status(
     packages: &[WorkspaceImportPackageReport],
     status: WorkspaceImportStatus,
@@ -385,16 +344,6 @@ fn source_package_path(
     Ok(PathBuf::from(&manifest.source_root).join(relative))
 }
 
-fn output_package_dir(package: &WorkspacePackage, build_root: &Path) -> Result<PathBuf> {
-    let relative = manifest_relative_path(&package.path).ok_or_else(|| Error::InvalidInput {
-        message: format!(
-            "package {} path must be a relative workspace path without parent components: {}",
-            package.package_id, package.path
-        ),
-    })?;
-    Ok(build_root.join(relative))
-}
-
 fn write_yaml(path: &Path, value: &impl Serialize) -> Result<()> {
     let content = serde_yaml::to_string(value).map_err(|source| Error::RenderYaml {
         path: path.to_path_buf(),
@@ -408,19 +357,6 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
     write_text(path, &format!("{content}\n"))
 }
 
-fn write_text(path: &Path, content: &str) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|source| Error::Write {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-    fs::write(path, content).map_err(|source| Error::Write {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
 fn push_id_list(output: &mut String, title: &str, ids: &[String]) {
     output.push_str(&format!("## {title}\n\n"));
     if ids.is_empty() {
@@ -431,10 +367,6 @@ fn push_id_list(output: &mut String, title: &str, ids: &[String]) {
         }
     }
     output.push('\n');
-}
-
-fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
 }
 
 #[cfg(test)]
@@ -469,7 +401,7 @@ mod tests {
         };
 
         assert_eq!(
-            topological_package_order(&manifest),
+            super::super::topological_package_order(&manifest),
             vec!["shared", "app", "wrapper"]
         );
     }

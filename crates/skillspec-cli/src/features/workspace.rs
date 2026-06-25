@@ -6,8 +6,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+mod converge;
 mod import;
 
+pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
 pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
 
 pub const WORKSPACE_SCHEMA: &str = "skillspec/workspace/v0";
@@ -978,6 +980,58 @@ pub(super) fn manifest_relative_path(value: &str) -> Option<PathBuf> {
     (!normalized.as_os_str().is_empty()).then_some(normalized)
 }
 
+pub(super) fn output_package_dir(package: &WorkspacePackage, build_root: &Path) -> Result<PathBuf> {
+    let relative = manifest_relative_path(&package.path).ok_or_else(|| Error::InvalidInput {
+        message: format!(
+            "package {} path must be a relative workspace path without parent components: {}",
+            package.package_id, package.path
+        ),
+    })?;
+    Ok(build_root.join(relative))
+}
+
+pub(super) fn topological_package_order(manifest: &WorkspaceManifest) -> Vec<String> {
+    let mut dependents = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut remaining_dependency_counts = BTreeMap::<String, usize>::new();
+    for package in manifest.packages.values() {
+        remaining_dependency_counts.insert(package.package_id.clone(), package.depends_on.len());
+        for dependency in &package.depends_on {
+            dependents
+                .entry(dependency.clone())
+                .or_default()
+                .insert(package.package_id.clone());
+        }
+    }
+
+    let mut ready = remaining_dependency_counts
+        .iter()
+        .filter_map(|(package_id, count)| (*count == 0).then_some(package_id.clone()))
+        .collect::<BTreeSet<_>>();
+    let mut order = Vec::new();
+    while let Some(package_id) = ready.pop_first() {
+        order.push(package_id.clone());
+        if let Some(children) = dependents.get(&package_id) {
+            for child in children {
+                if let Some(count) = remaining_dependency_counts.get_mut(child) {
+                    *count = count.saturating_sub(1);
+                    if *count == 0 {
+                        ready.insert(child.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if order.len() != manifest.packages.len() {
+        for package_id in manifest.packages.keys() {
+            if !order.contains(package_id) {
+                order.push(package_id.clone());
+            }
+        }
+    }
+    order
+}
+
 fn trim_reference(raw: &str) -> &str {
     raw.trim_end_matches(|ch: char| {
         matches!(
@@ -1149,7 +1203,7 @@ fn write_manifest(path: &Path, manifest: &WorkspaceManifest) -> Result<()> {
     write_text(path, &content)
 }
 
-fn write_text(path: &Path, content: &str) -> Result<()> {
+pub(super) fn write_text(path: &Path, content: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
             path: parent.to_path_buf(),
@@ -1179,7 +1233,7 @@ fn display_paths(paths: &[PathBuf]) -> String {
         .join(", ")
 }
 
-fn path_to_string(path: &Path) -> String {
+pub(super) fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 

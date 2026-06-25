@@ -531,6 +531,7 @@ fn help_lists_trace_align_arguments() {
     assert!(workspace_help.contains("map"));
     assert!(workspace_help.contains("validate"));
     assert!(workspace_help.contains("import"));
+    assert!(workspace_help.contains("converge"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -5028,6 +5029,23 @@ Read `../coding-standards/SKILL.md`.
         .output()
         .unwrap();
     assert_success(&validate_review);
+
+    let converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&converge);
+    let converge_report = json_stdout(&converge);
+    assert_eq!(converge_report["ok"], true);
+    assert_eq!(converge_report["ready"].as_array().unwrap().len(), 2);
+    assert!(converge_report["failed"].as_array().unwrap().is_empty());
+    assert!(converge_report["blocked"].as_array().unwrap().is_empty());
+    assert!(build.join("workspace-converge.report.md").is_file());
 }
 
 #[test]
@@ -5098,6 +5116,35 @@ Read `../bad/SKILL.md`.
     assert!(build.join("good").join("skill.spec.yml").is_file());
     assert!(!build.join("uses-bad").join("skill.spec.yml").is_file());
     assert!(build.join("workspace-import.report.md").is_file());
+
+    let converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&converge);
+    let converge_report = json_stdout(&converge);
+    assert_eq!(converge_report["ok"], false);
+    assert!(converge_report["ready"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "good"));
+    assert!(converge_report["failed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "bad"));
+    assert!(converge_report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "uses-bad"));
+    assert!(build.join("workspace-converge.report.md").is_file());
 }
 
 #[test]
@@ -5180,6 +5227,47 @@ fn import_skill_rejects_parent_folder_with_multiple_skills() {
     let err = stderr(&import);
     assert!(err.contains("expects one atomic skill package"));
     assert!(err.contains("skillspec workspace map"));
+}
+
+#[test]
+fn import_skill_keeps_reference_only_imports_connected() {
+    let dir = TempDir::new("import-reference-only");
+    let skill_dir = dir.path().join("source-skill");
+    let out = dir.path().join("draft").join("skill.spec.yml");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"---
+name: reference-only
+description: Reference-only import fixture.
+---
+# Reference Only
+
+Load VOCABULARY.md when terms matter.
+"#,
+    );
+    write_file(
+        &skill_dir.join("VOCABULARY.md"),
+        "# Vocabulary\n\nNo code here.\n",
+    );
+
+    let import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    let yaml = fs::read_to_string(&out).unwrap();
+    assert!(yaml.contains("kind: snippet"));
+    assert!(yaml.contains("id: source_summary"));
 }
 
 #[test]

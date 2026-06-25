@@ -407,6 +407,20 @@ pub(super) enum WorkspaceCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Verify generated workspace package drafts against the manifest",
+        long_about = "Converge a workspace build by verifying every manifest package has a ready generated skill.spec.yml or an explicit failure, checking package specs and dependency readiness, and writing workspace-converge.report.md. This does not compile, install, or refresh router indexes."
+    )]
+    Converge {
+        /// Path to skillspec.workspace.yml.
+        manifest: PathBuf,
+        /// Build root containing mirrored package outputs.
+        #[arg(long = "build-root")]
+        build_root: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

@@ -248,6 +248,22 @@ pub(super) fn run(command: Command) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+            WorkspaceCommand::Converge {
+                manifest,
+                build_root,
+                json,
+            } => {
+                let converge_report = workspace::converge_workspace(&manifest, &build_root)?;
+                let ok = converge_report.ok;
+                if json {
+                    report::json(&converge_report)?;
+                } else {
+                    report::text(&workspace::render_converge_report(&converge_report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
         },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {
