@@ -415,15 +415,6 @@ dependencies:
       required: true
       reason: Fetches public network documentation.
       safety: network_read
-  rg_cli:
-    kind: cli
-    description: Fast local inventory for existing projects and generated files.
-    command: rg
-    check:
-      command: rg
-    permission:
-      required: false
-      safety: local_read
   npm_cli:
     kind: cli
     description: Required for TypeScript project build checks.
@@ -641,11 +632,11 @@ commands:
         - curl_cli
   inspect_project_files:
     description: Inventory a project before choosing language, transport, and build commands.
-    template: rg --files <project-root>
+    template: python3 -c "import pathlib, sys; root = pathlib.Path(sys.argv[1]); [print(path.relative_to(root)) for path in root.rglob('*') if path.is_file()]" <project-root>
     safety: local_read
     requires:
       dependencies:
-        - rg_cli
+        - python_cli
   typescript_build_check:
     description: Build a TypeScript MCP server.
     template: npm run build
