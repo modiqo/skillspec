@@ -1,34 +1,10 @@
-mod act;
-mod align;
-mod capability;
-mod command_path;
-mod compiler;
-mod decision;
-mod deps;
-mod doctor;
-mod durable_lifecycle;
-mod error;
-mod grammar;
-mod import_dependency_ledger;
-mod importer;
-mod imports;
-mod install;
-mod model;
-mod parser;
-mod progress;
-mod report;
-mod router;
-mod router_lifecycle;
-mod sensemake;
-mod source_map;
-mod status;
-mod trace;
-mod visibility;
-mod workspace_synthesizer;
-
 use clap::{Parser, Subcommand, ValueEnum};
-use error::Result;
-use install::HarnessTarget;
+use skillspec::{
+    act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
+    importer, imports, install, model, parser, progress, report, router, router_lifecycle,
+    sensemake, source_map, status, trace, visibility, workspace_synthesizer,
+};
+use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
 use std::path::PathBuf;
 
