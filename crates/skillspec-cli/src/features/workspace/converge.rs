@@ -144,7 +144,8 @@ pub fn converge_workspace(
         dependency_edges: dependency_edges(&manifest),
         packages: package_reports,
         next: vec![format!(
-            "review ready package drafts under {}, then compile packages individually with `skillspec compile <package>/skill.spec.yml --target <target>`; workspace compile is Phase 6",
+            "skillspec workspace compile {} --build-root {} --target <target>",
+            manifest_path.display(),
             build_root.display()
         )],
     };

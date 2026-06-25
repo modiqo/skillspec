@@ -31,7 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
-| `workspace <COMMAND>` | Map, validate, fanout-import, and converge multi-skill workspaces. |
+| `workspace <COMMAND>` | Map, validate, fanout-import, converge, and compile multi-skill workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -332,6 +332,7 @@ Subcommands:
 - `validate <skillspec.workspace.yml> [--json]`
 - `import <skillspec.workspace.yml> --out <build-root> [--json]`
 - `converge <skillspec.workspace.yml> --build-root <build-root> [--json]`
+- `compile <skillspec.workspace.yml> --build-root <build-root> --target <target> [--json]`
 
 `workspace` is the authoring-side structure recon surface for repositories that
 contain multiple atomic skill packages. It is separate from `skillspec index`,
@@ -441,6 +442,33 @@ whose dependencies are not ready, and writes:
 - `<BUILD_ROOT>/workspace-converge.report.md`
 
 It does not compile loaders, install skills, or refresh router indexes.
+
+### `workspace compile`
+
+```text
+skillspec workspace compile <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: parent folder containing mirrored package
+  outputs from `workspace import`.
+- `--target <TARGET>`: loader target to generate. Values are `codex-skill` and
+  `claude-skill`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace compile` rechecks convergence, then compiles every ready package spec
+into a generated `SKILL.md` loader under its package folder. It blocks
+dependents whose dependencies did not compile and writes:
+
+- `<BUILD_ROOT>/workspace-compile.report.md`
+- `<BUILD_ROOT>/<package>/SKILL.md`
+
+It does not install skills or refresh router indexes.
 
 ### `source coverage`
 

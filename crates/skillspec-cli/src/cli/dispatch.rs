@@ -264,6 +264,24 @@ pub(super) fn run(command: Command) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+            WorkspaceCommand::Compile {
+                manifest,
+                build_root,
+                target,
+                json,
+            } => {
+                let compile_report =
+                    workspace::compile_workspace(&manifest, &build_root, target.into())?;
+                let ok = compile_report.ok;
+                if json {
+                    report::json(&compile_report)?;
+                } else {
+                    report::text(&workspace::render_compile_report(&compile_report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
         },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {
