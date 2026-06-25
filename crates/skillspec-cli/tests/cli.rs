@@ -678,10 +678,12 @@ description: Helps with notes.
     assert_success(&route);
     let route_report = json_stdout(&route);
     assert_eq!(route_report["selected"]["name"], "pdf");
-    assert!(route_report["selected"]["path"]
-        .as_str()
-        .unwrap()
-        .ends_with("/pdf/SKILL.md"));
+    assert_eq!(
+        Path::new(route_report["selected"]["path"].as_str().unwrap())
+            .strip_prefix(&root)
+            .unwrap(),
+        Path::new("pdf").join("SKILL.md")
+    );
     assert_eq!(route_report["selected"]["visibility"], "manual-only");
     assert_eq!(route_report["selected"]["has_skill_spec"], true);
     assert_eq!(
@@ -4384,8 +4386,14 @@ print("hello")
         .arg(&out)
         .output()
         .unwrap();
-    assert_success(&deps_check);
-    assert!(stdout(&deps_check).contains("deps.toml exists"));
+    let deps_report = json_stdout(&deps_check);
+    assert!(deps_report["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|dependency| dependency["id"] == "dependency_ledger"
+            && dependency["status"] == "present"
+            && dependency["message"] == "deps.toml exists"));
 }
 
 #[test]
