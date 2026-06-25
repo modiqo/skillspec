@@ -28,8 +28,8 @@ Use these evidence levels when reviewing a claim.
 
 `P0`: implementation source.
 
-Examples: `model.rs`, `parser.rs`, `decision.rs`, `sensemake.rs`, `imports.rs`,
-`deps.rs`, `trace.rs`, `align.rs`, `compiler.rs`, `importer.rs`, `main.rs`.
+Examples include the `spec/`, `execution/`, `features/`, and `cli/` modules
+under `crates/skillspec-cli/src/`.
 
 `P1`: formal reference source.
 
@@ -154,37 +154,37 @@ Use focused source searches before committing.
 For grammar fields:
 
 ```sh
-rg -n "pub struct SkillSpec|deny_unknown_fields|pub struct Expectation" crates/skillspec-cli/src/model.rs
+rg -n "pub struct SkillSpec|deny_unknown_fields|pub struct Expectation" crates/skillspec-cli/src/spec/model.rs
 ```
 
 For parser validation:
 
 ```sh
-rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-cli/src/parser.rs
+rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-cli/src/spec/parser.rs
 ```
 
 For decision behavior:
 
 ```sh
-rg -n "default_route_order|matches_predicate|apply_rule|RouteSelectionBasis|dedupe_strings" crates/skillspec-cli/src/decision.rs
+rg -n "default_route_order|matches_predicate|apply_rule|RouteSelectionBasis|dedupe_strings" crates/skillspec-cli/src/execution/decision.rs
 ```
 
 For sensemaking:
 
 ```sh
-rg -n "SensemakeReport|navigation|outgoing_refs|select_value|query_hints" crates/skillspec-cli/src/sensemake.rs
+rg -n "SensemakeReport|navigation|outgoing_refs|select_value|query_hints" crates/skillspec-cli/src/features/sensemake.rs
 ```
 
 For imports:
 
 ```sh
-rg -n "import path must be local and relative|topological_load_order|markdown_has_section" crates/skillspec-cli/src/imports.rs
+rg -n "import path must be local and relative|topological_load_order|markdown_has_section" crates/skillspec-cli/src/spec/imports.rs
 ```
 
 For traces and alignment:
 
 ```sh
-rg -n "TraceEnvelope|write_decision_trace|AlignReport|AlignStatus|obligations_for|report_status" crates/skillspec-cli/src/trace.rs crates/skillspec-cli/src/align.rs
+rg -n "TraceEnvelope|write_decision_trace|AlignReport|AlignStatus|obligations_for|report_status" crates/skillspec-cli/src/execution/trace.rs crates/skillspec-cli/src/execution/align.rs
 ```
 
 ## Final Repo QA
@@ -251,5 +251,5 @@ If the doc cannot answer those questions, it needs another pass.
 
 This doc is grounded in the QA pattern used for the design docs in this
 directory and the repository source map in `docs/design/README.md`. It also
-reflects the repo's existing command surface in `crates/skillspec-cli/src/main.rs`
+reflects the repo's existing command surface in `crates/skillspec-cli/src/cli/mod.rs`
 and the implementation files cited throughout the design-doc set.

@@ -11,7 +11,7 @@ It answers four questions for each command:
 - What does a realistic invocation look like?
 
 This document is not the formal command reference. The source of truth remains
-the clap command tree in `crates/skillspec-cli/src/main.rs` and the reference
+the clap command tree in `crates/skillspec-cli/src/cli/mod.rs` and the reference
 inventory in `spec/commandspec.md`. If this table disagrees with the CLI help or
 reference spec, this table is wrong.
 
@@ -161,11 +161,21 @@ binary.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/main.rs`, which defines the clap command tree;
+- `crates/skillspec-cli/src/cli/mod.rs`, which defines the clap command tree;
 - `spec/commandspec.md`, which is the reference command inventory;
-- `crates/skillspec-cli/src/act.rs`, `progress.rs`, `align.rs`, `grammar.rs`,
-  `deps.rs`, `imports.rs`, `compiler.rs`, `importer.rs`, `install.rs`,
-  `router.rs`, `visibility.rs`, `router_lifecycle.rs`,
-  `durable_lifecycle.rs`, and `capability.rs`,
-  which implement the listed command behavior;
+- `crates/skillspec-cli/src/execution/act.rs`,
+  `crates/skillspec-cli/src/execution/progress.rs`,
+  `crates/skillspec-cli/src/execution/align.rs`,
+  `crates/skillspec-cli/src/execution/deps.rs`,
+  `crates/skillspec-cli/src/spec/grammar.rs`,
+  `crates/skillspec-cli/src/spec/imports.rs`,
+  `crates/skillspec-cli/src/features/compiler.rs`,
+  `crates/skillspec-cli/src/features/importer.rs`,
+  `crates/skillspec-cli/src/features/capability.rs`,
+  `crates/skillspec-cli/src/lifecycle/install.rs`,
+  `crates/skillspec-cli/src/lifecycle/router.rs`,
+  `crates/skillspec-cli/src/lifecycle/visibility.rs`,
+  `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, and
+  `crates/skillspec-cli/src/lifecycle/durable_lifecycle.rs`, which implement
+  the listed command behavior;
 - `skillspec --help` and subcommand help output from the current local binary.

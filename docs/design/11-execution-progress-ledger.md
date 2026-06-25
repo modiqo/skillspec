@@ -347,10 +347,10 @@ ledger is the machine-readable progress memory.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/progress.rs`, which defines progress reports,
+- `crates/skillspec-cli/src/execution/progress.rs`, which defines progress reports,
   execution events, event recording, and progress derivation;
-- `crates/skillspec-cli/src/main.rs`, which exposes `progress show` and
+- `crates/skillspec-cli/src/cli/mod.rs`, which exposes `progress show` and
   `progress record`;
-- `crates/skillspec-cli/src/align.rs`, which consumes structured execution
+- `crates/skillspec-cli/src/execution/align.rs`, which consumes structured execution
   traces for obligation proof;
 - `spec/commandspec.md`, which lists the CLI arguments and event values.

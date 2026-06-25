@@ -2,7 +2,7 @@
 
 This document is the review-facing inventory for the `skillspec` CLI. The
 runtime source of truth is the clap command tree in
-`crates/skillspec-cli/src/main.rs`; this inventory exists so reviewers can scan
+`crates/skillspec-cli/src/cli/mod.rs`; this inventory exists so reviewers can scan
 the public command surface and spot missing docs, tests, or help text.
 
 When adding or changing a command:

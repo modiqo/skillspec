@@ -226,13 +226,13 @@ that claim.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/model.rs`, which defines `State`, `RouteHandoff`,
+- `crates/skillspec-cli/src/spec/model.rs`, which defines `State`, `RouteHandoff`,
   `HandoffBoundary`, `ExecutionPlan`, `ExecutionPhase`, and `ExecutionJump`;
-- `crates/skillspec-cli/src/parser.rs`, which validates state references and
+- `crates/skillspec-cli/src/spec/parser.rs`, which validates state references and
   route ids;
-- `crates/skillspec-cli/src/decision.rs`, which attaches the selected route's
+- `crates/skillspec-cli/src/execution/decision.rs`, which attaches the selected route's
   execution plan to the decision;
-- `crates/skillspec-cli/src/sensemake.rs`, which exposes state refs and route
+- `crates/skillspec-cli/src/features/sensemake.rs`, which exposes state refs and route
   execution-plan refs;
 - `spec/semantics.md`, which states that v0 state transitions are descriptive
   and not a general-purpose workflow runtime;

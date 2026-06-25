@@ -302,13 +302,13 @@ This doc is grounded in:
 
 - `spec/trace.md`, which defines the decision trace contract and the alignment
   purpose;
-- `crates/skillspec-cli/src/trace.rs`, which writes trace envelopes, run
+- `crates/skillspec-cli/src/execution/trace.rs`, which writes trace envelopes, run
   directories, compact JSONL, summaries, event selection, spec fingerprints, and
   input hashes;
-- `crates/skillspec-cli/src/main.rs`, which enforces `trace.required` for
+- `crates/skillspec-cli/src/cli/mod.rs`, which enforces `trace.required` for
   `decide` and `explain`;
-- `crates/skillspec-cli/src/align.rs`, which defines the alignment report,
+- `crates/skillspec-cli/src/execution/align.rs`, which defines the alignment report,
   statuses, layers, obligations, proof rows, execution ledger, and pass/fail/
   unproven rules;
-- `crates/skillspec-cli/src/decision.rs`, which emits decision events for trace
+- `crates/skillspec-cli/src/execution/decision.rs`, which emits decision events for trace
   writing.
