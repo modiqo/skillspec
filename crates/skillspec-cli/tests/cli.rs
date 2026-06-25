@@ -527,14 +527,16 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&workspace);
     let workspace_help = stdout(&workspace);
-    assert!(workspace_help
-        .contains("Map, validate, import, compile, and install multi-skill workspaces"));
+    assert!(workspace_help.contains(
+        "Map, validate, import, converge, compile, and install multi-skill or plugin-shaped workspaces"
+    ));
     assert!(workspace_help.contains("map"));
     assert!(workspace_help.contains("validate"));
     assert!(workspace_help.contains("import"));
     assert!(workspace_help.contains("converge"));
     assert!(workspace_help.contains("compile"));
     assert!(workspace_help.contains("install"));
+    assert!(workspace_help.contains("plugin-shaped"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -2809,6 +2811,48 @@ commands:
     assert!(out.contains("diagnose prose reliability debt"));
     assert!(out.contains("skillspec doctor <source-skill-folder-or-uri> --json"));
     assert!(out.contains("run doctor before import"));
+}
+
+#[test]
+fn sensemake_teaches_workspace_authoring_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-workspace");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Workspace authoring fixture.
+commands:
+  workspace_map_source:
+    description: Map a multi-skill or plugin-shaped source root.
+    template: skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml
+    safety: local_write
+  workspace_validate_manifest:
+    description: Validate the workspace graph.
+    template: skillspec workspace validate <build>/skillspec.workspace.yml
+    safety: local_read
+  workspace_import_packages:
+    description: Fanout import the workspace graph.
+    template: skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build>
+    safety: local_write
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("map workspace source root"));
+    assert!(
+        out.contains("skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml")
+    );
+    assert!(out.contains("fanout import workspace packages"));
+    assert!(out.contains("multi-skill or plugin-shaped source roots"));
 }
 
 #[test]

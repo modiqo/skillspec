@@ -146,7 +146,9 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: SourceCommand,
     },
-    #[command(about = "Map, validate, import, compile, and install multi-skill workspaces")]
+    #[command(
+        about = "Map, validate, import, converge, compile, and install multi-skill or plugin-shaped workspaces"
+    )]
     Workspace {
         #[command(subcommand)]
         command: WorkspaceCommand,
@@ -383,7 +385,7 @@ pub(super) enum SourceCommand {
 #[derive(Debug, Subcommand)]
 pub(super) enum WorkspaceCommand {
     #[command(
-        about = "Create a skillspec.workspace.yml graph from a folder with one or more SKILL.md packages",
+        about = "Create a skillspec.workspace.yml graph from a folder with SKILL.md packages or plugin-shaped roots",
         long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
     )]
     Map {

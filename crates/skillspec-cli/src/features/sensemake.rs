@@ -118,6 +118,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_workspace_authoring(spec) {
+        items.push(
+            "for multi-skill or plugin-shaped source roots, run workspace map/validate before fanout import; use workspace converge before compile and workspace install dry-run before writing harness roots"
+                .to_owned(),
+        );
+    }
     if has_retire_existing_install(spec) {
         items.push(
             "for installs that replace an existing active prose skill, ask for retirement approval and use --retire-existing so the old skill is backed up outside harness discovery roots"
@@ -512,6 +518,44 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_workspace_authoring(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "map workspace source root",
+                command:
+                    "skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "validate workspace graph",
+                command: "skillspec workspace validate <build>/skillspec.workspace.yml".to_owned(),
+            },
+            NavigationHint {
+                intent: "fanout import workspace packages",
+                command:
+                    "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build>"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "converge workspace build",
+                command:
+                    "skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build>"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "compile workspace build",
+                command:
+                    "skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "dry-run workspace install",
+                command:
+                    "skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run"
+                        .to_owned(),
+            },
+        ]);
+    }
     if has_retire_existing_install(spec) {
         hints.extend([
             NavigationHint {
@@ -578,6 +622,18 @@ fn has_source_import(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("import-skill"))
+}
+
+fn has_workspace_authoring(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("workspace_map_source")
+        || spec.commands.contains_key("workspace_import_packages")
+        || spec.commands.contains_key("workspace_converge_build")
+        || spec.commands.contains_key("workspace_compile_build")
+        || spec.commands.contains_key("workspace_install_packages")
+        || spec
+            .commands
+            .values()
+            .any(|command| command.template.contains("skillspec workspace "))
 }
 
 fn has_doctor(spec: &SkillSpec) -> bool {

@@ -31,7 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
-| `workspace <COMMAND>` | Map, validate, fanout-import, converge, and compile multi-skill workspaces. |
+| `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |

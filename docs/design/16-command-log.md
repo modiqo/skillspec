@@ -149,8 +149,8 @@ The command surface has three layers:
 
 - Runtime navigation and proof: `sensemake`, `decide`, `plan`, `act`,
   `progress`, and `trace align`.
-- Authoring and QA: `validate`, `test`, `query`, `refs`, `source`, `grammar`,
-  `imports`, `deps`, `compile`, `import-skill`, and `install`.
+- Authoring and QA: `validate`, `test`, `query`, `refs`, `source`, `workspace`,
+  `grammar`, `imports`, `deps`, `compile`, `import-skill`, and `install`.
 - Large skill discovery: `index`, `route`, `skills`, `visibility`, and
   `router`.
 - Durable lifecycle and bootstrap: `durable-executor` and `capability`.
