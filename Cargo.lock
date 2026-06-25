@@ -953,6 +953,7 @@ dependencies = [
  "clap",
  "jsonschema",
  "markdown",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

@@ -3210,6 +3210,110 @@ imports:
 }
 
 #[test]
+fn validate_rejects_missing_generated_package_sidecars() {
+    let dir = TempDir::new("validate-package-sidecars");
+    let skill_dir = dir.path().join("skill");
+    let spec = skill_dir.join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.sidecars
+title: CLI Sidecars
+description: Exercises generated package sidecar validation.
+routes:
+  - id: local
+    label: Local
+dependencies:
+  dependency_ledger:
+    kind: file
+    path: deps.toml
+resources:
+  helper_script:
+    path: resources/helper.py
+    role: script
+    used_by:
+      - kind: code
+        id: helper
+code:
+  helper:
+    language: python
+    kind: runnable_script
+    source:
+      file: resources/helper.py
+      from_resource: helper_script
+"#,
+    );
+
+    let missing = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&missing);
+    let missing_error = stderr(&missing);
+    assert!(missing_error.contains("package sidecar validation failed"));
+    assert!(missing_error.contains("deps.toml missing"));
+    assert!(missing_error.contains("resources/helper.py missing"));
+
+    write_file(&skill_dir.join("deps.toml"), "");
+    let empty_ledger = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&empty_ledger);
+    assert!(stderr(&empty_ledger).contains("deps.toml exists but is empty"));
+
+    write_file(
+        &skill_dir.join("deps.toml"),
+        "schema_version = 1\ndependency_count = 0\n",
+    );
+    write_file(&skill_dir.join("resources/helper.py"), "print('ok')\n");
+    let valid = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&valid);
+
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.sidecars
+title: CLI Sidecars
+description: Exercises generated package sidecar validation.
+routes:
+  - id: local
+    label: Local
+resources:
+  helper_script:
+    path: resources/other.py
+    role: script
+    used_by:
+      - kind: code
+        id: helper
+code:
+  helper:
+    language: python
+    kind: runnable_script
+    source:
+      file: resources/helper.py
+      from_resource: helper_script
+"#,
+    );
+    write_file(&skill_dir.join("resources/other.py"), "print('other')\n");
+    let mismatch = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_failure(&mismatch);
+    assert!(stderr(&mismatch).contains("does not match code file"));
+}
+
+#[test]
 fn imports_check_reports_nested_load_order_across_path_depths() {
     let dir = TempDir::new("imports-nested");
     let spec = dir.path().join("skill.spec.yml");
@@ -5339,6 +5443,11 @@ fn synthesize_from_workspace_generates_valid_review_scaffold() {
     let deps = dir.path().join("deps.txt");
     let out = dir.path().join("profile-enricher");
     let path = write_failing_rote(dir.path());
+    #[cfg(unix)]
+    write_executable(
+        &dir.path().join("bin").join("parallel-cli"),
+        "#!/bin/sh\nexit 0\n",
+    );
 
     write_file(
         &stats,
@@ -5353,9 +5462,13 @@ Result tokens: 1200
         &log,
         r#"
 [
-  {"sequence":1,"command":"rote exec -- parallel web enrich --profile input.json --out enriched.json"},
-  {"sequence":2,"command":"rote query @22 '.json' -r"},
-  {"sequence":3,"command":"jq . enriched.json"}
+  {"sequence":1,"command":"rote exec -- which parallel-cli"},
+  {"sequence":2,"command":"rote exec -- parallel-cli --version"},
+  {"sequence":3,"command":"rote exec -- parallel-cli auth status"},
+  {"sequence":4,"command":"rote exec -- parallel-cli auth"},
+  {"sequence":5,"command":"rote exec -- parallel-cli enrich run --data '[{\"name\":\"Example Person\"}]' --intent 'Find public professional profile facts' --processor base-fast --json --dry-run"},
+  {"sequence":6,"command":"rote exec -- parallel-cli enrich run --data '[{\"name\":\"Example Person\"}]' --target enriched-profiles.csv --intent 'Find public professional profile facts' --processor base-fast --json --dry-run"},
+  {"sequence":7,"command":"rote exec -- parallel-cli enrich run --data '[{\"name\":\"Example Person\"}]' --target enriched-profiles.csv --intent 'Find public professional profile facts' --processor base-fast --json"}
 ]
 "#,
     );
@@ -5363,7 +5476,7 @@ Result tokens: 1200
         &meta,
         r#"
 name = profile-enrichment
-strategy = durable
+strategy = completed-cli
 "#,
     );
     write_file(
@@ -5395,8 +5508,12 @@ strategy = durable
         .unwrap();
     assert_success(&output);
     let report = json_stdout(&output);
-    assert_eq!(report["workspace"], "profile-enrichment");
-    assert_eq!(report["observed_command_candidates"], 2);
+    assert!(report["workspace"].is_null());
+    assert_eq!(
+        report["deps_path"],
+        out.join("deps.toml").display().to_string()
+    );
+    assert!(report["command_candidates"].as_u64().unwrap() >= 5);
     assert!(report["inferred_dependencies"]
         .as_array()
         .unwrap()
@@ -5405,29 +5522,30 @@ strategy = durable
 
     let spec = out.join("skill.spec.yml");
     assert!(spec.is_file());
-    assert!(out.join("resources/observed-workspace/report.md").is_file());
-    assert!(out.join("resources/observed-workspace/stats.txt").is_file());
-    assert!(out.join("resources/observed-workspace/log.txt").is_file());
-    assert!(out.join("resources/observed-workspace/meta.txt").is_file());
-    assert!(out.join("resources/observed-workspace/deps.txt").is_file());
-    assert!(out
-        .join("resources/observed-workspace/coverage-matrix.md")
-        .is_file());
-    assert!(out
-        .join("resources/observed-workspace/parameterization.md")
-        .is_file());
-    assert!(out
-        .join("resources/observed-workspace/privacy-and-ambiguity.md")
-        .is_file());
+    assert!(out.join("deps.toml").is_file());
+    assert!(!out.join("resources/observed-workspace/report.md").exists());
+    assert!(!out.join("resources/observed-workspace/stats.txt").exists());
+    assert!(!out.join("resources/observed-workspace/log.txt").exists());
+    assert!(!out.join("resources/observed-workspace/meta.txt").exists());
+    assert!(!out.join("resources/observed-workspace/deps.txt").exists());
 
     let yaml = fs::read_to_string(&spec).unwrap();
+    assert!(yaml.contains("id: parallel_profile_enricher"));
     assert!(yaml.contains("parallel_cli"));
-    assert!(yaml.contains("observed_workspace_report"));
-    assert!(yaml.contains("observed_command_1"));
-    assert!(yaml.contains("approve_observed_result_for_synthesis"));
-    assert!(yaml.contains("synthesize_without_observation_approval"));
-    assert!(!yaml.contains("rote exec -- parallel"));
-    assert!(!yaml.contains("rote query @22"));
+    assert!(yaml.contains("dependency_ledger"));
+    assert!(yaml.contains("path: deps.toml"));
+    assert!(yaml.contains("profile_enrichment_cli"));
+    assert!(yaml.contains("provide_profile_enrichment_inputs"));
+    assert!(yaml.contains("people_json"));
+    assert!(yaml.contains("cli_enrich_dry_run"));
+    assert!(yaml.contains("use_auth_status_subcommand"));
+    assert!(yaml.contains("omit_target_option"));
+    assert!(!yaml.to_ascii_lowercase().contains("durable"));
+    assert!(!yaml.to_ascii_lowercase().contains("workspace"));
+    assert!(!yaml.to_ascii_lowercase().contains("observed"));
+    assert!(!yaml.to_ascii_lowercase().contains("rote"));
+    assert!(!yaml.contains("Example Person"));
+    assert!(!yaml.contains("Find public professional profile facts"));
 
     let validate = Command::new(bin())
         .arg("validate")
@@ -5444,6 +5562,89 @@ strategy = durable
         .output()
         .unwrap();
     assert_success(&imports);
+
+    let ledger = fs::read_to_string(out.join("deps.toml")).unwrap();
+    assert!(ledger.contains("generated_by = \"skillspec synthesize-from-workspace\""));
+    assert!(ledger.contains("dependency_count = "));
+    assert!(ledger.contains("id = \"parallel-cli\""));
+    assert!(!ledger.contains("id = \"dependency_ledger\""));
+
+    let deps_check = Command::new(bin())
+        .arg("deps")
+        .arg("check")
+        .arg(&spec)
+        .env("PATH", &path)
+        .output()
+        .unwrap();
+    assert_success(&deps_check);
+    let deps_report = json_stdout(&deps_check);
+    assert!(deps_report["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|dependency| dependency["id"] == "dependency_ledger"
+            && dependency["status"] == "present"
+            && dependency["message"] == "deps.toml exists"));
+}
+
+#[test]
+fn synthesize_from_workspace_preserves_detected_cli_name() {
+    let dir = TempDir::new("synthesize-workspace-cli-name");
+    let stats = dir.path().join("stats.txt");
+    let log = dir.path().join("log.json");
+    let meta = dir.path().join("meta.txt");
+    let out = dir.path().join("stripe-flow");
+    let path = write_failing_rote(dir.path());
+
+    write_file(&stats, "Workspace: stripe-flow\nTotal tokens: 200\n");
+    write_file(
+        &log,
+        r#"
+[
+  {"sequence":1,"command":"rote exec -- which stripe"},
+  {"sequence":2,"command":"rote exec -- STRIPE_API_KEY=test stripe customers list --limit 1"}
+]
+"#,
+    );
+    write_file(&meta, "name = stripe-flow\n");
+
+    let output = Command::new(bin())
+        .arg("synthesize-from-workspace")
+        .arg("stripe-flow")
+        .arg("--task")
+        .arg("run stripe customers list")
+        .arg("--out")
+        .arg(&out)
+        .arg("--workspace-stats-report")
+        .arg(&stats)
+        .arg("--workspace-log")
+        .arg(&log)
+        .arg("--workspace-meta")
+        .arg(&meta)
+        .arg("--observation-approved")
+        .arg("--json")
+        .env("PATH", &path)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    let dependencies = report["inferred_dependencies"].as_array().unwrap();
+    assert!(dependencies.iter().any(|dependency| dependency == "stripe"));
+    assert!(!dependencies
+        .iter()
+        .any(|dependency| dependency == "stripe_cli"));
+    assert!(!dependencies.iter().any(|dependency| dependency == "which"));
+
+    let yaml = fs::read_to_string(out.join("skill.spec.yml")).unwrap();
+    assert!(yaml.contains("  stripe:"));
+    assert!(yaml.contains("command: stripe"));
+    assert!(yaml.contains("stripe --version"));
+    let ledger = fs::read_to_string(out.join("deps.toml")).unwrap();
+    assert!(ledger.contains("id = \"stripe\""));
+    assert!(!ledger.contains("id = \"stripe_cli\""));
+    assert!(!yaml.contains("stripe_cli"));
+    assert!(!yaml.contains("parallel_cli"));
+    assert!(!yaml.contains("parallel-cli"));
 }
 
 #[test]
@@ -5477,10 +5678,8 @@ fn synthesize_from_workspace_requires_observation_approval() {
         .output()
         .unwrap();
     assert_failure(&output);
-    assert!(stderr(&output).contains("observed output approval is required"));
-    assert!(
-        stderr(&output).contains("Is this satisfactory enough to synthesize a reusable SkillSpec")
-    );
+    assert!(stderr(&output).contains("CLI interaction approval is required"));
+    assert!(stderr(&output).contains("Command candidates: 1"));
     assert!(stderr(&output).contains("--observation-approved"));
     assert!(!out.join("skill.spec.yml").exists());
 }
@@ -5512,7 +5711,7 @@ fn synthesize_from_workspace_requires_command_log_entries() {
         .output()
         .unwrap();
     assert_failure(&output);
-    assert!(stderr(&output).contains("workspace command log evidence has no command entries"));
+    assert!(stderr(&output).contains("CLI interaction transcript has no command entries"));
     assert!(!out.join("skill.spec.yml").exists());
 }
 
@@ -5535,7 +5734,7 @@ fn synthesize_from_workspace_live_collection_reports_context() {
     assert_failure(&output);
     let error = stderr(&output);
     assert!(error.contains("`rote workspace stats profile-enrichment` failed"));
-    assert!(error.contains("workspace: profile-enrichment"));
+    assert!(error.contains("source id: profile-enrichment"));
     assert!(error.contains("invocation cwd:"));
     assert!(error.contains("evidence overrides: stats=live, log=live, meta=live, deps=live"));
     assert!(error.contains("Fallback without workspace name also failed"));

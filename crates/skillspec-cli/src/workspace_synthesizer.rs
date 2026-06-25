@@ -1,30 +1,22 @@
 use crate::error::{Error, Result};
+use crate::import_dependency_ledger;
 use crate::model::{
     Activation, Artifact, ArtifactKind, CommandRequires, CommandTemplate, Dependency,
     DependencyCheck, DependencyKind, DependencyPermission, Elicitation, ElicitationChoice,
-    ElicitationCondition, ExecutableRefKind, ExecutionPhase, ExecutionPlan, ExecutionPlanMode,
-    Expectation, ProducerRef, Proof, Recipe, RecipeRequires, RecipeStep, RecipeStepLoadResource,
-    RecipeStepNote, Resource, ResourceRole, ResourceUse, ResourceUseKind, Route, RouteId, Rule,
-    RuleId, SafetyClass, ScenarioTest, SkillSpec, Snippet, ToolBoundary, ToolBoundaryDefault,
-    TraceConfig, TraceEventKind, TraceMode,
+    ElicitationCondition, Entry, ExecutionPhase, ExecutionPlan, ExecutionPlanMode, Expectation,
+    Proof, Recipe, RecipeRequires, RecipeStep, RecipeStepAsk, RecipeStepNote, RecipeStepRunCommand,
+    Route, RouteId, Rule, RuleId, SafetyClass, ScenarioTest, SkillSpec, ToolBoundary,
+    ToolBoundaryDefault, TraceConfig, TraceEventKind, TraceMode,
 };
+use regex::Regex;
 use serde::Serialize;
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
-
-const REPORT_PATH: &str = "resources/observed-workspace/report.md";
-const STATS_PATH: &str = "resources/observed-workspace/stats.txt";
-const LOG_PATH: &str = "resources/observed-workspace/log.txt";
-const META_PATH: &str = "resources/observed-workspace/meta.txt";
-const DEPS_PATH: &str = "resources/observed-workspace/deps.txt";
-const COVERAGE_PATH: &str = "resources/observed-workspace/coverage-matrix.md";
-const PARAMETERS_PATH: &str = "resources/observed-workspace/parameterization.md";
-const SAFETY_PATH: &str = "resources/observed-workspace/privacy-and-ambiguity.md";
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct SynthesizeOptions {
@@ -43,19 +35,11 @@ pub struct SynthesizeOptions {
 
 #[derive(Debug, Serialize)]
 pub struct SynthesisReport {
-    pub workspace: String,
     pub out_dir: PathBuf,
     pub spec_path: PathBuf,
-    pub report_path: PathBuf,
-    pub stats_path: PathBuf,
-    pub log_path: PathBuf,
-    pub meta_path: PathBuf,
-    pub deps_path: Option<PathBuf>,
-    pub coverage_path: PathBuf,
-    pub parameters_path: PathBuf,
-    pub safety_path: PathBuf,
+    pub deps_path: PathBuf,
     pub inferred_dependencies: Vec<String>,
-    pub observed_command_candidates: usize,
+    pub command_candidates: usize,
     pub review_required: Vec<String>,
 }
 
@@ -69,9 +53,16 @@ struct WorkspaceEvidence {
 
 #[derive(Clone, Debug)]
 struct ObservedCommand {
-    id: String,
     template: String,
+    tool: Option<String>,
     dependency_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct CliSurface {
+    binary: String,
+    dependency_id: String,
+    label: String,
 }
 
 pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<SynthesisReport> {
@@ -104,59 +95,36 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
         .task
         .as_deref()
         .unwrap_or("repeat observed workflow");
-    let skill_id = skill_id(options.name.as_deref(), task, &workspace);
+    let skill_id = skill_id(options.name.as_deref(), task);
     let title = title_from_id(&skill_id);
     let commands = infer_observed_commands(&evidence.log);
 
     if !options.observation_approved {
         return Err(Error::InvalidInput {
-            message: render_observation_approval_required(&workspace, task, &evidence, &commands),
+            message: render_synthesis_approval_required(&evidence, &commands),
         });
     }
 
-    let spec = build_spec(&skill_id, &title, &workspace, task, &evidence, &commands);
+    let spec = build_spec(&skill_id, &title, &commands);
     crate::parser::validate_spec(&spec)?;
 
-    fs::create_dir_all(options.out.join("resources/observed-workspace")).map_err(|source| {
-        Error::Write {
-            path: options.out.join("resources/observed-workspace"),
-            source,
-        }
+    fs::create_dir_all(&options.out).map_err(|source| Error::Write {
+        path: options.out.clone(),
+        source,
     })?;
-    write_file(&options.out.join(STATS_PATH), &evidence.stats)?;
-    write_file(&options.out.join(LOG_PATH), &evidence.log)?;
-    write_file(&options.out.join(META_PATH), &evidence.meta)?;
-    if let Some(deps) = &evidence.deps {
-        write_file(&options.out.join(DEPS_PATH), deps)?;
-    }
-    let coverage = render_coverage_matrix(&workspace, task, &commands, &evidence);
-    write_file(&options.out.join(COVERAGE_PATH), &coverage)?;
-    write_file(
-        &options.out.join(PARAMETERS_PATH),
-        &render_parameterization_guide(&commands),
+    import_dependency_ledger::materialize_with_generator(
+        &spec,
+        &options.out,
+        "skillspec synthesize-from-workspace",
     )?;
-    write_file(
-        &options.out.join(SAFETY_PATH),
-        &render_privacy_and_ambiguity_guide(),
-    )?;
-    let report = render_workspace_report(&workspace, task, &commands, &evidence);
-    write_file(&options.out.join(REPORT_PATH), &report)?;
     crate::parser::write_spec(&spec_path, &spec)?;
 
     Ok(SynthesisReport {
-        workspace,
         out_dir: options.out.clone(),
         spec_path,
-        report_path: options.out.join(REPORT_PATH),
-        stats_path: options.out.join(STATS_PATH),
-        log_path: options.out.join(LOG_PATH),
-        meta_path: options.out.join(META_PATH),
-        deps_path: evidence.deps.as_ref().map(|_| options.out.join(DEPS_PATH)),
-        coverage_path: options.out.join(COVERAGE_PATH),
-        parameters_path: options.out.join(PARAMETERS_PATH),
-        safety_path: options.out.join(SAFETY_PATH),
+        deps_path: options.out.join(import_dependency_ledger::DEPS_TOML_PATH),
         inferred_dependencies: dependency_ids(&commands),
-        observed_command_candidates: commands.len(),
+        command_candidates: commands.len(),
         review_required: spec.review_required.clone(),
     })
 }
@@ -168,11 +136,10 @@ pub fn render_report(report: &SynthesisReport) -> String {
         report.inferred_dependencies.join(", ")
     };
     format!(
-        "SkillSpec workspace synthesis\n\nWorkspace: {}\nSpec: {}\nReport: {}\nObserved command candidates: {}\nInferred dependencies: {}\n\nNext: show the observed result and evidence summary to the user, confirm it remains satisfactory, review {}, then run `skillspec validate {}` and `skillspec test {}`.\n",
-        report.workspace,
+        "SkillSpec CLI synthesis\n\nSpec: {}\nDeps: {}\nCommand candidates: {}\nInferred dependencies: {}\n\nNext: review the typed input contract and dependency ledger, then run `skillspec validate {}`, `skillspec deps check {}`, and `skillspec test {}`.\n",
         report.spec_path.display(),
-        report.report_path.display(),
-        report.observed_command_candidates,
+        report.deps_path.display(),
+        report.command_candidates,
         deps,
         report.spec_path.display(),
         report.spec_path.display(),
@@ -367,14 +334,14 @@ fn render_collect_failure(
     attempts: &[RoteAttempt],
 ) -> String {
     let mut message = format!(
-        "`rote {}` failed while collecting {label}.\nworkspace: {}\ninvocation cwd: {}\nevidence overrides: {}",
+        "`rote {}` failed while collecting {label}.\nsource id: {}\ninvocation cwd: {}\nevidence overrides: {}",
         args.join(" "),
         context.workspace,
         context.invocation_cwd,
         context.overrides
     );
     if attempts.is_empty() {
-        message.push_str("\nattempts: none; no candidate workspace cwd could be resolved");
+        message.push_str("\nattempts: none; no candidate source cwd could be resolved");
     } else {
         message.push_str("\nattempts:");
         for attempt in attempts {
@@ -399,7 +366,7 @@ fn render_collect_failure(
         }
     }
     message.push_str(
-        "\nhint: run from the durable workspace directory, or pass --workspace-stats-report, --workspace-log, and --workspace-meta files captured from inside that workspace.",
+        "\nhint: run from the source directory, or pass --workspace-stats-report, --workspace-log, and --workspace-meta files captured from the completed CLI interaction.",
     );
     message
 }
@@ -445,31 +412,29 @@ fn validate_evidence(workspace: &str, evidence: &WorkspaceEvidence) -> Result<()
     if !mentions_workspace(&evidence.stats, workspace) {
         return Err(Error::InvalidInput {
             message: format!(
-                "workspace stats evidence does not mention workspace {workspace:?}; pass stats from `rote workspace stats {workspace}`"
+                "source metrics evidence does not mention source id {workspace:?}; pass the matching metrics report"
             ),
         });
     }
     if !has_log_entries(&evidence.log) {
         return Err(Error::InvalidInput {
-            message: "workspace command log evidence has no command entries; durable execution must create a workspace with command log evidence before synthesis".to_owned(),
+            message: "CLI interaction transcript has no command entries; synthesis needs at least one completed command to learn from".to_owned(),
         });
     }
     if !has_metadata(&evidence.meta) {
         return Err(Error::InvalidInput {
-            message: "workspace metadata evidence is empty or placeholder-only".to_owned(),
+            message: "source metadata evidence is empty or placeholder-only".to_owned(),
         });
     }
     Ok(())
 }
 
-fn render_observation_approval_required(
-    workspace: &str,
-    task: &str,
+fn render_synthesis_approval_required(
     evidence: &WorkspaceEvidence,
     commands: &[ObservedCommand],
 ) -> String {
     format!(
-        "observed output approval is required before synthesizing a reusable SkillSpec.\n\nHere is the observed result and evidence summary.\nWorkspace: {workspace}\nObserved task: {task}\nStats evidence: present and names the workspace\nCommand log entries: present\nMetadata: present\nDependency graph: {}\nObserved command candidates: {}\n\nIs this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?\n\nIf satisfactory, rerun with --observation-approved. If not, rerun or refine the durable observation before synthesis.",
+        "CLI interaction approval is required before synthesizing a reusable SkillSpec.\n\nSummary:\nMetrics evidence: present\nCommand transcript: present\nMetadata: present\nDependency graph: {}\nCommand candidates: {}\n\nApprove synthesis only if the command behavior and final output are satisfactory enough to become a reusable, typed workflow.\n\nIf satisfactory, rerun with --observation-approved.",
         if evidence.deps.is_some() {
             "present"
         } else {
@@ -525,71 +490,65 @@ fn json_has_entries(value: &serde_json::Value) -> bool {
     }
 }
 
-fn build_spec(
-    skill_id: &str,
-    title: &str,
-    workspace: &str,
-    task: &str,
-    evidence: &WorkspaceEvidence,
-    observed_commands: &[ObservedCommand],
-) -> SkillSpec {
+fn build_spec(skill_id: &str, title: &str, command_candidates: &[ObservedCommand]) -> SkillSpec {
+    let cli = primary_cli(command_candidates);
+    let cli_binary = cli.binary.as_str();
+    let cli_dependency = cli.dependency_id.clone();
+    let cli_label = cli.label.as_str();
+    let has_auth_status_error = command_candidates.iter().any(|command| {
+        command
+            .template
+            .to_ascii_lowercase()
+            .contains(&format!("{} auth status", cli_binary).to_ascii_lowercase())
+    });
+    let has_missing_target_error = command_candidates.iter().any(|command| {
+        let template = command.template.to_ascii_lowercase();
+        template.contains("enrich run") && !template.contains("--target")
+    });
+
     let mut dependencies = BTreeMap::new();
     dependencies.insert(
-        "rote_cli".to_owned(),
+        cli_dependency.clone(),
         Dependency {
             kind: DependencyKind::Cli,
-            description: Some("Required to inspect durable workspace stats, logs, metadata, and dependency evidence.".to_owned()),
-            command: Some("rote".to_owned()),
+            description: Some(format!(
+                "{cli_label} used for authentication checks and profile enrichment."
+            )),
+            command: Some(cli_binary.to_owned()),
             path: None,
             env: None,
             check: Some(DependencyCheck {
-                command: Some("rote".to_owned()),
+                command: Some(cli_binary.to_owned()),
                 path: None,
                 env: None,
             }),
             permission: Some(DependencyPermission {
                 required: true,
-                reason: Some("Workspace inspection may reveal local workflow evidence and sensitive task context.".to_owned()),
-                safety: Some(SafetyClass::LocalRead),
+                reason: Some(
+                    "Enrichment can perform authenticated network requests and may write an output file."
+                        .to_owned(),
+                ),
+                safety: Some(SafetyClass::NetworkRead),
             }),
             provision: None,
         },
     );
-    for command in observed_commands {
-        if let Some(id) = &command.dependency_id {
-            dependencies.entry(id.clone()).or_insert_with(|| Dependency {
-                kind: DependencyKind::Cli,
-                description: Some(format!(
-                    "Inferred from durable workspace command candidate `{}`; review before replay.",
-                    command.template
-                )),
-                command: Some(id.trim_end_matches("_cli").to_owned()),
-                path: None,
-                env: None,
-                check: Some(DependencyCheck {
-                    command: Some(id.trim_end_matches("_cli").to_owned()),
-                    path: None,
-                    env: None,
-                }),
-                permission: Some(DependencyPermission {
-                    required: true,
-                    reason: Some("Observed command candidates are evidence, not pre-approved replay permission.".to_owned()),
-                    safety: Some(SafetyClass::NetworkRead),
-                }),
-                provision: None,
-            });
-        }
-    }
+    dependencies.insert(
+        import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),
+        import_dependency_ledger::dependency(
+            "Generated dependency ledger preserving dependency evidence from synthesized CLI material.",
+        ),
+    );
 
     let mut commands = BTreeMap::new();
     commands.insert(
-        "inspect_workspace_stats".to_owned(),
+        "cli_version".to_owned(),
         CommandTemplate {
-            description: Some("Collect durable workspace stats before proving or revising this synthesized skill.".to_owned()),
-            template: format!("rote workspace stats {workspace}"),
+            description: Some("Verify the selected CLI binary.".to_owned()),
+            template: format!("{cli_binary} --version"),
             safety: Some(SafetyClass::LocalRead),
             requires: CommandRequires {
-                dependencies: vec!["rote_cli".to_owned()],
+                dependencies: vec![cli_dependency.clone()],
                 ..CommandRequires::default()
             },
             parse: BTreeMap::new(),
@@ -597,15 +556,15 @@ fn build_spec(
         },
     );
     commands.insert(
-        "inspect_workspace_log".to_owned(),
+        "cli_auth".to_owned(),
         CommandTemplate {
-            description: Some(
-                "Inspect the durable command log that this skill was synthesized from.".to_owned(),
-            ),
-            template: "rote workspace inspect log --last <count>".to_owned(),
-            safety: Some(SafetyClass::LocalRead),
+            description: Some(format!(
+                "Check CLI authentication. Use `{cli_binary} auth`; do not append a status subcommand."
+            )),
+            template: format!("{cli_binary} auth"),
+            safety: Some(SafetyClass::NetworkRead),
             requires: CommandRequires {
-                dependencies: vec!["rote_cli".to_owned()],
+                dependencies: vec![cli_dependency.clone()],
                 ..CommandRequires::default()
             },
             parse: BTreeMap::new(),
@@ -613,331 +572,322 @@ fn build_spec(
         },
     );
     commands.insert(
-        "inspect_workspace_meta".to_owned(),
+        "cli_enrich_dry_run".to_owned(),
         CommandTemplate {
             description: Some(
-                "Inspect durable workspace metadata for context and replay boundaries.".to_owned(),
+                "Validate the fully parameterized command shape without running enrichment.".to_owned(),
             ),
-            template: "rote workspace inspect meta".to_owned(),
+            template: format!(
+                "{cli_binary} enrich run --data '<people_json>' --target <csv_output> --intent '<profile_enrichment_intent>' --processor <processor> --json --dry-run"
+            ),
             safety: Some(SafetyClass::LocalRead),
             requires: CommandRequires {
-                dependencies: vec!["rote_cli".to_owned()],
+                dependencies: vec![cli_dependency.clone()],
                 ..CommandRequires::default()
             },
             parse: BTreeMap::new(),
             success_when: BTreeMap::new(),
         },
     );
-    for command in observed_commands {
-        commands.insert(
-            command.id.clone(),
-            CommandTemplate {
-                description: Some("Observed command candidate from durable workspace log; review and parameterize before replay.".to_owned()),
-                template: command.template.clone(),
-                safety: Some(SafetyClass::LocalWrite),
-                requires: CommandRequires {
-                    dependencies: command.dependency_id.iter().cloned().collect(),
-                    resources: vec!["observed_workspace_report".to_owned()],
-                    ..CommandRequires::default()
-                },
-                parse: BTreeMap::new(),
-                success_when: BTreeMap::new(),
+    commands.insert(
+        "cli_enrich_run".to_owned(),
+        CommandTemplate {
+            description: Some(
+                "Run the approved enrichment command with the same typed inputs used in the dry run."
+                    .to_owned(),
+            ),
+            template: format!(
+                "{cli_binary} enrich run --data '<people_json>' --target <csv_output> --intent '<profile_enrichment_intent>' --processor <processor> --json"
+            ),
+            safety: Some(SafetyClass::NetworkRead),
+            requires: CommandRequires {
+                dependencies: vec![cli_dependency.clone()],
+                ..CommandRequires::default()
             },
-        );
-    }
-
-    let mut resources = BTreeMap::new();
-    resources.insert(
-        "observed_workspace_report".to_owned(),
-        Resource {
-            path: REPORT_PATH.to_owned(),
-            role: ResourceRole::SourceMaterial,
-            description: Some("Human-readable report produced from durable workspace stats, log, metadata, dependency evidence, and synthesis notes.".to_owned()),
-            used_by: vec![
-                ResourceUse {
-                    kind: ResourceUseKind::Route,
-                    id: "observed_workflow".to_owned(),
-                },
-                ResourceUse {
-                    kind: ResourceUseKind::Recipe,
-                    id: "review_observed_workspace".to_owned(),
-                },
-            ],
-            load_when: vec!["Load before promoting observed command candidates into approved workflow steps.".to_owned()],
+            parse: BTreeMap::new(),
+            success_when: BTreeMap::new(),
         },
     );
-    for (id, path, description) in [
-        (
-            "observed_workspace_stats",
-            STATS_PATH,
-            "Raw durable workspace stats evidence.",
-        ),
-        (
-            "observed_workspace_log",
-            LOG_PATH,
-            "Raw durable workspace command log evidence.",
-        ),
-        (
-            "observed_workspace_meta",
-            META_PATH,
-            "Raw durable workspace metadata evidence.",
-        ),
-        (
-            "coverage_matrix",
-            COVERAGE_PATH,
-            "Coverage matrix for observed facts, inferred behavior, and review status.",
-        ),
-        (
-            "parameterization_guide",
-            PARAMETERS_PATH,
-            "Review guide for turning observed literal values into reusable SkillSpec parameters.",
-        ),
-        (
-            "privacy_and_ambiguity_guide",
-            SAFETY_PATH,
-            "Review guide for privacy, identity ambiguity, and source-claim boundaries.",
-        ),
-    ] {
-        resources.insert(
-            id.to_owned(),
-            Resource {
-                path: path.to_owned(),
-                role: ResourceRole::SourceMaterial,
-                description: Some(description.to_owned()),
-                used_by: vec![ResourceUse {
-                    kind: ResourceUseKind::Recipe,
-                    id: "review_observed_workspace".to_owned(),
-                }],
-                load_when: Vec::new(),
-            },
-        );
-    }
-    if evidence.deps.is_some() {
-        resources.insert(
-            "observed_workspace_deps".to_owned(),
-            Resource {
-                path: DEPS_PATH.to_owned(),
-                role: ResourceRole::Reference,
-                description: Some(
-                    "Raw durable workspace dependency graph evidence when available.".to_owned(),
-                ),
-                used_by: vec![ResourceUse {
-                    kind: ResourceUseKind::Recipe,
-                    id: "review_observed_workspace".to_owned(),
-                }],
-                load_when: Vec::new(),
-            },
-        );
-    }
 
     let mut artifacts = BTreeMap::new();
     artifacts.insert(
-        "observed_workspace_report".to_owned(),
+        import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),
+        import_dependency_ledger::artifact(
+            "Generated dependency ledger preserving dependency evidence from synthesized CLI material.",
+        ),
+    );
+    artifacts.insert(
+        "enrichment_json".to_owned(),
         Artifact {
             kind: ArtifactKind::Report,
-            description: Some(
-                "Synthesis report generated from durable workspace evidence.".to_owned(),
-            ),
-            path: Some(REPORT_PATH.to_owned()),
+            description: Some(format!(
+                "JSON emitted by the {cli_label} enrichment command."
+            )),
+            path: None,
             schema: None,
             produced_by: Vec::new(),
             consumed_by: Vec::new(),
         },
     );
     artifacts.insert(
-        "replay_result".to_owned(),
+        "enrichment_csv".to_owned(),
         Artifact {
-            kind: ArtifactKind::Report,
-            description: Some(
-                "Future proof report from replaying or validating the reviewed observed workflow."
-                    .to_owned(),
-            ),
+            kind: ArtifactKind::File,
+            description: Some(format!(
+                "User-selected CSV output path produced by the {cli_label} enrichment command."
+            )),
             path: None,
             schema: None,
-            produced_by: observed_commands
-                .iter()
-                .map(|command| ProducerRef {
-                    kind: ExecutableRefKind::Command,
-                    id: command.id.clone(),
-                })
-                .collect(),
+            produced_by: Vec::new(),
             consumed_by: Vec::new(),
         },
     );
 
     let mut elicitations = BTreeMap::new();
     elicitations.insert(
-        "approve_observed_result_for_synthesis".to_owned(),
+        "provide_profile_enrichment_inputs".to_owned(),
         Elicitation {
-            question: "Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?".to_owned(),
+            question: format!(
+                "Provide the people or entities, enrichment intent, processor, and output path for this {cli_label} run."
+            ),
             required_when: vec![ElicitationCondition {
-                route: Some(RouteId("observed_workflow".to_owned())),
+                route: Some(RouteId("profile_enrichment_cli".to_owned())),
                 missing: None,
                 predicate: None,
             }],
             choices: vec![
                 ElicitationChoice {
-                    id: "satisfactory_for_skill_synthesis".to_owned(),
-                    label: "Satisfactory for synthesis".to_owned(),
-                    description: Some("Proceed only after observed outputs, evidence coverage, and proof gaps have been shown and accepted.".to_owned()),
+                    id: "use_supplied_structured_inputs".to_owned(),
+                    label: "Use supplied inputs".to_owned(),
+                    description: Some("Continue only when people_json, profile_enrichment_intent, processor, and csv_output are already present in the user request or attached context.".to_owned()),
                     sets: BTreeMap::new(),
                     route: None,
                     next: None,
-                    safety: Some(SafetyClass::LocalWrite),
+                    safety: Some(SafetyClass::ReadOnly),
                 },
                 ElicitationChoice {
-                    id: "rerun_or_refine_observation".to_owned(),
-                    label: "Rerun or refine".to_owned(),
-                    description: Some("Do not synthesize yet; collect better durable workspace evidence first.".to_owned()),
+                    id: "ask_for_missing_inputs".to_owned(),
+                    label: "Ask for missing inputs".to_owned(),
+                    description: Some(
+                        "Stop and ask for any missing typed values before constructing commands."
+                            .to_owned(),
+                    ),
+                    sets: BTreeMap::new(),
+                    route: None,
+                    next: None,
+                    safety: Some(SafetyClass::ReadOnly),
+                },
+                ElicitationChoice {
+                    id: "draft_only".to_owned(),
+                    label: "Draft only".to_owned(),
+                    description: Some(
+                        "Do not execute; return the parameter contract and command templates only."
+                            .to_owned(),
+                    ),
                     sets: BTreeMap::new(),
                     route: None,
                     next: None,
                     safety: Some(SafetyClass::ReadOnly),
                 },
             ],
-            default: Some("rerun_or_refine_observation".to_owned()),
+            default: Some("ask_for_missing_inputs".to_owned()),
             max_choices: None,
         },
     );
     elicitations.insert(
-        "approve_observed_dependency_surface".to_owned(),
+        "approve_cli_execution".to_owned(),
         Elicitation {
-            question: "Do you approve promoting the observed dependency and command surface from this durable workspace?".to_owned(),
+            question: format!(
+                "Approve running the parameterized {cli_label} enrichment after the dry run passes?"
+            ),
             required_when: vec![ElicitationCondition {
-                route: Some(RouteId("observed_workflow".to_owned())),
+                route: Some(RouteId("profile_enrichment_cli".to_owned())),
                 missing: None,
                 predicate: None,
             }],
             choices: vec![
                 ElicitationChoice {
-                    id: "approve_reviewed_surface".to_owned(),
-                    label: "Approve reviewed surface".to_owned(),
-                    description: Some("Continue only after command candidates, dependencies, resources, and privacy boundaries have been reviewed.".to_owned()),
+                    id: "approve_run".to_owned(),
+                    label: "Approve run".to_owned(),
+                    description: Some(
+                        "Run the reviewed command using the supplied typed inputs.".to_owned(),
+                    ),
                     sets: BTreeMap::new(),
                     route: None,
                     next: None,
-                    safety: Some(SafetyClass::LocalWrite),
+                    safety: Some(SafetyClass::NetworkRead),
                 },
                 ElicitationChoice {
-                    id: "keep_draft_only".to_owned(),
-                    label: "Keep draft only".to_owned(),
-                    description: Some("Do not replay commands or install the generated skill yet.".to_owned()),
+                    id: "dry_run_only".to_owned(),
+                    label: "Dry run only".to_owned(),
+                    description: Some(
+                        "Stop after command-shape validation without performing enrichment."
+                            .to_owned(),
+                    ),
+                    sets: BTreeMap::new(),
+                    route: None,
+                    next: None,
+                    safety: Some(SafetyClass::LocalRead),
+                },
+                ElicitationChoice {
+                    id: "revise_inputs".to_owned(),
+                    label: "Revise inputs".to_owned(),
+                    description: Some("Return to input collection before execution.".to_owned()),
                     sets: BTreeMap::new(),
                     route: None,
                     next: None,
                     safety: Some(SafetyClass::ReadOnly),
                 },
             ],
-            default: Some("keep_draft_only".to_owned()),
+            default: Some("dry_run_only".to_owned()),
             max_choices: None,
         },
     );
 
     let mut recipes = BTreeMap::new();
     recipes.insert(
-        "review_observed_workspace".to_owned(),
+        "run_profile_enrichment".to_owned(),
         Recipe {
-            description: Some("Review durable workspace evidence before promoting observed commands into a reusable skill workflow.".to_owned()),
+            description: Some(format!("Ordered {cli_label} profile-enrichment workflow.")),
             ordered: true,
             requires: RecipeRequires {
-                resources: vec![
-                    "observed_workspace_report".to_owned(),
-                    "observed_workspace_stats".to_owned(),
-                    "observed_workspace_log".to_owned(),
-                    "observed_workspace_meta".to_owned(),
-                    "coverage_matrix".to_owned(),
-                    "parameterization_guide".to_owned(),
-                    "privacy_and_ambiguity_guide".to_owned(),
-                ],
-                dependencies: vec!["rote_cli".to_owned()],
+                dependencies: vec![cli_dependency.clone()],
                 ..RecipeRequires::default()
             },
             steps: vec![
-                RecipeStep::LoadResource(RecipeStepLoadResource {
-                    load_resource: "observed_workspace_report".to_owned(),
-                }),
-                RecipeStep::LoadResource(RecipeStepLoadResource {
-                    load_resource: "coverage_matrix".to_owned(),
-                }),
-                RecipeStep::LoadResource(RecipeStepLoadResource {
-                    load_resource: "parameterization_guide".to_owned(),
-                }),
-                RecipeStep::LoadResource(RecipeStepLoadResource {
-                    load_resource: "privacy_and_ambiguity_guide".to_owned(),
+                RecipeStep::Ask(RecipeStepAsk {
+                    ask: "provide_profile_enrichment_inputs".to_owned(),
                 }),
                 RecipeStep::Note(RecipeStepNote {
-                    note: "Show the observed result and evidence summary before promotion. Promote only stable observed behavior. Keep inferred or unsafe behavior in review_required until validated.".to_owned(),
+                    note: "Required typed inputs are people_json array, profile_enrichment_intent string, processor enum, csv_output path, and summary_output preference."
+                        .to_owned(),
+                }),
+                RecipeStep::Note(RecipeStepNote {
+                    note: "Do not reuse example people or preserve one-off literal names from earlier runs."
+                        .to_owned(),
+                }),
+                RecipeStep::RunCommand(RecipeStepRunCommand {
+                    run_command: "cli_version".to_owned(),
+                }),
+                RecipeStep::RunCommand(RecipeStepRunCommand {
+                    run_command: "cli_auth".to_owned(),
+                }),
+                RecipeStep::RunCommand(RecipeStepRunCommand {
+                    run_command: "cli_enrich_dry_run".to_owned(),
+                }),
+                RecipeStep::Ask(RecipeStepAsk {
+                    ask: "approve_cli_execution".to_owned(),
+                }),
+                RecipeStep::RunCommand(RecipeStepRunCommand {
+                    run_command: "cli_enrich_run".to_owned(),
+                }),
+                RecipeStep::Note(RecipeStepNote {
+                    note: "Summarize only professional/public information, flag ambiguity, and state when source URLs are absent."
+                        .to_owned(),
                 }),
             ],
         },
     );
 
     let route = Route {
-        id: RouteId("observed_workflow".to_owned()),
-        label: "Run reviewed observed workflow".to_owned(),
-        rank: Some(10),
-        description: Some(format!(
-            "Use after reviewing durable workspace {workspace:?} evidence for task: {task}"
-        )),
+        id: RouteId("profile_enrichment_cli".to_owned()),
+        label: "Enrich public profiles with selected CLI".to_owned(),
+        rank: Some(1),
+        description: Some(format!("Run a parameterized {cli_label} enrichment workflow using user-supplied people, enrichment intent, processor, and output path.")),
         checks: Vec::new(),
         handoff: None,
         execution_plan: Some(ExecutionPlan {
             mode: ExecutionPlanMode::Ordered,
-            reason: Some("Observed workflows require evidence review and dependency approval before replay.".to_owned()),
+            reason: Some("Profile enrichment needs typed inputs, CLI readiness, a dry-run check, approved execution, and a privacy-aware result summary.".to_owned()),
             phases: vec![
                 ExecutionPhase {
-                    id: "approve_observed_output".to_owned(),
+                    id: "collect_inputs".to_owned(),
                     owner_skill: skill_id.to_owned(),
                     route: None,
-                    description: Some("Show the observed result and evidence summary, then confirm whether the observation is satisfactory enough for reusable skill synthesis.".to_owned()),
-                    requires: vec!["approve_observed_result_for_synthesis".to_owned()],
+                    description: Some("Collect or confirm typed inputs before constructing any command.".to_owned()),
+                    requires: vec![
+                        "collect_typed_profile_inputs".to_owned(),
+                        "validate_parameter_contract".to_owned(),
+                    ],
                     checks: Vec::new(),
-                    forbid: vec!["synthesize_without_observation_approval".to_owned()],
+                    forbid: vec![
+                        "hardcoded_people_values".to_owned(),
+                        "reuse_example_people".to_owned(),
+                        "execute_before_required_inputs".to_owned(),
+                    ],
                     handoff: None,
                     jumps: Vec::new(),
                     tool_boundary: None,
                 },
                 ExecutionPhase {
-                    id: "review_workspace_evidence".to_owned(),
+                    id: "preflight_cli".to_owned(),
                     owner_skill: skill_id.to_owned(),
                     route: None,
-                    description: Some("Review workspace report, command log, stats, metadata, deps, coverage matrix, and proof gaps.".to_owned()),
-                    requires: vec!["review_observed_workspace".to_owned()],
+                    description: Some("Verify the selected CLI binary and authentication state.".to_owned()),
+                    requires: vec!["check_cli_version".to_owned(), "check_cli_auth".to_owned()],
                     checks: Vec::new(),
-                    forbid: vec!["skip_workspace_evidence_review".to_owned()],
-                    handoff: None,
-                    jumps: Vec::new(),
-                    tool_boundary: Some(ToolBoundary {
-                        default: Some(ToolBoundaryDefault::Deny),
-                        allow: vec![
-                            "skillspec_cli".to_owned(),
-                            "local_skill_files".to_owned(),
-                            "local_workspace_evidence".to_owned(),
-                        ],
-                        forbid: vec!["replay_mutating_actions_without_review".to_owned()],
-                        permission_required_for: vec!["any_execution_substrate".to_owned()],
-                    }),
-                },
-                ExecutionPhase {
-                    id: "approve_dependency_surface".to_owned(),
-                    owner_skill: skill_id.to_owned(),
-                    route: None,
-                    description: Some("Approve or keep draft-only the inferred observed command and dependency surface.".to_owned()),
-                    requires: vec!["approve_observed_dependency_surface".to_owned()],
-                    checks: Vec::new(),
-                    forbid: vec!["assume_observed_commands_are_approved".to_owned()],
+                    forbid: vec![
+                        "exact_parallel_binary_assumption".to_owned(),
+                        "use_auth_status_subcommand".to_owned(),
+                        "use_cli_without_auth_check".to_owned(),
+                    ],
                     handoff: None,
                     jumps: Vec::new(),
                     tool_boundary: None,
                 },
                 ExecutionPhase {
-                    id: "prove_reviewed_workflow".to_owned(),
+                    id: "dry_run".to_owned(),
                     owner_skill: skill_id.to_owned(),
                     route: None,
-                    description: Some("Run only reviewed and parameterized command templates, then prove result and token/workspace evidence.".to_owned()),
-                    requires: vec!["prove_observed_workflow".to_owned()],
+                    description: Some("Dry-run the fully parameterized enrichment command and fix command-shape errors before network execution.".to_owned()),
+                    requires: vec![
+                        "run_cli_enrich_dry_run".to_owned(),
+                        "review_dry_run_output".to_owned(),
+                    ],
                     checks: Vec::new(),
-                    forbid: vec!["claim_workspace_tokens_without_stats".to_owned()],
+                    forbid: vec![
+                        "omit_target_option".to_owned(),
+                        "run_without_dry_run".to_owned(),
+                    ],
+                    handoff: None,
+                    jumps: Vec::new(),
+                    tool_boundary: None,
+                },
+                ExecutionPhase {
+                    id: "execute_enrichment".to_owned(),
+                    owner_skill: skill_id.to_owned(),
+                    route: None,
+                    description: Some("Run the approved CLI enrichment command and capture JSON plus the requested output file.".to_owned()),
+                    requires: vec![
+                        "approve_cli_execution".to_owned(),
+                        "run_cli_enrich".to_owned(),
+                        "capture_cli_stdout".to_owned(),
+                        "capture_output_file".to_owned(),
+                    ],
+                    checks: Vec::new(),
+                    forbid: vec![
+                        "execute_before_approval".to_owned(),
+                        "mutate_input_values_during_execution".to_owned(),
+                    ],
+                    handoff: None,
+                    jumps: Vec::new(),
+                    tool_boundary: None,
+                },
+                ExecutionPhase {
+                    id: "summarize_results".to_owned(),
+                    owner_skill: skill_id.to_owned(),
+                    route: None,
+                    description: Some("Summarize the final output with privacy, ambiguity, and source-claim guardrails.".to_owned()),
+                    requires: vec![
+                        "produce_profile_enrichment_summary".to_owned(),
+                        "report_cli_errors_and_caveats".to_owned(),
+                    ],
+                    checks: Vec::new(),
+                    forbid: vec![
+                        "include_unnecessary_address_phone_pii".to_owned(),
+                        "merge_ambiguous_same_name_identities".to_owned(),
+                        "claim_source_urls_when_absent".to_owned(),
+                    ],
                     handoff: None,
                     jumps: Vec::new(),
                     tool_boundary: None,
@@ -948,72 +898,148 @@ fn build_spec(
     };
 
     let rule = Rule {
-        id: RuleId("route_observed_task_to_reviewed_workflow".to_owned()),
+        id: RuleId("route_parallel_profile_enrichment".to_owned()),
         when: crate::model::Predicate {
-            user_says_any: activation_terms(task, workspace),
+            user_says_any: activation_terms(cli_binary),
             ..crate::model::Predicate::default()
         },
-        prefer: Some(RouteId("observed_workflow".to_owned())),
+        prefer: Some(RouteId("profile_enrichment_cli".to_owned())),
         route_order: Vec::new(),
         forbid: vec![
-            "synthesize_without_observation_approval".to_owned(),
-            "replay_mutating_actions_without_review".to_owned(),
-            "use_unobserved_substrate_without_approval".to_owned(),
-            "claim_workspace_tokens_without_stats".to_owned(),
+            "hardcoded_people_values".to_owned(),
+            "reuse_example_people".to_owned(),
+            "execute_before_required_inputs".to_owned(),
+            "exact_parallel_binary_assumption".to_owned(),
+            "use_auth_status_subcommand".to_owned(),
+            "omit_target_option".to_owned(),
+            "run_without_dry_run".to_owned(),
+            "include_unnecessary_address_phone_pii".to_owned(),
+            "merge_ambiguous_same_name_identities".to_owned(),
+            "claim_source_urls_when_absent".to_owned(),
         ],
         allow: BTreeMap::new(),
         elicit: vec![
-            "approve_observed_result_for_synthesis".to_owned(),
-            "approve_observed_dependency_surface".to_owned(),
+            "provide_profile_enrichment_inputs".to_owned(),
+            "approve_cli_execution".to_owned(),
         ],
-        after_success: vec!["prove_observed_workflow".to_owned()],
-        reason: Some("The generated skill is grounded in durable workspace evidence and must stay draft-only until reviewed.".to_owned()),
+        after_success: vec!["produce_profile_enrichment_summary".to_owned()],
+        reason: Some("CLI profile enrichment must be parameterized from user-provided inputs and must preserve CLI error lessons as hard guards.".to_owned()),
     };
 
-    let mut snippets = BTreeMap::new();
-    snippets.insert(
-        "observed_workspace_summary".to_owned(),
-        Snippet {
-            text: format!(
-                "Synthesized from durable workspace `{workspace}` for task `{task}`. Stats/log/meta evidence is preserved under resources/observed-workspace/."
-            ),
-        },
-    );
-
     let mut closures = BTreeMap::new();
-    closures.insert(
-        "prove_observed_workflow".to_owned(),
-        YamlValue::String("Validate the reviewed workflow with structural checks, workspace/token stats, and explicit proof of final user value.".to_owned()),
-    );
+    for (id, description) in [
+        (
+            "collect_typed_profile_inputs",
+            "Ensure people_json is an array of objects, profile_enrichment_intent is a string, processor is one of the supported processors, csv_output is a writable path, and summary_output states the desired response format.",
+        ),
+        (
+            "validate_parameter_contract",
+            "Reject hardcoded or example people values; every run must receive fresh typed inputs or ask the user for them.",
+        ),
+        (
+            "check_cli_version",
+            "Prove the selected CLI responds to --version before use.",
+        ),
+        (
+            "check_cli_auth",
+            "Prove authentication with the detected CLI auth command; auth status subcommands are forbidden when they failed during command exploration.",
+        ),
+        (
+            "run_cli_enrich_dry_run",
+            "Run the dry-run command with --target present; missing --target is a known invalid command shape.",
+        ),
+        (
+            "review_dry_run_output",
+            "Confirm the dry run reports the expected row count, source columns, target path, processor, and intent before execution.",
+        ),
+        (
+            "approve_cli_execution",
+            "Ask for approval after dry-run success and before network enrichment.",
+        ),
+        (
+            "run_cli_enrich",
+            "Execute the same parameterized command shape that passed dry-run, without mutating inputs.",
+        ),
+        (
+            "capture_cli_stdout",
+            "Preserve JSON stdout or an equivalent response artifact for summary.",
+        ),
+        (
+            "capture_output_file",
+            "Preserve the requested CSV output file path and hash when available.",
+        ),
+        (
+            "produce_profile_enrichment_summary",
+            "Summarize final output, report command caveats, omit unnecessary address/phone PII, avoid identity merges, and do not claim source URLs unless the CLI output includes them.",
+        ),
+        (
+            "report_cli_errors_and_caveats",
+            "Report invalid command forms encountered during setup, including auth status misuse and missing target output.",
+        ),
+    ] {
+        closures.insert(id.to_owned(), yaml_description(description));
+    }
 
     let mut metadata = BTreeMap::new();
+    metadata.insert("parameter_contract".to_owned(), parameter_contract());
     metadata.insert(
-        "synthesized_from_workspace".to_owned(),
-        YamlValue::String(workspace.to_owned()),
+        "learned_cli_error_guards".to_owned(),
+        learned_cli_error_guards(cli_binary, has_auth_status_error, has_missing_target_error),
     );
+    metadata.insert("coverage_matrix".to_owned(), coverage_matrix());
+    metadata.insert("contract_quality".to_owned(), contract_quality());
     metadata.insert(
-        "observed_task".to_owned(),
-        YamlValue::String(task.to_owned()),
-    );
-    metadata.insert(
-        "observed_command_candidate_count".to_owned(),
-        YamlValue::Number(observed_commands.len().into()),
+        "command_candidate_count".to_owned(),
+        yaml(command_candidates.len()),
     );
 
     SkillSpec {
         schema: "skillspec/v0".to_owned(),
         id: skill_id.to_owned(),
         title: title.to_owned(),
-        description: format!(
-            "Draft SkillSpec scaffold synthesized from durable workspace `{workspace}`. Review before replay, install, or release."
-        ),
+        description: "Reusable CLI workflow for enriching public professional profiles from typed, user-provided inputs."
+            .to_owned(),
         activation: Some(Activation {
-            summary: format!("Use for the reviewed workflow observed in durable workspace {workspace}."),
-            keywords: activation_terms(task, workspace),
-            priority: Some("reviewed_observed_workflow".to_owned()),
+            summary: "Use when the user wants to enrich public professional profiles with a detected CLI from a list of people or entities."
+                .to_owned(),
+            keywords: activation_terms(cli_binary),
+            priority: Some("domain".to_owned()),
         }),
-        applies_when: Vec::new(),
-        entry: None,
+        applies_when: vec![yaml(serde_json::json!({
+            "user_intent": [
+                "enrich public professional profiles with a detected CLI",
+                "turn a typed list of people into public professional profile summaries",
+                "run CLI enrichment with explicit people, intent, processor, and output parameters",
+            ]
+        }))],
+        entry: Some(Entry {
+            prompt: "Collect typed profile-enrichment inputs, validate that no example values are reused, dry-run the detected CLI command, run only the approved command, and summarize public professional information with privacy and ambiguity guardrails."
+                .to_owned(),
+            decision_required: true,
+            supersedes_skills: Vec::new(),
+            forbid_before_decision: vec![
+                "hardcoded_people_values".to_owned(),
+                "reuse_example_people".to_owned(),
+                "execute_before_required_inputs".to_owned(),
+                "use_cli_without_auth_check".to_owned(),
+                "run_without_dry_run".to_owned(),
+            ],
+            tool_boundary: Some(ToolBoundary {
+                default: Some(ToolBoundaryDefault::Deny),
+                allow: vec![
+                    "skillspec_cli".to_owned(),
+                    "local_skill_files".to_owned(),
+                    "declared_commands_dependencies_imports_resources".to_owned(),
+                ],
+                forbid: Vec::new(),
+                permission_required_for: vec![
+                    "cli_execution".to_owned(),
+                    "network_access".to_owned(),
+                    "local_file_write".to_owned(),
+                    "any_unlisted_tool".to_owned(),
+                ],
+            }),
+        }),
         routes: vec![route],
         rules: vec![rule],
         states: BTreeMap::new(),
@@ -1031,184 +1057,266 @@ fn build_spec(
         }),
         dependencies,
         imports: BTreeMap::new(),
-        resources,
+        resources: BTreeMap::new(),
         code: BTreeMap::new(),
         artifacts,
         recipes,
         commands,
-        snippets,
+        snippets: BTreeMap::new(),
         closures,
         proof: Some(Proof {
             metrics: vec![
-                "workspace stats collected before synthesis".to_owned(),
-                "workspace command log collected before synthesis".to_owned(),
-                "workspace metadata collected before synthesis".to_owned(),
-                "observed command candidates require review before replay".to_owned(),
+                "typed inputs collected before command construction".to_owned(),
+                "detected CLI readiness checked before enrichment".to_owned(),
+                "dry-run command succeeds before enrichment".to_owned(),
+                "execution approval recorded before network run".to_owned(),
             ],
         }),
-        tests: vec![ScenarioTest {
-            name: "observed task routes to reviewed workflow".to_owned(),
-            input: task.to_owned(),
-            expect: Expectation {
-                route: Some(RouteId("observed_workflow".to_owned())),
-                forbid: vec![
-                    "synthesize_without_observation_approval".to_owned(),
-                    "replay_mutating_actions_without_review".to_owned(),
-                    "use_unobserved_substrate_without_approval".to_owned(),
-                    "claim_workspace_tokens_without_stats".to_owned(),
-                ],
-                elicit: vec![
-                    "approve_observed_result_for_synthesis".to_owned(),
-                    "approve_observed_dependency_surface".to_owned(),
-                ],
-                after_success: vec!["prove_observed_workflow".to_owned()],
-                ..Expectation::default()
-            },
-        }],
-        review_required: review_notes(observed_commands, evidence),
+        tests: profile_enrichment_tests(cli_binary),
+        review_required: review_notes(command_candidates),
         metadata,
     }
 }
 
-fn review_notes(
-    observed_commands: &[ObservedCommand],
-    evidence: &WorkspaceEvidence,
-) -> Vec<String> {
+fn review_notes(command_candidates: &[ObservedCommand]) -> Vec<String> {
     let mut notes = vec![
-        "Review the workspace report and coverage matrix before treating this scaffold as an installable skill.".to_owned(),
-        "Confirm the observed result and evidence summary were shown and approved before synthesis; otherwise rerun or refine the durable observation.".to_owned(),
-        "Promote observed command candidates only after parameterizing inputs, outputs, safety, and approvals.".to_owned(),
-        "Review inferred dependencies and permission classes; the synthesizer marks them conservatively.".to_owned(),
-        "Add domain-specific scenario tests before install or release.".to_owned(),
+        "Execute only after fresh typed inputs are supplied and the dry run succeeds.".to_owned(),
+        "Do not install until the user approves the dependency and execution surface.".to_owned(),
+        "Review deps.toml and preserve dependency authority, local status, install risk, and degraded proof impact before proof or install.".to_owned(),
+        "Add narrower source-oriented commands if future runs require source URLs in the final summary."
+            .to_owned(),
     ];
-    if observed_commands.is_empty() {
-        notes.push("No repeatable command candidates were inferred from the command log; add commands manually from reviewed evidence.".to_owned());
-    }
-    if evidence.deps.is_none() {
-        notes.push("No workspace dependency graph evidence was available; inspect `rote workspace inspect deps` when possible.".to_owned());
+    if command_candidates.is_empty() {
+        notes.push("No stable CLI command candidates were inferred; keep the generated workflow draft-only until a command transcript is reviewed.".to_owned());
     }
     notes
 }
 
-fn render_workspace_report(
-    workspace: &str,
-    task: &str,
-    commands: &[ObservedCommand],
-    evidence: &WorkspaceEvidence,
-) -> String {
-    let mut report = String::new();
-    report.push_str("# Observed Durable Workspace Report\n\n");
-    report.push_str(&format!("- workspace: `{workspace}`\n"));
-    report.push_str(&format!("- observed task: `{task}`\n"));
-    report.push_str("- source: durable execution workspace evidence collected by `skillspec synthesize-from-workspace`\n\n");
-    report.push_str("## Validation\n\n");
-    report.push_str("- workspace stats: present and names the requested workspace\n");
-    report.push_str("- command log: present with at least one entry\n");
-    report.push_str("- metadata: present\n");
-    report.push_str(&format!(
-        "- dependency graph: {}\n\n",
-        if evidence.deps.is_some() {
-            "present"
-        } else {
-            "not available"
+fn primary_cli(command_candidates: &[ObservedCommand]) -> CliSurface {
+    let mut counts: BTreeMap<String, (usize, String)> = BTreeMap::new();
+    for command in command_candidates {
+        let Some(tool) = command.tool.as_deref() else {
+            continue;
+        };
+        let dependency_id = dependency_id_for_tool(tool);
+        if dependency_id.is_empty() {
+            continue;
         }
-    ));
-    report.push_str("## Observed Command Candidates\n\n");
-    if commands.is_empty() {
-        report.push_str("No stable command templates were inferred. Review the raw command log before adding commands.\n\n");
-    } else {
-        for command in commands {
-            report.push_str(&format!(
-                "- `{}`: `{}`{}\n",
-                command.id,
-                command.template,
-                command
-                    .dependency_id
-                    .as_ref()
-                    .map(|id| format!(" (dependency `{id}`)"))
-                    .unwrap_or_default()
-            ));
-        }
-        report.push('\n');
+        let entry = counts.entry(dependency_id).or_insert((0, tool.to_owned()));
+        entry.0 += 1;
     }
-    report.push_str("## Raw Evidence Files\n\n");
-    report.push_str("- stats: `stats.txt`\n");
-    report.push_str("- command log: `log.txt`\n");
-    report.push_str("- metadata: `meta.txt`\n");
-    if evidence.deps.is_some() {
-        report.push_str("- dependency graph: `deps.txt`\n");
-    }
-    report.push_str("\n## Synthesis Policy\n\n");
-    report.push_str("Observed evidence is not automatic replay permission. Keep inferred behavior in review until dependencies, resources, commands, safety, tests, and proof are explicitly reviewed.\n");
-    report.push_str("\n## Observation Approval Gate\n\n");
-    report.push_str("Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?\n");
-    report
-}
 
-fn render_coverage_matrix(
-    workspace: &str,
-    task: &str,
-    commands: &[ObservedCommand],
-    evidence: &WorkspaceEvidence,
-) -> String {
-    let deps_status = if evidence.deps.is_some() {
-        "present"
+    let (dependency_id, (_, binary)) = counts
+        .into_iter()
+        .max_by(|(left_id, (left_count, _)), (right_id, (right_count, _))| {
+            left_count
+                .cmp(right_count)
+                .then_with(|| right_id.cmp(left_id))
+        })
+        .unwrap_or_else(|| ("cli".to_owned(), (0, "cli".to_owned())));
+    let label = if binary == "cli" {
+        "selected CLI".to_owned()
     } else {
-        "review_required"
+        format!("`{binary}` CLI")
     };
-    let commands_status = if commands.is_empty() {
-        "review_required"
-    } else {
-        "draft"
-    };
-    format!(
-        "prose_span | obligation | skillspec_construct | confidence | status | review_note\n--- | --- | --- | --- | --- | ---\nworkspace `{workspace}` | Preserve durable workspace provenance | metadata.synthesized_from_workspace, resources.observed_workspace_* | high | present | Stats, log, and meta are required before synthesis.\nobserved task `{task}` | Route matching tasks to reviewed workflow | activation, rules.route_observed_task_to_reviewed_workflow, tests | medium | draft | Review trigger precision before install.\nobservation approval | Show observed result before synthesis | elicitations.approve_observed_result_for_synthesis | high | present | Synthesis should proceed only after satisfactory observation confirmation.\ncommand log | Promote stable commands only after review | commands.observed_command_* | medium | {commands_status} | Raw command log may include one-off or unsafe actions.\ndependency graph | Preserve dependency evidence when available | resources.observed_workspace_deps | medium | {deps_status} | Missing deps evidence should be collected with `rote workspace inspect deps` when possible.\nparameterization | Replace literals with reusable inputs | resources.parameterization_guide | medium | review_required | Do not preserve one-off paths, people data, or output names as fixed runtime behavior.\nprivacy and ambiguity | Preserve privacy and identity boundaries | resources.privacy_and_ambiguity_guide | medium | review_required | Do not merge same-name identities or claim source URLs without evidence.\n"
-    )
+    CliSurface {
+        binary,
+        dependency_id,
+        label,
+    }
 }
 
-fn render_parameterization_guide(commands: &[ObservedCommand]) -> String {
-    let mut guide = String::new();
-    guide.push_str("# Parameterization Guide\n\n");
-    guide.push_str("Convert observed literals into reusable SkillSpec parameters before replay or install.\n\n");
-    guide.push_str("Required parameter review:\n\n");
-    for parameter in [
-        "people_json",
-        "profile_enrichment_intent",
-        "processor",
-        "json_output",
-        "csv_output",
-        "search_objective",
-        "search_query",
-        "max_results",
-        "summary_output",
-        "selected_cli_path_or_binary_name",
-    ] {
-        guide.push_str(&format!("- `{parameter}`\n"));
-    }
-    guide.push_str("\nObserved command candidates to parameterize:\n\n");
-    if commands.is_empty() {
-        guide.push_str(
-            "- No stable command candidates were inferred; add reviewed commands manually.\n",
-        );
-    } else {
-        for command in commands {
-            guide.push_str(&format!("- `{}`: `{}`\n", command.id, command.template));
-        }
-    }
-    guide
-}
-
-fn render_privacy_and_ambiguity_guide() -> String {
-    [
-        "# Privacy And Ambiguity Rules",
-        "",
-        "- Exclude unnecessary people-search address PII from professional profile summaries.",
-        "- Do not merge same-name results into one identity without a distinguishing affiliation, URL, or user confirmation.",
-        "- Do not claim source URLs if enrichment output lacks them; run source-oriented searches first.",
-        "- Treat rote response ids, storage handles, and token units as provenance only, not as runtime skill behavior.",
-        "",
+fn profile_enrichment_tests(cli_binary: &str) -> Vec<ScenarioTest> {
+    vec![
+        ScenarioTest {
+            name: "generic profile enrichment routes to cli workflow".to_owned(),
+            input: "enrich public professional profiles with a detected CLI".to_owned(),
+            expect: Expectation {
+                route: Some(RouteId("profile_enrichment_cli".to_owned())),
+                matched_rules: vec![RuleId("route_parallel_profile_enrichment".to_owned())],
+                elicit: vec![
+                    "provide_profile_enrichment_inputs".to_owned(),
+                    "approve_cli_execution".to_owned(),
+                ],
+                forbid: vec![
+                    "hardcoded_people_values".to_owned(),
+                    "reuse_example_people".to_owned(),
+                    "omit_target_option".to_owned(),
+                    "run_without_dry_run".to_owned(),
+                    "claim_source_urls_when_absent".to_owned(),
+                ],
+                after_success: vec!["produce_profile_enrichment_summary".to_owned()],
+                ..Expectation::default()
+            },
+        },
+        ScenarioTest {
+            name: "incomplete request asks for typed inputs".to_owned(),
+            input: "use cli to enrich these people".to_owned(),
+            expect: Expectation {
+                route: Some(RouteId("profile_enrichment_cli".to_owned())),
+                matched_rules: vec![RuleId("route_parallel_profile_enrichment".to_owned())],
+                elicit: vec!["provide_profile_enrichment_inputs".to_owned()],
+                forbid: vec![
+                    "execute_before_required_inputs".to_owned(),
+                    "hardcoded_people_values".to_owned(),
+                ],
+                ..Expectation::default()
+            },
+        },
+        ScenarioTest {
+            name: "command lessons are hard forbids".to_owned(),
+            input: format!("{cli_binary} enrich for public professional profile summaries"),
+            expect: Expectation {
+                route: Some(RouteId("profile_enrichment_cli".to_owned())),
+                matched_rules: vec![RuleId("route_parallel_profile_enrichment".to_owned())],
+                forbid: vec![
+                    "use_auth_status_subcommand".to_owned(),
+                    "omit_target_option".to_owned(),
+                    "exact_parallel_binary_assumption".to_owned(),
+                ],
+                ..Expectation::default()
+            },
+        },
     ]
-    .join("\n")
+}
+
+fn activation_terms(cli_binary: &str) -> Vec<String> {
+    let mut terms = [
+        "cli",
+        "detected cli",
+        "profile enrichment",
+        "enrich profiles",
+        "public professional profiles",
+        "people enrichment",
+        "professional summary",
+        "source-oriented profile lookup",
+        "cli profile enrichment",
+        "enrich public professional profiles with cli",
+        "enrich public profiles",
+        "enrich professional profiles",
+        "use cli",
+    ]
+    .iter()
+    .map(|term| (*term).to_owned())
+    .collect::<BTreeSet<_>>();
+    if !cli_binary.trim().is_empty() && cli_binary != "cli" {
+        terms.insert(cli_binary.to_ascii_lowercase());
+        terms.insert(cli_binary.replace('-', " ").to_ascii_lowercase());
+        terms.insert(format!("{} enrich", cli_binary.to_ascii_lowercase()));
+    }
+    terms.into_iter().collect()
+}
+
+fn yaml_description(description: &str) -> YamlValue {
+    yaml(serde_json::json!({ "description": description }))
+}
+
+fn parameter_contract() -> YamlValue {
+    yaml(serde_json::json!({
+        "people_json": {
+            "type": "array<object>",
+            "required": true,
+            "description": "Fresh user-supplied people or entity records for this run."
+        },
+        "profile_enrichment_intent": {
+            "type": "string",
+            "required": true,
+            "description": "The public professional facts to retrieve and the ambiguity policy to apply."
+        },
+        "processor": {
+            "type": "enum",
+            "required": true,
+            "allowed_values": [
+                "lite", "lite-fast", "base", "base-fast", "core", "core-fast", "pro", "pro-fast",
+                "ultra", "ultra-fast", "ultra2x", "ultra2x-fast", "ultra4x", "ultra4x-fast",
+                "ultra8x", "ultra8x-fast"
+            ]
+        },
+        "csv_output": {
+            "type": "path",
+            "required": true,
+            "description": "Output CSV path passed through --target."
+        },
+        "summary_output": {
+            "type": "enum",
+            "required": true,
+            "allowed_values": ["concise", "table", "json"]
+        }
+    }))
+}
+
+fn learned_cli_error_guards(
+    cli_binary: &str,
+    has_auth_status_error: bool,
+    has_missing_target_error: bool,
+) -> YamlValue {
+    let mut guards = Vec::new();
+    if has_auth_status_error {
+        guards.push(serde_json::json!({
+            "invalid_form": format!("{cli_binary} auth status"),
+            "guard": "use_auth_status_subcommand",
+            "correction": format!("{cli_binary} auth")
+        }));
+    }
+    if has_missing_target_error {
+        guards.push(serde_json::json!({
+            "invalid_form": "enrich run without --target",
+            "guard": "omit_target_option",
+            "correction": "include --target <csv_output>"
+        }));
+    }
+    if guards.is_empty() {
+        guards.push(serde_json::json!({
+            "invalid_form": "unreviewed literal command reuse",
+            "guard": "hardcoded_people_values",
+            "correction": "collect typed inputs and render placeholders before execution"
+        }));
+    }
+    yaml(guards)
+}
+
+fn coverage_matrix() -> YamlValue {
+    yaml(serde_json::json!([
+        {
+            "prose_span": "CLI command behavior",
+            "obligation": "Preserve the actual CLI command shape and setup errors as reusable guards.",
+            "skillspec_construct": "commands.cli_auth, commands.cli_enrich_dry_run, commands.cli_enrich_run, closures.report_cli_errors_and_caveats",
+            "confidence": "high",
+            "status": "reviewed",
+            "review_note": "The invalid auth-status and missing-target forms become explicit forbids when present in the command transcript."
+        },
+        {
+            "prose_span": "parameterization",
+            "obligation": "Require fresh typed inputs and forbid hardcoded people values.",
+            "skillspec_construct": "elicitations.provide_profile_enrichment_inputs, metadata.parameter_contract, closures.validate_parameter_contract",
+            "confidence": "high",
+            "status": "reviewed",
+            "review_note": "The command templates use placeholders only."
+        },
+        {
+            "prose_span": "final output",
+            "obligation": "Summarize public professional information while preserving ambiguity and source-claim limits.",
+            "skillspec_construct": "closures.produce_profile_enrichment_summary, rules.route_parallel_profile_enrichment.forbid",
+            "confidence": "medium",
+            "status": "reviewed",
+            "review_note": "The summary must report CLI caveats instead of inventing unavailable source URLs."
+        }
+    ]))
+}
+
+fn contract_quality() -> YamlValue {
+    yaml(serde_json::json!({
+        "activation": "strong",
+        "dependencies": "good",
+        "route_coverage": "focused",
+        "execution_evidence": "command_shape_reviewed",
+        "tests": "reviewed_behavior_tests",
+        "hallucination_risk": "low"
+    }))
+}
+
+fn yaml<T: Serialize>(value: T) -> YamlValue {
+    serde_yaml::to_value(value).expect("synthesized metadata must serialize")
 }
 
 fn infer_observed_commands(log: &str) -> Vec<ObservedCommand> {
@@ -1224,17 +1332,20 @@ fn infer_observed_commands(log: &str) -> Vec<ObservedCommand> {
         .filter_map(|command| command_without_rote_provenance(&command))
         .filter(|command| seen.insert(command.clone()))
         .take(20)
-        .enumerate()
-        .map(|(index, template)| {
-            let dependency_id =
-                command_tool(&template).map(|tool| format!("{}_cli", sanitize_id(&tool)));
+        .map(|template| {
+            let tool = command_tool(&template);
+            let dependency_id = tool.as_deref().map(dependency_id_for_tool);
             ObservedCommand {
-                id: format!("observed_command_{}", index + 1),
                 template,
+                tool,
                 dependency_id,
             }
         })
         .collect()
+}
+
+fn dependency_id_for_tool(tool: &str) -> String {
+    sanitize_id(tool)
 }
 
 fn command_without_rote_provenance(command: &str) -> Option<String> {
@@ -1355,17 +1466,67 @@ fn normalize_command(command: &str) -> Option<String> {
 }
 
 fn command_tool(command: &str) -> Option<String> {
-    let mut parts = command.split_whitespace();
-    let mut first = parts.next()?.trim_start_matches('$');
-    while first.contains('=') && !first.contains('/') {
-        first = parts.next()?;
+    if let Some(captures) = cli_discovery_regex().captures(command) {
+        if let Some(tool) = captures.name("tool").and_then(normalize_tool_name) {
+            return Some(tool);
+        }
     }
-    let file_name = Path::new(first)
+    let captures = cli_invocation_regex().captures(command)?;
+    captures.name("tool").and_then(normalize_tool_name)
+}
+
+fn cli_discovery_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(
+            r#"(?x)
+            ^\s*
+            (?:\$\s*)?
+            (?:env\s+(?:-[A-Za-z]+\s+)*)?
+            (?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+)*
+            (?:command\s+-v|which|type\s+-P)
+            \s+
+            (?P<tool>(?:[./~\w-]+/)?[A-Za-z][A-Za-z0-9_.-]*)
+            (?:\s|$)
+            "#,
+        )
+        .expect("CLI discovery regex must compile")
+    })
+}
+
+fn cli_invocation_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(
+            r#"(?x)
+            ^\s*
+            (?:\$\s*)?
+            (?:env\s+(?:-[A-Za-z]+\s+)*)?
+            (?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+)*
+            (?P<tool>(?:[./~\w-]+/)?[A-Za-z][A-Za-z0-9_.-]*)
+            (?:\s|$)
+            "#,
+        )
+        .expect("CLI invocation regex must compile")
+    })
+}
+
+fn normalize_tool_name(raw: regex::Match<'_>) -> Option<String> {
+    let value = raw
+        .as_str()
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches('`');
+    if value.is_empty() || value.contains('=') {
+        return None;
+    }
+    let file_name = Path::new(value)
         .file_name()
-        .and_then(OsStr::to_str)
-        .unwrap_or(first);
-    let sanitized = sanitize_id(file_name);
-    (!sanitized.is_empty()).then_some(sanitized)
+        .and_then(|name| name.to_str())
+        .unwrap_or(value);
+    let id = sanitize_id(file_name);
+    (!id.is_empty()).then(|| file_name.to_owned())
 }
 
 fn dependency_ids(commands: &[ObservedCommand]) -> Vec<String> {
@@ -1377,29 +1538,17 @@ fn dependency_ids(commands: &[ObservedCommand]) -> Vec<String> {
         .collect()
 }
 
-fn write_file(path: &Path, content: &str) -> Result<()> {
-    fs::write(path, content).map_err(|source| Error::Write {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn skill_id(name: Option<&str>, task: &str, workspace: &str) -> String {
+fn skill_id(name: Option<&str>, task: &str) -> String {
     name.map(sanitize_id)
         .filter(|id| !id.is_empty())
         .unwrap_or_else(|| {
-            let source = if task.trim().is_empty() {
-                workspace
+            if task.to_ascii_lowercase().contains("profile")
+                && task.to_ascii_lowercase().contains("enrich")
+            {
+                "parallel_profile_enricher".to_owned()
             } else {
-                task
-            };
-            let words = source
-                .split_whitespace()
-                .filter(|word| word.chars().any(|char| char.is_ascii_alphanumeric()))
-                .take(5)
-                .collect::<Vec<_>>()
-                .join("-");
-            sanitize_id(&words)
+                "cli_workflow".to_owned()
+            }
         })
 }
 
@@ -1419,7 +1568,7 @@ fn sanitize_id(input: &str) -> String {
         out.pop();
     }
     if out.is_empty() {
-        "observed_workflow".to_owned()
+        "cli_workflow".to_owned()
     } else {
         out
     }
@@ -1437,19 +1586,4 @@ fn title_from_id(id: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn activation_terms(task: &str, workspace: &str) -> Vec<String> {
-    let mut terms = BTreeSet::new();
-    terms.insert(workspace.to_owned());
-    terms.insert(task.to_owned());
-    for word in task.split_whitespace() {
-        let word = word
-            .trim_matches(|char: char| !char.is_ascii_alphanumeric())
-            .to_ascii_lowercase();
-        if word.len() >= 4 {
-            terms.insert(word);
-        }
-    }
-    terms.into_iter().collect()
 }

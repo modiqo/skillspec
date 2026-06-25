@@ -1,10 +1,10 @@
 use crate::error::{Error, Result};
 use crate::import_dependency_ledger;
 use crate::model::{
-    Artifact, ArtifactKind, CodeBlock, CodeFileSource, CodeInlineSource, CodeKind, CodeProvenance,
-    CodeRequires, CodeSafety, CodeSource, CommandRequires, CommandTemplate, Dependency,
-    DependencyCheck, DependencyKind, Import, ImportLoad, ImportRequires, ImportRole, ImportUse,
-    ImportUseKind, Resource, ResourceRole, ResourceUse, ResourceUseKind, SkillSpec, Snippet,
+    CodeBlock, CodeFileSource, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires,
+    CodeSafety, CodeSource, CommandRequires, CommandTemplate, Dependency, DependencyCheck,
+    DependencyKind, Import, ImportLoad, ImportRequires, ImportRole, ImportUse, ImportUseKind,
+    Resource, ResourceRole, ResourceUse, ResourceUseKind, SkillSpec, Snippet,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -17,40 +17,19 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
     let analysis = SkillAnalysis::from_source(&source);
     let mut dependencies = dependencies_from_analysis(&analysis);
     dependencies.insert(
-        "dependency_ledger".to_owned(),
-        Dependency {
-            kind: DependencyKind::File,
-            description: Some(
-                "Generated dependency ledger for imported package evidence.".to_owned(),
-            ),
-            command: None,
-            path: Some("deps.toml".to_owned()),
-            env: None,
-            check: Some(DependencyCheck {
-                command: None,
-                path: Some("deps.toml".to_owned()),
-                env: None,
-            }),
-            permission: None,
-            provision: None,
-        },
+        import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),
+        import_dependency_ledger::dependency(
+            "Generated dependency ledger for imported package evidence.",
+        ),
     );
     let commands = commands_from_blocks(&analysis.command_blocks);
     let (imports, resources, code) = imports_resources_and_code(&analysis);
     let mut artifacts = BTreeMap::new();
     artifacts.insert(
-        "dependency_ledger".to_owned(),
-        Artifact {
-            kind: ArtifactKind::File,
-            description: Some(
-                "Generated dependency ledger preserving dependency evidence from imported skill material."
-                    .to_owned(),
-            ),
-            path: Some("deps.toml".to_owned()),
-            schema: None,
-            produced_by: Vec::new(),
-            consumed_by: Vec::new(),
-        },
+        import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),
+        import_dependency_ledger::artifact(
+            "Generated dependency ledger preserving dependency evidence from imported skill material.",
+        ),
     );
 
     let mut snippets = BTreeMap::new();

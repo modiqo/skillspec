@@ -1,16 +1,19 @@
 use crate::error::{Error, Result};
+use crate::import_dependency_ledger;
 use crate::imports;
 use crate::model::{
-    CodeSource, ConsumerRef, ExecutableRefKind, ImportLoad, ImportUse, ImportUseKind, ProducerRef,
-    RecipeStep, ResourceUse, ResourceUseKind, RouteId, RuleId, SkillSpec,
+    CodeSource, ConsumerRef, DependencyKind, ExecutableRefKind, ImportLoad, ImportUse,
+    ImportUseKind, ProducerRef, RecipeStep, ResourceUse, ResourceUseKind, RouteId, RuleId,
+    SkillSpec,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub fn load_spec(path: &Path) -> Result<SkillSpec> {
     let spec = load_spec_unresolved(path)?;
     imports::validate(&spec, path)?;
+    validate_package_sidecars(&spec, path)?;
     Ok(spec)
 }
 
@@ -80,6 +83,124 @@ pub fn validate_spec(spec: &SkillSpec) -> Result<()> {
     validate_commands(spec)?;
     validate_tests(spec)?;
     Ok(())
+}
+
+fn validate_package_sidecars(spec: &SkillSpec, spec_path: &Path) -> Result<()> {
+    let spec_dir = spec_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut failures = Vec::new();
+
+    for (id, dependency) in &spec.dependencies {
+        if dependency.kind != DependencyKind::File {
+            continue;
+        }
+        let path = dependency
+            .check
+            .as_ref()
+            .and_then(|check| check.path.as_deref())
+            .or(dependency.path.as_deref());
+        let Some(path) = path else {
+            continue;
+        };
+        if id == import_dependency_ledger::DEPENDENCY_LEDGER_ID
+            || path.ends_with(import_dependency_ledger::DEPS_TOML_PATH)
+        {
+            validate_sidecar_file(
+                spec_dir,
+                &format!("dependencies.{id}"),
+                path,
+                path.ends_with(import_dependency_ledger::DEPS_TOML_PATH),
+                &mut failures,
+            );
+        }
+    }
+
+    for (id, resource) in &spec.resources {
+        validate_sidecar_file(
+            spec_dir,
+            &format!("resources.{id}"),
+            &resource.path,
+            false,
+            &mut failures,
+        );
+    }
+
+    for (id, code) in &spec.code {
+        let CodeSource::File(file) = &code.source else {
+            continue;
+        };
+        validate_sidecar_file(
+            spec_dir,
+            &format!("code.{id}.source.file"),
+            &file.file,
+            false,
+            &mut failures,
+        );
+        if let Some(resource_id) = &file.from_resource {
+            if let Some(resource) = spec.resources.get(resource_id) {
+                if resource.path != file.file {
+                    failures.push(format!(
+                        "code.{id}.source.from_resource: resource {resource_id:?} path {} does not match code file {}",
+                        resource.path, file.file
+                    ));
+                }
+            }
+        }
+    }
+
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::InvalidInput {
+            message: format!("package sidecar validation failed: {}", failures.join("; ")),
+        })
+    }
+}
+
+fn validate_sidecar_file(
+    spec_dir: &Path,
+    field: &str,
+    path: &str,
+    require_non_empty: bool,
+    failures: &mut Vec<String>,
+) {
+    let Some(relative_path) = package_sidecar_path(field, path, failures) else {
+        return;
+    };
+    let resolved = spec_dir.join(relative_path);
+    match fs::metadata(&resolved) {
+        Ok(metadata) if metadata.is_file() => {
+            if require_non_empty && metadata.len() == 0 {
+                failures.push(format!("{field}: {path} exists but is empty"));
+            }
+        }
+        Ok(_) => failures.push(format!("{field}: {path} is not a file")),
+        Err(error) => failures.push(format!("{field}: {path} missing ({error})")),
+    }
+}
+
+fn package_sidecar_path<'a>(
+    field: &str,
+    path: &'a str,
+    failures: &mut Vec<String>,
+) -> Option<&'a Path> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || trimmed.contains("://") || trimmed.starts_with("~/") {
+        return None;
+    }
+    let relative_path = Path::new(trimmed);
+    if relative_path.is_absolute() {
+        return None;
+    }
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    }) {
+        failures.push(format!("{field}: {path} must stay within the skill folder"));
+        return None;
+    }
+    Some(relative_path)
 }
 
 fn validate_routes(spec: &SkillSpec) -> Result<()> {
