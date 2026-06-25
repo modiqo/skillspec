@@ -262,7 +262,7 @@ changed.
 Changing the grammar should update all relevant surfaces:
 
 - `crates/skillspec-cli/src/spec/model.rs`;
-- `crates/skillspec-cli/src/spec/parser.rs`;
+- `crates/skillspec-cli/src/spec/parser/validation.rs`;
 - `crates/skillspec-cli/src/execution/decision.rs` when decision behavior changes;
 - `crates/skillspec-cli/src/features/sensemake.rs` when query or refs behavior changes;
 - `spec/skill.spec.schema.json`;
@@ -283,7 +283,7 @@ This doc is grounded in:
 - `spec/grammar.md`, which defines the conceptual grammar;
 - `spec/skill.spec.schema.json`, which defines the JSON Schema surface;
 - `crates/skillspec-cli/src/spec/model.rs`, which defines the typed Rust model;
-- `crates/skillspec-cli/src/spec/parser.rs`, which validates schema, required fields,
+- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates schema, required fields,
   identifiers, references, import cycles, orphaned imports/resources, and test
   expectations;
 - `crates/skillspec-cli/src/execution/decision.rs`, which evaluates scenario

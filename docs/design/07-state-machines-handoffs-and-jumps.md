@@ -228,7 +228,7 @@ This doc is grounded in:
 
 - `crates/skillspec-cli/src/spec/model.rs`, which defines `State`, `RouteHandoff`,
   `HandoffBoundary`, `ExecutionPlan`, `ExecutionPhase`, and `ExecutionJump`;
-- `crates/skillspec-cli/src/spec/parser.rs`, which validates state references and
+- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates state references and
   route ids;
 - `crates/skillspec-cli/src/execution/decision.rs`, which attaches the selected route's
   execution plan to the decision;

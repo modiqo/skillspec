@@ -247,7 +247,7 @@ This doc is grounded in:
 - `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.
 - `crates/skillspec-cli/src/spec/model.rs`,
-  `crates/skillspec-cli/src/spec/parser.rs`,
+  `crates/skillspec-cli/src/spec/parser/validation.rs`,
   `crates/skillspec-cli/src/execution/decision.rs`,
   `crates/skillspec-cli/src/features/compiler.rs`,
   `crates/skillspec-cli/src/execution/deps.rs`,

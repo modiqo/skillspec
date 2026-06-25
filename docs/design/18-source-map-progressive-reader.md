@@ -84,7 +84,7 @@ claiming the old evidence still applies.
 
 Keep these surfaces aligned whenever the source-map workflow changes:
 
-- `crates/skillspec-cli/src/cli/mod.rs` for command shape and help text;
+- `crates/skillspec-cli/src/cli/args.rs` for command shape and help text;
 - `crates/skillspec-cli/src/features/source_map.rs` for map schema and query behavior;
 - `crates/skillspec-cli/src/spec/grammar.rs` for the import sequence taught by
   `skillspec grammar sensemake`;

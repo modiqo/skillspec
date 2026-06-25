@@ -349,7 +349,8 @@ This doc is grounded in:
 
 - `crates/skillspec-cli/src/execution/progress.rs`, which defines progress reports,
   execution events, event recording, and progress derivation;
-- `crates/skillspec-cli/src/cli/mod.rs`, which exposes `progress show` and
+- `crates/skillspec-cli/src/cli/args.rs` and
+  `crates/skillspec-cli/src/cli/dispatch.rs`, which expose `progress show` and
   `progress record`;
 - `crates/skillspec-cli/src/execution/align.rs`, which consumes structured execution
   traces for obligation proof;

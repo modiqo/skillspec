@@ -230,7 +230,7 @@ This doc is grounded in:
   `RouteSelectionBasis`, and implements default route order, predicate matching,
   rule application, dedupe, decision events, execution-plan attachment, and
   scenario-test comparison;
-- `crates/skillspec-cli/src/spec/parser.rs`, which validates route, rule,
+- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates route, rule,
   elicitation, action, and test references;
 - `spec/semantics.md` and `spec/relationships.md`, which describe the intended
   meaning of routes, rules, predicates, elicitations, tests, and traces.

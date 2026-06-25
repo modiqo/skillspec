@@ -305,7 +305,7 @@ This doc is grounded in:
 - `crates/skillspec-cli/src/execution/trace.rs`, which writes trace envelopes, run
   directories, compact JSONL, summaries, event selection, spec fingerprints, and
   input hashes;
-- `crates/skillspec-cli/src/cli/mod.rs`, which enforces `trace.required` for
+- `crates/skillspec-cli/src/cli/dispatch.rs`, which enforces `trace.required` for
   `decide` and `explain`;
 - `crates/skillspec-cli/src/execution/align.rs`, which defines the alignment report,
   statuses, layers, obligations, proof rows, execution ledger, and pass/fail/

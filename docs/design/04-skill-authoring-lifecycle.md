@@ -258,7 +258,8 @@ This doc is grounded in:
   `imports_resources_and_code`, `commands_from_blocks`, and
   `dependencies_from_analysis`;
 - `crates/skillspec-cli/src/features/compiler.rs`, which generates thin loader skills;
-- `crates/skillspec-cli/src/cli/mod.rs`, which exposes `validate`, `test`,
+- `crates/skillspec-cli/src/cli/args.rs` and
+  `crates/skillspec-cli/src/cli/dispatch.rs`, which expose `validate`, `test`,
   `decide`, `sensemake`, `query`, `refs`, `imports check`, `deps check`,
   `compile`, `import-skill`, and `trace align`;
 - `crates/skillspec-cli/src/execution/decision.rs`,

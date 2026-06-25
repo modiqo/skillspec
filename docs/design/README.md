@@ -75,21 +75,21 @@ Every design claim should be grounded in one or more of these sources:
 | --- | --- |
 | Contract semantics and non-goals | `spec/README.md`, `spec/semantics.md`, `spec/grammar.md`, `docs/01-why-skillspec.md`, `docs/02-prose-vs-skillspec.md` |
 | Top-level grammar shape | `crates/skillspec-cli/src/spec/model.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
-| Validation behavior | `crates/skillspec-cli/src/spec/parser.rs`, `conformance/valid/`, `conformance/invalid/` |
+| Validation behavior | `crates/skillspec-cli/src/spec/parser/validation.rs`, `conformance/valid/`, `conformance/invalid/` |
 | Route and rule decisions | `crates/skillspec-cli/src/execution/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
 | Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-cli/src/features/compiler.rs` |
-| Runtime phase loop | `crates/skillspec-cli/src/execution/act.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/cli/mod.rs`, `spec/commandspec.md` |
+| Runtime phase loop | `crates/skillspec-cli/src/execution/act.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md` |
 | Phase tool boundaries | `crates/skillspec-cli/src/spec/model.rs`, `crates/skillspec-cli/src/execution/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
-| Command log | `crates/skillspec-cli/src/cli/mod.rs`, `spec/commandspec.md`, command help output |
-| Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/spec/imports.rs`, `crates/skillspec-cli/src/spec/parser.rs` |
+| Command log | `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md`, command help output |
+| Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/spec/imports.rs`, `crates/skillspec-cli/src/spec/parser/validation.rs` |
 | Prose import scaffolding | `crates/skillspec-cli/src/features/importer.rs`, `docs/02-prose-vs-skillspec.md` |
-| Source-map progressive imports | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/mod.rs`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
+| Source-map progressive imports | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
 | Thin loader generation | `crates/skillspec-cli/src/features/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/execution/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
 | Skill router | `crates/skillspec-cli/src/lifecycle/router.rs`, `crates/skillspec-cli/src/lifecycle/visibility.rs`, `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli.rs` |
-| Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-cli/src/execution/trace.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/execution/align.rs` |
-| CLI surface | `crates/skillspec-cli/src/cli/mod.rs` |
+| Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-cli/src/execution/trace.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/execution/align.rs`, `crates/skillspec-cli/src/execution/align/ledger.rs`, `crates/skillspec-cli/src/execution/align/types.rs` |
+| CLI surface | `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs` |
 
 ## Terms Used In These Docs
 

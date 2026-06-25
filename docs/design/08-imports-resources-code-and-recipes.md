@@ -298,7 +298,7 @@ This doc is grounded in:
   commands, and recipes;
 - `crates/skillspec-cli/src/spec/model.rs`, which defines the typed structures and
   enums for imports, resources, code, artifacts, commands, and recipes;
-- `crates/skillspec-cli/src/spec/parser.rs`, which validates references and orphaned
+- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates references and orphaned
   imports/resources;
 - `crates/skillspec-cli/src/spec/imports.rs`, which validates local import paths,
   Markdown sections, and load order;

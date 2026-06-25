@@ -160,7 +160,7 @@ rg -n "pub struct SkillSpec|deny_unknown_fields|pub struct Expectation" crates/s
 For parser validation:
 
 ```sh
-rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-cli/src/spec/parser.rs
+rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-cli/src/spec/parser/validation.rs
 ```
 
 For decision behavior:
@@ -251,5 +251,7 @@ If the doc cannot answer those questions, it needs another pass.
 
 This doc is grounded in the QA pattern used for the design docs in this
 directory and the repository source map in `docs/design/README.md`. It also
-reflects the repo's existing command surface in `crates/skillspec-cli/src/cli/mod.rs`
-and the implementation files cited throughout the design-doc set.
+reflects the repo's existing command surface in
+`crates/skillspec-cli/src/cli/args.rs` and
+`crates/skillspec-cli/src/cli/dispatch.rs`, plus the implementation files cited
+throughout the design-doc set.

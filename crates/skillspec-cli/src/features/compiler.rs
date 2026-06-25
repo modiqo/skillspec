@@ -8,6 +8,15 @@ use crate::model::{
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
+mod contracts;
+mod selection;
+
+use contracts::{
+    write_authoring_contract, write_durable_handoff_contract, write_harness_presentation_contract,
+    write_runtime_contract,
+};
+use selection::write_frontmatter;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Target {
     CodexSkill,
@@ -145,61 +154,6 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
             let _ = writeln!(output, "- `{}`: {}", route.id.0, route.label);
         }
     }
-}
-
-fn write_durable_handoff_contract(output: &mut String) {
-    output.push_str("## Durable Handoff Contract\n\n");
-    output.push_str("This skill participates in agent-mediated durable execution. There is no runtime handoff engine: the agent reads the active SkillSpec contracts, carries the handoff packet in context, and preserves the declared evidence.\n\n");
-    output.push_str("- If a durable handoff packet is present, preserve its `workspace`, `trace_dir`, `return_to`, `branch_id`, and `execution_policy` fields.\n");
-    output.push_str("- If no durable handoff packet is present and the task asks for remembered evidence, future recall, reuse, trace, alignment, or durable execution, route through `durable-executor` first unless the user explicitly requests direct/no-rote execution.\n");
-    output.push_str("- If `durable_context.active` is true, do not route the whole task back to `durable-executor`; use `durable-executor` only as the execution substrate and then return to `return_to`.\n");
-    output.push_str("- This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.\n");
-    output.push_str("- Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.\n");
-    output.push_str("- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.\n");
-    output.push_str("- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.\n\n");
-}
-
-fn write_authoring_contract(output: &mut String) {
-    output.push_str(
-        "## Authoring And Revision Contract
-
-",
-    );
-    output.push_str(
-        "When importing, creating, revising, or extending this SkillSpec-backed skill, use the embedded grammar teacher before editing `skill.spec.yml`:
-
-",
-    );
-    output.push_str(
-        "```bash
-",
-    );
-    output.push_str(
-        "skillspec grammar sensemake --view index
-",
-    );
-    output.push_str(
-        "skillspec grammar sensemake --view porting
-",
-    );
-    output.push_str(
-        "skillspec grammar checklist --for import-skill
-",
-    );
-    output.push_str(
-        "```
-
-",
-    );
-    output.push_str("- Treat the checklist as the review gate for semantic edits: activation, routes, rules, elicitations, imports/resources, commands/deps, procedures, tests, proof, and contract quality.
-");
-    output.push_str("- Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
-");
-    output.push_str("- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
-");
-    output.push_str("- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
-
-");
 }
 
 fn write_imports(output: &mut String, spec: &SkillSpec) {
@@ -526,226 +480,6 @@ fn write_dependency(output: &mut String, id: &str, dependency: &Dependency) {
     output.push('\n');
 }
 
-fn write_frontmatter(output: &mut String, spec: &SkillSpec, target: Target) {
-    match target {
-        Target::CodexSkill | Target::ClaudeSkill => {
-            let _ = writeln!(output, "---");
-            let _ = writeln!(output, "name: {}", skill_name(&spec.id));
-            let _ = writeln!(output, "description: {:?}", selection_description(spec));
-            let _ = writeln!(output, "---");
-            output.push('\n');
-        }
-        Target::Markdown => {}
-    }
-}
-
-fn selection_description(spec: &SkillSpec) -> String {
-    let mut intents = Vec::new();
-    for applies_when in &spec.applies_when {
-        collect_user_intents(applies_when, &mut intents);
-    }
-
-    let activation_summary = spec
-        .activation
-        .as_ref()
-        .map(|activation| activation.summary.trim().trim_end_matches('.'))
-        .filter(|summary| !summary.is_empty());
-
-    let mut capabilities = Vec::new();
-    let cli_intent_surface = intents.iter().any(|intent| {
-        let intent = intent.to_ascii_lowercase();
-        intent.contains("cli")
-            || intent.contains("shell")
-            || intent.contains("command")
-            || intent.contains("process")
-            || intent.contains("terminal")
-    }) || spec.routes.iter().any(|route| {
-        let route = format!(
-            "{} {}",
-            route.label,
-            route.description.as_deref().unwrap_or_default()
-        )
-        .to_ascii_lowercase();
-        route.contains("cli")
-            || route.contains("shell")
-            || route.contains("command")
-            || route.contains("process")
-            || route.contains("terminal")
-    });
-    let cli_command_surface = spec
-        .commands
-        .keys()
-        .any(|id| id.contains("exec") || id.contains("process") || id.contains("pty"));
-    if cli_intent_surface && cli_command_surface {
-        push_unique(&mut capabilities, "CLI and shell commands");
-    }
-    if spec
-        .dependencies
-        .values()
-        .any(|dependency| dependency.kind == DependencyKind::Adapter)
-    {
-        push_unique(
-            &mut capabilities,
-            "APIs, MCP/rote adapters, and service connectors",
-        );
-    }
-    if spec
-        .dependencies
-        .values()
-        .any(|dependency| dependency.kind == DependencyKind::Browser)
-    {
-        push_unique(&mut capabilities, "browser handoff and page evidence");
-    }
-    if spec
-        .dependencies
-        .values()
-        .any(|dependency| dependency.kind == DependencyKind::Service)
-    {
-        push_unique(&mut capabilities, "external services");
-    }
-    if spec
-        .commands
-        .keys()
-        .any(|id| id.contains("exec") || id.contains("process"))
-    {
-        push_unique(&mut capabilities, "process capture");
-    }
-    if spec
-        .commands
-        .keys()
-        .any(|id| id.contains("stream") || id.contains("follow"))
-    {
-        push_unique(&mut capabilities, "logs and streams");
-    }
-    if spec.commands.keys().any(|id| id.contains("pty")) {
-        push_unique(&mut capabilities, "PTY and terminal-sensitive prompts");
-    }
-    if spec
-        .commands
-        .keys()
-        .any(|id| id.contains("deps") || id.contains("dependency"))
-    {
-        push_unique(&mut capabilities, "dependency checks");
-    }
-    if spec
-        .closures
-        .keys()
-        .any(|id| id.contains("crystallize") || id.contains("crystallization"))
-    {
-        push_unique(&mut capabilities, "flow crystallization and replay");
-    }
-
-    let mut parts = Vec::new();
-    if let Some(summary) = activation_summary {
-        parts.push(summary.to_owned());
-    }
-    if let Some(activation) = &spec.activation {
-        if !activation.keywords.is_empty() {
-            parts.push(format!(
-                "Use for {}",
-                sentence_list(
-                    &activation
-                        .keywords
-                        .iter()
-                        .take(12)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                )
-            ));
-        }
-    }
-    if !intents.is_empty() {
-        parts.push(format!(
-            "Use when the task needs to {}",
-            sentence_list(&intents.into_iter().take(7).collect::<Vec<_>>())
-        ));
-    } else {
-        parts.push(format!(
-            "Use for {}",
-            lower_first(spec.description.trim_end_matches('.'))
-        ));
-    }
-    if !capabilities.is_empty() {
-        parts.push(format!(
-            "Handles {}",
-            sentence_list(&capabilities.into_iter().take(8).collect::<Vec<_>>())
-        ));
-    }
-    if spec
-        .entry
-        .as_ref()
-        .is_some_and(|entry| entry.decision_required)
-    {
-        parts.push(
-            "Requires `skillspec decide` before substrate tools or overlapping low-level skills"
-                .to_owned(),
-        );
-    }
-    parts.push(
-        "Preserves evidence with SkillSpec routes, forbids, dependencies, traces, and token-savings reports"
-            .to_owned(),
-    );
-    shorten_description(&parts.join(". "))
-}
-
-fn collect_user_intents(value: &serde_yaml::Value, intents: &mut Vec<String>) {
-    let serde_yaml::Value::Mapping(mapping) = value else {
-        return;
-    };
-    let Some(user_intent) = mapping.get(serde_yaml::Value::String("user_intent".to_owned())) else {
-        return;
-    };
-    match user_intent {
-        serde_yaml::Value::Sequence(values) => {
-            for value in values {
-                if let Some(value) = value.as_str() {
-                    push_unique(intents, value);
-                }
-            }
-        }
-        serde_yaml::Value::String(value) => push_unique(intents, value),
-        _ => {}
-    }
-}
-
-fn push_unique(values: &mut Vec<String>, value: &str) {
-    let value = value.trim();
-    if value.is_empty() || values.iter().any(|existing| existing == value) {
-        return;
-    }
-    values.push(value.to_owned());
-}
-
-fn sentence_list(values: &[String]) -> String {
-    match values {
-        [] => String::new(),
-        [only] => only.clone(),
-        [head @ .., last] => format!("{} and {}", head.join(", "), last),
-    }
-}
-
-fn shorten_description(value: &str) -> String {
-    const LIMIT: usize = 900;
-    if value.len() <= LIMIT {
-        return value.to_owned();
-    }
-    let mut shortened = value[..LIMIT].trim_end().to_owned();
-    if let Some(index) = shortened.rfind(['.', ',', ';']) {
-        shortened.truncate(index);
-    }
-    shortened.trim_end().trim_end_matches('.').to_owned()
-}
-
-fn lower_first(value: &str) -> String {
-    let mut chars = value.chars();
-    let Some(first) = chars.next() else {
-        return String::new();
-    };
-    let mut lowered = first.to_lowercase().collect::<String>();
-    lowered.push_str(chars.as_str());
-    lowered
-}
-
 fn write_overview(output: &mut String, spec: &SkillSpec, target: Target) {
     let _ = writeln!(output, "# {}", spec.title);
     output.push('\n');
@@ -763,48 +497,6 @@ fn write_overview(output: &mut String, spec: &SkillSpec, target: Target) {
             );
         }
     }
-}
-
-fn write_runtime_contract(output: &mut String) {
-    output.push_str("## Runtime Contract\n\n");
-    output.push_str("- Read this generated skill for orientation and immediate rules.\n");
-    output.push_str("- Treat routes, rules, states, commands, tests, and review notes below as authoritative.\n");
-    output.push_str("- Route `execution_plan` entries are ordered hard obligations. Execute phase 1 before phase 2; do not jump to a later handoff just because that substrate is available. Phase `jumps` are the only declared conditional exits from the default order.\n");
-    output.push_str("- Route `handoff` entries are hard execution boundaries, not prose. If a selected route has `handoff.boundary: stop_current_skill`, stop current-skill execution except to pass the declared context to the target skill.\n");
-    output.push_str("- Rules beat prose when there is tension.\n");
-    output.push_str("- `forbid` entries are hard negative steering, not suggestions.\n");
-    output.push_str("- `elicit` entries require bounded user questions before guessing.\n");
-    output.push_str("- Use the scenario tests as examples of expected behavior.\n");
-    output.push_str("- When unfamiliar with the spec shape, run `skillspec sensemake <skill-folder>/skill.spec.yml --view index` to get section roles, counts, ids, and query commands without consuming the whole spec.\n");
-    output.push_str("- When the `skillspec` CLI is available, run `skillspec plan <skill-folder>/skill.spec.yml --input='<task>' --trace-dir \"${PWD}/.skillspec/traces\"`, preserve the printed `run_dir`, then run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before substrate tools. Treat the phase plan and current-route checklist as the active execution SOP.\n");
-    output.push_str("- The `skillspec act` checklist is an OODA loop for the selected route: observe the task and trace, orient with matched rules, current phase, and `PHASE TOOL BOUNDARY - HARD`, decide the next allowed action, act with evidence capture, then repeat before the next tool call.\n");
-    output.push_str("- The selected route and matched rules override lower-level skill defaults and generic tool preferences. If a lower-level skill suggests a forbidden tool, stop and follow the SkillSpec route.\n");
-    output.push_str("- For each execution phase, run `skillspec act <skill-folder>/skill.spec.yml --input='<task>' --run <run_dir> --phase <phase-id>` before acting, obey the rendered phase tool boundary, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show <skill-folder>/skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.\n");
-    output.push_str("- If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide` plus a manually constructed allow/deny checklist and progress notes before tool use. Prefer `skillspec explain` for human-facing route rationale.\n");
-    output.push_str("- After `skillspec act`, inspect matched rules and active execution surfaces with `skillspec query <skill-folder>/skill.spec.yml <handle> --view summary` and `skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary` instead of ad hoc YAML queries.\n");
-    output.push_str("- Escalate query detail from `--view index` to `--view summary` to `--view full` only when the smaller view cannot answer the decision.\n");
-    output.push_str("- When invoking `skillspec plan`, `skillspec act`, or `skillspec decide`, pass only the user's task text. Strip skill invocation prefixes such as `/durable-executor-spec`, `$durable-executor-spec`, or `/my-skill` before setting `--input`.\n");
-    output.push_str("- Prefer `--input='<task text>'` in shell examples so `$skill-name` text is not expanded by the shell.\n");
-    output.push_str("- Resolve `skill.spec.yml` relative to this `SKILL.md` folder, not the process working directory.\n");
-    output.push_str("- Always pass `--trace-dir`; use `${PWD}/.skillspec/traces` unless the user or harness provides a run-specific trace directory.\n");
-    output.push_str("- After `skillspec plan` or `skillspec act` prints trace lines, keep the emitted `run_dir` and mention it when reporting how the decision was made.\n");
-    output.push_str("- When the CLI is available, run `skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run_dir>` and add `--execution-trace <run_dir>/execution.jsonl` when structured action evidence exists. This writes `<run_dir>/alignment.json`. Include the compact alignment summary, status meaning, decision-replay and execution-proof layer results, evidence gaps, user-facing proof rows, and any failed or partial checks in the completion report. Do not report a bare `unproven`; use `Alignment: partial` plus specific `Missing proof` rows.\n");
-    output.push_str("- Always include token usage in the completion report. For successful rote-backed runs, collect `rote workspace stats <workspace>` into a report file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-report <file> --phase <phase-id> --requirement <stats-requirement-id>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Draft the final response with Result, Evidence, Alignment summary, Token usage, and SkillSpec sections, run `skillspec progress final-response <run_dir> --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings`, then rerun `skillspec trace align` and report that final alignment. Use `Token consumption` and `Token savings` from `skillspec trace align`; if stats truly cannot be collected, say `not recorded`. When query-reduction stats exist, report cached response tokens reduced to query-result tokens, saved-token delta, and reduction percentage instead of calling cached tokens consumed prompt tokens. When rote workspace evidence or stats exist, name the workspace and response ids/files, describe the workspace as a retrievable context file system, report measured context-window/API tokens when available, and explain crystallized/remembered reuse as avoiding full evidence reloads. Do not invent replay savings.\n");
-    output.push_str("- Alignment proof rows may mention command basenames such as `gh` or `git`, but must not include raw command arguments because args may contain private data.\n\n");
-    output.push_str("Minimum final response shape:\n\n");
-    output.push_str("- `Result`: answer the user's task directly.\n");
-    output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
-    output.push_str("- `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align`.\n");
-    output.push_str("- `Token usage`: include `Token consumption` and `Token savings` exactly as reported by `skillspec trace align`; say `not recorded` when absent.\n");
-    output.push_str("- `SkillSpec`: selected route, trace run directory, align status, status meaning, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, Alignment summary, or Token usage sections.\n\n");
-}
-
-fn write_harness_presentation_contract(output: &mut String) {
-    output.push_str("## Harness Presentation Contract\n\n");
-    output.push_str("- When presenting plan, action, progress, command, recipe, or closure steps to a user, show the step `description` as the default visible text. If no description is present, show a humanized id.\n");
-    output.push_str("- Keep raw command templates, concrete argv, provider payloads, and low-level tool details collapsed by default in normal progress UI. Reveal them only when the user explicitly expands details, approval is required, a command fails, debug/verbose mode is active, or no usable description exists.\n");
-    output.push_str("- For approval prompts, destructive or externally mutating actions, and failure reports, show both the human description and the raw command or payload summary needed for informed approval/debugging.\n");
-    output.push_str("- This is presentation-only. Always preserve raw command templates, concrete executed commands, stdout/stderr handles, response ids, and files in trace/evidence/alignment data exactly as required by the active SkillSpec.\n\n");
 }
 
 fn write_entry(output: &mut String, spec: &SkillSpec) {
@@ -1577,26 +1269,6 @@ fn trace_event_name(event: &TraceEventKind) -> &'static str {
         TraceEventKind::AfterSuccessScheduled => "after_success_scheduled",
         TraceEventKind::OutcomeRecorded => "outcome_recorded",
     }
-}
-
-fn skill_name(id: &str) -> String {
-    let mut name = String::new();
-    let mut last_was_dash = false;
-    for char in id.chars() {
-        let next = if char.is_ascii_alphanumeric() {
-            last_was_dash = false;
-            Some(char.to_ascii_lowercase())
-        } else if !last_was_dash {
-            last_was_dash = true;
-            Some('-')
-        } else {
-            None
-        };
-        if let Some(char) = next {
-            name.push(char);
-        }
-    }
-    name.trim_matches('-').to_owned()
 }
 
 #[cfg(test)]
