@@ -1,12 +1,12 @@
 schema: skillspec/v0
 id: skillspec
 title: SkillSpec
-description: SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, installing router mode, installing/updating/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+description: SkillSpec post-install setup and skill-authoring multiplexer for importing existing prose skills, inspecting SkillSpec status, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
   summary: >
     Multiplex SkillSpec post-install setup: import existing SKILL.md skills from
-    local folders or public URIs, install router mode, optionally install
-    install/update/delete durable-executor, create specs from observed durable execution workspaces,
+    local folders or public URIs, inspect installed status, install/update/enable/disable router mode, optionally
+    install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
     revise SkillSpec YAML, and prove value before install or release.
   keywords:
     - skillspec
@@ -20,15 +20,27 @@ activation:
     - dependency ledger
     - deps.toml
     - dependency preservation
+    - skillspec status
+    - status report
+    - lifecycle status
+    - installed skills inventory
+    - skillspec-backed skills
+    - legacy prose skills
     - install router
     - install skill-router
     - update router
+    - enable router
+    - disable router
     - repair skill-router
     - router mode
     - install durable-executor
     - durable executor install
     - update durable-executor
     - durable executor update
+    - enable durable-executor
+    - durable executor enable
+    - disable durable-executor
+    - durable executor disable
     - delete durable-executor
     - durable executor delete
     - observe durable executor
@@ -68,11 +80,12 @@ applies_when:
       - import an existing prose skill from a local folder or public URI
       - diagnose reliability debt and context burden in a prose skill before porting
       - preserve imported dependency mentions, package authority, install risk, and missing dependency proof gaps
+      - inspect installed SkillSpec status, lifecycle state, roots, router index state, and skill inventory
       - install skill-router after SkillSpec is installed
       - install router mode after SkillSpec is installed
-      - update or repair an installed skill-router mode
+      - update, enable, disable, or repair an installed skill-router mode
       - install durable-executor as an optional first-hop skill
-      - update or delete a managed durable-executor install
+      - update, enable, disable, or delete a managed durable-executor install
       - create a SkillSpec skill by observing a durable-executor rote-exec workspace
       - revise an existing SkillSpec-backed skill
       - add phase planning and progress tracking to a SkillSpec-backed skill
@@ -242,10 +255,10 @@ routes:
   - id: install_skill_router
     label: Install router mode
     rank: 3
-    description: Use when the user wants post-install setup to create or refresh the explicit-only skill-router surface in the configured skill roots.
+    description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, and verify the explicit-only router surface.
+      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, verify the implicit router surface, and verify routed skills are explicit-only.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -271,10 +284,9 @@ routes:
             - verify_router_install
           forbid:
             - use_removed_router_root
-            - make_router_implicit_when_durable_executor_missing
         - id: report_router_mode
           owner_skill: skillspec
-          description: Report which roots were changed, whether durable-executor stayed implicit, and whether durable first-hop is unavailable.
+          description: Report which roots were changed, whether the router is implicit, whether routed skills are explicit-only, and whether durable first-hop is unavailable.
           requires:
             - verify_router_installed
   - id: update_skill_router
@@ -313,9 +325,79 @@ routes:
           description: Report the backup path, updated router roots, preparedness status, durable-executor status, and restart warning.
           requires:
             - verify_router_updated
+  - id: switch_skill_router_mode
+    label: Enable or disable router mode
+    rank: 5
+    description: Use when the user wants to switch router mode on or off without uninstalling the managed router package.
+    execution_plan:
+      mode: ordered
+      reason: Router enable/disable mutates native Codex and Claude visibility metadata while preserving router files, config, manifest, and index.
+      phases:
+        - id: inspect_router_switch
+          owner_skill: skillspec
+          description: Verify router lifecycle help and that router config exists before switching mode.
+          requires:
+            - router_help
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: switch_router_mode
+          owner_skill: skillspec
+          description: Enable rebuilds the index from current roots and makes routed skills explicit-only; disable makes router explicit-only and restores routed skills to implicit/default visibility.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_enable_or_disable
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: report_router_switch
+          owner_skill: skillspec
+          description: Report enabled state, visibility change count, index rebuild/preparedness for enable, and restart warning.
+          requires:
+            - verify_router_updated
+  - id: inspect_skillspec_status
+    label: Inspect SkillSpec status
+    rank: 6
+    description: Use when the user wants a read-only report of installed SkillSpec lifecycle state, supported roots, router index status, and SkillSpec-backed versus legacy prose skills.
+    execution_plan:
+      mode: ordered
+      reason: Status inspection must not mutate router, durable-executor, visibility metadata, or indexes.
+      phases:
+        - id: inspect_status_help
+          owner_skill: skillspec
+          description: Verify the CLI exposes the read-only status command before collecting status.
+          requires:
+            - status_help
+          forbid:
+            - install_or_release_side_effect
+            - mutate_unrecorded_router_roots
+        - id: collect_status_report
+          owner_skill: skillspec
+          description: Run the read-only lifecycle and inventory status command and preserve the report.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+          requires:
+            - status_lifecycle_inventory
+          forbid:
+            - install_or_release_side_effect
+            - mutate_unrecorded_router_roots
+            - rebuild_index_for_status
+        - id: report_status_summary
+          owner_skill: skillspec
+          description: Report router and durable enabled/disabled state, supported and scanned roots, last router index state, and SkillSpec-backed versus legacy skill counts and names.
+          requires:
+            - report_skillspec_status
   - id: install_durable_executor
     label: Install durable-executor
-    rank: 5
+    rank: 6
     description: Use when the user wants the optional durable-executor first-hop skill installed after SkillSpec itself is installed.
     execution_plan:
       mode: ordered
@@ -323,9 +405,10 @@ routes:
       phases:
         - id: resolve_durable_source
           owner_skill: skillspec
-          description: Determine whether the user supplied a local durable-executor source folder and which harness targets should receive it.
+          description: Determine whether rote is available, whether the user supplied a local durable-executor source folder, and which harness targets should receive it.
           requires:
             - durable_help
+            - verify_rote_cli
             - find_durable_executor
             - choose_durable_source
           forbid:
@@ -341,12 +424,12 @@ routes:
             - make_durable_executor_explicit_in_router_mode
         - id: report_durable_status
           owner_skill: skillspec
-          description: Report whether durable-executor is installed and remains the router-managed implicit exception.
+          description: Report whether durable-executor is installed and whether it is implicit or explicit-only under its lifecycle state.
           requires:
             - verify_durable_optional_status
   - id: update_durable_executor
     label: Update durable-executor
-    rank: 6
+    rank: 7
     description: Use when the user wants to refresh every managed durable-executor install from its recorded source or an explicit replacement source.
     execution_plan:
       mode: ordered
@@ -380,9 +463,44 @@ routes:
           description: Report the backup path, updated durable installs, router refresh status, and restart warning.
           requires:
             - verify_durable_optional_status
+  - id: switch_durable_executor_mode
+    label: Enable or disable durable-executor
+    rank: 8
+    description: Use when the user wants to switch durable-executor implicit invocation on or off without uninstalling the managed durable package.
+    execution_plan:
+      mode: ordered
+      reason: Durable enable/disable mutates native Codex and Claude visibility metadata while preserving durable files, managed markers, and config.
+      phases:
+        - id: inspect_durable_switch
+          owner_skill: skillspec
+          description: Verify durable-executor lifecycle help and the saved durable config before switching mode.
+          requires:
+            - durable_help
+          forbid:
+            - mutate_unrecorded_durable_roots
+        - id: switch_durable_mode
+          owner_skill: skillspec
+          description: Enable makes recorded durable installs implicit; disable makes recorded durable installs explicit-only and refreshes router state when configured and enabled.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - durable_enable_or_disable
+          forbid:
+            - mutate_unrecorded_durable_roots
+        - id: report_durable_switch
+          owner_skill: skillspec
+          description: Report enabled state, visibility change count, router refresh status if present, and restart warning.
+          requires:
+            - verify_durable_optional_status
   - id: delete_durable_executor
     label: Delete durable-executor
-    rank: 7
+    rank: 9
     description: Use when the user wants to remove every managed durable-executor install and refresh router state when configured.
     execution_plan:
       mode: ordered
@@ -674,15 +792,50 @@ rules:
         - install skill-router
         - router mode
         - setup router
-        - explicit-only router
         - skill-router explicit
     prefer: install_skill_router
     forbid:
       - use_removed_router_root
-      - make_router_implicit_when_durable_executor_missing
     after_success:
       - verify_router_installed
     reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_router_switch_to_lifecycle
+    when:
+      user_says_any:
+        - enable router
+        - router enable
+        - disable router
+        - router disable
+        - switch off router
+        - switch on router
+        - turn off router mode
+        - turn on router mode
+    prefer: switch_skill_router_mode
+    forbid:
+      - mutate_unrecorded_router_roots
+    after_success:
+      - verify_router_updated
+    reason: Router enable/disable is a reversible lifecycle switch, not uninstall; enable must rebuild the index from current roots.
+  - id: route_status_to_read_only_inventory
+    when:
+      user_says_any:
+        - skillspec status
+        - status report
+        - installed status
+        - lifecycle status
+        - router status
+        - durable status
+        - skill inventory
+        - legacy skills
+        - skillspec-backed skills
+    prefer: inspect_skillspec_status
+    forbid:
+      - install_or_release_side_effect
+      - rebuild_index_for_status
+      - mutate_unrecorded_router_roots
+    after_success:
+      - report_skillspec_status
+    reason: Status is a read-only inspection path for lifecycle state, roots, router index freshness, and SkillSpec-backed versus legacy skill inventory.
   - id: route_router_update_to_router_maintenance
     when:
       user_says_any:
@@ -737,6 +890,25 @@ rules:
     after_success:
       - verify_durable_optional_status
     reason: Durable-executor update is backup-first maintenance for managed installs recorded by durable config.
+  - id: route_durable_switch_to_lifecycle
+    when:
+      user_says_any:
+        - enable durable-executor
+        - enable durable executor
+        - durable-executor enable
+        - durable executor enable
+        - disable durable-executor
+        - disable durable executor
+        - durable-executor disable
+        - durable executor disable
+        - switch off durable-executor
+        - switch on durable-executor
+    prefer: switch_durable_executor_mode
+    forbid:
+      - mutate_unrecorded_durable_roots
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable enable/disable is a reversible visibility switch, not uninstall; it preserves durable files and config.
   - id: route_durable_delete_to_lifecycle
     when:
       user_says_any:
@@ -1177,7 +1349,7 @@ dependencies:
       safety: local_write
   rote_cli:
     kind: cli
-    description: Required when creating a SkillSpec from observed durable execution evidence in a named rote workspace.
+    description: Required when installing/updating durable-executor or creating a SkillSpec from observed durable execution evidence in a named rote workspace.
     command: rote
     check:
       command: rote
@@ -1615,15 +1787,43 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  verify_rote_cli:
+    description: Verify that rote is on PATH before durable-executor install/update makes rote-exec the runtime substrate.
+    template: rote --help
+    safety: read_only
+    requires:
+      dependencies:
+        - rote_cli
   router_install:
-    description: Install or refresh the explicit-only skill-router surface in the selected skill roots.
+    description: Install or refresh router mode in the selected skill roots, making router implicit and routed skills explicit-only.
     template: skillspec router install --roots <skill-roots> --index <router-index>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
+  router_enable_or_disable:
+    description: Switch installed router mode on or off without uninstalling router files; enable rebuilds the index from current roots.
+    template: skillspec router enable|disable --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  status_help:
+    description: Show the read-only SkillSpec status command help.
+    template: skillspec status --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  status_lifecycle_inventory:
+    description: Report installed router and durable-executor state, enabled/disabled mode, supported roots, router index status, and SkillSpec-backed versus legacy skill inventory.
+    template: skillspec status --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
   router_update:
-    description: Back up and update every recorded skill-router install, visibility state, and index, then report the harness restart warning.
+    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, then report the harness restart warning.
     template: skillspec router update --json
     safety: local_write
     requires:
@@ -1644,15 +1844,24 @@ commands:
       dependencies:
         - rg_cli
   durable_install:
-    description: Install durable-executor from an explicit local source folder through the managed lifecycle.
+    description: Install durable-executor from an explicit local source folder through the managed lifecycle after the rote preflight passes.
     template: skillspec durable-executor install <durable-source-folder> --target <target> --json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
+        - rote_cli
   durable_update:
-    description: Back up and update every recorded durable-executor install from durable config or an explicit replacement source.
+    description: Back up and update every recorded durable-executor install from durable config or an explicit replacement source after the rote preflight passes.
     template: skillspec durable-executor update --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  durable_enable_or_disable:
+    description: Switch durable-executor implicit invocation on or off without uninstalling durable files. The enable path checks `rote` on PATH before making durable-executor implicit; the disable path only writes visibility metadata and config.
+    template: skillspec durable-executor enable|disable --json
     safety: local_write
     requires:
       dependencies:
@@ -1909,6 +2118,27 @@ recipes:
       - run_command: router_help
       - run_command: router_update
       - note: Report the backup path, every updated router root, preparedness status, durable-executor status, and the harness restart warning.
+  router_switch_loop:
+    description: Reversible router mode switch through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: router_enable_or_disable
+      - run_command: verify_router_install
+      - note: For enable, report index rebuild and preparedness. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
+  status_inspection_loop:
+    description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: status_help
+      - run_command: status_lifecycle_inventory
+      - note: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index updated/stale data, and SkillSpec-backed versus legacy skill names and counts.
   durable_executor_install_loop:
     description: Optional durable-executor setup through an explicit local source folder and the managed lifecycle command.
     ordered: true
@@ -1916,8 +2146,10 @@ recipes:
       dependencies:
         - skillspec_cli
         - rg_cli
+        - rote_cli
     steps:
       - run_command: durable_help
+      - run_command: verify_rote_cli
       - run_command: find_durable_executor
       - ask: choose_durable_source
       - ask: approve_install_targets
@@ -1930,11 +2162,24 @@ recipes:
     requires:
       dependencies:
         - skillspec_cli
+        - rote_cli
     steps:
       - run_command: durable_help
+      - run_command: verify_rote_cli
       - run_command: durable_update
       - run_command: verify_durable_executor
       - note: Report the backup path, every updated durable-executor folder, router refresh status if present, and the harness restart warning.
+  durable_executor_switch_loop:
+    description: Reversible durable-executor implicit-invocation switch through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: durable_help
+      - run_command: durable_enable_or_disable
+      - run_command: verify_durable_executor
+      - note: For enable, report the rote preflight and that durable-executor is implicit. For disable, report that durable-executor is explicit-only, files remain installed, and active harnesses should restart.
   durable_executor_delete_loop:
     description: Marker-guarded durable-executor removal through the managed lifecycle command.
     ordered: true
@@ -2131,8 +2376,12 @@ closures:
     description: Report the router update backup path, updated recorded roots, preparedness state, durable-executor status, and harness restart warning.
     commands:
       - router_update
+  report_skillspec_status:
+    description: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index exists/stale/updated data, and SkillSpec-backed versus legacy skill counts and names.
+    commands:
+      - status_lifecycle_inventory
   verify_durable_optional_status:
-    description: Report whether durable-executor is installed, skipped, or unavailable, and whether it remains implicit under router mode.
+    description: Report whether durable-executor is installed, skipped, or unavailable, and whether durable lifecycle currently leaves it implicit or explicit-only.
     commands:
       - find_durable_executor
       - verify_durable_executor
@@ -2248,7 +2497,41 @@ tests:
         - verify_router_installed
       forbid:
         - use_removed_router_root
-        - make_router_implicit_when_durable_executor_missing
+  - name: router disable routes to reversible router switch
+    input: /skillspec disable router
+    expect:
+      route: switch_skill_router_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_switch_to_lifecycle
+      after_success:
+        - verify_router_updated
+      forbid:
+        - mutate_unrecorded_router_roots
+  - name: router enable routes to reversible router switch
+    input: /skillspec enable router and rebuild the index
+    expect:
+      route: switch_skill_router_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_switch_to_lifecycle
+      after_success:
+        - verify_router_updated
+      forbid:
+        - mutate_unrecorded_router_roots
+  - name: status routes to read-only lifecycle inventory
+    input: /skillspec status
+    expect:
+      route: inspect_skillspec_status
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_status_to_read_only_inventory
+      after_success:
+        - report_skillspec_status
+      forbid:
+        - install_or_release_side_effect
+        - rebuild_index_for_status
+        - mutate_unrecorded_router_roots
   - name: router update routes to backup-first router maintenance
     input: /skillspec update router and repair stale skill-router files
     expect:
@@ -2286,6 +2569,28 @@ tests:
         - verify_durable_optional_status
       forbid:
         - update_durable_without_backup
+        - mutate_unrecorded_durable_roots
+  - name: durable executor disable uses managed switch
+    input: /skillspec disable durable-executor
+    expect:
+      route: switch_durable_executor_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_switch_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
+        - mutate_unrecorded_durable_roots
+  - name: durable executor enable uses managed switch
+    input: /skillspec enable durable-executor
+    expect:
+      route: switch_durable_executor_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_switch_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
         - mutate_unrecorded_durable_roots
   - name: durable executor delete uses managed lifecycle
     input: /skillspec delete durable-executor
@@ -2517,13 +2822,13 @@ metadata:
     note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
   extracted_value_targets:
     activation_triggers: 12
-    routes: 11
-    rules: 22
+    routes: 12
+    rules: 23
     dependency_checks: 5
-    command_templates: 53
-    recipes: 12
-    closures: 22
-    tests: 23
+    command_templates: 55
+    recipes: 13
+    closures: 23
+    tests: 24
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%
   contract_quality:
@@ -2571,8 +2876,8 @@ metadata:
       status: proven_by_tests
       review_note: Execution alignment can remain unproven if no real execution ledger is available.
     - prose_span: Post-install setup multiplexer
-      obligation: Provide one prompt entry point named skillspec that imports existing skills, manages router mode, manages durable-executor install/update/delete, and creates SkillSpec-backed skills from observed durable rote workspaces.
-      skillspec_construct: routes.install_skill_router, routes.update_skill_router, routes.install_durable_executor, routes.update_durable_executor, routes.delete_durable_executor, routes.observed_durable_workspace_to_skill, rules.post_install_setup_routes_to_multiplexer, rules.route_router_install_to_router_setup, rules.route_router_update_to_router_maintenance, rules.route_durable_install_to_optional_durable, rules.route_durable_update_to_lifecycle, rules.route_durable_delete_to_lifecycle, rules.route_observed_workspace_to_spec, recipes.router_install_loop, recipes.router_update_loop, recipes.durable_executor_install_loop, recipes.durable_executor_update_loop, recipes.durable_executor_delete_loop, recipes.observed_workspace_to_spec_loop
+      obligation: Provide one prompt entry point named skillspec that imports existing skills, reports read-only lifecycle and skill inventory status, manages router mode, manages durable-executor install/update/enable/disable/delete, and creates SkillSpec-backed skills from observed durable rote workspaces.
+      skillspec_construct: routes.install_skill_router, routes.update_skill_router, routes.switch_skill_router_mode, routes.inspect_skillspec_status, routes.install_durable_executor, routes.update_durable_executor, routes.switch_durable_executor_mode, routes.delete_durable_executor, routes.observed_durable_workspace_to_skill, rules.post_install_setup_routes_to_multiplexer, rules.route_router_install_to_router_setup, rules.route_router_update_to_router_maintenance, rules.route_router_switch_to_lifecycle, rules.route_status_to_read_only_inventory, rules.route_durable_install_to_optional_durable, rules.route_durable_update_to_lifecycle, rules.route_durable_switch_to_lifecycle, rules.route_durable_delete_to_lifecycle, rules.route_observed_workspace_to_spec, recipes.router_install_loop, recipes.router_update_loop, recipes.router_switch_loop, recipes.status_inspection_loop, recipes.durable_executor_install_loop, recipes.durable_executor_update_loop, recipes.durable_executor_switch_loop, recipes.durable_executor_delete_loop, recipes.observed_workspace_to_spec_loop
       confidence: high
       status: reviewed
-      review_note: Router setup uses roots plus index and forbids a separate router root; durable-executor remains optional, source-aware, and marker-guarded for update/delete.
+      review_note: Status is read-only and must not repair visibility or rebuild indexes; router setup uses roots plus index and forbids a separate router root; router and durable-executor switches preserve installed files while changing native visibility; durable-executor remains optional, source-aware, and marker-guarded for update/delete.

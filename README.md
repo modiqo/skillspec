@@ -96,8 +96,9 @@ The broader use cases are:
 | Goal | Chat prompt | What SkillSpec does |
 | --- | --- | --- |
 | Make skills verifiable | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` | Converts a prose `SKILL.md` into routes, rules, phases, dependencies, resources, commands, tests, progress tracking, and alignment proof. |
-| Route large skill libraries | `/skillspec install router` | Marks managed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves `durable-executor` as the implicit first hop when present. |
-| Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop skill so tool-backed work can preserve traces, evidence, alignment, and token stats. |
+| Inspect installed state | `/skillspec status` | Reports router and durable-executor installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy prose skills. |
+| Route large skill libraries | `/skillspec install router` | Installs an implicit router surface, marks routed skills explicit-only, builds a routing index, repairs out-of-band additions, and preserves `durable-executor` as implicit only when durable is enabled. |
+| Make execution durable | `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional durable first-hop skill after checking `rote` is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
 | Learn skills from work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` | Uses a durable rote workspace as evidence, then synthesizes a reviewable SkillSpec scaffold with observed resources, dependencies, commands, and proof gaps. |
 | Revise an existing contract | `/skillspec revise this spec to add router setup checks` | Starts from the current grammar and active handles, patches the reviewed contract, then reruns structural QA. |
 | Prove value before release | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
@@ -111,21 +112,33 @@ Marketplace path:
 
 ```text
 /skillspec import ./my-skill, compile it for Codex, install it, and prove it
+/skillspec status
 /skillspec install router
 /skillspec update router
+/skillspec disable router
+/skillspec enable router
 /skillspec install durable-executor from /path/or/public-uri
+/skillspec disable durable-executor
+/skillspec enable durable-executor
 /skillspec create from observed durable execution: "use parallel web to enrich this profile"
 ```
 
 That is the intended user experience: import the existing skill, choose the
 target, install it, then look at the proof report. Router setup and optional
-durable-executor setup stay inside the same prompt surface. Router install
-applies explicit-only native controls across managed roots, builds the routing
-index, runs a clean status check, and preserves an installed durable-executor as
-the implicit first hop. Router update backs up the existing config, manifest,
-index, and generated router skills, rewrites every recorded harness root, and
-warns you to restart active Codex, Claude, Agents, or vendor sessions. If a
-skill is later added outside SkillSpec, `skillspec router index status` detects
+durable-executor setup stay inside the same prompt surface. Status is read-only:
+it reports installed lifecycle state, supported roots, router index freshness,
+and SkillSpec-backed versus legacy prose skill inventory. Router install
+applies native controls across managed roots, makes the router implicit, makes
+routed skills explicit-only, builds the routing index, and runs a clean status
+check. Router disable keeps the files but makes the router explicit-only and
+restores routed skills to implicit/default discovery; router enable turns router
+mode back on and rebuilds the index from current roots. Router update backs up
+the existing config, manifest, index, and generated router skills, rewrites
+every recorded harness root, preserves the enabled/disabled state, and warns you
+to restart active Codex, Claude, Agents, or vendor sessions. Durable-executor
+disable makes the installed first-hop explicit-only; durable-executor enable
+checks `rote` on `PATH` before making it implicit again. If a skill is later
+added outside SkillSpec, `skillspec router index status` detects
 prose-only versus SkillSpec-backed additions and `skillspec router index
 refresh` reapplies explicit invocation controls and rebuilds the index.
 

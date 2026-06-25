@@ -45,7 +45,8 @@ flowchart LR
     B --> D[visibility manifest]
     B --> E[skill index]
     B --> F[router config]
-    B --> G[explicit-only skills]
+    B --> G[implicit skill-router]
+    B --> H[explicit-only routed skills]
 ```
 
 Grounded command:
@@ -61,7 +62,7 @@ Review check:
 - Router skill is generated in each configured root.
 - Router config records managed roots and router skill dirs.
 - Visibility is manifest-backed for restore.
-- `durable-executor` remains implicit only when already installed.
+- `durable-executor` remains implicit only when installed and enabled.
 
 ## 3. Runtime Routing Uses The Index
 
@@ -119,7 +120,7 @@ skillspec router index refresh --roots <skill-root>... --index <router-index> --
 Review check:
 
 - Status is read-only.
-- Refresh reapplies explicit-only controls.
+- Refresh reapplies explicit-only controls only when router mode is enabled.
 - Prose-only skills are indexed but receive conversion advice.
 - Missing skills are reported as drift instead of silently ignored.
 
@@ -130,21 +131,31 @@ Router mode is managed state, not a loose folder copy.
 ```mermaid
 flowchart LR
     A[install] --> B[config + marker + manifest + index]
-    B --> C[update with backup]
-    B --> D[delete/uninstall]
-    C --> E[restart harness warning]
-    D --> F[restore visibility]
+    B --> C[disable switch]
+    C --> D[router explicit, skills implicit]
+    D --> E[enable switch]
+    E --> F[index rebuilt + preparedness]
+    B --> G[update with backup]
+    B --> H[delete/uninstall]
+    G --> I[restart harness warning]
+    H --> J[restore visibility]
 ```
 
 Grounded commands:
 
 ```sh
+skillspec status --json
+skillspec router disable --json
+skillspec router enable --json
 skillspec router update --json
 skillspec router delete --json
 ```
 
 Review check:
 
+- Disable does not uninstall; it makes router explicit-only and routed skills implicit/default.
+- Enable rebuilds the index from current roots and checks preparedness.
+- Status is read-only; it reports lifecycle state, supported/scanned roots, router index freshness, and SkillSpec-backed versus legacy skill inventory without repairing visibility or rebuilding the index.
 - Update starts from saved router config.
 - Delete removes only generated router skills with the managed marker.
 - Active harness sessions should restart after mutation.

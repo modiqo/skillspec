@@ -438,21 +438,45 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_router_lifecycle(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "inspect installed lifecycle, roots, index, and skill inventory status",
+                command: "skillspec status --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "enable router mode and rebuild index",
+                command: "skillspec router enable --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "disable router mode without uninstalling",
+                command: "skillspec router disable --json".to_owned(),
+            },
+        ]);
+    }
     if has_durable_lifecycle(spec) {
         hints.extend([
             NavigationHint {
-                intent: "install durable-executor lifecycle",
+                intent: "install durable-executor lifecycle after rote preflight",
                 command:
                     "skillspec durable-executor install <source-folder> --target <target> --json"
                         .to_owned(),
             },
             NavigationHint {
-                intent: "update durable-executor lifecycle",
+                intent: "update durable-executor lifecycle after rote preflight",
                 command: "skillspec durable-executor update --json".to_owned(),
             },
             NavigationHint {
                 intent: "delete durable-executor lifecycle",
                 command: "skillspec durable-executor delete --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "enable durable-executor implicit first-hop after rote preflight",
+                command: "skillspec durable-executor enable --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "disable durable-executor implicit first-hop",
+                command: "skillspec durable-executor disable --json".to_owned(),
             },
         ]);
     }
@@ -534,6 +558,18 @@ fn has_durable_lifecycle(spec: &SkillSpec) -> bool {
             .commands
             .values()
             .any(|command| command.template.contains("durable-executor"))
+}
+
+fn has_router_lifecycle(spec: &SkillSpec) -> bool {
+    spec.commands.contains_key("router_install")
+        || spec.commands.contains_key("router_update")
+        || spec.commands.contains_key("status_lifecycle_inventory")
+        || spec.commands.contains_key("router_enable")
+        || spec.commands.contains_key("router_disable")
+        || spec.commands.values().any(|command| {
+            command.template.contains("router enable")
+                || command.template.contains("skillspec status")
+        })
 }
 
 fn has_source_import(spec: &SkillSpec) -> bool {

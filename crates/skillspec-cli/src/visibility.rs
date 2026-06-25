@@ -63,6 +63,16 @@ pub struct VisibilityApplyOptions {
 }
 
 #[derive(Clone, Debug)]
+pub struct RouterModeVisibilityOptions {
+    pub roots: Vec<PathBuf>,
+    pub router_name: String,
+    pub durable_enabled: bool,
+    pub enabled: bool,
+    pub manifest: PathBuf,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct SetVisibilityOptions {
     pub roots: Vec<PathBuf>,
     pub skill: String,
@@ -177,6 +187,39 @@ pub fn apply(options: VisibilityApplyOptions) -> Result<VisibilityApplyReport> {
     }
     Ok(VisibilityApplyReport {
         profile: options.profile,
+        manifest: options.manifest,
+        dry_run: options.dry_run,
+        changes: prepared.into_iter().map(|change| change.report).collect(),
+        warnings,
+    })
+}
+
+pub fn apply_router_mode(options: RouterModeVisibilityOptions) -> Result<VisibilityApplyReport> {
+    let (entries, warnings) = scan(&options.roots)?;
+    let profile = if options.enabled {
+        VisibilityProfile::RouterManaged
+    } else {
+        VisibilityProfile::Explicit
+    };
+    let mut prepared = prepare_router_mode_changes(
+        &entries,
+        &options.router_name,
+        options.durable_enabled,
+        options.enabled,
+    )?;
+    for change in &mut prepared {
+        change.report.status = if options.dry_run {
+            VisibilityChangeStatus::Planned
+        } else {
+            VisibilityChangeStatus::Applied
+        };
+    }
+    if !options.dry_run {
+        write_prepared_changes(&prepared)?;
+        write_manifest(&options.manifest, profile, &prepared)?;
+    }
+    Ok(VisibilityApplyReport {
+        profile,
         manifest: options.manifest,
         dry_run: options.dry_run,
         changes: prepared.into_iter().map(|change| change.report).collect(),
@@ -344,6 +387,42 @@ fn prepare_profile_changes(
             VisibilityProfile::Explicit => entry.visibility,
         };
         changes.extend(prepare_changes(entry, target, profile)?);
+    }
+    Ok(changes)
+}
+
+fn prepare_router_mode_changes(
+    entries: &[SkillEntry],
+    router_name: &str,
+    durable_enabled: bool,
+    enabled: bool,
+) -> Result<Vec<PreparedChange>> {
+    let mut changes = Vec::new();
+    for entry in entries {
+        let target = if entry.name == router_name {
+            if enabled {
+                Visibility::Implicit
+            } else {
+                Visibility::ManualOnly
+            }
+        } else if entry.name == ROUTER_MANAGED_IMPLICIT_EXCEPTION {
+            if durable_enabled {
+                Visibility::Implicit
+            } else {
+                Visibility::ManualOnly
+            }
+        } else if entry.visibility == Visibility::Off {
+            Visibility::Off
+        } else if enabled {
+            Visibility::ManualOnly
+        } else {
+            Visibility::Implicit
+        };
+        changes.extend(prepare_changes(
+            entry,
+            target,
+            VisibilityProfile::RouterManaged,
+        )?);
     }
     Ok(changes)
 }
@@ -752,10 +831,12 @@ fn write_manifest(
     if manifest_path.is_file() {
         let existing = read_manifest(manifest_path)?;
         for existing_change in existing.changes {
-            let replaced = manifest_changes
-                .iter()
-                .any(|change| same_manifest_target(change, &existing_change));
-            if !replaced {
+            if let Some(replacement) = manifest_changes
+                .iter_mut()
+                .find(|change| same_manifest_target(change, &existing_change))
+            {
+                preserve_original_before_state(replacement, &existing_change);
+            } else {
                 manifest_changes.push(existing_change);
             }
         }
@@ -768,6 +849,23 @@ fn write_manifest(
     };
     let json = serde_json::to_string_pretty(&manifest).map_err(Error::RenderJson)?;
     write_file(manifest_path, &format!("{json}\n"))
+}
+
+fn preserve_original_before_state(
+    replacement: &mut VisibilityManifestChange,
+    existing: &VisibilityManifestChange,
+) {
+    replacement.before_visibility = existing.before_visibility;
+    for replacement_snapshot in &mut replacement.file_changes {
+        if let Some(existing_snapshot) = existing
+            .file_changes
+            .iter()
+            .find(|snapshot| router::same_path(&snapshot.path, &replacement_snapshot.path))
+        {
+            replacement_snapshot.before_present = existing_snapshot.before_present;
+            replacement_snapshot.before_content = existing_snapshot.before_content.clone();
+        }
+    }
 }
 
 fn same_manifest_target(left: &VisibilityManifestChange, right: &VisibilityManifestChange) -> bool {

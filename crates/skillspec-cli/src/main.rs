@@ -20,6 +20,7 @@ mod router;
 mod router_lifecycle;
 mod sensemake;
 mod source_map;
+mod status;
 mod trace;
 mod visibility;
 mod workspace_synthesizer;
@@ -151,6 +152,17 @@ enum Command {
     Doctor {
         /// Local SKILL.md file, local single skill folder, or public GitHub single skill folder URL.
         path: String,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Show installed SkillSpec lifecycle status, roots, router index state, and skill inventory"
+    )]
+    Status {
+        /// Skill roots to scan for inventory. Defaults to router config roots, then detected harness roots.
+        #[arg(long = "roots", num_args = 1..)]
+        roots: Vec<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -500,7 +512,7 @@ enum VisibilityProfileArg {
 #[derive(Debug, Subcommand)]
 enum RouterCommand {
     #[command(
-        about = "Install the explicit-only SkillSpec-backed skill-router, managed index, and preparedness check"
+        about = "Install the managed SkillSpec-backed skill-router, visibility state, index, and preparedness check"
     )]
     Install {
         /// Skill roots to scan and manage.
@@ -560,6 +572,26 @@ enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Enable router mode, rebuild the index, and make routed skills explicit-only"
+    )]
+    Enable {
+        /// Show changes without writing files, index, manifest, or config.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Disable router mode without uninstalling it")]
+    Disable {
+        /// Show changes without writing files, manifest, or config.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(about = "Detect, repair, or inspect router index drift")]
     Index {
         #[command(subcommand)]
@@ -569,7 +601,9 @@ enum RouterCommand {
 
 #[derive(Debug, Subcommand)]
 enum DurableExecutorCommand {
-    #[command(about = "Install durable-executor from an explicit local source folder")]
+    #[command(
+        about = "Install durable-executor from an explicit local source folder after checking rote"
+    )]
     Install {
         /// Local durable-executor skill folder containing SKILL.md and skill.spec.yml.
         source: PathBuf,
@@ -589,7 +623,9 @@ enum DurableExecutorCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Back up and refresh every managed durable-executor install")]
+    #[command(
+        about = "Back up and refresh every managed durable-executor install after checking rote"
+    )]
     Update {
         /// Override the source folder recorded at install time.
         #[arg(long)]
@@ -610,6 +646,26 @@ enum DurableExecutorCommand {
     )]
     Delete {
         /// Show changes without removing files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Enable durable-executor as the implicit durable first-hop after checking rote"
+    )]
+    Enable {
+        /// Show changes without writing visibility metadata or config.
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Disable durable-executor implicit invocation without uninstalling it")]
+    Disable {
+        /// Show changes without writing visibility metadata or config.
         #[arg(long)]
         dry_run: bool,
         /// Emit JSON instead of a concise human report.
@@ -1306,6 +1362,14 @@ fn run() -> Result<()> {
                 report::text(&doctor::render(&doctor_report))?;
             }
         }
+        Command::Status { roots, json } => {
+            let status_report = status::status(status::StatusOptions { roots })?;
+            if json {
+                report::json(&status_report)?;
+            } else {
+                report::text(&status::render(&status_report))?;
+            }
+        }
         Command::Source { command } => match command {
             SourceCommand::Map { path, out, json } => {
                 let report = source_map::create_source_map(&path, &out)?;
@@ -1794,6 +1858,24 @@ fn run() -> Result<()> {
                     report::text(&router_lifecycle::render_update(&report))?;
                 }
             }
+            RouterCommand::Enable { dry_run, json } => {
+                let report =
+                    router_lifecycle::enable(router_lifecycle::RouterModeOptions { dry_run })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_mode(&report))?;
+                }
+            }
+            RouterCommand::Disable { dry_run, json } => {
+                let report =
+                    router_lifecycle::disable(router_lifecycle::RouterModeOptions { dry_run })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_mode(&report))?;
+                }
+            }
             RouterCommand::Index { command } => match command {
                 RouterIndexCommand::Refresh {
                     roots,
@@ -1883,6 +1965,24 @@ fn run() -> Result<()> {
                     report::json(&report)?;
                 } else {
                     report::text(&durable_lifecycle::render_delete(&report))?;
+                }
+            }
+            DurableExecutorCommand::Enable { dry_run, json } => {
+                let report =
+                    durable_lifecycle::enable(durable_lifecycle::DurableModeOptions { dry_run })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&durable_lifecycle::render_mode(&report))?;
+                }
+            }
+            DurableExecutorCommand::Disable { dry_run, json } => {
+                let report =
+                    durable_lifecycle::disable(durable_lifecycle::DurableModeOptions { dry_run })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&durable_lifecycle::render_mode(&report))?;
                 }
             }
         },

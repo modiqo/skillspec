@@ -3,7 +3,8 @@
 This runbook verifies the post-install `skillspec` prompt skill in both Codex
 and Claude. The prompt skill is the user-facing multiplexer: users invoke
 `/skillspec ...` in the harness, and the skill routes setup work to import,
-router install/update/delete, optional durable-executor install/update/delete,
+router install/update/enable/disable/delete, optional durable-executor
+install/update/enable/disable/delete, read-only status inventory,
 rote-browse import/install,
 or observed-workspace skill creation.
 
@@ -19,9 +20,13 @@ Expected prompt forms:
 /skillspec import <local-skill-folder-or-public-github-uri>
 /skillspec install router
 /skillspec update router
+/skillspec disable router
+/skillspec enable router
 /skillspec delete router
 /skillspec install durable-executor from <local-skill-folder>
 /skillspec update durable-executor
+/skillspec disable durable-executor
+/skillspec enable durable-executor
 /skillspec delete durable-executor
 /skillspec import <rote-browse-source>, compile it, and install it
 /skillspec observe durable workspace <workspace> and create a spec skill
@@ -167,7 +172,11 @@ Expected result:
 - The command records managed install directories under
   `~/.skillspec/durable-executor/config.json`.
 - If router mode is already configured, the router index refreshes and
-  `durable-executor` remains implicit.
+  `durable-executor` remains implicit only when durable lifecycle is enabled.
+- `skillspec durable-executor disable` keeps recorded installs but makes them
+  explicit-only across Codex and Claude visibility metadata.
+- `skillspec durable-executor enable` checks `rote` on `PATH` and switches
+  recorded installs back to implicit invocation.
 - `skillspec durable-executor update` creates a backup and rewrites recorded
   marker-protected managed installs.
 - `skillspec durable-executor delete` removes only marker-protected managed
@@ -200,11 +209,21 @@ Expected result:
 
 - The router skill is installed into the selected managed root.
 - No `--router-root` is requested or used.
-- Router mode applies explicit-only controls to indexed skills.
-- `durable-executor` remains implicit when present.
+- Router mode makes the router implicit and applies explicit-only controls to
+  indexed routed skills.
+- `durable-executor` remains implicit when present and durable lifecycle is
+  enabled.
 - Missing `durable-executor` is reported as "durable first-hop unavailable",
   not installed silently.
 - The routing index is built and preparedness is checked.
+- `skillspec router disable` keeps router files but makes router explicit-only
+  and restores routed skills to implicit/default visibility.
+- `skillspec router enable` switches router mode back on, rebuilds the index
+  from current roots, and checks preparedness.
+- `skillspec status --json` is the read-only overview: it reports router and
+  durable-executor installed/enabled/disabled state, supported and scanned
+  roots, router index exists/stale/updated data, and SkillSpec-backed versus
+  legacy prose skills by name and path.
 
 ### 5. Verify Router Indexing
 
@@ -227,7 +246,8 @@ Expected result:
 
 - `stale` is `false` after a clean install or refresh.
 - PDF-related requests rank the imported PDF skill.
-- `durable-executor` is not marked explicit-only.
+- `durable-executor` is not marked explicit-only unless durable lifecycle was
+  disabled.
 - Other indexed skills have Codex explicit invocation controls.
 
 If the test uses separate roots instead of the shared `.agents` root, pass the
@@ -267,8 +287,12 @@ the prompt asks for it:
 /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf, compile it for Claude, install it, and prove it
 /skillspec install durable-executor from /path/to/durable-executor
 /skillspec update durable-executor
+/skillspec disable durable-executor
+/skillspec enable durable-executor
 /skillspec import /path/to/rote-browse, compile it for Claude, install it, and prove it
 /skillspec install router
+/skillspec disable router
+/skillspec enable router
 ```
 
 Expected Claude-specific result:

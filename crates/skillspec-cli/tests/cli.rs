@@ -79,6 +79,20 @@ fn write_executable(path: &Path, content: &str) {
     fs::set_permissions(path, permissions).unwrap();
 }
 
+fn write_fake_rote(path: &Path) -> std::ffi::OsString {
+    let bin_dir = path.join("bin");
+    #[cfg(unix)]
+    write_executable(&bin_dir.join("rote"), "#!/bin/sh\nexit 0\n");
+    #[cfg(windows)]
+    write_file(&bin_dir.join("rote.cmd"), "@echo off\r\nexit /B 0\r\n");
+
+    let mut paths = vec![bin_dir];
+    if let Some(existing) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing));
+    }
+    std::env::join_paths(paths).unwrap()
+}
+
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -911,7 +925,7 @@ description: Use as the durable execution first-hop for tool-backed requests tha
             .as_array()
             .unwrap()
             .len(),
-        4
+        2
     );
     assert_eq!(install_report["preparedness"]["ready"], true);
     assert_eq!(install_report["preparedness"]["status_checked"], true);
@@ -937,12 +951,12 @@ description: Use as the durable execution first-hop for tool-backed requests tha
         .unwrap();
     assert_success(&validate_router_spec);
     assert!(root.join("pdf/agents/openai.yaml").is_file());
-    assert!(root.join("skill-router/agents/openai.yaml").is_file());
+    assert!(!root.join("skill-router/agents/openai.yaml").exists());
     assert!(!root.join("durable-executor/agents/openai.yaml").exists());
     assert!(fs::read_to_string(root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
-    assert!(fs::read_to_string(root.join("skill-router/SKILL.md"))
+    assert!(!fs::read_to_string(root.join("skill-router/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
     assert!(!fs::read_to_string(root.join("durable-executor/SKILL.md"))
@@ -1357,6 +1371,7 @@ Use this skill as the visible discovery surface for large local skill libraries.
 
     for root in [&agents_root, &codex_root] {
         let router_skill = fs::read_to_string(root.join("skill-router/SKILL.md")).unwrap();
+        assert!(router_skill.contains("router mode is enabled"));
         assert!(router_skill.contains("explicit-only"));
         assert!(!router_skill.contains("visible discovery surface"));
         assert!(root.join("skill-router/skill.spec.yml").is_file());
@@ -1599,14 +1614,149 @@ description: Use when extracting PDF text, tables, and images.
             .is_some_and(|text| text.contains("durable first-hop is unavailable"))));
     assert!(root.join("skill-router/SKILL.md").is_file());
     assert!(root.join("skill-router/skill.spec.yml").is_file());
-    assert!(root.join("skill-router/agents/openai.yaml").is_file());
+    assert!(!root.join("skill-router/agents/openai.yaml").exists());
     assert!(fs::read_to_string(root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
-    assert!(fs::read_to_string(root.join("skill-router/SKILL.md"))
+    assert!(!fs::read_to_string(root.join("skill-router/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
     assert!(!root.join("durable-executor").exists());
+}
+
+#[test]
+fn router_disable_and_enable_toggle_visibility_and_reindex_all_roots() {
+    let dir = TempDir::new("router-enable-disable");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let agents_root = home.join(".agents/skills");
+    let codex_root = home.join(".codex/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+
+    write_file(
+        &agents_root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text.
+---
+# PDF
+"#,
+    );
+    write_file(
+        &codex_root.join("csv/SKILL.md"),
+        r#"---
+name: csv
+description: Use when working with CSV files.
+---
+# CSV
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&agents_root)
+        .arg(&codex_root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+    assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(
+        fs::read_to_string(codex_root.join("csv/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: false")
+    );
+    assert!(
+        !fs::read_to_string(agents_root.join("skill-router/SKILL.md"))
+            .unwrap()
+            .contains("disable-model-invocation: true")
+    );
+
+    let disable_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable_router);
+    let disable_report = json_stdout(&disable_router);
+    assert_eq!(disable_report["enabled"], false);
+    assert!(disable_report["index_report"].is_null());
+    assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: false"));
+    assert!(
+        fs::read_to_string(agents_root.join("pdf/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: true")
+    );
+    assert!(
+        fs::read_to_string(codex_root.join("csv/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: true")
+    );
+    assert!(
+        fs::read_to_string(agents_root.join("skill-router/SKILL.md"))
+            .unwrap()
+            .contains("disable-model-invocation: true")
+    );
+    assert!(
+        fs::read_to_string(codex_root.join("skill-router/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: false")
+    );
+
+    write_file(
+        &codex_root.join("markdown/SKILL.md"),
+        r#"---
+name: markdown
+description: Use when editing markdown.
+---
+# Markdown
+"#,
+    );
+
+    let enable_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("enable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&enable_router);
+    let enable_report = json_stdout(&enable_router);
+    assert_eq!(enable_report["enabled"], true);
+    assert_eq!(enable_report["preparedness"]["ready"], true);
+    assert_eq!(enable_report["index_report"]["skills_indexed"], 5);
+    assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(
+        fs::read_to_string(codex_root.join("markdown/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: false")
+    );
+    assert!(
+        !fs::read_to_string(agents_root.join("skill-router/SKILL.md"))
+            .unwrap()
+            .contains("disable-model-invocation: true")
+    );
+    assert!(
+        fs::read_to_string(codex_root.join("skill-router/agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: true")
+    );
 }
 
 #[test]
@@ -1614,6 +1764,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
     let dir = TempDir::new("durable-lifecycle");
     let home = dir.path().join("home");
     let skillspec_home = dir.path().join("skillspec-home");
+    let path = write_fake_rote(dir.path());
     let root = home.join(".agents/skills");
     let source = dir.path().join("source");
     write_durable_source(&source, "initial");
@@ -1621,6 +1772,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
     let install = Command::new(bin())
         .env("HOME", &home)
         .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
         .arg("durable-executor")
         .arg("install")
         .arg(&source)
@@ -1632,6 +1784,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
     assert_success(&install);
     let install_report = json_stdout(&install);
     assert_eq!(install_report["skill_name"], "durable-executor");
+    assert_eq!(install_report["rote_preflight"]["present"], true);
     assert_eq!(install_report["managed_installs"][0]["status"], "installed");
     assert!(root.join("durable-executor/SKILL.md").is_file());
     assert!(root
@@ -1645,6 +1798,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
     let unsafe_update = Command::new(bin())
         .env("HOME", &home)
         .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
         .arg("durable-executor")
         .arg("update")
         .arg("--json")
@@ -1661,6 +1815,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
     let update = Command::new(bin())
         .env("HOME", &home)
         .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
         .arg("durable-executor")
         .arg("update")
         .arg("--json")
@@ -1668,6 +1823,7 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
         .unwrap();
     assert_success(&update);
     let update_report = json_stdout(&update);
+    assert_eq!(update_report["rote_preflight"]["present"], true);
     assert_eq!(update_report["managed_installs"][0]["status"], "updated");
     assert!(update_report["backup"]["path"].as_str().is_some());
     assert!(fs::read_to_string(root.join("durable-executor/SKILL.md"))
@@ -1711,10 +1867,321 @@ fn durable_executor_lifecycle_installs_updates_and_deletes_managed_dirs() {
 }
 
 #[test]
+fn durable_executor_disable_and_enable_toggle_implicit_invocation() {
+    let dir = TempDir::new("durable-enable-disable");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let path = write_fake_rote(dir.path());
+    let source = dir.path().join("source");
+    let agents_install = home.join(".agents/skills/durable-executor");
+    let codex_install = home.join(".codex/skills/durable-executor");
+    write_durable_source(&source, "toggle visibility");
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--target")
+        .arg("codex")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+
+    let disable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable);
+    let disable_report = json_stdout(&disable);
+    assert_eq!(disable_report["enabled"], false);
+    assert!(fs::read_to_string(agents_install.join("SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: true"));
+    assert!(
+        fs::read_to_string(agents_install.join("agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: false")
+    );
+    assert!(fs::read_to_string(codex_install.join("agents/openai.yaml"))
+        .unwrap()
+        .contains("allow_implicit_invocation: false"));
+
+    let config_path = skillspec_home.join("durable-executor/config.json");
+    let config: Value = serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+    assert_eq!(config["enabled"], false);
+
+    let enable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("durable-executor")
+        .arg("enable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&enable);
+    let enable_report = json_stdout(&enable);
+    assert_eq!(enable_report["enabled"], true);
+    assert!(fs::read_to_string(agents_install.join("SKILL.md"))
+        .unwrap()
+        .contains("disable-model-invocation: false"));
+    assert!(
+        fs::read_to_string(agents_install.join("agents/openai.yaml"))
+            .unwrap()
+            .contains("allow_implicit_invocation: true")
+    );
+    assert!(fs::read_to_string(codex_install.join("agents/openai.yaml"))
+        .unwrap()
+        .contains("allow_implicit_invocation: true"));
+}
+
+#[test]
+fn durable_executor_install_requires_rote_on_path() {
+    let dir = TempDir::new("durable-requires-rote");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let empty_path = dir.path().join("empty-path");
+    fs::create_dir_all(&empty_path).unwrap();
+    let root = home.join(".agents/skills");
+    let source = dir.path().join("source");
+    write_durable_source(&source, "missing rote");
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &empty_path)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&install);
+    assert!(stderr(&install).contains("requires `rote` on PATH"));
+    assert!(!root.join("durable-executor").exists());
+    assert!(!skillspec_home.join("durable-executor/config.json").exists());
+
+    let dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &empty_path)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let dry_run_report = json_stdout(&dry_run);
+    assert_eq!(dry_run_report["rote_preflight"]["present"], false);
+    assert!(!root.join("durable-executor").exists());
+    assert!(!skillspec_home.join("durable-executor/config.json").exists());
+}
+
+#[test]
+fn durable_executor_enable_requires_rote_on_path() {
+    let dir = TempDir::new("durable-enable-requires-rote");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let path = write_fake_rote(dir.path());
+    let empty_path = dir.path().join("empty-path");
+    fs::create_dir_all(&empty_path).unwrap();
+    let source = dir.path().join("source");
+    let install_dir = home.join(".agents/skills/durable-executor");
+    write_durable_source(&source, "enable missing rote");
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+
+    let disable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &empty_path)
+        .arg("durable-executor")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable);
+
+    let enable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &empty_path)
+        .arg("durable-executor")
+        .arg("enable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&enable);
+    assert!(stderr(&enable).contains("requires `rote` on PATH"));
+    assert!(fs::read_to_string(install_dir.join("agents/openai.yaml"))
+        .unwrap()
+        .contains("allow_implicit_invocation: false"));
+
+    let config_path = skillspec_home.join("durable-executor/config.json");
+    let config: Value = serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+    assert_eq!(config["enabled"], false);
+}
+
+#[test]
+fn status_reports_lifecycle_roots_index_and_skill_inventory() {
+    let dir = TempDir::new("status-lifecycle-inventory");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let path = write_fake_rote(dir.path());
+    let root = home.join(".agents/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let durable_source = dir.path().join("durable-source");
+    write_durable_source(&durable_source, "status inventory");
+    write_file(
+        &root.join("alpha/SKILL.md"),
+        r#"---
+name: alpha
+description: Alpha SkillSpec-backed skill.
+---
+# Alpha
+"#,
+    );
+    write_file(
+        &root.join("alpha/skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: alpha
+title: Alpha
+description: Alpha SkillSpec-backed skill.
+routes:
+  - id: alpha
+    label: Alpha
+"#,
+    );
+    write_file(
+        &root.join("legacy/SKILL.md"),
+        r#"---
+name: legacy
+description: Legacy prose-only skill.
+---
+# Legacy
+"#,
+    );
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+
+    let install_durable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
+        .arg("durable-executor")
+        .arg("install")
+        .arg(&durable_source)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_durable);
+
+    let disable_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable_router);
+
+    let disable_durable = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("durable-executor")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable_durable);
+
+    let status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("status")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&status);
+    let report = json_stdout(&status);
+    assert_eq!(report["router"]["installed"], true);
+    assert_eq!(report["router"]["enabled"], false);
+    assert_eq!(report["router"]["disabled"], true);
+    assert_eq!(report["durable_executor"]["installed"], true);
+    assert_eq!(report["durable_executor"]["enabled"], false);
+    assert_eq!(report["durable_executor"]["disabled"], true);
+    assert_eq!(report["roots"]["scan_source"], "router_config");
+    assert_eq!(report["roots"]["scanned_count"], 1);
+    assert!(report["roots"]["supported_count"].as_u64().unwrap() >= 2);
+    assert_eq!(report["skills"]["legacy_count"], 1);
+    assert!(report["skills"]["skillspec_backed_count"].as_u64().unwrap() >= 3);
+    assert!(report["skills"]["legacy"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|skill| skill["name"] == "legacy"));
+    assert!(report["skills"]["skillspec_backed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|skill| skill["name"] == "alpha"));
+    assert_eq!(report["router"]["index_status"]["exists"], true);
+    assert_eq!(
+        report["router"]["index_status"]["discovered_skills"],
+        report["skills"]["total"]
+    );
+}
+
+#[test]
 fn durable_executor_install_refreshes_router_and_remains_implicit() {
     let dir = TempDir::new("durable-router-hook");
     let home = dir.path().join("home");
     let skillspec_home = dir.path().join("skillspec-home");
+    let path = write_fake_rote(dir.path());
     let root = home.join(".agents/skills");
     let index = skillspec_home.join("router/skill-index.sqlite");
     let source = dir.path().join("durable-source");
@@ -1746,6 +2213,7 @@ description: Use when extracting PDF text, tables, and images.
     let install_durable = Command::new(bin())
         .env("HOME", &home)
         .env("SKILLSPEC_HOME", &skillspec_home)
+        .env("PATH", &path)
         .arg("durable-executor")
         .arg("install")
         .arg(&source)

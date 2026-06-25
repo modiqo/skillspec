@@ -1,3 +1,4 @@
+use crate::durable_lifecycle;
 use crate::error::{Error, Result};
 use crate::router::{self, IndexReport, IndexStatusReport};
 use crate::visibility::{self, VisibilityApplyReport, VisibilityRestoreReport};
@@ -32,6 +33,11 @@ pub struct RouterUninstallOptions {
 #[derive(Clone, Debug)]
 pub struct RouterUpdateOptions {
     pub backup_dir: Option<PathBuf>,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct RouterModeOptions {
     pub dry_run: bool,
 }
 
@@ -90,6 +96,47 @@ pub struct RouterUpdateReport {
     pub index_report: Option<IndexReport>,
     pub preparedness: Option<RouterPreparednessReport>,
     pub restart_warning: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterModeReport {
+    pub router_name: String,
+    pub router_skill_dirs: Vec<PathBuf>,
+    pub index: PathBuf,
+    pub manifest: PathBuf,
+    pub config: PathBuf,
+    pub enabled: bool,
+    pub dry_run: bool,
+    pub router_skill_reports: Vec<RouterSkillReport>,
+    pub durable_executor: DurableExecutorReport,
+    pub visibility: VisibilityApplyReport,
+    pub index_report: Option<IndexReport>,
+    pub preparedness: Option<RouterPreparednessReport>,
+    pub restart_warning: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterStatusReport {
+    pub installed: bool,
+    pub enabled: bool,
+    pub disabled: bool,
+    pub config: PathBuf,
+    pub router_name: Option<String>,
+    pub roots: Vec<PathBuf>,
+    pub router_skill_dirs: Vec<RouterSkillInstallStatus>,
+    pub index: Option<PathBuf>,
+    pub manifest: Option<PathBuf>,
+    pub index_status: Option<IndexStatusReport>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterSkillInstallStatus {
+    pub path: PathBuf,
+    pub present: bool,
+    pub managed: bool,
+    pub has_skill_md: bool,
+    pub has_skill_spec: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -168,6 +215,8 @@ pub enum RouterFileStatus {
 struct RouterConfig {
     schema: String,
     created_at_unix: u64,
+    #[serde(default = "default_enabled")]
+    enabled: bool,
     roots: Vec<PathBuf>,
     #[serde(default)]
     router_skill_dirs: Vec<PathBuf>,
@@ -204,12 +253,13 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
 
     let router_skill_reports =
         install_router_skills(&router_skill_dirs, &router_name, &index, options.dry_run)?;
-    let visibility = visibility::apply(visibility::VisibilityApplyOptions {
-        roots: options.roots.clone(),
-        profile: visibility::VisibilityProfile::RouterManaged,
-        manifest: manifest.clone(),
-        dry_run: options.dry_run,
-    })?;
+    let visibility = apply_router_visibility(
+        &options.roots,
+        &router_name,
+        true,
+        manifest.clone(),
+        options.dry_run,
+    )?;
     let (index_report, preparedness) = if options.dry_run {
         (
             None,
@@ -242,6 +292,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
             &index,
             &manifest,
             &router_name,
+            true,
         )?;
         (Some(report), preparedness)
     };
@@ -378,13 +429,14 @@ pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
         &config.index,
         options.dry_run,
     )?;
-    let visibility = visibility::apply(visibility::VisibilityApplyOptions {
-        roots: config.roots.clone(),
-        profile: visibility::VisibilityProfile::RouterManaged,
-        manifest: config.manifest.clone(),
-        dry_run: options.dry_run,
-    })?;
-    let (index_report, preparedness) = if options.dry_run {
+    let visibility = apply_router_visibility(
+        &config.roots,
+        &config.router_name,
+        config.enabled,
+        config.manifest.clone(),
+        options.dry_run,
+    )?;
+    let (index_report, preparedness) = if options.dry_run || !config.enabled {
         (None, None)
     } else {
         let report = router::index(router::IndexOptions {
@@ -406,6 +458,7 @@ pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
             &config.index,
             &config.manifest,
             &config.router_name,
+            config.enabled,
         )?;
         (Some(report), Some(preparedness))
     };
@@ -427,22 +480,84 @@ pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
     })
 }
 
+pub fn enable(options: RouterModeOptions) -> Result<RouterModeReport> {
+    set_enabled(true, options)
+}
+
+pub fn disable(options: RouterModeOptions) -> Result<RouterModeReport> {
+    set_enabled(false, options)
+}
+
+pub fn status() -> Result<RouterStatusReport> {
+    let config_path = config_path()?;
+    let Some(config) = read_config_optional()? else {
+        return Ok(RouterStatusReport {
+            installed: false,
+            enabled: false,
+            disabled: false,
+            config: config_path,
+            router_name: None,
+            roots: Vec::new(),
+            router_skill_dirs: Vec::new(),
+            index: None,
+            manifest: None,
+            index_status: None,
+            warnings: Vec::new(),
+        });
+    };
+
+    let router_skill_dirs = configured_router_skill_dirs(&config, &config.router_name)
+        .into_iter()
+        .map(|path| RouterSkillInstallStatus {
+            present: path.is_dir(),
+            managed: path.join(ROUTER_MARKER).is_file(),
+            has_skill_md: path.join("SKILL.md").is_file(),
+            has_skill_spec: path.join("skill.spec.yml").is_file(),
+            path,
+        })
+        .collect::<Vec<_>>();
+    let index_status = router::index_status(router::IndexStatusOptions {
+        roots: config.roots.clone(),
+        index: config.index.clone(),
+        visibility_manifest: Some(config.manifest.clone()),
+    })?;
+    let warnings = index_status.warnings.clone();
+
+    Ok(RouterStatusReport {
+        installed: true,
+        enabled: config.enabled,
+        disabled: !config.enabled,
+        config: config_path,
+        router_name: Some(config.router_name),
+        roots: config.roots,
+        router_skill_dirs,
+        index: Some(config.index),
+        manifest: Some(config.manifest),
+        index_status: Some(index_status),
+        warnings,
+    })
+}
+
 pub fn after_skill_install() -> Result<Option<RouterHookReport>> {
     let Some(config) = read_config_optional()? else {
         return Ok(None);
     };
+    if !config.enabled {
+        return Ok(None);
+    }
     let router_skill_reports = install_router_skills(
         &configured_router_skill_dirs(&config, &config.router_name),
         &config.router_name,
         &config.index,
         false,
     )?;
-    let visibility = visibility::apply(visibility::VisibilityApplyOptions {
-        roots: config.roots.clone(),
-        profile: visibility::VisibilityProfile::RouterManaged,
-        manifest: config.manifest.clone(),
-        dry_run: false,
-    })?;
+    let visibility = apply_router_visibility(
+        &config.roots,
+        &config.router_name,
+        true,
+        config.manifest.clone(),
+        false,
+    )?;
     let index_report = router::index(router::IndexOptions {
         roots: config.roots.clone(),
         out: config.index.clone(),
@@ -479,30 +594,35 @@ pub fn refresh(options: RouterRefreshOptions) -> Result<RouterRefreshReport> {
         visibility_manifest: manifest.clone(),
     })?;
 
-    let visibility = if router_config_present {
-        let Some(manifest) = manifest.clone() else {
-            return Err(Error::InvalidInput {
-                message: "router index refresh found router config but no visibility manifest"
-                    .to_owned(),
-            });
-        };
-        if let Some(config) = &config {
-            install_router_skills(
-                &configured_router_skill_dirs(config, &config.router_name),
-                &config.router_name,
-                &index,
+    let visibility =
+        if router_config_present && config.as_ref().is_some_and(|config| config.enabled) {
+            let Some(manifest) = manifest.clone() else {
+                return Err(Error::InvalidInput {
+                    message: "router index refresh found router config but no visibility manifest"
+                        .to_owned(),
+                });
+            };
+            if let Some(config) = &config {
+                install_router_skills(
+                    &configured_router_skill_dirs(config, &config.router_name),
+                    &config.router_name,
+                    &index,
+                    false,
+                )?;
+            }
+            Some(apply_router_visibility(
+                &options.roots,
+                &config
+                    .as_ref()
+                    .map(|config| config.router_name.clone())
+                    .unwrap_or_else(|| DEFAULT_ROUTER_NAME.to_owned()),
+                true,
+                manifest,
                 false,
-            )?;
-        }
-        Some(visibility::apply(visibility::VisibilityApplyOptions {
-            roots: options.roots.clone(),
-            profile: visibility::VisibilityProfile::RouterManaged,
-            manifest,
-            dry_run: false,
-        })?)
-    } else {
-        None
-    };
+            )?)
+        } else {
+            None
+        };
 
     let index_report = router::index(router::IndexOptions {
         roots: options.roots.clone(),
@@ -717,6 +837,48 @@ pub fn render_update(report: &RouterUpdateReport) -> String {
         output.push_str(&format!("Prepared: {}\n", preparedness.ready));
         output.push_str(&format!(
             "Index stale after update: {}\n",
+            preparedness.index_stale
+        ));
+    }
+    output.push_str(&format!("Restart warning: {}\n", report.restart_warning));
+    output
+}
+
+pub fn render_mode(report: &RouterModeReport) -> String {
+    let mut output = String::new();
+    let action = if report.enabled { "enable" } else { "disable" };
+    output.push_str(&format!("Skill router {action}\n\n"));
+    output.push_str("Router roots:\n");
+    for router_skill in &report.router_skill_reports {
+        output.push_str(&format!(
+            "- {} ({:?})\n",
+            router_skill.path.display(),
+            router_skill.status
+        ));
+    }
+    output.push_str(&format!("Index: {}\n", report.index.display()));
+    output.push_str(&format!("Manifest: {}\n", report.manifest.display()));
+    output.push_str(&format!("Config: {}\n", report.config.display()));
+    output.push_str(&format!("Enabled: {}\n", report.enabled));
+    output.push_str(&format!("Dry run: {}\n", report.dry_run));
+    output.push_str(&format!(
+        "Durable executor: {}\n",
+        report.durable_executor.message
+    ));
+    output.push_str(&format!(
+        "Visibility changes: {}\n",
+        report.visibility.changes.len()
+    ));
+    if let Some(index_report) = &report.index_report {
+        output.push_str(&format!(
+            "Skills indexed: {}\n",
+            index_report.skills_indexed
+        ));
+    }
+    if let Some(preparedness) = &report.preparedness {
+        output.push_str(&format!("Prepared: {}\n", preparedness.ready));
+        output.push_str(&format!(
+            "Index stale after enable: {}\n",
             preparedness.index_stale
         ));
     }
@@ -951,8 +1113,9 @@ metadata:
 
 This is a thin native harness loader generated by `skillspec router install`.
 Load and follow `./skill.spec.yml`; that file is the router contract.
-This router is explicit-only; `durable-executor` remains the implicit first-hop
-when it is installed separately in the managed roots.
+When router mode is enabled, this router is implicit and all routed skills are
+explicit-only. `durable-executor` remains implicit only when its own lifecycle
+state is enabled.
 "#
     );
     write_file(&skill_dir.join("SKILL.md"), &skill)?;
@@ -998,6 +1161,8 @@ activation:
     - skill descriptions shortened
     - install router
     - uninstall router
+    - enable router
+    - disable router
     - refresh skill index
     - out-of-band skill
     - prose skill added
@@ -1014,6 +1179,7 @@ applies_when:
       - route a request to the best SkillSpec or SKILL.md package
       - reduce native skill discovery context pressure
       - install or uninstall the SkillSpec router
+      - enable or disable router mode without deleting the router package
       - make skills explicit-only, manual-only, implicit, or off
       - refresh a skill index after skill additions or removals
       - detect or repair skills added outside the SkillSpec install flow
@@ -1062,7 +1228,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, update, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into every managed root, back up and update recorded router installs, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
+    description: Install the router skill into every managed root, enable or disable router mode, back up and update recorded router installs, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -1073,7 +1239,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, update, uninstall, index refresh, or index status commands. Install prepares the router; update backs up and rewrites recorded router packages; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
+          description: Run router install, enable, disable, update, uninstall, index refresh, or index status commands. Enable makes the router implicit, makes routed skills explicit-only, rebuilds the index, and checks preparedness. Disable makes the router explicit-only and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -1120,6 +1286,8 @@ rules:
       user_says_any:
         - install router
         - uninstall router
+        - enable router
+        - disable router
         - router index
         - refresh index
         - index status
@@ -1174,8 +1342,8 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use index refresh to apply explicit invocation controls and rebuild the index after out-of-band skill changes.
-    template: 'skillspec router install|uninstall|index refresh|index status'
+    description: Apply the requested router lifecycle command. Use enable to reapply explicit invocation controls and rebuild the index after router mode was disabled.
+    template: 'skillspec router install|enable|disable|update|uninstall|index refresh|index status'
     safety: local_write
 
   run_visibility_plan:
@@ -1197,7 +1365,7 @@ tests:
         - route_queries_use_index
 
   - name: lifecycle uses router commands
-    input: install router and refresh index
+    input: enable router and refresh index
     expect:
       route: manage_router_lifecycle
       matched_rules:
@@ -1302,16 +1470,22 @@ fn aggregate_router_file_status(reports: &[RouterSkillReport]) -> RouterFileStat
 fn inspect_durable_executor(roots: &[PathBuf]) -> Result<DurableExecutorReport> {
     let mut warnings = Vec::new();
     let entries = router::scan_roots(roots, &mut warnings)?;
+    let durable_enabled = durable_lifecycle::is_enabled_for_router()?;
     if let Some(entry) = entries
         .iter()
         .find(|entry| entry.name == visibility::ROUTER_MANAGED_IMPLICIT_EXCEPTION)
     {
+        let mode = if durable_enabled {
+            "implicit"
+        } else {
+            "explicit-only"
+        };
         return Ok(DurableExecutorReport {
             present: true,
             skill_dir: Some(entry.skill_dir.clone()),
             message: format!(
-                "{} present in managed roots; router-managed visibility keeps it implicit",
-                visibility::ROUTER_MANAGED_IMPLICIT_EXCEPTION
+                "{} present in managed roots; durable lifecycle keeps it {mode}",
+                visibility::ROUTER_MANAGED_IMPLICIT_EXCEPTION,
             ),
             warnings,
         });
@@ -1329,6 +1503,97 @@ fn inspect_durable_executor(roots: &[PathBuf]) -> Result<DurableExecutorReport> 
             visibility::ROUTER_MANAGED_IMPLICIT_EXCEPTION
         ),
         warnings,
+    })
+}
+
+fn set_enabled(enabled: bool, options: RouterModeOptions) -> Result<RouterModeReport> {
+    let mut config = read_config_optional()?.ok_or_else(|| Error::InvalidInput {
+        message:
+            "router enable/disable requires an existing router config; run router install first"
+                .to_owned(),
+    })?;
+    let config_path = config_path()?;
+    let router_skill_dirs = configured_router_skill_dirs(&config, &config.router_name);
+    if router_skill_dirs.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "router enable/disable requires router config to locate managed router skills"
+                .to_owned(),
+        });
+    }
+    let router_skill_reports = install_router_skills(
+        &router_skill_dirs,
+        &config.router_name,
+        &config.index,
+        options.dry_run,
+    )?;
+    let durable_executor = inspect_durable_executor(&config.roots)?;
+    let visibility = apply_router_visibility(
+        &config.roots,
+        &config.router_name,
+        enabled,
+        config.manifest.clone(),
+        options.dry_run,
+    )?;
+    let (index_report, preparedness) = if enabled && !options.dry_run {
+        let report = router::index(router::IndexOptions {
+            roots: config.roots.clone(),
+            out: config.index.clone(),
+            visibility_manifest: Some(config.manifest.clone()),
+        })?;
+        let preparedness = check_preparedness(
+            &config.roots,
+            &config.index,
+            &config.manifest,
+            &visibility,
+            &report,
+        )?;
+        (Some(report), Some(preparedness))
+    } else {
+        (None, None)
+    };
+    if !options.dry_run {
+        config.enabled = enabled;
+        write_config(
+            &config_path,
+            &config.roots,
+            &router_skill_dirs,
+            &config.index,
+            &config.manifest,
+            &config.router_name,
+            config.enabled,
+        )?;
+    }
+    Ok(RouterModeReport {
+        router_name: config.router_name,
+        router_skill_dirs,
+        index: config.index,
+        manifest: config.manifest,
+        config: config_path,
+        enabled,
+        dry_run: options.dry_run,
+        router_skill_reports,
+        durable_executor,
+        visibility,
+        index_report,
+        preparedness,
+        restart_warning: restart_warning(),
+    })
+}
+
+fn apply_router_visibility(
+    roots: &[PathBuf],
+    router_name: &str,
+    enabled: bool,
+    manifest: PathBuf,
+    dry_run: bool,
+) -> Result<VisibilityApplyReport> {
+    visibility::apply_router_mode(visibility::RouterModeVisibilityOptions {
+        roots: roots.to_vec(),
+        router_name: router_name.to_owned(),
+        durable_enabled: durable_lifecycle::is_enabled_for_router()?,
+        enabled,
+        manifest,
+        dry_run,
     })
 }
 
@@ -1356,10 +1621,12 @@ fn write_config(
     index: &Path,
     manifest: &Path,
     router_name: &str,
+    enabled: bool,
 ) -> Result<()> {
     let config = RouterConfig {
         schema: CONFIG_SCHEMA.to_owned(),
         created_at_unix: now_unix(),
+        enabled,
         roots: roots.to_vec(),
         router_skill_dirs: router_skill_dirs.to_vec(),
         index: index.to_path_buf(),
@@ -1369,6 +1636,10 @@ fn write_config(
     };
     let json = serde_json::to_string_pretty(&config).map_err(Error::RenderJson)?;
     write_file(path, &format!("{json}\n"))
+}
+
+fn default_enabled() -> bool {
+    true
 }
 
 fn read_config_optional() -> Result<Option<RouterConfig>> {

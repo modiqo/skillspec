@@ -201,6 +201,8 @@ Grounded commands:
 
 ```sh
 skillspec durable-executor install <source-folder> --target <target> --json
+skillspec durable-executor disable --json
+skillspec durable-executor enable --json
 skillspec durable-executor update --json
 skillspec durable-executor delete --json
 ```
@@ -208,6 +210,10 @@ skillspec durable-executor delete --json
 Review check:
 
 - Install requires an explicit local durable-executor source folder.
+- Install, update, and enable preflight that `rote` is available on `PATH`;
+  dry-run reports the preflight without writing files.
+- Disable does not uninstall; it makes recorded durable installs explicit-only.
+- Enable makes recorded durable installs implicit again.
 - Update refuses existing unmarked folders.
 - Delete removes only recorded marker-protected installs.
 - Router state refreshes when router mode is configured.
