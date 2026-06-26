@@ -1,11 +1,11 @@
 ---
 name: skillspec
-description: "Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, workspace import, workspace converge and workspace compile. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, map a skills repository that contains multiple SKILL.md packages before import"
+description: "Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install compiled workspaces, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, workspace import, workspace converge and workspace compile. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec, map a skills repository that contains multiple SKILL"
 ---
 
 # SkillSpec
 
-SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 
 ## Entry Gate
 
@@ -142,6 +142,7 @@ Minimum final response shape:
 - `workspace_compile`: Compile workspace build
 - `inspect_skillspec_status`: Inspect SkillSpec status
 - `install_durable_executor`: Install durable-executor
+- `workspace_install`: Install workspace build
 - `update_durable_executor`: Update durable-executor
 - `switch_durable_executor_mode`: Enable or disable durable-executor
 - `observed_durable_workspace_to_skill`: Create skill from observed durable workspace

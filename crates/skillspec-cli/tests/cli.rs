@@ -527,12 +527,14 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&workspace);
     let workspace_help = stdout(&workspace);
-    assert!(workspace_help.contains("Map, validate, and import multi-skill workspaces"));
+    assert!(workspace_help
+        .contains("Map, validate, import, compile, and install multi-skill workspaces"));
     assert!(workspace_help.contains("map"));
     assert!(workspace_help.contains("validate"));
     assert!(workspace_help.contains("import"));
     assert!(workspace_help.contains("converge"));
     assert!(workspace_help.contains("compile"));
+    assert!(workspace_help.contains("install"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -5071,6 +5073,101 @@ Read `../coding-standards/SKILL.md`.
     let loader = fs::read_to_string(review_loader).unwrap();
     assert!(loader.contains("thin loader"));
     assert!(loader.contains("skill.spec.yml"));
+
+    let collision_home = dir.path().join("collision-home");
+    fs::create_dir_all(collision_home.join(".agents/skills")).unwrap();
+    write_file(
+        &collision_home
+            .join(".agents/skills")
+            .join("skills--code-review")
+            .join("SKILL.md"),
+        "---\nname: code-review\ndescription: Existing skill.\n---\n# Existing\n",
+    );
+    let blocked_install = Command::new(bin())
+        .env("HOME", &collision_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&blocked_install);
+    let blocked_install_report = json_stdout(&blocked_install);
+    assert_eq!(blocked_install_report["ok"], false);
+    assert!(blocked_install_report["planned"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "coding-standards"));
+    assert!(blocked_install_report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "code-review"));
+    assert!(!collision_home
+        .join(".agents/skills/skills--coding-standards/SKILL.md")
+        .exists());
+
+    let home = dir.path().join("home");
+    fs::create_dir_all(home.join(".agents/skills")).unwrap();
+    let install_dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_dry_run);
+    let install_plan = json_stdout(&install_dry_run);
+    assert_eq!(install_plan["ok"], true);
+    assert_eq!(install_plan["dry_run"], true);
+    assert_eq!(install_plan["planned"].as_array().unwrap().len(), 2);
+    assert!(build.join("workspace-install.report.md").is_file());
+    assert!(!home
+        .join(".agents/skills/skills--code-review/SKILL.md")
+        .exists());
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+    let install_report = json_stdout(&install);
+    assert_eq!(install_report["ok"], true);
+    assert_eq!(install_report["dry_run"], false);
+    assert_eq!(install_report["installed"].as_array().unwrap().len(), 2);
+    assert!(install_report["planned"].as_array().unwrap().is_empty());
+    assert!(home
+        .join(".agents/skills/skills--coding-standards/SKILL.md")
+        .is_file());
+    assert!(home
+        .join(".agents/skills/skills--coding-standards/skill.spec.yml")
+        .is_file());
+    assert!(home
+        .join(".agents/skills/skills--code-review/SKILL.md")
+        .is_file());
+    assert!(home
+        .join(".agents/skills/skills--code-review/skill.spec.yml")
+        .is_file());
+    assert!(build.join("workspace-install.manifest.json").is_file());
 }
 
 #[test]

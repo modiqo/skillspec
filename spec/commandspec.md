@@ -333,6 +333,7 @@ Subcommands:
 - `import <skillspec.workspace.yml> --out <build-root> [--json]`
 - `converge <skillspec.workspace.yml> --build-root <build-root> [--json]`
 - `compile <skillspec.workspace.yml> --build-root <build-root> --target <target> [--json]`
+- `install <skillspec.workspace.yml> --build-root <build-root> --target <target> [--dry-run] [--json]`
 
 `workspace` is the authoring-side structure recon surface for repositories that
 contain multiple atomic skill packages. It is separate from `skillspec index`,
@@ -469,6 +470,43 @@ dependents whose dependencies did not compile and writes:
 - `<BUILD_ROOT>/<package>/SKILL.md`
 
 It does not install skills or refresh router indexes.
+
+### `workspace install`
+
+```text
+skillspec workspace install <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: parent folder containing compiled workspace
+  package outputs from `workspace compile`.
+- `--target <TARGET>`: harness root to install into. Values are `agents`,
+  `codex`, and `claude-local`. Repeat for multiple targets.
+- `--all-detected`: install into every detected harness skill root.
+- `--dry-run`: show the full install plan without writing harness files.
+- `--retire-existing`: back up and remove an existing active install folder
+  before installing the package with the same `install_slug`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace install` preflights the whole workspace before copying package
+folders. It uses the manifest `install_slug` for every installed folder, checks
+that compiled `SKILL.md` loaders and `skill.spec.yml` files exist, blocks folder
+collisions unless `--retire-existing` is selected, blocks public-name
+collisions, and blocks dependents whose dependencies are not install-ready.
+
+On dry-run, no harness files are written. On install, packages are copied in
+dependency order and the command writes:
+
+- `<BUILD_ROOT>/workspace-install.report.md`
+- `<BUILD_ROOT>/workspace-install.manifest.json`
+
+It does not refresh router indexes. Router refresh remains a separate runtime
+operation.
 
 ### `source coverage`
 

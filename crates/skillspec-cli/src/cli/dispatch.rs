@@ -282,6 +282,37 @@ pub(super) fn run(command: Command) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+            WorkspaceCommand::Install {
+                manifest,
+                build_root,
+                target,
+                all_detected,
+                dry_run,
+                retire_existing,
+                json,
+            } => {
+                let targets = target
+                    .into_iter()
+                    .map(HarnessTarget::from)
+                    .collect::<Vec<_>>();
+                let install_report = workspace::install_workspace(
+                    &manifest,
+                    &build_root,
+                    &targets,
+                    all_detected,
+                    dry_run,
+                    retire_existing,
+                )?;
+                let ok = install_report.ok;
+                if json {
+                    report::json(&install_report)?;
+                } else {
+                    report::text(&workspace::render_install_report(&install_report))?;
+                }
+                if !ok {
+                    std::process::exit(1);
+                }
+            }
         },
         Command::Grammar { command } => match command {
             GrammarCommand::Sensemake { view, json } => {

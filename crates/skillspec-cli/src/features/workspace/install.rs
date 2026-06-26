@@ -1,0 +1,859 @@
+use super::{
+    dependency_edges, load_manifest, output_package_dir, path_to_string, topological_package_order,
+    validate_workspace, write_text, WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
+};
+use crate::error::{Error, Result};
+use crate::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
+use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+const INSTALL_MANIFEST_SCHEMA: &str = "skillspec/workspace-install/v0";
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceInstallReport {
+    pub ok: bool,
+    pub dry_run: bool,
+    pub manifest_path: String,
+    pub build_root: String,
+    pub report_path: String,
+    pub install_manifest_path: String,
+    pub package_count: usize,
+    pub targets: Vec<String>,
+    pub installed: Vec<String>,
+    pub planned: Vec<String>,
+    pub failed: Vec<String>,
+    pub blocked: Vec<String>,
+    pub missing: Vec<String>,
+    pub dependency_edges: Vec<WorkspaceDependencyEdge>,
+    pub packages: Vec<WorkspaceInstallPackageReport>,
+    pub next: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceInstallPackageReport {
+    pub package_id: String,
+    pub public_name: String,
+    pub install_slug: String,
+    pub status: WorkspaceInstallStatus,
+    pub source_dir: String,
+    pub dependencies: Vec<String>,
+    pub targets: Vec<WorkspaceInstallTargetReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceInstallStatus {
+    Planned,
+    Installed,
+    Failed,
+    Blocked,
+    Missing,
+}
+
+impl WorkspaceInstallStatus {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Planned => "planned",
+            Self::Installed => "installed",
+            Self::Failed => "failed",
+            Self::Blocked => "blocked",
+            Self::Missing => "missing",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceInstallTargetReport {
+    pub target: HarnessTarget,
+    pub id: String,
+    pub path: String,
+    pub existed: bool,
+    pub retired_existing: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_path: Option<String>,
+    pub status: WorkspaceInstallTargetStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceInstallTargetStatus {
+    Planned,
+    Installed,
+    Blocked,
+    Failed,
+}
+
+impl WorkspaceInstallTargetStatus {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Planned => "planned",
+            Self::Installed => "installed",
+            Self::Blocked => "blocked",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct WorkspaceInstalledManifest {
+    schema: &'static str,
+    manifest_path: String,
+    build_root: String,
+    targets: Vec<String>,
+    packages: Vec<WorkspaceInstalledPackage>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct WorkspaceInstalledPackage {
+    package_id: String,
+    public_name: String,
+    install_slug: String,
+    dependencies: Vec<String>,
+    installs: Vec<WorkspaceInstalledTarget>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct WorkspaceInstalledTarget {
+    target: HarnessTarget,
+    id: String,
+    path: String,
+    retired_existing: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backup_path: Option<String>,
+}
+
+pub fn install_workspace(
+    manifest_path: &Path,
+    build_root: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    dry_run: bool,
+    retire_existing: bool,
+) -> Result<WorkspaceInstallReport> {
+    let validation = validate_workspace(manifest_path)?;
+    if !validation.ok {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "workspace install requires a valid manifest; run `skillspec workspace validate {}` first. Errors: {}",
+                manifest_path.display(),
+                validation.errors.join("; ")
+            ),
+        });
+    }
+    if !build_root.is_dir() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "workspace install build root is not a directory: {}",
+                build_root.display()
+            ),
+        });
+    }
+
+    let roots = install::selected_roots(targets, all_detected)?;
+    if roots.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "no install targets selected; use --target or --all-detected".to_owned(),
+        });
+    }
+
+    let manifest = load_manifest(manifest_path)?;
+    let duplicate_public_names = duplicate_public_names(&manifest);
+    let mut package_reports = preflight_packages(
+        &manifest,
+        build_root,
+        targets,
+        all_detected,
+        retire_existing,
+        &roots,
+        &duplicate_public_names,
+    )?;
+
+    let mut report = install_report(
+        manifest_path,
+        build_root,
+        dry_run,
+        &roots,
+        &manifest,
+        package_reports,
+    );
+
+    if report.ok && !dry_run {
+        package_reports = install_packages(
+            &manifest,
+            build_root,
+            targets,
+            all_detected,
+            retire_existing,
+            report.packages,
+        )?;
+        report = install_report(
+            manifest_path,
+            build_root,
+            dry_run,
+            &roots,
+            &manifest,
+            package_reports,
+        );
+        if !report.installed.is_empty() {
+            write_install_manifest(&report, &manifest)?;
+        }
+    }
+
+    write_text(
+        &PathBuf::from(&report.report_path),
+        &render_install_report(&report),
+    )?;
+    Ok(report)
+}
+
+pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
+    let mut output = String::new();
+    output.push_str("Workspace install\n\n");
+    output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+    output.push_str(&format!("- build_root: {}\n", report.build_root));
+    output.push_str(&format!(
+        "- mode: {}\n",
+        if report.dry_run { "dry-run" } else { "install" }
+    ));
+    output.push_str(&format!("- targets: {}\n", report.targets.join(", ")));
+    output.push_str(&format!("- packages: {}\n", report.package_count));
+    output.push_str(&format!(
+        "- status: {}\n",
+        if report.ok { "ok" } else { "failed" }
+    ));
+    output.push_str(&format!("- report: {}\n", report.report_path));
+    output.push_str(&format!(
+        "- install_manifest: {}\n",
+        report.install_manifest_path
+    ));
+    output.push('\n');
+
+    push_id_list(&mut output, "Installed", &report.installed);
+    push_id_list(&mut output, "Planned", &report.planned);
+    push_id_list(&mut output, "Failed", &report.failed);
+    push_id_list(&mut output, "Blocked", &report.blocked);
+    push_id_list(&mut output, "Missing", &report.missing);
+
+    output.push_str("\n## Packages\n\n");
+    for package in &report.packages {
+        output.push_str(&format!(
+            "- {}: {} public_name={} install_slug={} source={}\n",
+            package.package_id,
+            package.status.as_str(),
+            package.public_name,
+            package.install_slug,
+            package.source_dir
+        ));
+        if !package.dependencies.is_empty() {
+            output.push_str(&format!(
+                "  depends_on: {}\n",
+                package.dependencies.join(", ")
+            ));
+        }
+        if let Some(message) = &package.message {
+            output.push_str(&format!("  message: {message}\n"));
+        }
+        for target in &package.targets {
+            output.push_str(&format!(
+                "  - {}: {} -> {}",
+                target.id,
+                target.status.as_str(),
+                target.path
+            ));
+            if target.existed {
+                output.push_str(" existed=true");
+            }
+            if target.retired_existing {
+                output.push_str(" retired_existing=true");
+            }
+            if let Some(backup_path) = &target.backup_path {
+                output.push_str(&format!(" backup={backup_path}"));
+            }
+            output.push('\n');
+            if let Some(message) = &target.message {
+                output.push_str(&format!("    message: {message}\n"));
+            }
+        }
+    }
+
+    output.push_str("\n## Dependency Graph\n\n");
+    if report.dependency_edges.is_empty() {
+        output.push_str("- none\n");
+    } else {
+        for edge in &report.dependency_edges {
+            output.push_str(&format!("- {} -> {}\n", edge.from, edge.to));
+        }
+    }
+
+    output.push_str("\n## Next\n\n");
+    if report.ok {
+        for next in &report.next {
+            output.push_str(&format!("- {next}\n"));
+        }
+    } else {
+        output.push_str("- fix missing compiled loaders, folder collisions, or public-name collisions, then rerun workspace install with --dry-run before installing\n");
+    }
+    output
+}
+
+fn preflight_packages(
+    manifest: &WorkspaceManifest,
+    build_root: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    retire_existing: bool,
+    roots: &[HarnessRoot],
+    duplicate_public_names: &BTreeMap<String, Vec<String>>,
+) -> Result<Vec<WorkspaceInstallPackageReport>> {
+    let mut statuses = BTreeMap::<String, WorkspaceInstallStatus>::new();
+    let mut reports = Vec::new();
+    for package_id in topological_package_order(manifest) {
+        let package = manifest
+            .packages
+            .get(&package_id)
+            .expect("topological order only includes known packages");
+        let blocked_by = package
+            .depends_on
+            .iter()
+            .filter(|dependency| {
+                statuses.get(*dependency) != Some(&WorkspaceInstallStatus::Planned)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let report = if blocked_by.is_empty() {
+            preflight_one_package(
+                package,
+                build_root,
+                targets,
+                all_detected,
+                retire_existing,
+                roots,
+                duplicate_public_names,
+            )?
+        } else {
+            blocked_package_report(
+                package,
+                build_root,
+                roots,
+                format!(
+                    "dependency packages are not install-ready: {}",
+                    blocked_by.join(", ")
+                ),
+            )?
+        };
+        statuses.insert(package.package_id.clone(), report.status.clone());
+        reports.push(report);
+    }
+    Ok(reports)
+}
+
+fn preflight_one_package(
+    package: &WorkspacePackage,
+    build_root: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    retire_existing: bool,
+    roots: &[HarnessRoot],
+    duplicate_public_names: &BTreeMap<String, Vec<String>>,
+) -> Result<WorkspaceInstallPackageReport> {
+    let source_dir = output_package_dir(package, build_root)?;
+    let loader_path = source_dir.join("SKILL.md");
+    let spec_path = source_dir.join("skill.spec.yml");
+    if !loader_path.is_file() || !spec_path.is_file() {
+        return missing_package_report(
+            package,
+            &source_dir,
+            roots,
+            format!(
+                "compiled package is missing {}; run workspace compile before install",
+                if !loader_path.is_file() {
+                    loader_path.display().to_string()
+                } else {
+                    spec_path.display().to_string()
+                }
+            ),
+        );
+    }
+
+    let dry_run = install::install_skill_without_router_hook(
+        &source_dir,
+        targets,
+        all_detected,
+        true,
+        false,
+        retire_existing,
+        Some(&package.install_slug),
+    );
+    let mut target_reports = match dry_run {
+        Ok(report) => report
+            .installs
+            .into_iter()
+            .map(|target| WorkspaceInstallTargetReport {
+                target: target.target,
+                id: target.id.to_owned(),
+                path: path_to_string(&target.path),
+                existed: target.existed,
+                retired_existing: target.retired_existing,
+                backup_path: target.backup_path.as_ref().map(|path| path_to_string(path)),
+                status: WorkspaceInstallTargetStatus::Planned,
+                message: None,
+            })
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            return failed_package_report(package, &source_dir, roots, error.to_string());
+        }
+    };
+
+    let mut blockers = Vec::new();
+    if let Some(packages) = duplicate_public_names.get(&package.public_name) {
+        blockers.push(format!(
+            "public_name {:?} is used by multiple workspace packages: {}",
+            package.public_name,
+            packages.join(", ")
+        ));
+    }
+
+    for target in &mut target_reports {
+        let install_dir = PathBuf::from(&target.path);
+        if target.existed && !retire_existing {
+            let message = format!(
+                "install folder already exists; rerun with --retire-existing only after reviewing backup behavior: {}",
+                install_dir.display()
+            );
+            target.status = WorkspaceInstallTargetStatus::Blocked;
+            target.message = Some(message.clone());
+            blockers.push(message);
+            continue;
+        }
+
+        let Some(root) = roots.iter().find(|root| root.target == target.target) else {
+            continue;
+        };
+        match public_name_collision(&root.path, &install_dir, &package.public_name) {
+            Ok(Some(collision_path)) => {
+                let message = format!(
+                    "public_name {:?} already exists at {}",
+                    package.public_name,
+                    collision_path.display()
+                );
+                target.status = WorkspaceInstallTargetStatus::Blocked;
+                target.message = Some(message.clone());
+                blockers.push(message);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                let message = format!(
+                    "could not inspect existing skills for public_name collisions under {}: {}",
+                    root.path.display(),
+                    error
+                );
+                target.status = WorkspaceInstallTargetStatus::Blocked;
+                target.message = Some(message.clone());
+                blockers.push(message);
+            }
+        }
+    }
+
+    let message = unique_messages(&blockers).join("; ");
+    Ok(WorkspaceInstallPackageReport {
+        package_id: package.package_id.clone(),
+        public_name: package.public_name.clone(),
+        install_slug: package.install_slug.clone(),
+        status: if blockers.is_empty() {
+            WorkspaceInstallStatus::Planned
+        } else {
+            WorkspaceInstallStatus::Blocked
+        },
+        source_dir: path_to_string(&source_dir),
+        dependencies: package.depends_on.clone(),
+        targets: target_reports,
+        message: (!message.is_empty()).then_some(message),
+    })
+}
+
+fn install_packages(
+    manifest: &WorkspaceManifest,
+    build_root: &Path,
+    targets: &[HarnessTarget],
+    all_detected: bool,
+    retire_existing: bool,
+    mut package_reports: Vec<WorkspaceInstallPackageReport>,
+) -> Result<Vec<WorkspaceInstallPackageReport>> {
+    let mut statuses = BTreeMap::<String, WorkspaceInstallStatus>::new();
+    for package_report in &mut package_reports {
+        let package = manifest
+            .packages
+            .get(&package_report.package_id)
+            .expect("report only includes known packages");
+        let blocked_by = package
+            .depends_on
+            .iter()
+            .filter(|dependency| {
+                statuses.get(*dependency) != Some(&WorkspaceInstallStatus::Installed)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if !blocked_by.is_empty() {
+            package_report.status = WorkspaceInstallStatus::Blocked;
+            package_report.message = Some(format!(
+                "dependency packages did not install: {}",
+                blocked_by.join(", ")
+            ));
+            for target in &mut package_report.targets {
+                target.status = WorkspaceInstallTargetStatus::Blocked;
+                target.message = package_report.message.clone();
+            }
+            statuses.insert(package.package_id.clone(), package_report.status.clone());
+            continue;
+        }
+
+        let source_dir = output_package_dir(package, build_root)?;
+        match install::install_skill_without_router_hook(
+            &source_dir,
+            targets,
+            all_detected,
+            false,
+            false,
+            retire_existing,
+            Some(&package.install_slug),
+        ) {
+            Ok(report) => {
+                package_report.status = WorkspaceInstallStatus::Installed;
+                package_report.targets = report
+                    .installs
+                    .into_iter()
+                    .map(|target| WorkspaceInstallTargetReport {
+                        target: target.target,
+                        id: target.id.to_owned(),
+                        path: path_to_string(&target.path),
+                        existed: target.existed,
+                        retired_existing: target.retired_existing,
+                        backup_path: target.backup_path.as_ref().map(|path| path_to_string(path)),
+                        status: match target.status {
+                            InstallStatus::Planned => WorkspaceInstallTargetStatus::Planned,
+                            InstallStatus::Installed => WorkspaceInstallTargetStatus::Installed,
+                        },
+                        message: None,
+                    })
+                    .collect();
+                package_report.message = None;
+            }
+            Err(error) => {
+                package_report.status = WorkspaceInstallStatus::Failed;
+                package_report.message = Some(error.to_string());
+                for target in &mut package_report.targets {
+                    target.status = WorkspaceInstallTargetStatus::Failed;
+                    target.message = package_report.message.clone();
+                }
+            }
+        }
+        statuses.insert(package.package_id.clone(), package_report.status.clone());
+    }
+    Ok(package_reports)
+}
+
+fn install_report(
+    manifest_path: &Path,
+    build_root: &Path,
+    dry_run: bool,
+    roots: &[HarnessRoot],
+    manifest: &WorkspaceManifest,
+    packages: Vec<WorkspaceInstallPackageReport>,
+) -> WorkspaceInstallReport {
+    let report_path = build_root.join("workspace-install.report.md");
+    let install_manifest_path = build_root.join("workspace-install.manifest.json");
+    let installed = package_ids_by_status(&packages, WorkspaceInstallStatus::Installed);
+    let planned = package_ids_by_status(&packages, WorkspaceInstallStatus::Planned);
+    let failed = package_ids_by_status(&packages, WorkspaceInstallStatus::Failed);
+    let blocked = package_ids_by_status(&packages, WorkspaceInstallStatus::Blocked);
+    let missing = package_ids_by_status(&packages, WorkspaceInstallStatus::Missing);
+    WorkspaceInstallReport {
+        ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
+        dry_run,
+        manifest_path: path_to_string(manifest_path),
+        build_root: path_to_string(build_root),
+        report_path: path_to_string(&report_path),
+        install_manifest_path: path_to_string(&install_manifest_path),
+        package_count: manifest.packages.len(),
+        targets: roots.iter().map(|root| root.id.to_owned()).collect(),
+        installed,
+        planned,
+        failed,
+        blocked,
+        missing,
+        dependency_edges: dependency_edges(manifest),
+        packages,
+        next: if dry_run {
+            vec![
+                "rerun the same command without --dry-run after reviewing planned writes"
+                    .to_owned(),
+            ]
+        } else {
+            vec![
+                "inspect workspace-install.manifest.json for installed package ids, slugs, public names, and target paths".to_owned(),
+                "refresh router indexes separately if this harness uses router mode".to_owned(),
+            ]
+        },
+    }
+}
+
+fn write_install_manifest(
+    report: &WorkspaceInstallReport,
+    manifest: &WorkspaceManifest,
+) -> Result<()> {
+    let installed_manifest = WorkspaceInstalledManifest {
+        schema: INSTALL_MANIFEST_SCHEMA,
+        manifest_path: report.manifest_path.clone(),
+        build_root: report.build_root.clone(),
+        targets: report.targets.clone(),
+        packages: report
+            .packages
+            .iter()
+            .filter(|package| package.status == WorkspaceInstallStatus::Installed)
+            .map(|package| WorkspaceInstalledPackage {
+                package_id: package.package_id.clone(),
+                public_name: package.public_name.clone(),
+                install_slug: package.install_slug.clone(),
+                dependencies: manifest
+                    .packages
+                    .get(&package.package_id)
+                    .map(|source| source.depends_on.clone())
+                    .unwrap_or_default(),
+                installs: package
+                    .targets
+                    .iter()
+                    .filter(|target| target.status == WorkspaceInstallTargetStatus::Installed)
+                    .map(|target| WorkspaceInstalledTarget {
+                        target: target.target,
+                        id: target.id.clone(),
+                        path: target.path.clone(),
+                        retired_existing: target.retired_existing,
+                        backup_path: target.backup_path.clone(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    };
+    write_json(
+        &PathBuf::from(&report.install_manifest_path),
+        &installed_manifest,
+    )
+}
+
+fn missing_package_report(
+    package: &WorkspacePackage,
+    source_dir: &Path,
+    roots: &[HarnessRoot],
+    message: String,
+) -> Result<WorkspaceInstallPackageReport> {
+    Ok(WorkspaceInstallPackageReport {
+        package_id: package.package_id.clone(),
+        public_name: package.public_name.clone(),
+        install_slug: package.install_slug.clone(),
+        status: WorkspaceInstallStatus::Missing,
+        source_dir: path_to_string(source_dir),
+        dependencies: package.depends_on.clone(),
+        targets: target_reports_for_roots(package, roots, WorkspaceInstallTargetStatus::Blocked),
+        message: Some(message),
+    })
+}
+
+fn failed_package_report(
+    package: &WorkspacePackage,
+    source_dir: &Path,
+    roots: &[HarnessRoot],
+    message: String,
+) -> Result<WorkspaceInstallPackageReport> {
+    Ok(WorkspaceInstallPackageReport {
+        package_id: package.package_id.clone(),
+        public_name: package.public_name.clone(),
+        install_slug: package.install_slug.clone(),
+        status: WorkspaceInstallStatus::Failed,
+        source_dir: path_to_string(source_dir),
+        dependencies: package.depends_on.clone(),
+        targets: target_reports_for_roots(package, roots, WorkspaceInstallTargetStatus::Failed),
+        message: Some(message),
+    })
+}
+
+fn blocked_package_report(
+    package: &WorkspacePackage,
+    build_root: &Path,
+    roots: &[HarnessRoot],
+    message: String,
+) -> Result<WorkspaceInstallPackageReport> {
+    let source_dir = output_package_dir(package, build_root)?;
+    Ok(WorkspaceInstallPackageReport {
+        package_id: package.package_id.clone(),
+        public_name: package.public_name.clone(),
+        install_slug: package.install_slug.clone(),
+        status: WorkspaceInstallStatus::Blocked,
+        source_dir: path_to_string(&source_dir),
+        dependencies: package.depends_on.clone(),
+        targets: target_reports_for_roots(package, roots, WorkspaceInstallTargetStatus::Blocked),
+        message: Some(message),
+    })
+}
+
+fn target_reports_for_roots(
+    package: &WorkspacePackage,
+    roots: &[HarnessRoot],
+    status: WorkspaceInstallTargetStatus,
+) -> Vec<WorkspaceInstallTargetReport> {
+    roots
+        .iter()
+        .map(|root| {
+            let path = root.path.join(&package.install_slug);
+            WorkspaceInstallTargetReport {
+                target: root.target,
+                id: root.id.to_owned(),
+                existed: path.exists(),
+                path: path_to_string(&path),
+                retired_existing: false,
+                backup_path: None,
+                status: status.clone(),
+                message: None,
+            }
+        })
+        .collect()
+}
+
+fn public_name_collision(
+    root: &Path,
+    install_dir: &Path,
+    public_name: &str,
+) -> Result<Option<PathBuf>> {
+    if !root.is_dir() {
+        return Ok(None);
+    }
+    for entry in fs::read_dir(root).map_err(|source| Error::Read {
+        path: root.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| Error::Read {
+            path: root.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        if same_path(&path, install_dir) || !path.is_dir() {
+            continue;
+        }
+        if installed_public_name(&path)?.as_deref() == Some(public_name) {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+fn installed_public_name(skill_dir: &Path) -> Result<Option<String>> {
+    let skill_path = skill_dir.join("SKILL.md");
+    if !skill_path.is_file() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(&skill_path).map_err(|source| Error::Read {
+        path: skill_path.clone(),
+        source,
+    })?;
+    let frontmatter = parse_frontmatter(&skill_path, &content)?;
+    Ok(frontmatter
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(str::to_owned))
+}
+
+fn parse_frontmatter(path: &Path, content: &str) -> Result<BTreeMap<String, serde_yaml::Value>> {
+    let normalized = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let Some(rest) = normalized.strip_prefix("---") else {
+        return Ok(BTreeMap::new());
+    };
+    let rest = rest
+        .strip_prefix('\n')
+        .or_else(|| rest.strip_prefix("\r\n"));
+    let Some(rest) = rest else {
+        return Ok(BTreeMap::new());
+    };
+
+    let mut yaml = String::new();
+    for line in rest.lines() {
+        if line.trim() == "---" {
+            if yaml.trim().is_empty() {
+                return Ok(BTreeMap::new());
+            }
+            return serde_yaml::from_str(&yaml).map_err(|source| Error::ParseYaml {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+        yaml.push_str(line);
+        yaml.push('\n');
+    }
+    Ok(BTreeMap::new())
+}
+
+fn duplicate_public_names(manifest: &WorkspaceManifest) -> BTreeMap<String, Vec<String>> {
+    let mut by_name = BTreeMap::<String, Vec<String>>::new();
+    for package in manifest.packages.values() {
+        by_name
+            .entry(package.public_name.clone())
+            .or_default()
+            .push(package.package_id.clone());
+    }
+    by_name
+        .into_iter()
+        .filter_map(|(name, packages)| (packages.len() > 1).then_some((name, packages)))
+        .collect()
+}
+
+fn package_ids_by_status(
+    packages: &[WorkspaceInstallPackageReport],
+    status: WorkspaceInstallStatus,
+) -> Vec<String> {
+    packages
+        .iter()
+        .filter_map(|package| (package.status == status).then_some(package.package_id.clone()))
+        .collect()
+}
+
+fn unique_messages(messages: &[String]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    messages
+        .iter()
+        .filter_map(|message| {
+            if seen.insert(message.clone()) {
+                Some(message.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn same_path(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
+}
+
+fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
+    let content = serde_json::to_string_pretty(value)?;
+    write_text(path, &format!("{content}\n"))
+}
+
+fn push_id_list(output: &mut String, title: &str, ids: &[String]) {
+    output.push_str(&format!("## {title}\n\n"));
+    if ids.is_empty() {
+        output.push_str("- none\n");
+    } else {
+        for id in ids {
+            output.push_str(&format!("- {id}\n"));
+        }
+    }
+    output.push('\n');
+}
