@@ -61,6 +61,7 @@ skillspec grammar checklist --for import-skill
 - Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
 - Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
 - For one atomic prose skill, prefer `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove` before hand-editing. It writes grammar/schema proof, a typed shape crib, source map, doctor report, mechanical draft, QA results, compile output, and optional estimated non-Rote stats when `--run-dir` is supplied.
+- Do not auto-fill the scaffold. Use the source map, shape crib, and coverage matrix to promote only source-backed behavior, then report progress by gates: staged/mapped, draft generated, semantic spec patched, QA running, compiled/proof ready.
 
 ## Durable Handoff Contract
 

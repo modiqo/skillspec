@@ -260,7 +260,7 @@ routes:
             - produce_mechanical_draft
         - id: semantic_promotion
           owner_skill: skillspec
-          description: Fill the coverage matrix from the current source only, split source code into package-local resources/code entries, and promote routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
+          description: Guide the agent through a small source-backed promotion pass instead of auto-filling the scaffold. Fill the coverage matrix from the current source only, split source code into package-local resources/code entries, and promote only evidenced activation, routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -274,10 +274,13 @@ routes:
               - install_or_release_side_effect
           requires:
             - fill_coverage_matrix
+            - promote_only_source_backed_behavior
             - split_source_code_into_resources
             - review_and_promote_draft
             - produce_reviewed_spec
           forbid:
+            - auto_fill_scaffold_from_inference
+            - guess_routes_rules_or_tests
             - consult_existing_ports_without_user_request
             - consult_repo_history_without_user_request
             - consult_memory_or_prior_examples_without_user_request
@@ -2966,7 +2969,7 @@ code:
     language: text
     kind: validator
     source:
-      inline: "For each source section, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
+      inline: "Guide the promotion pass; do not auto-fill the scaffold. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep the pass short and deliberate: choose real activation/routes, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
     provenance:
       resource: source_skill_md
       heading: Creation Procedure

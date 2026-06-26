@@ -165,6 +165,12 @@ under `.skillspec/`. When a trace run is supplied with `--run-dir`, it also
 records estimated non-Rote token metrics so alignment does not report token
 usage as missing.
 
+The command does not auto-fill behavior. After the scaffold, the agent should
+make one guided promotion pass: choose source-backed activation/routes, promote
+only evidenced rules/dependencies/recipes/tests, fill coverage rows for open
+gaps, run the QA ladder once, then fix failures by class instead of one field at
+a time.
+
 The lower-level mechanical importer is still available when you only want a
 draft or need to debug one gate:
 

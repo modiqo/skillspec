@@ -19,6 +19,7 @@ One-shot porting makes the safe path the default path.
 ## Non-Goals
 
 - do not claim a mechanically imported skill is semantically complete;
+- do not auto-fill semantic behavior from weak inference;
 - do not live-run imported runtime behavior unless runtime dependencies exist;
 - do not hide dependency gaps by deleting dependency evidence;
 - do not replace workspace map/import for parent folders with multiple skills.
@@ -61,6 +62,34 @@ One-shot porting makes the safe path the default path.
      `metrics_source: estimated`;
    - never leave non-Rote port proof with token usage silently unrecorded when
      metrics were available.
+
+## Guided Semantic Promotion
+
+Semantic promotion is agent-guided, not automatic. The scaffold gives the agent
+source handles, typed shapes, and proof gates; the agent still makes the
+behavioral edits deliberately from source evidence.
+
+The guided pass should stay short:
+
+1. choose the real activation and route set from the source map;
+2. promote only source-backed rules, elicitations, dependencies, recipes,
+   closures, and tests;
+3. fill the coverage matrix for promoted obligations and unresolved gaps;
+4. run the QA ladder once;
+5. fix failures by schema class, then rerun the ladder.
+
+The agent should not parade every internal command. Progress should be reported
+by gates:
+
+- Staged and mapped source.
+- Draft generated.
+- Semantic spec patched.
+- QA running.
+- Compiled and proof report ready.
+
+If evidence is weak, leave `review_required` and explain the missing source
+proof. A valid scaffold with unresolved behavior is better than a polished spec
+that guessed.
 
 ## Command Shape
 
@@ -112,4 +141,6 @@ The first implementation should be conservative:
 - overwrite only with `--force`;
 - use current importer scaffolding as the semantic baseline;
 - mark semantic promotion as review-required in the report;
+- guide the agent to promote behavior from source-backed evidence instead of
+  auto-filling routes, rules, recipes, dependencies, or tests;
 - record estimated token metrics only when a run directory is supplied.

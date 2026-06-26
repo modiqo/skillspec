@@ -1059,6 +1059,9 @@ Options:
 
 The command does not claim semantic completion. Missing scenario tests and
 dependency gaps are reported as `review_required` so the port stays honest.
+The next semantic promotion step is agent-guided, not automatic: use the source
+map, shape crib, and coverage matrix to promote only source-backed behavior, run
+the QA ladder once, then fix failures by class.
 Parent folders containing multiple `SKILL.md` files are rejected; use
 `workspace map` and `workspace import` for those.
 

@@ -370,8 +370,12 @@ skillspec port-one-shot ./my-skill \
   --prove
 ```
 
-The generated `skill.spec.yml` is still a scaffold until reviewed. If you need
-manual control, run the lower-level steps directly:
+The generated `skill.spec.yml` is still a scaffold until reviewed. Do not
+auto-fill it. Use the source map and shape crib for one guided promotion pass:
+promote only source-backed activation, routes, rules, dependencies, recipes, and
+tests; leave weak areas as `review_required`; then run the QA ladder once.
+
+If you need manual control, run the lower-level steps directly:
 
 ```sh
 skillspec source map ./my-skill --out ./my-skill/.skillspec/source-map
