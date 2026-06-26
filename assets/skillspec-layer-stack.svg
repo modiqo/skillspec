@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">Where SkillSpec fits in the agent stack</title>
+  <desc id="desc">A concentric diagram showing models inside the agent harness, SkillSpec as a contract layer inside skills, and skills as the outer capability layer.</desc>
+  <defs>
+    <filter id="soft-shadow" x="-12%" y="-12%" width="124%" height="128%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#26313b" flood-opacity="0.13"/>
+    </filter>
+    <style>
+      .label {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+      .ring-name {
+        font-size: 28px;
+        font-weight: 760;
+      }
+      .ring-small {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .ring-center-note {
+        font-size: 16px;
+        font-weight: 620;
+      }
+      .headline {
+        fill: #11151b;
+        font-size: 38px;
+        font-weight: 780;
+      }
+      .body {
+        fill: #697179;
+        font-size: 20px;
+        font-weight: 440;
+      }
+      .item-title {
+        fill: #151920;
+        font-size: 25px;
+        font-weight: 760;
+      }
+      .item-body {
+        fill: #697179;
+        font-size: 18px;
+        font-weight: 440;
+      }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" fill="#fbfaf8"/>
+
+  <g transform="translate(70 78)">
+    <circle cx="326" cy="326" r="286" fill="#e7ddcf" filter="url(#soft-shadow)"/>
+    <circle cx="326" cy="326" r="225" fill="#c2e0ec" stroke="#fbfaf8" stroke-width="6"/>
+    <circle cx="326" cy="326" r="166" fill="#58c98f" stroke="#fbfaf8" stroke-width="6"/>
+    <circle cx="326" cy="326" r="88" fill="#d96a48" stroke="#fbfaf8" stroke-width="6"/>
+
+    <text class="label ring-name" x="326" y="78" text-anchor="middle" fill="#242a31">Skills</text>
+    <text class="label ring-name" x="326" y="140" text-anchor="middle" fill="#173c50">SkillSpec</text>
+    <text class="label ring-small" x="326" y="210" text-anchor="middle" fill="#073628">Agent Harness</text>
+    <text class="label ring-small" x="326" y="320" text-anchor="middle" fill="#ffffff">Models</text>
+    <text class="label ring-center-note" x="326" y="350" text-anchor="middle" fill="#ffffff">reasoning engine</text>
+  </g>
+
+  <g transform="translate(742 104)">
+    <text class="label headline" x="0" y="0">SkillSpec sits inside</text>
+    <text class="label headline" x="0" y="44">the skills layer.</text>
+
+    <text class="label body" x="0" y="92">
+      <tspan x="0" dy="0">Skills give agents capabilities. SkillSpec gives</tspan>
+      <tspan x="0" dy="32">important skills a checkable contract: route,</tspan>
+      <tspan x="0" dy="32">steps, tool limits, checks, and proof.</tspan>
+    </text>
+
+    <g transform="translate(0 220)">
+      <circle cx="10" cy="0" r="10" fill="#e7ddcf"/>
+      <text class="label item-title" x="38" y="8">Skills</text>
+      <text class="label item-body" x="38" y="42">
+        <tspan x="38" dy="0">Instructions, examples, scripts, references,</tspan>
+        <tspan x="38" dy="28">tools, and resources for a task.</tspan>
+      </text>
+    </g>
+
+    <g transform="translate(0 342)">
+      <circle cx="10" cy="0" r="10" fill="#8fc8de"/>
+      <text class="label item-title" x="38" y="8">SkillSpec</text>
+      <text class="label item-body" x="38" y="42">
+        <tspan x="38" dy="0">The behavior contract inside the skill:</tspan>
+        <tspan x="38" dy="28">when to use it, what path to follow,</tspan>
+        <tspan x="38" dy="28">what to check, and what proof to show.</tspan>
+      </text>
+    </g>
+
+    <g transform="translate(0 492)">
+      <circle cx="10" cy="0" r="10" fill="#58c98f"/>
+      <text class="label item-title" x="38" y="8">Agent Harness</text>
+      <text class="label item-body" x="38" y="42">
+        <tspan x="38" dy="0">The runtime that loads skills, grants tools,</tspan>
+        <tspan x="38" dy="28">runs commands, and handles I/O.</tspan>
+      </text>
+    </g>
+
+    <g transform="translate(0 602)">
+      <circle cx="10" cy="0" r="10" fill="#d96a48"/>
+      <text class="label item-title" x="38" y="8">Models</text>
+      <text class="label item-body" x="38" y="42">
+        <tspan x="38" dy="0">The reasoning engine beneath the operating</tspan>
+        <tspan x="38" dy="28">layers above it.</tspan>
+      </text>
+    </g>
+  </g>
+</svg>

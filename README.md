@@ -30,6 +30,10 @@ No new agent runtime. No orchestration platform. Just a `skill.spec.yml`, a
 small generated `SKILL.md` loader, and a CLI that validates, plans, records, and
 reports.
 
+<p align="center">
+  <img src="assets/skillspec-layer-stack.svg" alt="Where SkillSpec fits in the agent stack" width="900">
+</p>
+
 ## What SkillSpec Adds
 
 A regular skill tells the agent what to do. SkillSpec makes the important parts
