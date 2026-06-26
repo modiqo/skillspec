@@ -1993,7 +1993,7 @@ artifacts:
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
-    description: Static reliability-debt and context-burden diagnostic for exactly one prose source before semantic import; remote GitHub single skill folders may be qualified by temporary sparse checkout.
+    description: Static doctor report that first classifies source shape, then runs full reliability-debt and context-burden scoring only for one atomic prose source; local folders, public GitHub skill folders, and public GitHub repo URIs may return shape-only reports for multi-skill, entry-with-subskills, plugin-shaped, or non-skill code repo targets.
     produced_by:
       - kind: command
         id: doctor_source_skill
@@ -2168,8 +2168,8 @@ commands:
       dependencies:
         - rg_cli
   doctor_source_skill:
-    description: Score exactly one prose skill's static reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps before import. The target may be a local skill folder or a public GitHub single skill folder; parent folders with multiple SKILL.md files are invalid.
-    template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
+    description: Run the static doctor shape gate and, only for a simple atomic SKILL.md package, score reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. The target may be a local folder, public GitHub skill folder, or public GitHub repo URI; multi-skill, entry-with-subskills, plugin-shaped, and non-skill code repos return shape-only reports with the recommended next command.
+    template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
     safety: local_write
     requires:
       dependencies:

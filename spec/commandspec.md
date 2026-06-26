@@ -30,7 +30,7 @@ skillspec <COMMAND>
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
-| `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
+| `doctor <target> [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static single-skill reliability and context-burden debt when the shape is atomic. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
@@ -259,24 +259,38 @@ skillspec doctor <TARGET> [--json]
 
 Arguments:
 
-- `<TARGET>`: local `SKILL.md` file, local single skill folder, or public
-  GitHub single skill folder URL/shorthand to inspect.
+- `<TARGET>`: local `SKILL.md` file, local folder, public GitHub skill folder,
+  public GitHub repo URL, or GitHub shorthand to inspect.
 
 Options:
 
 - `--json`: emit JSON instead of a concise human report.
 
-`doctor` is a static diagnostic. It reads files and Markdown AST structure; it
-does not execute scripts, call tools, invoke a model, or simulate a task. It
-reports a structural score, activation-loaded surface percentage,
-frontmatter/activation/deferred surface split, and issue list.
+`doctor` is a static diagnostic. It does not execute scripts, call tools, invoke
+a model, or simulate a task. It first runs a cheap shape gate and reports one of
+these shapes:
 
-For public GitHub targets, `doctor` performs a temporary sparse checkout of the
-requested folder and removes it after the report. Supported remote forms include
-`https://github.com/owner/repo/tree/main/path/to/skill` and
-`owner/repo/path/to/skill`. `doctor` requires exactly one `SKILL.md` under the
-target; parent folders with many skills are rejected for both local and remote
-inputs.
+- `simple_skill`: exactly one atomic `SKILL.md` package. Doctor continues into
+  the full Markdown/source-map analysis and reports structural score,
+  activation-loaded surface percentage, frontmatter/activation/deferred surface
+  split, and issue list.
+- `entry_skill_with_subskills`: a root `SKILL.md` plus nested skill packages.
+  Doctor stops with `analysis_status: shape_only` and recommends
+  `skillspec workspace map`.
+- `multi_skill_workspace`: multiple `SKILL.md` packages without a plugin
+  namespace marker. Doctor stops with `analysis_status: shape_only`.
+- `plugin_workspace`: a plugin-shaped root with `skills/` plus
+  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`. Doctor stops with
+  `analysis_status: shape_only` so namespaces are preserved.
+- `non_skill_repository`: no `SKILL.md` was found. Doctor stops before
+  source-map parsing and reports code/manifest signals instead of wasting time
+  on a normal code repo.
+
+For public GitHub targets, `doctor` performs a temporary partial sparse checkout
+and removes it after the report. Supported remote forms include
+`https://github.com/owner/repo`,
+`https://github.com/owner/repo/tree/main/path/to/skill`, `owner/repo`, and
+`owner/repo/path/to/skill`.
 
 The issue model is grounded in the reliability-gap and contract-trace
 methodology: instruction-density degradation, primacy-bias exposure, code mixed

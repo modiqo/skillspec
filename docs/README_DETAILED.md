@@ -159,6 +159,13 @@ Before importing, classify the source shape:
 | Plugin-shaped root with `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
 | Existing reviewed `skill.spec.yml` | revise the spec from grammar/current-spec handles; do not re-import |
 
+Use `skillspec doctor <target> --json` as the cheap shape gate when the source
+could be a repo URI or parent folder. It reports `simple_skill`,
+`entry_skill_with_subskills`, `multi_skill_workspace`, `plugin_workspace`, or
+`non_skill_repository`. Full structural scoring only runs for `simple_skill`;
+workspace/plugin/code-repo shapes stop with `analysis_status: shape_only` and a
+recommended next command.
+
 For one atomic skill package, prefer the bundled porting path:
 
 ```sh

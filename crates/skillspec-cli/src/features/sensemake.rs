@@ -108,7 +108,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for prose skill diagnostics, run doctor before import to quantify activation-loaded surface, instruction density, primacy-bias exposure, code/instruction mixing, dependency ambiguity, and unproven proof surfaces"
+            "for source diagnostics, run doctor before import as a cheap shape gate; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
                 .to_owned(),
         );
     }
@@ -501,8 +501,8 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_source_import(spec) {
         hints.extend([
             NavigationHint {
-                intent: "diagnose prose reliability debt",
-                command: "skillspec doctor <source-skill-folder-or-uri> --json".to_owned(),
+                intent: "diagnose source shape and prose reliability debt",
+                command: "skillspec doctor <source-skill-folder-or-repo-uri> --json".to_owned(),
             },
             NavigationHint {
                 intent: "map import source",

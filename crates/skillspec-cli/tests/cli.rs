@@ -731,8 +731,9 @@ fn help_lists_trace_align_arguments() {
     let doctor_help = stdout(&doctor);
     assert!(doctor_help.contains("structural score"));
     assert!(doctor_help.contains("activation-loaded surface percentage"));
-    assert!(doctor_help.contains("single skill folder"));
-    assert!(doctor_help.contains("sparse checkout"));
+    assert!(doctor_help.contains("GitHub repo URI"));
+    assert!(doctor_help.contains("shape-only report"));
+    assert!(doctor_help.contains("partial sparse checkout"));
 
     let durable = Command::new(bin())
         .arg("durable-executor")
@@ -3050,9 +3051,9 @@ commands:
         .unwrap();
     assert_success(&output);
     let out = stdout(&output);
-    assert!(out.contains("diagnose prose reliability debt"));
-    assert!(out.contains("skillspec doctor <source-skill-folder-or-uri> --json"));
-    assert!(out.contains("run doctor before import"));
+    assert!(out.contains("diagnose source shape and prose reliability debt"));
+    assert!(out.contains("skillspec doctor <source-skill-folder-or-repo-uri> --json"));
+    assert!(out.contains("cheap shape gate"));
 }
 
 #[test]
@@ -5345,7 +5346,7 @@ from reportlab.pdfgen import canvas
 }
 
 #[test]
-fn doctor_rejects_parent_folder_with_multiple_skills() {
+fn doctor_reports_parent_folder_with_multiple_skills_as_shape_only() {
     let dir = TempDir::new("doctor-multi");
     let root = dir.path().join("skills");
     write_file(
@@ -5360,10 +5361,156 @@ fn doctor_rejects_parent_folder_with_multiple_skills() {
     let output = Command::new(bin())
         .arg("doctor")
         .arg(&root)
+        .arg("--json")
         .output()
         .unwrap();
-    assert_failure(&output);
-    assert!(stderr(&output).contains("requires exactly one SKILL.md"));
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "shape_only");
+    assert_eq!(report["shape"]["kind"], "multi_skill_workspace");
+    assert_eq!(report["shape"]["skill_files"].as_array().unwrap().len(), 2);
+    assert!(report["shape"]["recommended_command"]
+        .as_str()
+        .unwrap()
+        .contains("workspace map"));
+}
+
+#[test]
+fn doctor_ignores_hidden_harness_skill_roots_when_classifying_shape() {
+    let dir = TempDir::new("doctor-hidden-harness");
+    let root = dir.path().join("repo");
+    write_file(
+        &root.join("SKILL.md"),
+        "---\nname: public-skill\ndescription: Public skill.\n---\n# Public\n",
+    );
+    write_file(
+        &root
+            .join(".claude")
+            .join("skills")
+            .join("private")
+            .join("SKILL.md"),
+        "---\nname: private\ndescription: Hidden harness state.\n---\n# Private\n",
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "full");
+    assert_eq!(report["shape"]["kind"], "simple_skill");
+    assert_eq!(report["shape"]["skill_files"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn doctor_detects_entry_skill_with_subskills() {
+    let dir = TempDir::new("doctor-entry-subskills");
+    let root = dir.path().join("skills-repo");
+    write_file(
+        &root.join("SKILL.md"),
+        r#"---
+name: parent
+description: Parent skill.
+---
+# Parent
+
+Use `./legal-review/SKILL.md` and `/contract-review` when those workflows apply.
+"#,
+    );
+    write_file(
+        &root.join("legal-review").join("SKILL.md"),
+        "---\nname: legal-review\ndescription: Legal review.\n---\n# Legal\n",
+    );
+    write_file(
+        &root.join("contract-review").join("SKILL.md"),
+        "---\nname: contract-review\ndescription: Contract review.\n---\n# Contract\n",
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "shape_only");
+    assert_eq!(report["shape"]["kind"], "entry_skill_with_subskills");
+    assert_eq!(report["shape"]["primary_skill"], "SKILL.md");
+    let referenced = report["shape"]["referenced_skill_paths"]
+        .as_array()
+        .unwrap();
+    assert!(referenced
+        .iter()
+        .any(|path| path.as_str() == Some("legal-review")));
+    assert!(referenced
+        .iter()
+        .any(|path| path.as_str() == Some("contract-review")));
+}
+
+#[test]
+fn doctor_detects_plugin_workspace_shape() {
+    let dir = TempDir::new("doctor-plugin-shape");
+    let root = dir.path().join("claude-for-legal");
+    write_file(
+        &root
+            .join("commercial")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"commercial-legal","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("commercial")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+        "---\nname: review\ndescription: Review.\n---\n# Review\n",
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "shape_only");
+    assert_eq!(report["shape"]["kind"], "plugin_workspace");
+    let plugins = report["shape"]["plugin_roots"].as_array().unwrap();
+    assert_eq!(plugins.len(), 1);
+    assert_eq!(plugins[0]["namespace"], "commercial-legal");
+    assert_eq!(plugins[0]["path"], "commercial");
+}
+
+#[test]
+fn doctor_reports_non_skill_repository_shape_without_source_mapping() {
+    let dir = TempDir::new("doctor-code-repo");
+    let root = dir.path().join("code-repo");
+    write_file(
+        &root.join("Cargo.toml"),
+        "[package]\nname = \"not-a-skill\"\n",
+    );
+    write_file(&root.join("src").join("main.rs"), "fn main() {}\n");
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "shape_only");
+    assert_eq!(report["shape"]["kind"], "non_skill_repository");
+    assert_eq!(report["counts"]["code_files"], 1);
+    assert_eq!(report["counts"]["manifest_files"], 1);
+    let issues = serde_json::to_string(&report["issues"]).unwrap();
+    assert!(issues.contains("no_skill_entrypoint"));
 }
 
 #[test]

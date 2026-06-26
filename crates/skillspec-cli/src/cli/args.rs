@@ -144,10 +144,10 @@ pub(super) enum Command {
     },
     #[command(
         about = "Scan a prose skill for static reliability and context-burden debt",
-        long_about = "Scan a prose SKILL.md file, local single skill folder, or public GitHub single skill folder without executing tools or calling a model. Remote GitHub folders are staged with a temporary sparse checkout and cleaned up after the report. Doctor requires exactly one SKILL.md under the target so parent folders with many skills are rejected. Reports structural score, activation-loaded surface percentage, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
+        long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. Doctor first runs a cheap shape gate: simple SKILL.md packages receive full structural analysis, while multi-skill workspaces, root skills with subskills, plugin-shaped workspaces, and non-skill code repos return a shape-only report with the recommended next command. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Full single-skill analysis reports structural score, activation-loaded surface percentage, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
     )]
     Doctor {
-        /// Local SKILL.md file, local single skill folder, or public GitHub single skill folder URL.
+        /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
         path: String,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
