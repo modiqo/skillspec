@@ -20,6 +20,7 @@ activation:
     - workspace validate
     - workspace import
     - workspace converge
+    - workspace compile
     - skillspec workspace
     - skillspec.workspace.yml
     - multi-skill repo
@@ -29,6 +30,7 @@ activation:
     - fanout converge
     - fanout import
     - converge workspace
+    - compile workspace
     - workspace proof
     - import workspace packages
     - cross-skill references
@@ -98,6 +100,7 @@ applies_when:
       - validate a multi-skill workspace graph before fanout import
       - fanout-import a validated workspace graph into one generated package draft per atomic skill
       - converge generated workspace package drafts against the workspace graph before compile or install
+      - compile converged workspace package drafts into harness-ready SKILL.md loaders without installing them
       - detect cross-skill references, shared standards packages, and skill dependency edges
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
@@ -392,6 +395,42 @@ routes:
           description: Report ready, failed, blocked, and missing packages plus review/compile guidance only when every package is ready.
           requires:
             - report_workspace_converge
+  - id: workspace_compile
+    label: Compile workspace build
+    rank: 6
+    description: Use when converged workspace package drafts should be compiled into harness-ready SKILL.md loaders under the mirrored build root.
+    execution_plan:
+      mode: ordered
+      reason: Workspace compile is the Phase 6 gate after convergence; it writes loaders for ready packages but must not install skills or refresh router indexes.
+      phases:
+        - id: validate_workspace_for_compile
+          owner_skill: skillspec
+          description: Revalidate the workspace manifest and recheck convergence before writing loaders.
+          requires:
+            - workspace_validate_manifest
+            - workspace_converge_build
+            - validate_workspace_graph
+        - id: compile_workspace_build
+          owner_skill: skillspec
+          description: Compile ready package specs into SKILL.md loaders and block dependents whose dependencies did not compile.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_compile_build
+            - produce_workspace_compile_report
+          forbid:
+            - install_during_workspace_compile
+            - refresh_router_during_workspace_compile
+            - use_router_index_for_authoring_recon
+        - id: report_workspace_compile
+          owner_skill: skillspec
+          description: Report compiled, failed, blocked, missing, and skipped packages plus Phase 7 install guidance.
+          requires:
+            - report_workspace_compile
   - id: install_skill_router
     label: Install router mode
     rank: 3
@@ -924,6 +963,23 @@ rules:
     after_success:
       - report_workspace_converge
     reason: Converge verifies generated package drafts and dependency readiness after fanout import and before compile or install.
+  - id: route_workspace_compile_to_phase6
+    when:
+      user_says_any:
+        - workspace compile
+        - skillspec workspace compile
+        - compile workspace
+        - compile workspace build
+        - compile workspace package drafts
+        - workspace-compile.report.md
+    prefer: workspace_compile
+    forbid:
+      - install_during_workspace_compile
+      - refresh_router_during_workspace_compile
+      - use_router_index_for_authoring_recon
+    after_success:
+      - report_workspace_compile
+    reason: Workspace compile runs after convergence, writes generated loaders in the build tree, and must stop before install or router refresh.
   - id: route_local_sources_to_local_port
     when:
       user_says_any:
@@ -969,6 +1025,7 @@ rules:
       - workspace_skill_authoring
       - workspace_fanout_import
       - workspace_converge
+      - workspace_compile
       - install_skill_router
       - update_skill_router
       - install_durable_executor
@@ -1667,6 +1724,8 @@ artifacts:
         id: workspace_import_loop
       - kind: command
         id: workspace_converge_build
+      - kind: command
+        id: workspace_compile_build
   workspace_converge_report:
     kind: report
     path: workspace-build/workspace-converge.report.md
@@ -1677,6 +1736,28 @@ artifacts:
     consumed_by:
       - kind: recipe
         id: workspace_converge_loop
+      - kind: command
+        id: workspace_compile_build
+  workspace_compiled_loaders:
+    kind: file
+    path: workspace-build/<package>/SKILL.md
+    description: Harness-ready SKILL.md loaders generated from each ready workspace package spec under the mirrored build root.
+    produced_by:
+      - kind: command
+        id: workspace_compile_build
+    consumed_by:
+      - kind: recipe
+        id: workspace_compile_loop
+  workspace_compile_report:
+    kind: report
+    path: workspace-build/workspace-compile.report.md
+    description: Workspace-level compile report naming compiled, failed, blocked, missing, and skipped packages plus loader paths and Phase 7 install guidance.
+    produced_by:
+      - kind: command
+        id: workspace_compile_build
+    consumed_by:
+      - kind: recipe
+        id: workspace_compile_loop
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
@@ -1918,6 +1999,13 @@ commands:
   workspace_converge_build:
     description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install.
     template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_compile_build:
+    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state.
+    template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill
     safety: local_write
     requires:
       dependencies:
@@ -2355,6 +2443,27 @@ recipes:
       - note: Treat ready packages as compile candidates only after their dependencies are also ready.
       - note: Do not compile loaders, install skills, or refresh router indexes during convergence.
       - note: Report ready, failed, blocked, and missing packages, then stop if any package is not ready.
+  workspace_compile_loop:
+    description: "Phase 6 workspace compile: recheck convergence, compile ready package specs into SKILL.md loaders, and report compile readiness before install."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_package_drafts
+        - workspace_converge_report
+        - workspace_compiled_loaders
+        - workspace_compile_report
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_converge_build
+      - run_command: workspace_compile_build
+      - produce_artifact: workspace_compiled_loaders
+      - produce_artifact: workspace_compile_report
+      - note: Compile only packages that converged as ready and whose dependencies compiled successfully.
+      - note: Do not install skills, retire existing skills, mutate harness roots, refresh router indexes, or change visibility during workspace compile.
+      - note: Report compiled, failed, blocked, missing, and skipped packages, then stop before Phase 7 install planning.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
     ordered: true
@@ -2708,6 +2817,10 @@ closures:
     description: Run workspace converge and write a graph-level proof report that names ready, failed, blocked, and missing package drafts, dependency-readiness status, validation warnings, and cross-package reference counts.
     commands:
       - workspace_converge_build
+  produce_workspace_compile_report:
+    description: Run workspace compile and write a report that names compiled, failed, blocked, missing, and skipped packages plus loader paths and Phase 7 install guidance.
+    commands:
+      - workspace_compile_build
   report_workspace_import:
     description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
     commands:
@@ -2716,6 +2829,10 @@ closures:
     description: Summarize the workspace converge result, generated spec readiness, dependency blockers, missing package drafts, validation warnings, and Phase 6 or per-package compile next steps without compiling or installing anything.
     commands:
       - workspace_converge_build
+  report_workspace_compile:
+    description: Summarize the workspace compile result, generated loader paths, dependency compile blockers, missing package drafts, validation warnings, and Phase 7 install next steps without installing or refreshing router state.
+    commands:
+      - workspace_compile_build
   report_workspace_recon:
     description: Summarize the workspace package map, dependency graph, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
     commands:
@@ -2816,6 +2933,7 @@ proof:
     - multi-skill source roots are mapped with skillspec.workspace.yml and validated before fanout import planning
     - workspace fanout import writes one generated package draft per atomic skill and reports built, failed, skipped, and blocked packages
     - workspace converge validates generated package drafts against the workspace graph and reports ready, failed, blocked, missing, validation warnings, and dependency-readiness proof before compile or install
+    - workspace compile rechecks convergence, writes SKILL.md loaders only for ready packages whose dependencies compiled, and reports compiled, failed, blocked, missing, and skipped packages before install
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
@@ -2887,6 +3005,19 @@ tests:
       forbid:
         - use_router_index_for_authoring_recon
         - compile_or_install_during_workspace_import
+  - name: workspace package drafts compile after converge
+    input: /skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
+    expect:
+      route: workspace_compile
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_compile_to_phase6
+      after_success:
+        - report_workspace_compile
+      forbid:
+        - use_router_index_for_authoring_recon
+        - install_during_workspace_compile
+        - refresh_router_during_workspace_compile
   - name: public github source stages before import
     input: Import https://github.com/org/repo/tree/main/skills/pdf as a SkillSpec skill
     expect:

@@ -6,9 +6,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+mod compile;
 mod converge;
 mod import;
 
+pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileReport};
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
 pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
 

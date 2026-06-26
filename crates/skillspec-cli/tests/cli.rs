@@ -532,6 +532,7 @@ fn help_lists_trace_align_arguments() {
     assert!(workspace_help.contains("validate"));
     assert!(workspace_help.contains("import"));
     assert!(workspace_help.contains("converge"));
+    assert!(workspace_help.contains("compile"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -5046,6 +5047,30 @@ Read `../coding-standards/SKILL.md`.
     assert!(converge_report["failed"].as_array().unwrap().is_empty());
     assert!(converge_report["blocked"].as_array().unwrap().is_empty());
     assert!(build.join("workspace-converge.report.md").is_file());
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&compile);
+    let compile_report = json_stdout(&compile);
+    assert_eq!(compile_report["ok"], true);
+    assert_eq!(compile_report["compiled"].as_array().unwrap().len(), 2);
+    assert!(compile_report["failed"].as_array().unwrap().is_empty());
+    assert!(compile_report["blocked"].as_array().unwrap().is_empty());
+    assert!(build.join("workspace-compile.report.md").is_file());
+    let review_loader = build.join("code-review").join("SKILL.md");
+    assert!(review_loader.is_file());
+    let loader = fs::read_to_string(review_loader).unwrap();
+    assert!(loader.contains("thin loader"));
+    assert!(loader.contains("skill.spec.yml"));
 }
 
 #[test]
@@ -5145,6 +5170,39 @@ Read `../bad/SKILL.md`.
         .iter()
         .any(|id| id == "uses-bad"));
     assert!(build.join("workspace-converge.report.md").is_file());
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&compile);
+    let compile_report = json_stdout(&compile);
+    assert_eq!(compile_report["ok"], false);
+    assert!(compile_report["compiled"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "good"));
+    assert!(compile_report["failed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "bad"));
+    assert!(compile_report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == "uses-bad"));
+    assert!(build.join("workspace-compile.report.md").is_file());
+    assert!(build.join("good").join("SKILL.md").is_file());
+    assert!(!build.join("uses-bad").join("SKILL.md").is_file());
 }
 
 #[test]

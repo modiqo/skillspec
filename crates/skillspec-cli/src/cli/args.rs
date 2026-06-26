@@ -312,6 +312,12 @@ pub(super) enum CompileTarget {
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]
+pub(super) enum WorkspaceCompileTarget {
+    CodexSkill,
+    ClaudeSkill,
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
 pub(super) enum RouterExecutionModeArg {
     Direct,
     Durable,
@@ -417,6 +423,23 @@ pub(super) enum WorkspaceCommand {
         /// Build root containing mirrored package outputs.
         #[arg(long = "build-root")]
         build_root: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Compile ready workspace package drafts into harness loaders",
+        long_about = "Compile every ready package in a converged workspace build into a generated SKILL.md loader for the requested harness target. This rechecks workspace convergence, skips packages whose dependencies did not compile, writes workspace-compile.report.md, and does not install skills or refresh router indexes."
+    )]
+    Compile {
+        /// Path to skillspec.workspace.yml.
+        manifest: PathBuf,
+        /// Build root containing mirrored package outputs.
+        #[arg(long = "build-root")]
+        build_root: PathBuf,
+        /// Harness loader target to generate.
+        #[arg(long, value_enum)]
+        target: WorkspaceCompileTarget,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -1293,6 +1316,15 @@ impl From<CompileTarget> for compiler::Target {
             CompileTarget::CodexSkill => compiler::Target::CodexSkill,
             CompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
             CompileTarget::Markdown => compiler::Target::Markdown,
+        }
+    }
+}
+
+impl From<WorkspaceCompileTarget> for compiler::Target {
+    fn from(value: WorkspaceCompileTarget) -> Self {
+        match value {
+            WorkspaceCompileTarget::CodexSkill => compiler::Target::CodexSkill,
+            WorkspaceCompileTarget::ClaudeSkill => compiler::Target::ClaudeSkill,
         }
     }
 }
