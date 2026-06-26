@@ -191,13 +191,13 @@ When a source root contains many `SKILL.md` files, do not import the parent
 folder as one skill. Map the workspace first:
 
 ```sh
-skillspec workspace map ./skills --out ./build/skillspec.workspace.yml
-skillspec workspace validate ./build/skillspec.workspace.yml
-skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
-skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
-skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility
+skillspec workspace map ./skills --out ./build/skillspec.workspace.yml --summary
+skillspec workspace validate ./build/skillspec.workspace.yml --summary
+skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build --summary
+skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build --summary
+skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill --summary
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run --summary
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility --summary
 ```
 
 This is authoring recon, not router indexing. `workspace map` creates a
@@ -207,6 +207,25 @@ import` fans out one draft package per skill under a mirrored build root.
 `workspace converge` verifies those drafts before compile. `workspace compile`
 writes harness-ready loaders. `workspace install` preflights every write,
 blocks collisions, and can apply the workspace visibility policy.
+
+Use `--summary` for harness-friendly output with wall-clock and estimated token
+metrics. The detailed reports, source maps, package evidence, loaders, and
+install manifests remain on disk at the printed paths. Use `--json` when a
+machine caller needs the full report on stdout.
+
+This does not require Rote. Non-Rote summaries estimate output economy from the
+compact agent-visible response versus artifacts preserved on disk. Rote-backed
+durable runs can additionally report measured workspace token consumption.
+To make those non-Rote numbers appear in `trace align`, record the printed
+summary block before alignment:
+
+```bash
+skillspec progress stats .skillspec/traces/<run-id> \
+  --agent-visible-tokens 190 \
+  --artifact-tokens-preserved 96190 \
+  --avoided-tokens 96000 \
+  --metrics-source estimated
+```
 
 Plugin-shaped repositories keep their plugin boundaries. A folder with `skills/`
 plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` becomes a plugin
@@ -388,6 +407,13 @@ skillspec progress stats .skillspec/traces/<run-id> \
   --phase durable_closure \
   --requirement compute_workspace_stats \
   --requirement record_stats_collected_event
+skillspec progress stats .skillspec/traces/<run-id> \
+  --agent-visible-tokens <n> \
+  --artifact-tokens-preserved <n> \
+  --avoided-tokens <n> \
+  --metrics-source estimated \
+  --phase <phase-id> \
+  --requirement <stats-requirement-id>
 skillspec progress final-response .skillspec/traces/<run-id> \
   --phase durable_closure \
   --requirement record_final_response_sent_event \
@@ -499,6 +525,12 @@ as `not recorded` rather than omitted. When query-reduction stats are present,
 `Token consumption` describes the extracted query-result data actually recorded,
 and `Token savings` names the cached-response token count, extracted
 query-result token count, saved-token delta, and reduction percentage.
+Non-Rote `--summary` metrics are separate estimated output-economy numbers. Use
+`progress stats --agent-visible-tokens ... --artifact-tokens-preserved ...
+--avoided-tokens ... --metrics-source estimated` to record them for alignment,
+and do not describe them as measured model token consumption.
+Once recorded, `trace align` prints them in `token_usage` as estimated
+agent-visible output and estimated tokens kept out of chat.
 
 Compiled SkillSpec-backed `SKILL.md` loaders include runtime guidance for using
 an existing `skill.spec.yml`: validate first, check dependencies, create the

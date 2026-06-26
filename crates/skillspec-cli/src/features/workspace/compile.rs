@@ -53,7 +53,7 @@ pub enum WorkspaceCompileStatus {
 }
 
 impl WorkspaceCompileStatus {
-    fn as_str(&self) -> &'static str {
+    pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Compiled => "compiled",
             Self::Failed => "failed",

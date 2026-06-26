@@ -535,35 +535,36 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             NavigationHint {
                 intent: "map workspace source root",
                 command:
-                    "skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml"
+                    "skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml --summary"
                         .to_owned(),
             },
             NavigationHint {
                 intent: "validate workspace graph",
-                command: "skillspec workspace validate <build>/skillspec.workspace.yml".to_owned(),
+                command: "skillspec workspace validate <build>/skillspec.workspace.yml --summary"
+                    .to_owned(),
             },
             NavigationHint {
                 intent: "fanout import workspace packages",
                 command:
-                    "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build>"
+                    "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary"
                         .to_owned(),
             },
             NavigationHint {
                 intent: "converge workspace build",
                 command:
-                    "skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build>"
+                    "skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build> --summary"
                         .to_owned(),
             },
             NavigationHint {
                 intent: "compile workspace build",
                 command:
-                    "skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill"
+                    "skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill --summary"
                         .to_owned(),
             },
             NavigationHint {
                 intent: "dry-run workspace install",
                 command:
-                    "skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run"
+                    "skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run --summary"
                         .to_owned(),
             },
         ]);

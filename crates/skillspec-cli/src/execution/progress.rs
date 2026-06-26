@@ -114,6 +114,14 @@ pub struct ExecutionEvent {
     pub saved_tokens: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reduction_percent: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_visible_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_tokens_preserved: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avoided_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics_source: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -144,6 +152,10 @@ pub struct StatsRecordOptions {
     pub response_tokens_cached: Option<u64>,
     pub saved_tokens: Option<u64>,
     pub reduction_percent: Option<f64>,
+    pub agent_visible_tokens: Option<u64>,
+    pub artifact_tokens_preserved: Option<u64>,
+    pub avoided_tokens: Option<u64>,
+    pub metrics_source: Option<String>,
     pub message: Option<String>,
 }
 
@@ -218,6 +230,10 @@ pub fn record(options: RecordOptions) -> Result<ExecutionEvent> {
         response_tokens_cached: None,
         saved_tokens: None,
         reduction_percent: None,
+        agent_visible_tokens: None,
+        artifact_tokens_preserved: None,
+        avoided_tokens: None,
+        metrics_source: None,
     };
     append_execution_event(&execution_ledger_path(&options.run_dir), &event)?;
     Ok(event)
@@ -230,7 +246,10 @@ pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
         || options.query_result_tokens.is_some()
         || options.response_tokens_cached.is_some()
         || options.saved_tokens.is_some()
-        || options.reduction_percent.is_some();
+        || options.reduction_percent.is_some()
+        || options.agent_visible_tokens.is_some()
+        || options.artifact_tokens_preserved.is_some()
+        || options.avoided_tokens.is_some();
     if options.workspace_stats_json.is_none()
         && options.workspace_stats_report.is_none()
         && !has_direct_token_field
@@ -343,6 +362,15 @@ pub fn record_stats(options: StatsRecordOptions) -> Result<ExecutionEvent> {
         response_tokens_cached,
         saved_tokens,
         reduction_percent,
+        agent_visible_tokens: options.agent_visible_tokens,
+        artifact_tokens_preserved: options.artifact_tokens_preserved,
+        avoided_tokens: options.avoided_tokens.or_else(|| {
+            options
+                .artifact_tokens_preserved
+                .zip(options.agent_visible_tokens)
+                .map(|(artifact, visible)| artifact.saturating_sub(visible))
+        }),
+        metrics_source: options.metrics_source,
     };
     let ledger_path = execution_ledger_path(&options.run_dir);
     append_execution_event(&ledger_path, &event)?;
@@ -391,6 +419,10 @@ pub fn record_final_response(options: FinalResponseRecordOptions) -> Result<Exec
         response_tokens_cached: None,
         saved_tokens: None,
         reduction_percent: None,
+        agent_visible_tokens: None,
+        artifact_tokens_preserved: None,
+        avoided_tokens: None,
+        metrics_source: None,
     };
     let ledger_path = execution_ledger_path(&options.run_dir);
     append_execution_event(&ledger_path, &event)?;
@@ -684,6 +716,10 @@ fn append_requirement_satisfied_events(
             response_tokens_cached: None,
             saved_tokens: None,
             reduction_percent: None,
+            agent_visible_tokens: None,
+            artifact_tokens_preserved: None,
+            avoided_tokens: None,
+            metrics_source: None,
         };
         append_execution_event(ledger_path, &event)?;
     }
@@ -754,6 +790,10 @@ fn evidence_value(options: &RecordOptions) -> Option<serde_json::Value> {
 }
 
 fn stats_source(options: &StatsRecordOptions) -> Option<serde_json::Value> {
+    let has_summary_metrics = options.agent_visible_tokens.is_some()
+        || options.artifact_tokens_preserved.is_some()
+        || options.avoided_tokens.is_some()
+        || options.metrics_source.is_some();
     match (
         &options.workspace_stats_json,
         &options.workspace_stats_report,
@@ -772,6 +812,10 @@ fn stats_source(options: &StatsRecordOptions) -> Option<serde_json::Value> {
             "kind": "rote_workspace_stats",
             "format": "report",
             "path": path.display().to_string(),
+        })),
+        (None, None) if has_summary_metrics => Some(serde_json::json!({
+            "kind": "summary_metrics",
+            "metrics_source": options.metrics_source.as_deref().unwrap_or("estimated"),
         })),
         (None, None) => None,
     }

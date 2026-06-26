@@ -52,7 +52,7 @@ pub enum WorkspaceImportStatus {
 }
 
 impl WorkspaceImportStatus {
-    fn as_str(&self) -> &'static str {
+    pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Built => "built",
             Self::Failed => "failed",

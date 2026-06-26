@@ -328,21 +328,25 @@ skillspec workspace <COMMAND>
 
 Subcommands:
 
-- `map <source-root> --out <skillspec.workspace.yml> [--json]`
-- `validate <skillspec.workspace.yml> [--json]`
-- `import <skillspec.workspace.yml> --out <build-root> [--json]`
-- `converge <skillspec.workspace.yml> --build-root <build-root> [--json]`
-- `compile <skillspec.workspace.yml> --build-root <build-root> --target <target> [--json]`
-- `install <skillspec.workspace.yml> --build-root <build-root> --target <target> [--dry-run] [--json]`
+- `map <source-root> --out <skillspec.workspace.yml> [--summary] [--json]`
+- `validate <skillspec.workspace.yml> [--summary] [--json]`
+- `import <skillspec.workspace.yml> --out <build-root> [--summary] [--json]`
+- `converge <skillspec.workspace.yml> --build-root <build-root> [--summary] [--json]`
+- `compile <skillspec.workspace.yml> --build-root <build-root> --target <target> [--summary] [--json]`
+- `install <skillspec.workspace.yml> --build-root <build-root> --target <target> [--dry-run] [--summary] [--json]`
 
 `workspace` is the authoring-side structure recon surface for repositories that
 contain multiple atomic skill packages. It is separate from `skillspec index`,
 which remains router/runtime catalog infrastructure.
 
+Workspace `--summary` token numbers do not require Rote. They are estimates
+based on agent-visible output versus proof artifacts preserved on disk. Durable
+Rote workspace stats remain the separate measured token-accounting path.
+
 ### `workspace map`
 
 ```text
-skillspec workspace map <SOURCE_ROOT> --out <OUT>
+skillspec workspace map <SOURCE_ROOT> --out <OUT> [--summary]
 ```
 
 Arguments:
@@ -352,6 +356,9 @@ Arguments:
 Options:
 
 - `--out <OUT>`: output path for `skillspec.workspace.yml`.
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  agent-visible tokens, preserved artifact tokens, avoided tokens, and report
+  paths. Full proof artifacts are still written to disk.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace map` discovers every folder with `SKILL.md`, parses frontmatter names
@@ -378,7 +385,7 @@ index.
 ### `workspace validate`
 
 ```text
-skillspec workspace validate <MANIFEST>
+skillspec workspace validate <MANIFEST> [--summary]
 ```
 
 Arguments:
@@ -387,6 +394,8 @@ Arguments:
 
 Options:
 
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  token metrics, error/warning counts, and first blockers.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace validate` checks the package graph before fanout import. It verifies
@@ -400,7 +409,7 @@ planned. Plugin slash-command workflow references may cross packages without a
 ### `workspace import`
 
 ```text
-skillspec workspace import <MANIFEST> --out <BUILD_ROOT>
+skillspec workspace import <MANIFEST> --out <BUILD_ROOT> [--summary]
 ```
 
 Arguments:
@@ -411,6 +420,9 @@ Options:
 
 - `--out <BUILD_ROOT>`: parent folder where mirrored package outputs are
   written.
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  agent-visible tokens, preserved artifact tokens, avoided tokens, package
+  counts, blockers, and report paths.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace import` runs the existing single-package pipeline for each workspace
@@ -434,7 +446,7 @@ It does not compile loaders, install skills, or refresh router indexes.
 ### `workspace converge`
 
 ```text
-skillspec workspace converge <MANIFEST> --build-root <BUILD_ROOT>
+skillspec workspace converge <MANIFEST> --build-root <BUILD_ROOT> [--summary]
 ```
 
 Arguments:
@@ -445,6 +457,8 @@ Options:
 
 - `--build-root <BUILD_ROOT>`: parent folder containing mirrored package
   outputs from `workspace import`.
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  token metrics, readiness counts, blockers, and report paths.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace converge` verifies the generated package drafts against the manifest
@@ -460,7 +474,7 @@ It does not compile loaders, install skills, or refresh router indexes.
 ### `workspace compile`
 
 ```text
-skillspec workspace compile <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET>
+skillspec workspace compile <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET> [--summary]
 ```
 
 Arguments:
@@ -473,6 +487,8 @@ Options:
   outputs from `workspace import`.
 - `--target <TARGET>`: loader target to generate. Values are `codex-skill` and
   `claude-skill`.
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  token metrics, compile counts, blockers, and report paths.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace compile` rechecks convergence, then compiles every ready package spec
@@ -489,7 +505,7 @@ It does not install skills or refresh router indexes.
 ### `workspace install`
 
 ```text
-skillspec workspace install <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET>
+skillspec workspace install <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET> [--summary]
 ```
 
 Arguments:
@@ -514,6 +530,8 @@ Options:
 - `--visibility-manifest <PATH>`: reversible visibility manifest path used by
   `--apply-visibility`. Defaults to
   `<BUILD_ROOT>/workspace-visibility.manifest.json`.
+- `--summary`: emit a compact human summary with wall-clock time, estimated
+  token metrics, install counts, blockers, visibility paths, and report paths.
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace install` preflights the whole workspace before copying package
@@ -692,7 +710,10 @@ token_usage:
 unproven`. Token usage is always shown; absent stats are reported as `not
 recorded`. Query-reduction stats are reported as cached response tokens reduced
 to extracted query-result tokens, plus the saved-token delta and reduction
-percentage.
+percentage. Non-Rote summary metrics recorded through `progress stats
+--agent-visible-tokens ... --artifact-tokens-preserved ... --avoided-tokens ...
+--metrics-source estimated` are reported as estimated output economy, not
+measured model usage.
 
 ## `progress`
 
@@ -791,6 +812,16 @@ Options:
 - `--saved-tokens <N>`: tokens saved by query reduction or cache reuse.
 - `--reduction-percent <PCT>`: percent reduction from cached/source tokens to
   query-result tokens.
+- `--agent-visible-tokens <N>`: estimated tokens in compact output visible to
+  the agent, usually copied from a workspace `--summary` metrics block.
+- `--artifact-tokens-preserved <N>`: estimated artifact tokens preserved on
+  disk instead of loaded into chat.
+- `--avoided-tokens <N>`: estimated tokens kept out of chat by using the compact
+  summary. If omitted, it is derived from artifact minus agent-visible tokens
+  when both are supplied.
+- `--metrics-source <SOURCE>`: source label for explicit metrics, normally
+  `estimated` for non-Rote summary metrics or `measured` for harness-provided
+  exact counts.
 - `--message <MESSAGE>`: human-readable event note.
 - `--json`: emit JSON for the appended event.
 
@@ -806,6 +837,17 @@ least one explicit token metric; it will not create an empty
 `stats_collected` event. When `--phase` and `--requirement` are supplied, it
 also appends matching `requirement_satisfied` events so phase completion
 summaries can prove the stats requirements without manual JSONL edits.
+
+For non-Rote workspace runs, copy the metrics from the command's `--summary`
+block into `progress stats` before running `trace align`:
+
+```bash
+skillspec progress stats .skillspec/traces/<run-id> \
+  --agent-visible-tokens 190 \
+  --artifact-tokens-preserved 96190 \
+  --avoided-tokens 96000 \
+  --metrics-source estimated
+```
 
 ### `progress final-response`
 

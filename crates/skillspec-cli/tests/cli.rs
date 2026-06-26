@@ -2938,10 +2938,13 @@ commands:
     assert_success(&output);
     let out = stdout(&output);
     assert!(out.contains("map workspace source root"));
-    assert!(
-        out.contains("skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml")
-    );
+    assert!(out.contains(
+        "skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml --summary"
+    ));
     assert!(out.contains("fanout import workspace packages"));
+    assert!(out.contains(
+        "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary"
+    ));
     assert!(out.contains("multi-skill or plugin-shaped source roots"));
 }
 
@@ -4371,6 +4374,77 @@ Token Savings:
 }
 
 #[test]
+fn progress_stats_records_estimated_summary_metrics_for_alignment() {
+    let dir = TempDir::new("progress-stats-summary");
+    let spec = dir.path().join("skill.spec.yml");
+    let trace_root = dir.path().join("traces");
+    write_file(&spec, alignment_spec());
+
+    let decide = Command::new(bin())
+        .arg("decide")
+        .arg(&spec)
+        .arg("--input=run gh PR status as a tracked background process")
+        .arg("--trace-dir")
+        .arg(&trace_root)
+        .output()
+        .unwrap();
+    assert_success(&decide);
+    let run_dir = fs::read_dir(&trace_root)
+        .unwrap()
+        .find_map(|entry| {
+            let path = entry.unwrap().path();
+            path.is_dir().then_some(path)
+        })
+        .expect("expected trace run directory");
+
+    let progress_stats = Command::new(bin())
+        .arg("progress")
+        .arg("stats")
+        .arg(&run_dir)
+        .arg("--agent-visible-tokens")
+        .arg("190")
+        .arg("--artifact-tokens-preserved")
+        .arg("96190")
+        .arg("--avoided-tokens")
+        .arg("96000")
+        .arg("--metrics-source")
+        .arg("estimated")
+        .output()
+        .unwrap();
+    assert_success(&progress_stats);
+    let event = json_stdout(&progress_stats);
+    assert_eq!(event["event"], "stats_collected");
+    assert_eq!(event["agent_visible_tokens"], 190);
+    assert_eq!(event["artifact_tokens_preserved"], 96190);
+    assert_eq!(event["avoided_tokens"], 96000);
+    assert_eq!(event["metrics_source"], "estimated");
+    assert_eq!(event["source"]["kind"], "summary_metrics");
+
+    let execution_trace = run_dir.join("execution.jsonl");
+    let align = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&align);
+    let report = json_stdout(&align);
+    assert_eq!(
+        report["summary"]["tokens"]["consumption"],
+        "estimated agent-visible output 190 tokens (estimated; not measured model usage)"
+    );
+    assert_eq!(
+        report["summary"]["tokens"]["savings"],
+        "estimated 96000 tokens kept out of chat (96190 artifact tokens preserved; 190 agent-visible tokens; source: estimated)"
+    );
+}
+
+#[test]
 fn progress_stats_refuses_empty_token_evidence() {
     let dir = TempDir::new("progress-stats-empty");
     let run_dir = dir.path().join("run-empty-stats");
@@ -5109,6 +5183,27 @@ Run `/coding-standards` before the wrapper.
     assert!(manifest_yaml.contains("install_slug: skills--review-wrapper"));
     assert!(manifest_yaml.contains("depends_on:\n    - coding-standards"));
 
+    let map_summary = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&map_summary);
+    let map_summary = stdout(&map_summary);
+    assert!(map_summary.contains("Workspace map summary"));
+    assert!(map_summary.contains("metrics:"));
+    assert!(map_summary.contains("wall_clock:"));
+    assert!(map_summary.contains("agent_visible_tokens: ~"));
+    assert!(map_summary.contains("artifact_tokens_preserved: ~"));
+    assert!(map_summary.contains("avoided_tokens: ~"));
+    assert!(map_summary.contains("metrics_source: estimated"));
+    assert!(map_summary.contains(&format!("- manifest: {}", manifest.display())));
+    assert!(!map_summary.contains("## Packages"));
+
     let validate = Command::new(bin())
         .arg("workspace")
         .arg("validate")
@@ -5119,6 +5214,19 @@ Run `/coding-standards` before the wrapper.
     assert_success(&validate);
     let validate_report = json_stdout(&validate);
     assert_eq!(validate_report["ok"], true);
+
+    let validate_summary = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&validate_summary);
+    let validate_summary = stdout(&validate_summary);
+    assert!(validate_summary.contains("Workspace validate summary"));
+    assert!(validate_summary.contains("metrics:"));
+    assert!(validate_summary.contains("agent_visible_tokens: ~"));
 }
 
 #[test]
@@ -5395,6 +5503,25 @@ Read `../coding-standards/SKILL.md`.
         .join("code-review")
         .join(".skillspec/workspace-import.json")
         .is_file());
+
+    let import_summary = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&import_summary);
+    let import_summary = stdout(&import_summary);
+    assert!(import_summary.contains("Workspace import summary"));
+    assert!(import_summary.contains("metrics:"));
+    assert!(import_summary.contains("wall_clock:"));
+    assert!(import_summary.contains("agent_visible_tokens: ~"));
+    assert!(import_summary.contains("artifact_tokens_preserved: ~"));
+    assert!(import_summary.contains("avoided_tokens: ~"));
+    assert!(import_summary.contains("report:"));
 
     let validate_shared = Command::new(bin())
         .arg("validate")

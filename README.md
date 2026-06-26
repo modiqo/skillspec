@@ -295,13 +295,13 @@ If the source is a whole skills repo with many `SKILL.md` files, map the
 workspace first. This is authoring-side structure recon, not router indexing:
 
 ```sh
-skillspec workspace map ./skills --out ./build/skillspec.workspace.yml
-skillspec workspace validate ./build/skillspec.workspace.yml
-skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
-skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
-skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility
+skillspec workspace map ./skills --out ./build/skillspec.workspace.yml --summary
+skillspec workspace validate ./build/skillspec.workspace.yml --summary
+skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build --summary
+skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build --summary
+skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill --summary
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run --summary
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility --summary
 ```
 
 The workspace manifest names each atomic skill package, records deterministic
@@ -316,6 +316,27 @@ also reports workspace visibility using the default `entry-implicit` policy:
 entry skills stay visible, while shared/helper/wrapper packages become
 manual-only support skills when `--apply-visibility` is used. Router index
 refresh is still separate runtime work.
+
+`--summary` keeps the agent-facing output compact and prints wall-clock plus
+estimated token metrics. Full reports and package proof remain on disk at the
+paths shown in the summary. Use `--json` when a caller needs the full machine
+report on stdout.
+
+These summary metrics do not require Rote. They estimate output economy from
+what the agent sees versus the proof artifacts preserved on disk. Rote-backed
+durable runs add measured workspace token stats when exact consumption is
+available.
+
+To include non-Rote summary metrics in `trace align`, record the printed metrics
+into the run ledger before alignment:
+
+```bash
+skillspec progress stats .skillspec/traces/<run-id> \
+  --agent-visible-tokens 190 \
+  --artifact-tokens-preserved 96190 \
+  --avoided-tokens 96000 \
+  --metrics-source estimated
+```
 
 Plugin-shaped repos are preserved instead of flattened. If a folder has
 `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`,

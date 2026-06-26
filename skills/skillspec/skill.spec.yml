@@ -41,9 +41,15 @@ activation:
     - parent folder with multiple skills
     - fanout converge
     - fanout import
+    - parallel strategy
+    - sequential strategy
     - converge workspace
     - compile workspace
     - install workspace
+    - token economy
+    - token savings
+    - compact metrics
+    - agent-visible tokens
     - workspace proof
     - workspace install proof
     - workspace-install.report.md
@@ -145,7 +151,7 @@ applies_when:
       - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill and plugin-shaped workspaces before import, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill and plugin-shaped workspaces before import, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -160,6 +166,9 @@ entry:
     - work_around_missing_dependency_without_waiver
     - claim_partial_dependency_proof_as_full
     - leave_old_and_new_skill_discoverable_without_user_choice
+    - parallelize_dependency_bound_or_mutating_phases
+    - load_full_reports_when_summary_suffices
+    - claim_token_savings_without_metrics
   tool_boundary:
     default: deny
     allow:
@@ -179,6 +188,9 @@ entry:
       - consult_existing_ports_without_user_request
       - consult_repo_history_without_user_request
       - consult_memory_or_prior_examples_without_user_request
+      - parallelize_dependency_bound_or_mutating_phases
+      - load_full_reports_when_summary_suffices
+      - claim_token_savings_without_metrics
     permission_required_for:
       - any_unlisted_tool
       - any_forbidden_action
@@ -348,6 +360,8 @@ routes:
           owner_skill: skillspec
           description: Explain plugin namespaces, package map, dependency graph, workflow references, warnings, and the next fanout/converge implementation phase without importing yet.
           requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
             - report_workspace_recon
   - id: workspace_fanout_import
     label: Fanout import workspace
@@ -386,6 +400,8 @@ routes:
           owner_skill: skillspec
           description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next converge command.
           requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
             - report_workspace_import
   - id: workspace_converge
     label: Converge workspace build
@@ -420,6 +436,8 @@ routes:
           owner_skill: skillspec
           description: Report ready, failed, blocked, and missing packages plus review/compile guidance only when every package is ready.
           requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
             - report_workspace_converge
   - id: workspace_compile
     label: Compile workspace build
@@ -456,6 +474,8 @@ routes:
           owner_skill: skillspec
           description: Report compiled, failed, blocked, missing, and skipped packages plus Phase 7 install guidance.
           requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
             - report_workspace_compile
   - id: workspace_install
     label: Install workspace build
@@ -508,6 +528,8 @@ routes:
           owner_skill: skillspec
           description: Report installed, planned, failed, blocked, and missing packages plus install manifest paths, visibility policy, optional visibility manifest, and router-refresh separation.
           requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
             - report_workspace_install
   - id: install_skill_router
     label: Install router mode
@@ -2127,57 +2149,57 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_map_source:
-    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing.
-    template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
+    template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_validate_manifest:
-    description: Validate workspace package boundaries, plugin namespace names, deterministic install slugs, hard dependency edges, cross-skill references, and cycles before fanout import planning.
-    template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml
+    description: Validate workspace package boundaries, plugin namespace names, deterministic install slugs, hard dependency edges, cross-skill references, and cycles before fanout import planning. Use summary mode to report wall-clock and estimated token metrics.
+    template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
     safety: local_read
     requires:
       dependencies:
         - skillspec_cli
   workspace_import_packages:
-    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages.
-    template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root>
+    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Use summary mode to keep agent-visible output small while full source maps and package evidence stay on disk.
+    template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_converge_build:
-    description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install.
-    template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root>
+    description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install. Use summary mode to report compact readiness counts plus metrics.
+    template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_compile_build:
-    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state.
-    template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill
+    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Use summary mode to report compact compile counts plus metrics.
+    template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_dry_run:
-    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run
+    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
     safety: local_read
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_packages:
-    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex
+    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Use summary mode to report compact install counts plus metrics.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_apply_visibility:
-    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility
+    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Use summary mode to report compact install counts plus metrics while preserving full install proof.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility --summary
     safety: local_write
     requires:
       dependencies:
@@ -2249,6 +2271,21 @@ commands:
   progress_record_requirement:
     description: Append structured evidence that a phase requirement was satisfied or failed.
     template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_stats_rote:
+    description: Append measured Rote workspace token stats to execution.jsonl so trace align can report measured token consumption and savings.
+    template: skillspec progress stats <trace-dir> --workspace <rote-workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  progress_stats_summary_metrics:
+    description: Append non-Rote workspace summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
+    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
     safety: local_write
     requires:
       dependencies:
@@ -2587,6 +2624,7 @@ recipes:
       - note: Preserve plugin-shaped roots as namespaces when a folder has skills/ plus .claude-plugin/plugin.json, .mcp.json, or CLAUDE.md; use skill-safe public names to avoid collisions instead of flattening repeated local names.
       - note: Treat relative file references as hard dependencies. Treat plugin slash-command references as workflow links unless the manifest records a hard file dependency.
       - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
+      - note: Run recon as a sequential graph gate from compact command summaries; preserve the full workspace map and validation reports on disk instead of loading them into chat unless a blocker needs exact detail.
       - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
       - note: Report plugin namespaces, package map, hard dependency graph, workflow references, warnings, and next fanout/converge phase from the validated workspace manifest.
   workspace_import_loop:
@@ -2605,6 +2643,8 @@ recipes:
       - produce_artifact: workspace_import_report
       - produce_artifact: workspace_package_drafts
       - note: Do not compile loaders, install skills, or refresh router indexes during workspace import.
+      - note: Fanout is valid only for independent package import units with isolated output folders, source-map evidence, and package-scoped failures; keep dependency blockers and the phase boundary sequential.
+      - note: Prefer the compact import summary in chat. Open per-package reports, source maps, or full generated specs only for failed packages, review, or exact proof.
       - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
       - note: Report built, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
   workspace_converge_loop:
@@ -2622,6 +2662,8 @@ recipes:
       - run_command: workspace_converge_build
       - produce_artifact: workspace_converge_report
       - note: Treat ready packages as compile candidates only after their dependencies are also ready.
+      - note: Keep convergence sequential at the graph level even when checks are computed internally in parallel; do not let a ready independent package erase blocked or failed dependency evidence.
+      - note: Prefer the compact convergence summary in chat and use report paths for the detailed proof.
       - note: Do not compile loaders, install skills, or refresh router indexes during convergence.
       - note: Report ready, failed, blocked, and missing packages, then stop if any package is not ready.
   workspace_compile_loop:
@@ -2643,6 +2685,8 @@ recipes:
       - produce_artifact: workspace_compiled_loaders
       - produce_artifact: workspace_compile_report
       - note: Compile only packages that converged as ready and whose dependencies compiled successfully.
+      - note: Compile may batch independent ready packages only when outputs are package-local; dependency ordering, missing-package blockers, and compile failure propagation stay sequential.
+      - note: Prefer the compact compile summary in chat and keep generated loaders and detailed compile reports as artifact paths unless exact review is needed.
       - note: Do not install skills, retire existing skills, mutate harness roots, refresh router indexes, or change visibility during workspace compile.
       - note: Report compiled, failed, blocked, missing, and skipped packages, then stop before Phase 7 install planning.
   workspace_install_loop:
@@ -2667,6 +2711,8 @@ recipes:
       - produce_artifact: workspace_install_report
       - note: Use workspace_install_apply_visibility instead of the plain install command when the user wants native visibility metadata written; the reversible manifest is workspace-visibility.manifest.json by default.
       - note: Install packages using manifest install_slug folders and dependency order only.
+      - note: Keep install, visibility mutation, collision handling, and router-refresh advice sequential; do not parallelize writes to harness roots.
+      - note: Prefer compact install counts and metrics in chat while preserving install manifests and visibility manifests on disk.
       - note: Do not refresh router indexes or silently overwrite existing skills during workspace install; router refresh remains a separate runtime command after install.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
@@ -2977,6 +3023,22 @@ states:
     do:
       - generate_value_report
 snippets:
+  execution_strategy_shape:
+    text: |
+      Execution strategy SOP:
+      - Treat selected route phases as sequential gates unless the route or command explicitly permits isolated package fanout.
+      - Parallelize only independent read/build/proof units with package-scoped output directories, trace labels, and evidence paths.
+      - Keep dependency ordering, convergence gates, installs, visibility writes, router lifecycle, destructive actions, and user approvals sequential.
+      - In chat, report the strategy chosen and the reason when the source has many packages, plugins, cross-skill references, or expensive proof work.
+  compact_evidence_shape:
+    text: |
+      Token economy SOP:
+      - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
+      - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
+      - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
+      - Treat Rote workspace stats as measured token accounting and non-Rote --summary blocks as estimated output economy.
+      - Record non-Rote summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
+      - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:
     text: |
       Imported dependency preservation SOP:
@@ -3002,6 +3064,10 @@ snippets:
       risk = "Third-party Python package; install only with user approval."
       install = "pip install pypdf"
 closures:
+  choose_execution_strategy:
+    description: State whether the active work stays sequential or uses package-scoped fanout, and preserve the reason when many packages, plugins, cross-skill references, or expensive proof work are involved.
+  preserve_compact_evidence:
+    description: Keep large proof artifacts on disk, report compact summaries plus paths in chat, and load full detail only for exact review, blockers, or proof gaps.
   fill_coverage_matrix:
     description: Record prose_span, obligation, skillspec_construct, confidence, status, and review_note before semantic edits or install.
   split_source_code_into_resources:
@@ -3089,6 +3155,8 @@ closures:
       - act_named_phase
       - progress_record_requirement
       - progress_record_phase
+      - progress_stats_rote
+      - progress_stats_summary_metrics
       - progress_show
       - decide_demo
       - trace_align
@@ -3165,6 +3233,9 @@ proof:
     - workspace converge validates generated package drafts against the workspace graph and reports ready, failed, blocked, missing, validation warnings, and dependency-readiness proof before compile or install
     - workspace compile rechecks convergence, writes SKILL.md loaders only for ready packages whose dependencies compiled, and reports compiled, failed, blocked, missing, and skipped packages before install
     - workspace install dry-runs compiled package installs, blocks collisions before mutation, writes install and visibility proof, optionally applies native visibility metadata, and keeps router refresh separate
+    - "execution strategy is explicit: sequential at phase, dependency, install, visibility, router, and approval gates; package fanout only for independent units with isolated artifacts"
+    - "compact evidence mode is used by default: summaries, handles, alignment rows, and report paths are shown in chat while full proof remains on disk"
+    - "wall-clock and token metrics are reported with their source: Rote-backed stats are measured, non-Rote summary blocks are estimated output economy, and missing metrics are stated as not recorded"
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware

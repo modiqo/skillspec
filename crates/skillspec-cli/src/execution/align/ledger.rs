@@ -47,6 +47,10 @@ pub(super) struct ExecutionEvent {
     pub(super) response_tokens_cached: Option<u64>,
     pub(super) saved_tokens: Option<u64>,
     pub(super) reduction_percent: Option<f64>,
+    pub(super) agent_visible_tokens: Option<u64>,
+    pub(super) artifact_tokens_preserved: Option<u64>,
+    pub(super) avoided_tokens: Option<u64>,
+    pub(super) metrics_source: Option<String>,
 }
 
 impl ExecutionLedger {
@@ -426,6 +430,19 @@ impl ExecutionLedger {
         });
         let context_tokens = sum_token(&token_events, |event| event.context_tokens);
         let query_result_tokens = sum_token(&token_events, |event| event.query_result_tokens);
+        let agent_visible_tokens = sum_token(&token_events, |event| event.agent_visible_tokens);
+        let artifact_tokens_preserved =
+            sum_token(&token_events, |event| event.artifact_tokens_preserved);
+        let avoided_output_tokens =
+            sum_token(&token_events, |event| event.avoided_tokens).or_else(|| {
+                artifact_tokens_preserved
+                    .zip(agent_visible_tokens)
+                    .map(|(artifact, visible)| artifact.saturating_sub(visible))
+            });
+        let metrics_source = token_events
+            .iter()
+            .find_map(|event| event.metrics_source.as_deref())
+            .unwrap_or("estimated");
         let saved_tokens = sum_token(&token_events, |event| {
             event
                 .saved_tokens
@@ -449,6 +466,14 @@ impl ExecutionLedger {
             format!("retrieved workspace context {context} tokens")
         } else if let Some(query_result) = query_result_tokens {
             format!("query-result data {query_result} tokens recorded")
+        } else if let Some(visible) = agent_visible_tokens {
+            format!(
+                "estimated agent-visible output {visible} tokens ({metrics_source}; not measured model usage)"
+            )
+        } else if let Some(artifact) = artifact_tokens_preserved {
+            format!(
+                "estimated artifact footprint {artifact} tokens preserved outside chat ({metrics_source}; not measured model usage)"
+            )
         } else {
             "recorded, but no total/input/output token fields were present".to_owned()
         };
@@ -473,7 +498,24 @@ impl ExecutionLedger {
                 }
                 (Some(saved), None) => format!("{saved} tokens saved or cached"),
                 (None, Some(percent)) => format!("{percent:.1}% reduction recorded"),
-                (None, None) => "not recorded".to_owned(),
+                (None, None) => {
+                    if let Some(avoided) = avoided_output_tokens {
+                        match (artifact_tokens_preserved, agent_visible_tokens) {
+                            (Some(artifact), Some(visible)) => format!(
+                                "estimated {avoided} tokens kept out of chat ({artifact} artifact tokens preserved; {visible} agent-visible tokens; source: {metrics_source})"
+                            ),
+                            _ => format!(
+                                "estimated {avoided} tokens kept out of chat (source: {metrics_source})"
+                            ),
+                        }
+                    } else if let Some(artifact) = artifact_tokens_preserved {
+                        format!(
+                            "estimated {artifact} artifact tokens preserved outside chat (source: {metrics_source})"
+                        )
+                    } else {
+                        "not recorded".to_owned()
+                    }
+                }
             }
         };
 
@@ -540,6 +582,10 @@ impl ExecutionEvent {
             response_tokens_cached: u64_field(value, "response_tokens_cached"),
             saved_tokens: u64_field(value, "saved_tokens"),
             reduction_percent: f64_field(value, "reduction_percent"),
+            agent_visible_tokens: u64_field(value, "agent_visible_tokens"),
+            artifact_tokens_preserved: u64_field(value, "artifact_tokens_preserved"),
+            avoided_tokens: u64_field(value, "avoided_tokens"),
+            metrics_source: string_field(value, "metrics_source"),
         }
     }
 
@@ -577,6 +623,9 @@ impl ExecutionEvent {
             || self.response_tokens_cached.is_some()
             || self.saved_tokens.is_some()
             || self.reduction_percent.is_some()
+            || self.agent_visible_tokens.is_some()
+            || self.artifact_tokens_preserved.is_some()
+            || self.avoided_tokens.is_some()
     }
 }
 

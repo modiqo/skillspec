@@ -301,17 +301,27 @@ harness roots; it does not rebuild the router index.
 The expected authoring flow is:
 
 ```bash
-skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml
-skillspec workspace validate <build>/skillspec.workspace.yml
-skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build>
-skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build>
-skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill
-skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run
-skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --apply-visibility
+skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml --summary
+skillspec workspace validate <build>/skillspec.workspace.yml --summary
+skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary
+skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build> --summary
+skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill --summary
+skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run --summary
+skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --apply-visibility --summary
 ```
 
 `map` and `validate` are the structure recon gate. `import` fans out one draft
 package per atomic skill. `converge` checks generated drafts against the graph.
+`--summary` keeps agent-facing output compact by printing wall-clock and
+estimated token metrics while preserving full reports and package evidence on
+disk.
+Those estimates are non-Rote output-economy metrics: agent-visible summary
+tokens versus artifact tokens kept out of chat. Rote-backed durable runs add a
+separate measured token-accounting layer when workspace stats are available.
+When a run needs these estimates in `trace align`, record the summary values
+with `skillspec progress stats <run-dir> --agent-visible-tokens <n>
+--artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source
+estimated` before alignment.
 `compile` writes harness loaders. `install` preflights and then writes the
 compiled package set into harness roots using manifest install slugs.
 

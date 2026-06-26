@@ -1,10 +1,12 @@
 use crate::error::{Error, Result};
+use crate::metrics::{self, MetricSummary};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
 
 mod compile;
 mod converge;
@@ -404,6 +406,359 @@ pub fn render_validation_report(report: &WorkspaceValidationReport) -> String {
         }
     }
     output
+}
+
+pub fn render_map_summary(report: &WorkspaceMapReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(
+        elapsed,
+        artifact_bytes([&report.manifest_path, &report.report_path]),
+    );
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace map summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(true)));
+        output.push_str(&format!("- source_root: {}\n", report.source_root));
+        output.push_str(&format!("- workspace_slug: {}\n", report.workspace_slug));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!(
+            "- plugin_namespaces: {}\n",
+            report.plugin_namespaces.len()
+        ));
+        output.push_str(&format!(
+            "- dependency_edges: {}\n",
+            report.dependency_edges.len()
+        ));
+        output.push_str(&format!(
+            "- cross_package_references: {}\n",
+            report
+                .references
+                .iter()
+                .filter(|reference| reference.target_package.is_some())
+                .count()
+        ));
+        output.push_str(&format!(
+            "- unresolved_references: {}\n",
+            report.unresolved_references.len()
+        ));
+        output.push_str(&format!(
+            "- duplicate_public_names: {}\n",
+            report.duplicate_public_names.len()
+        ));
+        output.push_str(&format!(
+            "- duplicate_install_slugs: {}\n",
+            report.duplicate_install_slugs.len()
+        ));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- report: {}\n", report.report_path));
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        push_next_summary(&mut output, &report.next);
+        output
+    })
+}
+
+pub fn render_validation_summary(report: &WorkspaceValidationReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(elapsed, 0);
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace validate summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(report.ok)));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!(
+            "- dependency_edges: {}\n",
+            report.dependency_edges.len()
+        ));
+        output.push_str(&format!("- errors: {}\n", report.errors.len()));
+        output.push_str(&format!("- warnings: {}\n", report.warnings.len()));
+        push_limited_strings(&mut output, "Errors", &report.errors, 3);
+        push_limited_strings(&mut output, "Warnings", &report.warnings, 3);
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        output
+    })
+}
+
+pub fn render_import_summary(report: &WorkspaceImportReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(elapsed, artifact_bytes(import_artifacts(report)));
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace import summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(report.ok)));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- build_root: {}\n", report.build_root));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!("- built: {}\n", report.built.len()));
+        output.push_str(&format!("- failed: {}\n", report.failed.len()));
+        output.push_str(&format!("- blocked: {}\n", report.blocked.len()));
+        output.push_str(&format!("- skipped: {}\n", report.skipped.len()));
+        output.push_str(&format!("- report: {}\n", report.report_path));
+        output.push_str(&format!("- manifest_copy: {}\n", report.manifest_copy_path));
+        push_package_messages(
+            &mut output,
+            "Package blockers",
+            report.packages.iter().filter_map(|package| {
+                package.message.as_ref().map(|message| {
+                    format!(
+                        "{}: {} ({})",
+                        package.package_id,
+                        package.status.as_str(),
+                        message
+                    )
+                })
+            }),
+            5,
+        );
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        push_next_summary(&mut output, &report.next);
+        output
+    })
+}
+
+pub fn render_converge_summary(report: &WorkspaceConvergeReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(elapsed, artifact_bytes(converge_artifacts(report)));
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace converge summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(report.ok)));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- build_root: {}\n", report.build_root));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!("- ready: {}\n", report.ready.len()));
+        output.push_str(&format!("- failed: {}\n", report.failed.len()));
+        output.push_str(&format!("- blocked: {}\n", report.blocked.len()));
+        output.push_str(&format!("- missing: {}\n", report.missing.len()));
+        output.push_str(&format!(
+            "- warnings: {}\n",
+            report.validation_warnings.len()
+        ));
+        output.push_str(&format!(
+            "- cross_package_references: {}\n",
+            report.cross_package_references.len()
+        ));
+        output.push_str(&format!("- report: {}\n", report.report_path));
+        push_package_messages(
+            &mut output,
+            "Package blockers",
+            report.packages.iter().filter_map(|package| {
+                package.message.as_ref().map(|message| {
+                    format!(
+                        "{}: {} ({})",
+                        package.package_id,
+                        package.status.as_str(),
+                        message
+                    )
+                })
+            }),
+            5,
+        );
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        push_next_summary(&mut output, &report.next);
+        output
+    })
+}
+
+pub fn render_compile_summary(report: &WorkspaceCompileReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(elapsed, artifact_bytes(compile_artifacts(report)));
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace compile summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(report.ok)));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- build_root: {}\n", report.build_root));
+        output.push_str(&format!("- target: {}\n", report.target));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!("- compiled: {}\n", report.compiled.len()));
+        output.push_str(&format!("- failed: {}\n", report.failed.len()));
+        output.push_str(&format!("- blocked: {}\n", report.blocked.len()));
+        output.push_str(&format!("- missing: {}\n", report.missing.len()));
+        output.push_str(&format!("- skipped: {}\n", report.skipped.len()));
+        output.push_str(&format!(
+            "- warnings: {}\n",
+            report.validation_warnings.len()
+        ));
+        output.push_str(&format!("- report: {}\n", report.report_path));
+        push_package_messages(
+            &mut output,
+            "Package blockers",
+            report.packages.iter().filter_map(|package| {
+                package.message.as_ref().map(|message| {
+                    format!(
+                        "{}: {} ({})",
+                        package.package_id,
+                        package.status.as_str(),
+                        message
+                    )
+                })
+            }),
+            5,
+        );
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        push_next_summary(&mut output, &report.next);
+        output
+    })
+}
+
+pub fn render_install_summary(report: &WorkspaceInstallReport, elapsed: Duration) -> String {
+    let metrics = MetricSummary::new(elapsed, artifact_bytes(install_artifacts(report)));
+    metrics::render_with_metrics(metrics, |metrics| {
+        let mut output = String::new();
+        output.push_str("Workspace install summary\n\n");
+        output.push_str(&format!("- status: {}\n", status_text(report.ok)));
+        output.push_str(&format!(
+            "- mode: {}\n",
+            if report.dry_run { "dry-run" } else { "install" }
+        ));
+        output.push_str(&format!("- manifest: {}\n", report.manifest_path));
+        output.push_str(&format!("- build_root: {}\n", report.build_root));
+        output.push_str(&format!("- targets: {}\n", report.targets.join(", ")));
+        output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!("- installed: {}\n", report.installed.len()));
+        output.push_str(&format!("- planned: {}\n", report.planned.len()));
+        output.push_str(&format!("- failed: {}\n", report.failed.len()));
+        output.push_str(&format!("- blocked: {}\n", report.blocked.len()));
+        output.push_str(&format!("- missing: {}\n", report.missing.len()));
+        output.push_str(&format!(
+            "- visibility_policy: {}\n",
+            report.visibility_policy.as_str()
+        ));
+        output.push_str(&format!(
+            "- apply_visibility: {}\n",
+            report.apply_visibility
+        ));
+        output.push_str(&format!(
+            "- router_refresh_recommended: {}\n",
+            report.router_refresh_recommended
+        ));
+        output.push_str(&format!("- report: {}\n", report.report_path));
+        output.push_str(&format!(
+            "- install_manifest: {}\n",
+            report.install_manifest_path
+        ));
+        if let Some(path) = &report.visibility_manifest_path {
+            output.push_str(&format!("- visibility_manifest: {path}\n"));
+        }
+        push_package_messages(
+            &mut output,
+            "Package blockers",
+            report.packages.iter().filter_map(|package| {
+                package.message.as_ref().map(|message| {
+                    format!(
+                        "{}: {} ({})",
+                        package.package_id,
+                        package.status.as_str(),
+                        message
+                    )
+                })
+            }),
+            5,
+        );
+        output.push('\n');
+        metrics::push_metric_block(&mut output, metrics);
+        push_next_summary(&mut output, &report.next);
+        output
+    })
+}
+
+fn status_text(ok: bool) -> &'static str {
+    if ok {
+        "ok"
+    } else {
+        "failed"
+    }
+}
+
+fn artifact_bytes<I, S>(paths: I) -> u64
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    metrics::existing_paths_bytes(
+        paths
+            .into_iter()
+            .filter(|path| !path.as_ref().trim().is_empty())
+            .map(|path| PathBuf::from(path.as_ref())),
+    )
+}
+
+fn import_artifacts(report: &WorkspaceImportReport) -> Vec<String> {
+    let mut paths = vec![
+        report.manifest_copy_path.clone(),
+        report.report_path.clone(),
+    ];
+    for package in &report.packages {
+        paths.extend([
+            package.spec_path.clone(),
+            package.source_map_path.clone(),
+            package.doctor_report_path.clone(),
+            package.package_report_path.clone(),
+        ]);
+    }
+    paths
+}
+
+fn converge_artifacts(report: &WorkspaceConvergeReport) -> Vec<String> {
+    let mut paths = vec![report.report_path.clone()];
+    paths.extend(
+        report
+            .packages
+            .iter()
+            .map(|package| package.package_report_path.clone()),
+    );
+    paths
+}
+
+fn compile_artifacts(report: &WorkspaceCompileReport) -> Vec<String> {
+    let mut paths = vec![report.report_path.clone()];
+    for package in &report.packages {
+        paths.extend([package.spec_path.clone(), package.loader_path.clone()]);
+    }
+    paths
+}
+
+fn install_artifacts(report: &WorkspaceInstallReport) -> Vec<String> {
+    let mut paths = vec![
+        report.report_path.clone(),
+        report.install_manifest_path.clone(),
+    ];
+    if let Some(path) = &report.visibility_manifest_path {
+        paths.push(path.clone());
+    }
+    paths
+}
+
+fn push_limited_strings(output: &mut String, title: &str, items: &[String], limit: usize) {
+    push_package_messages(output, title, items.iter().cloned(), limit);
+}
+
+fn push_package_messages<I>(output: &mut String, title: &str, items: I, limit: usize)
+where
+    I: IntoIterator<Item = String>,
+{
+    let items = items.into_iter().take(limit + 1).collect::<Vec<_>>();
+    if items.is_empty() {
+        return;
+    }
+    output.push_str(&format!("\n{title}:\n"));
+    for item in items.iter().take(limit) {
+        output.push_str(&format!("- {item}\n"));
+    }
+    if items.len() > limit {
+        output.push_str("- ...\n");
+    }
+}
+
+fn push_next_summary(output: &mut String, next: &[String]) {
+    if next.is_empty() {
+        return;
+    }
+    output.push_str("\nnext:\n");
+    for command in next.iter().take(2) {
+        output.push_str(&format!("- {command}\n"));
+    }
 }
 
 fn validate_manifest(path: &Path, manifest: &WorkspaceManifest) -> WorkspaceValidationReport {

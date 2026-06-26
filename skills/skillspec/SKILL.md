@@ -13,7 +13,7 @@ SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-s
 - Until that plan and checklist are read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.
 - The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.
 - After each phase action, record structured progress in `<run_dir>/execution.jsonl` and run `skillspec progress show ./skill.spec.yml --run <run_dir>` before moving to the next phase.
-- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence, consult_existing_ports_without_user_request, consult_repo_history_without_user_request, consult_memory_or_prior_examples_without_user_request, drop_imported_dependency_mentions, work_around_missing_dependency_without_waiver, claim_partial_dependency_proof_as_full, leave_old_and_new_skill_discoverable_without_user_choice.
+- Forbidden before the decision: edit_yaml_from_memory, skip_grammar_sensemake, import_without_reading_source_skill, install_before_dependency_surface_approval, claim_unproven_execution_evidence, consult_existing_ports_without_user_request, consult_repo_history_without_user_request, consult_memory_or_prior_examples_without_user_request, drop_imported_dependency_mentions, work_around_missing_dependency_without_waiver, claim_partial_dependency_proof_as_full, leave_old_and_new_skill_discoverable_without_user_choice, parallelize_dependency_bound_or_mutating_phases, load_full_reports_when_summary_suffices, claim_token_savings_without_metrics.
 
 This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.
 
@@ -33,9 +33,11 @@ This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the 
 6. Read the full phase plan and action checklist before using tools. Treat them as the active execution SOP, not as advice. The `PHASE TOOL BOUNDARY - HARD` section is the permission boundary for the next action.
 7. For each execution phase, run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show ./skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.
 8. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.
-9. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.
-10. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
-11. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
+9. Use the smallest view that proves the next decision. Prefer `--summary`, `--view index`, `--view summary`, evidence paths, source-map handles, and alignment rows; open full reports or full source spans only when the task, blocker, review, or proof gap requires exact detail.
+10. Choose the execution strategy before doing work. Treat route phases as sequential gates. Use parallel or fanout work only inside independent package/read/build/proof units with isolated output paths. Keep dependency ordering, installs, visibility changes, router lifecycle, and approval-boundary work sequential.
+11. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.
+12. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.
+13. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.
 
 ## Harness Presentation Contract
 
@@ -69,7 +71,7 @@ This skill participates in agent-mediated durable execution. There is no runtime
 - This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.
 - Any CLI, shell command, local process, package command, API fallback, or provider command must use the durable execution substrate, normally a rote adapter or `rote exec --`, unless the active spec or user explicitly allows direct execution.
 - On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.
-- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.
+- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories. Do not parallelize dependency-bound phases, installs, visibility mutations, router refresh, or approval gates.
 
 ## How To Execute The Structure
 
@@ -77,6 +79,8 @@ Before the first task action, use `skillspec plan` and `skillspec act` to conver
 
 - `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
 - execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.
+- execution strategy: keep the plan sequential at phase boundaries. Parallelize only independent package/read/build/proof work with isolated artifacts and evidence labels. Keep dependency resolution, convergence gates, installs, visibility changes, router lifecycle, and user approvals sequential.
+- token economy: keep full evidence on disk and expose compact proof in chat. Prefer summaries, indexes, handles, and report paths; load full JSON, full reports, or full source spans only when exact evidence is required.
 - phase tool boundary: `skillspec act` renders the effective `tool_boundary` inherited from entry, route, and phase. Treat it as hard. If a needed tool or substrate is not listed, stop and ask permission before using it.
 - route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.
 - `matched_rules`: these are active obligations, not explanatory decoration. Use each rule's `reason`, `prefer`, `forbid`, `elicit`, and `after_success` fields to constrain the next action.
@@ -95,12 +99,19 @@ If every allowed route is blocked by missing dependencies, auth, permissions, or
 
 ## Quick Commands
 
+For workspace map/import/converge/compile/install flows, prefer `--summary` in
+the harness. It prints wall-clock and estimated token metrics while preserving
+full reports, source maps, loaders, install manifests, and package evidence on
+disk at the printed paths. Use `--json` only when the full machine report needs
+to be consumed from stdout.
+
 ```bash
 skillspec sensemake ./skill.spec.yml --view index
 skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>
 skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>
 skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --workspace <rote-workspace> --workspace-stats-report "${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt" --phase <phase-id> --requirement <stats-requirement-id>
+skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
 skillspec progress final-response "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings
 skillspec progress show ./skill.spec.yml --run "${PWD}/.skillspec/traces/<run-id>"
 skillspec validate ./skill.spec.yml
@@ -121,12 +132,14 @@ When reporting completion, always include the selected route, the SkillSpec trac
 
 Always include token usage. For successful rote-backed runs, collect `rote workspace stats <workspace>` into a report file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-report <file> --phase <phase-id> --requirement <stats-requirement-id>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Draft the final response with Result, Evidence, Alignment summary, Token usage, and SkillSpec sections, run `skillspec progress final-response <run_dir> --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings`, then rerun `skillspec trace align` and report that final alignment. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.
 
+When Rote is not used, token economy is still active but token consumption is not measured by the harness. Use compact CLI outputs, source-map handles, `query`/`refs` summaries, and artifact paths. If a non-rote command prints `agent_visible_tokens`, `artifact_tokens_preserved`, `avoided_tokens`, and `metrics_source: estimated`, record those values with `skillspec progress stats <run_dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated` before `trace align`, then report them as estimated output economy, not measured model usage. If neither measured nor estimated metrics exist, say `not recorded`.
+
 Minimum final response shape:
 
 - `Result`: answer the user's task directly.
 - `Evidence`: workspace name plus important response ids/files the user can query later.
 - `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align`.
-- `Token usage`: include `Token consumption` and `Token savings` exactly as reported by `skillspec trace align`; say `not recorded` when absent.
+- `Token usage`: include measured `Token consumption` and `Token savings` from `skillspec trace align` when available; otherwise include estimated non-rote summary metrics or say `not recorded`.
 - `SkillSpec`: selected route, trace run directory, align status, status meaning, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, Alignment summary, or Token usage sections.
 
 ## Route Hints

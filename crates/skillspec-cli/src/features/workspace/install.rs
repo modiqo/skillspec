@@ -68,7 +68,7 @@ pub enum WorkspaceVisibilityPolicy {
 }
 
 impl WorkspaceVisibilityPolicy {
-    fn as_str(self) -> &'static str {
+    pub(super) fn as_str(self) -> &'static str {
         match self {
             Self::EntryImplicit => "entry-implicit",
             Self::AllImplicit => "all-implicit",
@@ -108,7 +108,7 @@ pub enum WorkspaceInstallStatus {
 }
 
 impl WorkspaceInstallStatus {
-    fn as_str(&self) -> &'static str {
+    pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Planned => "planned",
             Self::Installed => "installed",

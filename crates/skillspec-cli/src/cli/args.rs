@@ -400,6 +400,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
     #[command(
         about = "Validate a skillspec.workspace.yml package graph",
@@ -411,6 +414,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
     #[command(
         about = "Import every package in a validated skillspec.workspace.yml graph",
@@ -425,6 +431,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
     #[command(
         about = "Verify generated workspace package drafts against the manifest",
@@ -439,6 +448,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
     #[command(
         about = "Compile ready workspace package drafts into harness loaders",
@@ -456,6 +468,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
     #[command(
         about = "Install compiled workspace packages into harness roots",
@@ -491,6 +506,9 @@ pub(super) enum WorkspaceCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Emit a compact metric summary with report paths instead of the full human report.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
     },
 }
 
@@ -952,6 +970,18 @@ pub(super) enum ProgressCommand {
         /// Percent reduction from cached/source tokens to query-result tokens.
         #[arg(long)]
         reduction_percent: Option<f64>,
+        /// Estimated tokens in the compact output visible to the agent.
+        #[arg(long)]
+        agent_visible_tokens: Option<u64>,
+        /// Estimated tokens preserved in artifacts outside the prompt.
+        #[arg(long)]
+        artifact_tokens_preserved: Option<u64>,
+        /// Estimated tokens avoided by showing compact output instead of full artifacts.
+        #[arg(long)]
+        avoided_tokens: Option<u64>,
+        /// Source of the metric values, for example measured or estimated.
+        #[arg(long)]
+        metrics_source: Option<String>,
         /// Human-readable event note.
         #[arg(long)]
         message: Option<String>,

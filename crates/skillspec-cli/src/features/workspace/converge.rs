@@ -49,7 +49,7 @@ pub enum WorkspaceConvergeStatus {
 }
 
 impl WorkspaceConvergeStatus {
-    fn as_str(&self) -> &'static str {
+    pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Ready => "ready",
             Self::Failed => "failed",

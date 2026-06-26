@@ -33,6 +33,7 @@ pub mod features {
     pub mod compiler;
     pub mod doctor;
     pub mod importer;
+    pub mod metrics;
     pub mod sensemake;
     pub mod source_map;
     pub mod workspace;
@@ -41,7 +42,8 @@ pub mod features {
 
 pub use execution::{act, align, command_path, decision, deps, progress, report, trace};
 pub use features::{
-    capability, compiler, doctor, importer, sensemake, source_map, workspace, workspace_synthesizer,
+    capability, compiler, doctor, importer, metrics, sensemake, source_map, workspace,
+    workspace_synthesizer,
 };
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 pub use spec::{grammar, import_dependency_ledger, imports, model, parser};
