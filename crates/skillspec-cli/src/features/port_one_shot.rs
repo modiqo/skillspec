@@ -1,8 +1,9 @@
 use crate::error::{Error, Result};
 use crate::model::{
-    Dependency, DependencyCheck, DependencyKind, DependencyPermission, DependencyProvision,
-    DependencyProvisionOption, Elicitation, ElicitationChoice, ElicitationCondition,
-    ExecutionPhase, ExecutionPlan, ExecutionPlanMode, Expectation, Predicate, Route, RouteId, Rule,
+    Artifact, ArtifactKind, CommandTemplate, ConsumerRef, Dependency, DependencyCheck,
+    DependencyKind, DependencyPermission, DependencyProvision, DependencyProvisionOption,
+    Elicitation, ElicitationChoice, ElicitationCondition, ExecutableRefKind, ExecutionPhase,
+    ExecutionPlan, ExecutionPlanMode, Expectation, Predicate, ProducerRef, Route, RouteId, Rule,
     RuleId, SafetyClass, ScenarioTest, SkillSpec, State, ToolBoundary, ToolBoundaryDefault,
     TraceConfig, TraceEventKind, TraceMode,
 };
@@ -654,9 +655,41 @@ fn shape_crib_yaml(path: &Path) -> Result<String> {
         imports: BTreeMap::new(),
         resources: BTreeMap::new(),
         code: BTreeMap::new(),
-        artifacts: BTreeMap::new(),
+        artifacts: BTreeMap::from([(
+            "qa_report".to_owned(),
+            Artifact {
+                kind: ArtifactKind::Report,
+                description: Some(
+                    "Artifacts are consumed only by executable refs: command, code, or recipe."
+                        .to_owned(),
+                ),
+                path: Some(".skillspec/reports/qa.md".to_owned()),
+                schema: None,
+                produced_by: vec![ProducerRef {
+                    kind: ExecutableRefKind::Command,
+                    id: "write_report".to_owned(),
+                }],
+                consumed_by: vec![ConsumerRef {
+                    kind: ExecutableRefKind::Command,
+                    id: "write_report".to_owned(),
+                }],
+            },
+        )]),
         recipes: BTreeMap::new(),
-        commands: BTreeMap::new(),
+        commands: BTreeMap::from([(
+            "write_report".to_owned(),
+            CommandTemplate {
+                description: Some(
+                    "Command used by the artifact example; routes and rules are not artifact consumers."
+                        .to_owned(),
+                ),
+                template: "skillspec validate skill.spec.yml".to_owned(),
+                safety: Some(SafetyClass::LocalRead),
+                requires: Default::default(),
+                parse: BTreeMap::new(),
+                success_when: BTreeMap::new(),
+            },
+        )]),
         snippets: BTreeMap::from([
             (
                 "drafting_message".to_owned(),

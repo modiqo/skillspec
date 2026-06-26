@@ -498,9 +498,15 @@ fn import_skill_checklist() -> Vec<ChecklistItem> {
         },
         ChecklistItem {
             id: "elicitations",
-            prompt: "Model user approvals and bounded choices before side effects.",
-            evidence: "elicitations referenced by rules, recipes, or states",
+            prompt: "Model user approvals and bounded choices before side effects. Quote question strings that contain colon-space or other YAML-sensitive punctuation.",
+            evidence: "elicitations referenced by rules, recipes, or states, with YAML-safe quoted question strings when needed",
             status_values: &["good", "partial", "missing", "not_applicable"],
+        },
+        ChecklistItem {
+            id: "artifact_dataflow",
+            prompt: "Connect artifacts to executable producers and consumers only; routes and rules are control-flow, not artifact consumers.",
+            evidence: "artifacts.produced_by and artifacts.consumed_by use kind=command, kind=code, or kind=recipe only",
+            status_values: &["valid", "empty", "invalid_ref", "missing"],
         },
         ChecklistItem {
             id: "imports_resources",

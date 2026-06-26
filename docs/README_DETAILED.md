@@ -178,7 +178,9 @@ The command does not auto-fill behavior. After the scaffold, the agent should
 make one guided promotion pass: choose source-backed activation/routes, promote
 only evidenced rules/dependencies/recipes/tests, fill coverage rows for open
 gaps, run the QA ladder once, then fix failures by class instead of one field at
-a time.
+a time. Quote YAML strings that contain `: `, especially elicitation questions,
+and keep artifact `produced_by` / `consumed_by` refs limited to `command`,
+`code`, or `recipe`.
 
 The lower-level mechanical importer is still available when you only want a
 draft or need to debug one gate:

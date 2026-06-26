@@ -382,7 +382,10 @@ skillspec port-one-shot ./my-skill \
 The generated `skill.spec.yml` is still a scaffold until reviewed. Do not
 auto-fill it. Use the source map and shape crib for one guided promotion pass:
 promote only source-backed activation, routes, rules, dependencies, recipes, and
-tests; leave weak areas as `review_required`; then run the QA ladder once.
+tests; leave weak areas as `review_required`; then run the QA ladder once. When
+editing YAML directly, quote strings that contain `: `, especially elicitation
+questions, and keep artifact `produced_by` / `consumed_by` refs limited to
+`command`, `code`, or `recipe`.
 
 If you need manual control, run the lower-level steps directly:
 

@@ -1059,7 +1059,8 @@ Choose the import path before running `port-one-shot`:
 `port-one-shot` is the safe default for one atomic prose skill. It bundles:
 
 - embedded grammar porting guide, checklist, and JSON Schema artifacts;
-- a generated typed shape crib for schema-sensitive YAML sections;
+- a generated typed shape crib for schema-sensitive YAML sections, including
+  artifact executable-ref shapes;
 - source map and doctor reports;
 - mechanical import through typed Rust structs;
 - validate, imports check, deps check, scenario tests, and compile;

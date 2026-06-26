@@ -294,6 +294,11 @@ question.
 Choices may set facts, steer a route, or advance to a state. They do not
 execute commands by themselves.
 
+When authoring YAML by hand, quote `question` strings that contain `: ` or use a
+block scalar. Unquoted nested scalars such as
+`question: What are we reviewing: a dependency list?` can be parsed as a broken
+mapping before SkillSpec validation runs.
+
 ## Trace
 
 ```text
@@ -591,6 +596,11 @@ executable-ref-kind
 Artifacts name the files or data products that code, commands, and recipes
 consume or produce. They make dataflow explicit without requiring a workflow
 engine.
+
+`produced_by` and `consumed_by` take executable refs only. Valid `kind` values
+are `command`, `code`, and `recipe`. Routes and rules can require checks,
+schedule recipes, or reference imports/resources, but they are not artifact
+producers or consumers.
 
 ## Recipes
 

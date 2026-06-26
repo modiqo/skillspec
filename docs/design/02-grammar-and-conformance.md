@@ -137,12 +137,16 @@ Examples:
 - `elicitations.choices.route` must name a known route.
 - `elicitations.choices.next` must name a known state.
 - `elicitations.required_when.route` must name a known route.
+- `elicitations.*.question` is a string; when hand-authoring YAML, quote
+  question values that contain `: ` so YAML does not parse the colon as a
+  nested mapping.
 - `commands.requires.dependencies` must name known dependencies.
 - `code.requires.dependencies`, `code.requires.imports`,
   `code.requires.resources`, and `code.requires.artifacts` must name known ids.
 - `recipes.requires.*` and recipe steps must name known targets.
 - `artifacts.produced_by` and `artifacts.consumed_by` must name known executable
-  references.
+  references. Executable references are only `command`, `code`, or `recipe`;
+  routes and rules are control-flow and cannot be artifact consumers.
 - test expectations that name routes, rules, actions, or elicitations must name
   known ids.
 

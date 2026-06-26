@@ -75,7 +75,7 @@ metric recording. It does not replace the agent's guided semantic promotion pass
      model;
    - include route execution plan, scalar `prefer`, list `elicit`, state
      `do/next`, trace `mode|required|record`, dependency permission, safety
-     enum, and scenario test shapes.
+     enum, artifact executable refs, and scenario test shapes.
 
 5. QA ladder
    - validate;
@@ -103,8 +103,12 @@ The guided pass should stay short:
 2. promote only source-backed rules, elicitations, dependencies, recipes,
    closures, and tests;
 3. fill the coverage matrix for promoted obligations and unresolved gaps;
-4. run the QA ladder once;
-5. fix failures by schema class, then rerun the ladder.
+4. quote YAML strings containing `: `, especially elicitation questions,
+   descriptions, and review notes;
+5. keep artifact `produced_by` and `consumed_by` refs limited to commands, code
+   blocks, and recipes;
+6. run the QA ladder once;
+7. fix failures by schema class, then rerun the ladder.
 
 The agent should not parade every internal command. Progress should be reported
 by gates:

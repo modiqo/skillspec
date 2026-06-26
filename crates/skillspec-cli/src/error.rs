@@ -22,6 +22,13 @@ pub enum Error {
         #[source]
         source: serde_yaml::Error,
     },
+    #[error("failed to parse YAML from {path}: {source}\nhelp: {hint}")]
+    ParseYamlWithHint {
+        path: PathBuf,
+        #[source]
+        source: serde_yaml::Error,
+        hint: String,
+    },
     #[error("failed to parse JSON from {path}: {source}")]
     ParseJson {
         path: PathBuf,
