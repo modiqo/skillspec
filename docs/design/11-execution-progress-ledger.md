@@ -262,7 +262,8 @@ Run alignment with the execution ledger:
 ```sh
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 The aligner reads structured execution events and marks obligations as proven,
@@ -336,8 +337,8 @@ A harness integrating SkillSpec should:
 - block or ask permission for unlisted tools;
 - assign stable evidence refs;
 - append ledger events after actual work;
-- run `progress show` before phase transitions;
-- pass `execution.jsonl` to `trace align`;
+- run `progress show` as an internal gate check before phase transitions;
+- pass `execution.jsonl` to `trace align --summary`;
 - surface missing proof rows to the user.
 
 The harness should not ask the model to remember progress from prose alone. The

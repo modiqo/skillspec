@@ -39,7 +39,7 @@ omitted.
 
 ## Alignment Summary Format
 
-Use the compact summary produced by `skillspec trace align`.
+Use the compact summary produced by `skillspec trace align --summary`.
 
 The preferred human format is:
 
@@ -116,7 +116,8 @@ It consumes execution traces supplied through:
 ```sh
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 Execution proof can show:
@@ -191,11 +192,11 @@ in the prompt. The measured consumption is the extracted or used token surface.
 The savings are the delta between cached response tokens and extracted
 query-result tokens.
 
-When rote workspace stats exist, report measured context-window or API tokens
-separately from query-reduction savings:
+When durable-executor workspace stats exist, report measured context-window or
+API tokens separately from query-reduction savings:
 
 ```text
-Token consumption: 752608 rote workspace data tokens recorded
+Token consumption: 752608 durable workspace data tokens recorded
 Token savings: 3729702 tokens saved by query reduction
 ```
 
@@ -233,8 +234,8 @@ Compiled SkillSpec loader files should instruct agents to:
 
 - preserve the trace run directory;
 - record progress after phase actions;
-- run `progress show` before phase transitions;
-- run `trace align` at completion;
+- run `progress show` as an internal gate check before phase transitions;
+- run `trace align --summary` at completion;
 - include alignment summary;
 - include token usage;
 - report missing proof rows;

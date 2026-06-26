@@ -33,7 +33,8 @@ skillspec progress record .skillspec/traces/<run-id> <event> [phase] [requiremen
 skillspec progress show <spec> --run .skillspec/traces/<run-id>
 skillspec trace align <spec> \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 `plan`, `act`, and `progress` are not generic workflow execution commands.
@@ -244,7 +245,9 @@ This command is the phase tracker. It answers two practical questions:
 - What proof has already been recorded?
 
 The agent should run `progress show` after each phase action and before moving
-to another phase.
+to another phase, but treat the output as an internal gate check. In normal chat
+updates, surface only the gate result unless the user asks for details or a
+blocker/failure needs evidence.
 
 ### `trace align`
 
@@ -254,10 +257,11 @@ execution ledger:
 ```sh
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
-The output separates two layers:
+The compact output separates two layers:
 
 - decision replay;
 - execution proof.
@@ -370,7 +374,7 @@ skillspec progress record .skillspec/traces/<run-id> \
 The message should describe the blocker without hiding missing proof. A blocked
 event is better than claiming success from an unproven action.
 
-### 6. Show Progress Before Moving On
+### 6. Check Progress Before Moving On
 
 ```sh
 skillspec progress show ./skill.spec.yml \
@@ -378,14 +382,16 @@ skillspec progress show ./skill.spec.yml \
 ```
 
 If a next phase exists, run `act` for that phase and repeat the loop. If all
-phases are complete, run alignment.
+phases are complete, run alignment. Do not paste the full progress report into
+the user-visible transcript unless it is needed for a decision.
 
 ### 7. Align And Report
 
 ```sh
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 The final response should include:
@@ -491,7 +497,7 @@ If the next tool is outside the phase boundary, stop and ask for permission.
 If a phase action happened but evidence was not captured, record only what can
 be proven. Do not mark the requirement satisfied.
 
-If `trace align` returns incomplete execution proof, report the exact missing
+If `trace align --summary` returns incomplete execution proof, report the exact missing
 proof rows.
 
 ## Source Alignment

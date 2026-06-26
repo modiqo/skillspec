@@ -336,10 +336,10 @@ reused from `<workspace-build>/.skillspec/workspace-cache.json` and reported as
 `--summary` keeps agent-facing output compact by printing wall-clock and
 estimated token metrics while preserving full reports and package evidence on
 disk.
-Those estimates are non-Rote output-economy metrics: agent-visible summary
-tokens versus artifact tokens kept out of chat. Rote-backed durable runs add a
+Those estimates are direct-run output-economy metrics: agent-visible summary
+tokens versus artifact tokens kept out of chat. Durable-executor runs add a
 separate measured token-accounting layer when workspace stats are available.
-When a run needs these estimates in `trace align`, record the summary values
+When a run needs these estimates in `trace align --summary`, record the summary values
 with `skillspec progress stats <run-dir> --agent-visible-tokens <n>
 --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source
 estimated` before alignment.

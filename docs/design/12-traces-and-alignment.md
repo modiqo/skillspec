@@ -90,8 +90,9 @@ stable JSONL stream and summary for later review.
 
 ## Alignment
 
-`skillspec trace align <spec> --decision-trace <run_dir>` compares the current
-spec with a decision trace.
+`skillspec trace align <spec> --decision-trace <run_dir> --summary` compares
+the current spec with a decision trace and prints only the completion-facing
+summary for normal harness use.
 
 The aligner:
 
@@ -118,9 +119,10 @@ The report includes:
 - execution `obligations`;
 - user-facing `proof_rows`.
 
-`skillspec trace align` writes the full report to `<run_dir>/alignment.json`.
-This keeps the completion summary and token usage with the run artifacts
-instead of leaving them only in terminal output.
+`skillspec trace align --summary` writes the full report to
+`<run_dir>/alignment.json` while keeping terminal output compact. Omit
+`--summary` only for debugging, failure triage, or explicit user requests for
+detailed checks.
 
 `ok` is true when no deterministic check failed. A report can have `ok: true`
 and `status: unproven` when decision replay succeeded but execution proof is
@@ -257,7 +259,7 @@ skillspec decide skill.spec.yml --input '<task>' --trace-dir .skillspec/traces
 After execution:
 
 ```sh
-skillspec trace align skill.spec.yml --decision-trace .skillspec/traces/<run-id>
+skillspec trace align skill.spec.yml --decision-trace .skillspec/traces/<run-id> --summary
 ```
 
 When structured execution evidence exists:
@@ -265,7 +267,8 @@ When structured execution evidence exists:
 ```sh
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace execution-ledger.jsonl
+  --execution-trace execution-ledger.jsonl \
+  --summary
 ```
 
 The final report should include:

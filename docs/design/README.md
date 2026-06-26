@@ -41,7 +41,7 @@ directory listings.
 | 07 | [State Machines, Handoffs, And Jumps](07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
 | 08 | [Imports, Resources, Code, And Recipes](08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
 | 09 | [Phase Tool Boundaries](09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
-| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, `progress record`, `progress show`, and `trace align` form the visible runtime loop for a SkillSpec-backed run. |
+| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, `progress record`, internal `progress show` checks, and compact `trace align --summary` form the runtime loop for a SkillSpec-backed run. |
 | 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
 | 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
 | 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
@@ -52,7 +52,7 @@ directory listings.
 | 18 | [Source Map Progressive Reader](18-source-map-progressive-reader.md) | How `skillspec source map/query/coverage/stale` lets imports navigate large Markdown skill sources by exact handles before `import-skill --source-map`. |
 | 19 | [Workspace Authoring Graph](19-workspace-authoring-graph.md) | How source-shape detection chooses single-skill, multi-skill, plugin-shaped, or revision flow, and how `skillspec workspace map/validate/import/converge/compile/install` handles workspace roots before install. |
 | 20 | [Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md) | How SkillSpec separates wall-clock speed from token economy, then adds spec caching, workspace incremental cache, parallel fanout, batching, and source reuse. |
-| 21 | [One-Shot Porting Workflow](21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated non-Rote metric recording for one atomic prose skill without replacing workspace or revision flows. |
+| 21 | [One-Shot Porting Workflow](21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated direct-run metric recording for one atomic prose skill without replacing workspace or revision flows. |
 
 ## Visual Explainers
 
@@ -160,7 +160,7 @@ compatible harness.
 which execution obligations have proof.
 
 `Completion summary` means the compact final status block from
-`skillspec trace align`, including decision replay, phase order, requirement
+`skillspec trace align --summary`, including decision replay, phase order, requirement
 proof counts, missing proof rows, forbidden-action status, alignment status, and
 token usage.
 

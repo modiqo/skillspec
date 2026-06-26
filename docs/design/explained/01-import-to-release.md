@@ -165,7 +165,7 @@ skillspec test <skill-folder>/skill.spec.yml
 skillspec compile <skill-folder>/skill.spec.yml --target codex-skill
 skillspec plan <skill-folder>/skill.spec.yml --input '<task>' --trace-dir <skill-folder>/.skillspec/traces
 skillspec act <skill-folder>/skill.spec.yml --input '<task>' --run <run-dir> --phase <phase-id>
-skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run-dir>
+skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run-dir> --summary
 ```
 
 Release check:

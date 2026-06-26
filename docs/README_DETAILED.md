@@ -183,7 +183,7 @@ skillspec port-one-shot path/to/skill-folder \
 It writes grammar/schema/checklist proof, a source map, doctor report, typed
 mechanical draft, shape crib, QA results, compiled loader, and compact report
 under `.skillspec/`. When a trace run is supplied with `--run-dir`, it also
-records estimated non-Rote token metrics so alignment does not report token
+records estimated direct-run token metrics so alignment does not report token
 usage as missing.
 
 The command does not auto-fill behavior. After the scaffold, the agent should
@@ -218,7 +218,8 @@ skillspec act skill.spec.yml \
 skillspec progress show skill.spec.yml --run .skillspec/traces/<run-id>
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 `import-skill` preserves source material; it does not pretend to understand the
@@ -266,11 +267,11 @@ source maps, package evidence, loaders, and install manifests remain on disk at
 the printed paths. Use `--json` when a machine caller needs the full report on
 stdout.
 
-This does not require Rote. Non-Rote summaries estimate output economy from the
-compact agent-visible response versus artifacts preserved on disk. Rote-backed
-durable runs can additionally report measured workspace token consumption.
-To make those non-Rote numbers appear in `trace align`, record the printed
-summary block before alignment:
+Direct-run summaries estimate output economy from the compact agent-visible
+response versus artifacts preserved on disk. Durable-executor runs can
+additionally report measured workspace token consumption. To make direct-run
+summary numbers appear in `trace align --summary`, record the printed summary block before
+alignment:
 
 ```bash
 skillspec progress stats .skillspec/traces/<run-id> \
@@ -455,7 +456,7 @@ skillspec progress record .skillspec/traces/<run-id> phase-completed \
   --evidence-kind <kind> \
   --evidence-ref <ref>
 skillspec progress stats .skillspec/traces/<run-id> \
-  --workspace <rote-workspace> \
+  --workspace <workspace> \
   --workspace-stats-report .skillspec/traces/<run-id>/workspace-stats.txt \
   --phase durable_closure \
   --requirement compute_workspace_stats \
@@ -483,9 +484,9 @@ section roles, counts, ids, and query handles without dumping the whole YAML.
 Use it when the spec shape is unfamiliar.
 
 For `/skillspec create from observed durable execution: "..."`, the prompt
-multiplexer collects durable rote workspace evidence and then calls the
-rote-specific CLI only after the observed result and evidence summary have been
-shown and approved:
+multiplexer collects durable workspace evidence and then calls the synthesis CLI
+only after the observed result and evidence summary have been shown and
+approved:
 
 ```sh
 skillspec synthesize-from-workspace <workspace> \
@@ -509,13 +510,13 @@ evidence to `.skillspec/traces/<run-id>/execution.jsonl`, and `progress show`
 derives `.skillspec/traces/<run-id>/progress.json` with completed, current,
 blocked, and remaining phases.
 
-For rote-backed runs, persist `rote workspace stats <workspace>` to a report
-file and run `progress stats` before `trace align`. That appends the
-`stats_collected` event the aligner uses for measured token consumption and
-query-reduction savings, without manually editing `execution.jsonl`. After
+For durable-executor runs, persist the workspace stats to a report file and run
+`progress stats` before `trace align --summary`. That appends the `stats_collected` event
+the aligner uses for measured token consumption and query-reduction savings,
+without manually editing `execution.jsonl`. After
 drafting the final report sections, run `progress final-response --result
 --evidence --alignment --token-savings` with the durable closure phase and
-requirements, then rerun `trace align` so the final alignment proves the
+requirements, then rerun `trace align --summary` so the final alignment proves the
 response included evidence, alignment, and token usage.
 
 When final closure needs several route, elicitation, forbid/no-violation, or
@@ -554,18 +555,23 @@ skillspec trace compact .skillspec/traces/<run-id>
 
 skillspec trace align path/to/skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
-`trace align` replays the captured input against the current spec and compares
-the decision facts deterministically. With `execution.jsonl`, it can also check
-whether the selected route, phase obligations, forbids, and after-success
-closures were actually proven. Without structured execution evidence it reports
-the specific missing proof rows as `unproven`, not as guessed pass/fail results.
+`trace align --summary` replays the captured input against the current spec and
+compares the decision facts deterministically. With `execution.jsonl`, it can
+also check whether the selected route, phase obligations, forbids, and
+after-success closures were actually proven. Without structured execution
+evidence it reports the specific missing proof rows as `unproven`, not as
+guessed pass/fail results.
 It writes the full alignment report to
 `.skillspec/traces/<run-id>/alignment.json` so the completion summary and token
 usage are durable run artifacts.
-The text report always includes a completion-facing block:
+Use `--summary` for normal harness runs; it prints only the completion-facing
+block plus the alignment report path. Omit `--summary` only for debugging,
+failure triage, or explicit user requests for detailed checks. The summary
+block is:
 
 ```text
 alignment_summary:
@@ -585,11 +591,11 @@ as `not recorded` rather than omitted. When query-reduction stats are present,
 `Token consumption` describes the extracted query-result data actually recorded,
 and `Token savings` names the cached-response token count, extracted
 query-result token count, saved-token delta, and reduction percentage.
-Non-Rote `--summary` metrics are separate estimated output-economy numbers. Use
+Direct CLI `--summary` metrics are separate estimated output-economy numbers. Use
 `progress stats --agent-visible-tokens ... --artifact-tokens-preserved ...
 --avoided-tokens ... --metrics-source estimated` to record them for alignment,
 and do not describe them as measured model token consumption.
-Once recorded, `trace align` prints them in `token_usage` as estimated
+Once recorded, `trace align --summary` prints them in `token_usage` as estimated
 agent-visible output and estimated tokens kept out of chat.
 
 Compiled SkillSpec-backed `SKILL.md` loaders include runtime guidance for using

@@ -399,6 +399,55 @@ pub fn align(report: &AlignReport) -> Result<()> {
     Ok(())
 }
 
+pub fn align_summary(report: &AlignReport, alignment_report: &Path) -> Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    writeln!(stdout, "alignment_summary:")?;
+    writeln!(
+        stdout,
+        "  Decision replay: {}",
+        report.summary.completion.decision_replay
+    )?;
+    writeln!(
+        stdout,
+        "  Phase order: {}",
+        report.summary.completion.phase_order
+    )?;
+    writeln!(
+        stdout,
+        "  Requirements: {}",
+        report.summary.completion.requirements
+    )?;
+    for item in &report.summary.completion.missing_proof {
+        writeln!(stdout, "  Missing proof: {item}")?;
+    }
+    writeln!(
+        stdout,
+        "  Forbidden actions: {}",
+        report.summary.completion.forbidden_actions
+    )?;
+    writeln!(
+        stdout,
+        "  Alignment: {}",
+        report.summary.completion.alignment
+    )?;
+    writeln!(stdout, "token_usage:")?;
+    writeln!(
+        stdout,
+        "  Token consumption: {}",
+        report.summary.tokens.consumption
+    )?;
+    writeln!(stdout, "  Token savings: {}", report.summary.tokens.savings)?;
+    if !report.summary.tokens.evidence.is_empty() {
+        writeln!(
+            stdout,
+            "  Token evidence: {}",
+            report.summary.tokens.evidence.join(", ")
+        )?;
+    }
+    writeln!(stdout, "alignment_report: {}", alignment_report.display())?;
+    Ok(())
+}
+
 fn check_status_name(status: AlignCheckStatus) -> &'static str {
     match status {
         AlignCheckStatus::Pass => "pass",

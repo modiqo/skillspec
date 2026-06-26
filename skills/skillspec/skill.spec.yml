@@ -2400,7 +2400,7 @@ commands:
       dependencies:
         - skillspec_cli
   port_one_shot:
-    description: Bundle grammar preflight, source map, doctor, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, tests, compile, compact report, and optional estimated non-Rote stats for one atomic local skill package.
+    description: Bundle grammar preflight, source map, doctor, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, tests, compile, compact report, and optional estimated direct-run stats for one atomic local skill package.
     template: skillspec port-one-shot <source-skill-folder> --out <draft-dir> --target codex-skill --prove --run-dir <trace-dir> --phase mechanical_import --requirement estimated_token_metrics
     safety: local_write
     requires:
@@ -2455,23 +2455,23 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
-  progress_stats_rote:
-    description: Append measured Rote workspace token stats to execution.jsonl so trace align can report measured token consumption and savings.
-    template: skillspec progress stats <trace-dir> --workspace <rote-workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
+  progress_stats_durable_workspace:
+    description: Append measured durable-executor workspace token stats to execution.jsonl so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
+    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
         - rote_cli
   progress_stats_summary_metrics:
-    description: Append non-Rote workspace summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
+    description: Append direct-run summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
     template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_show:
-    description: Show completed, current, blocked, and remaining phases from the run execution ledger and write progress.json.
+    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
     template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
     safety: local_write
     requires:
@@ -2730,8 +2730,8 @@ commands:
       dependencies:
         - skillspec_cli
   trace_align:
-    description: Replay and align a captured decision trace plus execution ledger, reporting pass, unproven, or fail with specific evidence gaps.
-    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl
+    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json while printing only the compact completion-facing summary.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary
     safety: read_only
     requires:
       dependencies:
@@ -3226,8 +3226,8 @@ snippets:
       - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
       - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
-      - Treat Rote workspace stats as measured token accounting and non-Rote --summary blocks as estimated output economy.
-      - Record non-Rote summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
+      - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
+      - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:
     text: |
@@ -3349,7 +3349,7 @@ closures:
       - act_named_phase
       - progress_record_requirement
       - progress_record_phase
-      - progress_stats_rote
+      - progress_stats_durable_workspace
       - progress_stats_summary_metrics
       - progress_show
       - decide_demo
@@ -3392,7 +3392,7 @@ closures:
   capture_observation_task:
     description: Preserve the quoted or otherwise supplied real task that durable-executor should run before synthesis, without replacing it with a vague workspace placeholder.
   handoff_observation_task_to_durable_executor:
-    description: Hand the observation task to durable-executor with return_to=skillspec so the task is executed once through rote-backed evidence before SkillSpec synthesis resumes.
+    description: Hand the observation task to durable-executor with return_to=skillspec so the task is executed once through durable workspace evidence before SkillSpec synthesis resumes.
   capture_observation_workspace:
     description: Record the durable workspace name, trace directory, artifacts, and return packet produced by durable-executor before inspecting logs or stats.
   record_capability_selection_ledger:
@@ -3429,7 +3429,7 @@ proof:
     - workspace install dry-runs compiled package installs, blocks collisions before mutation, writes install and visibility proof, optionally applies native visibility metadata, and keeps router refresh separate
     - "execution strategy is explicit: sequential at phase, dependency, install, visibility, router, and approval gates; package fanout only for independent units with isolated artifacts"
     - "compact evidence mode is used by default: summaries, handles, alignment rows, and report paths are shown in chat while full proof remains on disk"
-    - "wall-clock and token metrics are reported with their source: Rote-backed stats are measured, non-Rote summary blocks are estimated output economy, and missing metrics are stated as not recorded"
+    - "wall-clock and token metrics are reported with their source: durable-executor workspace stats are measured, direct CLI summary blocks are estimated output economy, and missing metrics are stated as not recorded"
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware

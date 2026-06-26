@@ -631,6 +631,7 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
     assert!(align_help.contains("--execution-trace <EXECUTION_TRACE>"));
     assert!(align_help.contains("<PATH>"));
+    assert!(align_help.contains("--summary"));
     assert!(align_help.contains("--json"));
 
     let synthesize = Command::new(bin())
@@ -4357,6 +4358,29 @@ trace:
     assert!(text.contains("token_usage:"));
     assert!(text.contains("  Token consumption: total 1234 tokens"));
     assert!(text.contains("  Token savings: 500 tokens saved or cached; 28.5% reduction"));
+
+    let align_summary = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&align_summary);
+    let summary = stdout(&align_summary);
+    assert!(summary.contains("alignment_summary:"));
+    assert!(summary.contains("  Decision replay: pass"));
+    assert!(summary.contains("  Requirements: 1/2 proven"));
+    assert!(summary.contains("  Alignment: partial"));
+    assert!(summary.contains("token_usage:"));
+    assert!(summary.contains("alignment_report:"));
+    assert!(!summary.contains("checks:"));
+    assert!(!summary.contains("obligations:"));
+    assert!(!stderr(&align_summary).contains("alignment: wrote"));
 }
 
 #[test]

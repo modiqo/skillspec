@@ -391,7 +391,9 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         },
         NavigationHint {
             intent: "prove completion",
-            command: format!("skillspec trace align {spec_path} --decision-trace <run_dir>"),
+            command: format!(
+                "skillspec trace align {spec_path} --decision-trace <run_dir> --summary"
+            ),
         },
     ];
     if spec.dependencies.contains_key("dependency_ledger")

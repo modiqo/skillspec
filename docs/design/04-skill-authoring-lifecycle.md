@@ -255,7 +255,7 @@ skillspec decide skill.spec.yml --input '<representative task>' --trace-dir .ski
 For a real run, add:
 
 ```sh
-skillspec trace align skill.spec.yml --decision-trace <run-dir>
+skillspec trace align skill.spec.yml --decision-trace <run-dir> --summary
 ```
 
 If the harness recorded structured execution events, include them in the

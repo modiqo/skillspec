@@ -225,7 +225,7 @@ pub(super) enum Command {
     },
     #[command(
         about = "Port one atomic prose skill through grammar preflight, import, QA, compile, and metrics",
-        long_about = "Bundle the safe single-skill porting ladder in one command: embedded grammar/schema/checklist artifacts, source map, doctor report, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, scenario tests, compile, compact proof report, and optional non-Rote estimated progress stats. This is for one atomic skill package only. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers must use workspace map/import. Existing reviewed skill.spec.yml files should use the revision path instead of one-shot import."
+        long_about = "Bundle the safe single-skill porting ladder in one command: embedded grammar/schema/checklist artifacts, source map, doctor report, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, scenario tests, compile, compact proof report, and optional direct-run estimated progress stats. This is for one atomic skill package only. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers must use workspace map/import. Existing reviewed skill.spec.yml files should use the revision path instead of one-shot import."
     )]
     PortOneShot {
         /// Local SKILL.md file or single skill folder to port.
@@ -242,7 +242,7 @@ pub(super) enum Command {
         /// Overwrite an existing <out>/skill.spec.yml draft.
         #[arg(long)]
         force: bool,
-        /// Existing trace run directory where estimated non-Rote token metrics should be recorded.
+        /// Existing trace run directory where estimated direct-run token metrics should be recorded.
         #[arg(long)]
         run_dir: Option<PathBuf>,
         /// Phase id whose requirement(s) the estimated stats event satisfies.
@@ -936,6 +936,9 @@ pub(super) enum TraceCommand {
         /// JSONL execution ledger with sanitized action evidence. Repeat for multiple ledgers.
         #[arg(long)]
         execution_trace: Vec<PathBuf>,
+        /// Print only the completion-facing alignment and token summary while writing the full report to alignment.json.
+        #[arg(long, conflicts_with = "json")]
+        summary: bool,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -972,7 +975,7 @@ pub(super) enum ProgressCommand {
         /// Event status, such as pass, fail, blocked, or pending.
         #[arg(long)]
         status: Option<String>,
-        /// Evidence kind, such as rote_response, file, trace, or command.
+        /// Evidence kind, such as file, trace, command, or response_id.
         #[arg(long)]
         evidence_kind: Option<String>,
         /// Evidence reference, such as @7 or a relative file path.

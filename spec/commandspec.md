@@ -41,7 +41,7 @@ skillspec <COMMAND>
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from one local atomic skill file or folder, optionally gated by a fresh source map. |
 | `port-one-shot <source> --out <dir> [--target <target>] [--prove]` | Bundle grammar preflight, source map, doctor, import, QA, compile, report, and optional estimated metric recording for one atomic prose skill. |
-| `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
+| `synthesize-from-workspace <workspace> --out <folder>` | Durable-executor-specific optional integration that synthesizes a draft SkillSpec from durable workspace stats, command log, metadata, and optional dependency evidence. |
 | `index --roots <path>... --out <index-file-or-router-dir>` | Build the router-specific SQLite skill catalog used by `skillspec route` and the optional skill-router. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
@@ -384,9 +384,9 @@ Subcommands:
 contain multiple atomic skill packages. It is separate from `skillspec index`,
 which remains router/runtime catalog infrastructure.
 
-Workspace `--summary` token numbers do not require Rote. They are estimates
-based on agent-visible output versus proof artifacts preserved on disk. Durable
-Rote workspace stats remain the separate measured token-accounting path.
+Workspace `--summary` token numbers are direct-run estimates based on
+agent-visible output versus proof artifacts preserved on disk. Durable-executor
+workspace stats remain the separate measured token-accounting path.
 
 ### `workspace map`
 
@@ -701,7 +701,7 @@ skillspec trace <COMMAND>
 Subcommands:
 
 - `compact <run-dir>`
-- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--json]`
+- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--summary] [--json]`
 
 ### `trace compact`
 
@@ -730,16 +730,21 @@ Options:
   `decide` or `explain` `--trace-dir`.
 - `--execution-trace <EXECUTION_TRACE>`: JSONL execution ledger with sanitized
   action evidence. Repeat for multiple ledgers.
+- `--summary`: emit only the completion-facing alignment summary, token usage
+  block, and `alignment.json` path while still writing the full report to disk.
 - `--json`: emit JSON instead of a concise human report.
 
-Current alignment compares deterministic decision-trace facts and emits a
-summary before the detailed check list. The summary includes the selected
-route, route-selection basis, matched rules, pass/fail/unproven counts for
-deterministic checks, and pass/fail/unproven counts for execution obligations.
+Current alignment compares deterministic decision-trace facts. Default human
+output includes a summary before the detailed check list. `--summary` suppresses
+the detailed checks, proof rows, and obligation list for normal harness
+completion display. The full report is always written to
+`<DECISION_TRACE>/alignment.json`.
+The full human report includes the selected route, route-selection basis,
+matched rules, pass/fail/unproven counts for deterministic checks, and
+pass/fail/unproven counts for execution obligations.
 `unproven` means no deterministic drift was found but one or more required
 facts or execution obligations still lack structured proof. Execution
 obligations remain `unproven` until structured execution evidence is supplied.
-The command writes the full report to `<DECISION_TRACE>/alignment.json`.
 The human report also includes a completion-facing summary:
 
 ```text
@@ -759,7 +764,7 @@ token_usage:
 unproven`. Token usage is always shown; absent stats are reported as `not
 recorded`. Query-reduction stats are reported as cached response tokens reduced
 to extracted query-result tokens, plus the saved-token delta and reduction
-percentage. Non-Rote summary metrics recorded through `progress stats
+percentage. Direct CLI summary metrics recorded through `progress stats
 --agent-visible-tokens ... --artifact-tokens-preserved ... --avoided-tokens ...
 --metrics-source estimated` are reported as estimated output economy, not
 measured model usage.
@@ -821,10 +826,10 @@ Options:
   related proof events.
 - `--status <STATUS>`: event status, such as `pass`, `fail`, `blocked`, or
   `pending`.
-- `--evidence-kind <EVIDENCE_KIND>`: evidence kind, such as `rote_response`,
-  `file`, `trace`, or `command`.
-- `--evidence-ref <EVIDENCE_REF>`: evidence reference, such as a rote response
-  id or relative file path.
+- `--evidence-kind <EVIDENCE_KIND>`: evidence kind, such as `file`, `trace`,
+  `command`, or `response_id`.
+- `--evidence-ref <EVIDENCE_REF>`: evidence reference, such as a response id,
+  trace id, or relative file path.
 - `--source-skill <SOURCE_SKILL>`: skill that emitted this progress event.
 - `--message <MESSAGE>`: human-readable event note.
 - `--json`: emit JSON for the appended event.
@@ -865,17 +870,17 @@ Arguments:
 
 Options:
 
-- `--workspace <WORKSPACE>`: rote workspace name. When omitted, the command
+- `--workspace <WORKSPACE>`: durable workspace name. When omitted, the command
   reads `name` from `--workspace-stats-json` or `Workspace:`/`Name:` from
   `--workspace-stats-report` if present.
 - `--phase <PHASE>`: phase id whose requirement(s) this stats event satisfies.
 - `--requirement <REQUIREMENT>`: requirement id satisfied by this stats event.
   Repeat for multiple requirements. Requires `--phase`.
-- `--workspace-stats-report <PATH>`: human-readable report produced by
-  `rote workspace stats <workspace>`.
-- `--workspace-stats-json <PATH>`: JSON file produced by
-  `rote workspace stats <workspace> --json`. This remains supported for
-  compatibility, but durable executor defaults to the report form.
+- `--workspace-stats-report <PATH>`: human-readable durable workspace stats
+  report.
+- `--workspace-stats-json <PATH>`: JSON durable workspace stats report. This
+  remains supported for compatibility, but durable executor defaults to the
+  report form.
 - `--total-tokens <N>`: total API request+response tokens.
 - `--context-tokens <N>`: one-time context-window tokens consumed during
   exploration.
@@ -893,14 +898,14 @@ Options:
   summary. If omitted, it is derived from artifact minus agent-visible tokens
   when both are supplied.
 - `--metrics-source <SOURCE>`: source label for explicit metrics, normally
-  `estimated` for non-Rote summary metrics or `measured` for harness-provided
-  exact counts.
+  `estimated` for direct-run summary metrics or `measured` for
+  harness-provided exact counts.
 - `--message <MESSAGE>`: human-readable event note.
 - `--json`: emit JSON for the appended event.
 
 `progress stats` appends a machine-readable `stats_collected` event to
-`<RUN>/execution.jsonl` so `trace align` can report numeric token consumption
-and savings. It understands the current rote workspace stats JSON shape, including
+`<RUN>/execution.jsonl` so `trace align --summary` can report numeric token
+consumption and savings. It understands the current durable workspace stats JSON shape, including
 `metrics.total_tokens`, `metrics.context_tokens`,
 `token_savings.source_tokens`, `token_savings.result_tokens`, and
 `token_savings.tokens_saved`, and the human report labels `Total tokens`,
@@ -911,8 +916,8 @@ least one explicit token metric; it will not create an empty
 also appends matching `requirement_satisfied` events so phase completion
 summaries can prove the stats requirements without manual JSONL edits.
 
-For non-Rote workspace runs, copy the metrics from the command's `--summary`
-block into `progress stats` before running `trace align`:
+For direct workspace runs, copy the metrics from the command's `--summary`
+block into `progress stats` before running `trace align --summary`:
 
 ```bash
 skillspec progress stats .skillspec/traces/<run-id> \
@@ -948,7 +953,8 @@ Options:
 `progress final-response` appends the `final_response_sent` event shape that
 `trace align` uses to prove the final report included evidence, alignment, and
 token-savings sections. Run it after drafting those sections and before the
-final answer, then rerun `trace align` and report the rerun alignment summary.
+final answer, then rerun `trace align --summary` and report the rerun alignment
+summary.
 When `--phase` and `--requirement` are supplied, it also appends matching
 `requirement_satisfied` events so completion summaries can prove the final
 report closure requirements.
@@ -1077,8 +1083,8 @@ Options:
   `codex-skill`, `claude-skill`, and `markdown`. Defaults to `codex-skill`.
 - `--prove`: treat failed required QA gates as a failed proof run.
 - `--force`: overwrite an existing `<OUT>/skill.spec.yml` draft.
-- `--run-dir <RUN_DIR>`: existing trace run directory where estimated non-Rote
-  token metrics should be recorded.
+- `--run-dir <RUN_DIR>`: existing trace run directory where estimated
+  direct-run token metrics should be recorded.
 - `--phase <PHASE>`: phase id whose requirement(s) the estimated stats event
   satisfies.
 - `--requirement <REQUIREMENT>`: requirement id satisfied by the estimated stats
@@ -1103,7 +1109,7 @@ Choose the import path before running `port-one-shot`:
 - mechanical import through typed Rust structs;
 - validate, imports check, deps check, scenario tests, and compile;
 - compact report with wall-clock and estimated output-economy metrics;
-- optional `progress stats` recording for non-Rote trace runs.
+- optional `progress stats` recording for direct trace runs.
 
 The command does not claim semantic completion. Missing scenario tests and
 dependency gaps are reported as `review_required` so the port stays honest.
@@ -1124,7 +1130,7 @@ skillspec synthesize-from-workspace <WORKSPACE> --out <OUT>
 
 Arguments:
 
-- `<WORKSPACE>`: durable rote workspace name created by durable execution.
+- `<WORKSPACE>`: durable workspace name created by durable execution.
 
 Options:
 
@@ -1147,9 +1153,9 @@ Options:
 
 Notes:
 
-- This is a rote-specific optional integration, not a generic SkillSpec
-  workspace importer. It hinges on durable execution having already created a
-  rote workspace.
+- This is a durable-executor-specific optional integration, not a generic
+  SkillSpec workspace importer. It hinges on durable execution having already
+  created a workspace.
 - Without pre-captured files, it collects evidence through `rote workspace
   stats <workspace>`, `rote workspace inspect log --last <n>`, and
   `rote workspace inspect meta`.

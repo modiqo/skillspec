@@ -13,7 +13,7 @@ One-shot porting makes the safe path the default path.
 - generate the draft with typed Rust structures, not handwritten YAML snippets;
 - run source mapping, mechanical import, validation, imports, dependencies,
   scenario tests, and compile as one QA gate;
-- record estimated non-Rote token metrics when a trace run is supplied;
+- record estimated direct-run token metrics when a trace run is supplied;
 - emit one compact report with artifact paths instead of dumping full proof.
 
 ## Non-Goals
@@ -88,7 +88,7 @@ metric recording. It does not replace the agent's guided semantic promotion pass
    - compute compact-output and artifact-preservation estimates;
    - if `--run-dir` is supplied, append a `stats_collected` progress event with
      `metrics_source: estimated`;
-   - never leave non-Rote port proof with token usage silently unrecorded when
+   - never leave direct-run port proof with token usage silently unrecorded when
      metrics were available.
 
 ## Guided Semantic Promotion

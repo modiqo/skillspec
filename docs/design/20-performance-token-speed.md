@@ -30,9 +30,9 @@ Those summaries report:
 - estimated avoided tokens;
 - cache hit/miss counts when a command uses cache evidence.
 
-The estimates are output-economy metrics. They are not model API token
-measurements. Rote-backed durable execution remains the measured token path when
-workspace stats exist.
+The estimates are direct-run output-economy metrics. They are not model API
+token measurements. Durable-executor workspace stats remain the measured token
+path when they exist.
 
 ## Design Targets
 
@@ -171,7 +171,7 @@ trees unless `--view full` or `--json` is explicitly requested.
 
 - Keep `--summary` outputs compact.
 - Add cache hit/miss fields to summaries.
-- Document that non-Rote token values are estimated output economy.
+- Document that direct-run token values are estimated output economy.
 
 ### Phase 2: Persistent Spec Cache
 

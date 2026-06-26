@@ -98,12 +98,12 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str(
         "6. Read the full phase plan and action checklist before using tools. Treat them as the active execution SOP, not as advice. The `PHASE TOOL BOUNDARY - HARD` section is the permission boundary for the next action.\n",
     );
-    output.push_str("7. For each execution phase, run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then run `skillspec progress show ./skill.spec.yml --run <run_dir>` to see completed, current, blocked, and remaining phases.\n");
+    output.push_str("7. For each execution phase, run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>` before acting, record phase progress in `<run_dir>/execution.jsonl`, then use `skillspec progress show ./skill.spec.yml --run <run_dir>` as an internal gate check for completed, current, blocked, and remaining phases. Surface only the gate result unless the user asks for details or a blocker/failure needs evidence.\n");
     output.push_str("8. Pull active details with `skillspec query ./skill.spec.yml <handle> --view summary` and relationship edges with `skillspec refs ./skill.spec.yml <handle> --view summary`. Prefer precise handles such as `rule:<id>`, `rule:<id>.forbid`, `command:<id>.requires`, and `state:<id>.next` over reading the whole spec.\n");
     output.push_str("9. Use the smallest view that proves the next decision. Prefer `--summary`, `--view index`, `--view summary`, evidence paths, source-map handles, and alignment rows; open full reports or full source spans only when the task, blocker, review, or proof gap requires exact detail.\n");
     output.push_str("10. Choose the execution strategy before doing work. Treat route phases as sequential gates. Use parallel or fanout work only inside independent package/read/build/proof units with isolated output paths. Keep dependency ordering, installs, visibility changes, router lifecycle, and approval-boundary work sequential.\n");
     output.push_str("11. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.\n");
-    output.push_str("12. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir>` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report the alignment status, meaning, model layers, evidence gaps, user-facing proof rows, summary, and trace path.\n");
+    output.push_str("12. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --summary` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json`; report only the compact alignment summary, token block, and trace path unless debugging, failure, or user request requires detailed checks.\n");
     output.push_str("13. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
     write_harness_presentation_contract(output);
     write_authoring_contract(output);
@@ -133,8 +133,8 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec sensemake ./skill.spec.yml --view index\n");
     output.push_str("skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec act ./skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n");
-    output.push_str("skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n");
-    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <rote-workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
+    output.push_str("skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>\n");
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress final-response \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings\n");
     output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --events \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\"\n");
@@ -150,17 +150,17 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("skillspec query ./skill.spec.yml command:<id>.requires\n");
     output.push_str("skillspec decide ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec explain ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
-    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\"\n");
+    output.push_str("skillspec trace align ./skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\" --summary\n");
     output.push_str("```\n\n");
     output.push_str("## Completion Report\n\n");
-    output.push_str("When reporting completion, always include the selected route, the SkillSpec trace `run_dir`, the persisted `<run_dir>/alignment.json`, and the compact `skillspec trace align` completion summary. Do not report a bare `unproven`; if alignment is incomplete, use `Alignment: partial` plus specific `Missing proof` rows from the align output. Command proof must name only the command basename, never raw args.\n\n");
-    output.push_str("Always include token usage. For successful rote-backed runs, collect `rote workspace stats <workspace>` into a report file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-report <file> --phase <phase-id> --requirement <stats-requirement-id>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Draft the final response with Result, Evidence, Alignment summary, Token usage, and SkillSpec sections, run `skillspec progress final-response <run_dir> --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings`, then rerun `skillspec trace align` and report that final alignment. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When rote workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.\n\n");
-    output.push_str("When Rote is not used, token economy is still active but token consumption is not measured by the harness. Use compact CLI outputs, source-map handles, `query`/`refs` summaries, and artifact paths. If a non-rote command prints `agent_visible_tokens`, `artifact_tokens_preserved`, `avoided_tokens`, and `metrics_source: estimated`, record those values with `skillspec progress stats <run_dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated` before `trace align`, then report them as estimated output economy, not measured model usage. If neither measured nor estimated metrics exist, say `not recorded`.\n\n");
+    output.push_str("When reporting completion, always include the selected route, the SkillSpec trace `run_dir`, the persisted `<run_dir>/alignment.json`, and the compact `skillspec trace align --summary` completion summary. Do not report a bare `unproven`; if alignment is incomplete, use `Alignment: partial` plus specific `Missing proof` rows from the align output. Command proof must name only the command basename, never raw args.\n\n");
+    output.push_str("Always include token usage. For durable-executor runs, collect the durable workspace stats into a report file and run `skillspec progress stats <run_dir> --workspace <workspace> --workspace-stats-report <file> --phase <phase-id> --requirement <stats-requirement-id>` before alignment; missing `stats_collected` evidence is a workflow bug, not a normal omission. Draft the final response with Result, Evidence, Alignment summary, Token usage, and SkillSpec sections, run `skillspec progress final-response <run_dir> --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings`, then rerun `skillspec trace align --summary` and report that compact final alignment. If stats truly cannot be collected, write `Token consumption: not recorded` and `Token savings: not recorded`; do not invent savings. When query-reduction stats exist, state the cached response tokens, extracted query-result tokens, saved-token delta, and reduction percentage. When durable workspace stats exist, include measured context-window/API tokens and explain that full evidence is outside the prompt in the workspace and can be retrieved by id/file instead of reloaded into context.\n\n");
+    output.push_str("For direct SkillSpec CLI runs, token economy is still active but token consumption is not measured by the harness. Use compact CLI outputs, source-map handles, `query`/`refs` summaries, and artifact paths. If a summary command prints `agent_visible_tokens`, `artifact_tokens_preserved`, `avoided_tokens`, and `metrics_source: estimated`, record those values with `skillspec progress stats <run_dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated` before `trace align --summary`, then report them as estimated output economy, not measured model usage. If neither measured nor estimated metrics exist, say `not recorded`. In direct runs, the Evidence section should name trace files and artifacts only; do not mention durable-executor or its underlying tools unless that route was actually used.\n\n");
     output.push_str("Minimum final response shape:\n\n");
     output.push_str("- `Result`: answer the user's task directly.\n");
-    output.push_str("- `Evidence`: workspace name plus important response ids/files the user can query later.\n");
-    output.push_str("- `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align`.\n");
-    output.push_str("- `Token usage`: include measured `Token consumption` and `Token savings` from `skillspec trace align` when available; otherwise include estimated non-rote summary metrics or say `not recorded`.\n");
+    output.push_str("- `Evidence`: for durable-executor runs, workspace name plus important response ids/files the user can query later; for direct CLI runs, trace and artifact paths only.\n");
+    output.push_str("- `Alignment summary`: include `Decision replay`, `Phase order`, `Requirements`, one or more `Missing proof` rows, `Forbidden actions`, and `Alignment` exactly as reported by `skillspec trace align --summary`.\n");
+    output.push_str("- `Token usage`: include measured `Token consumption` and `Token savings` from `skillspec trace align --summary` when available; otherwise include estimated summary metrics or say `not recorded`.\n");
     output.push_str("- `SkillSpec`: selected route, trace run directory, align status, status meaning, and proof rows that map request/spec obligations to observed evidence. Never let this replace the Result, Evidence, Alignment summary, or Token usage sections.\n\n");
     if !spec.routes.is_empty() {
         output.push_str("## Route Hints\n\n");
@@ -564,7 +564,7 @@ fn write_entry_gate(output: &mut String, spec: &SkillSpec) {
         output.push_str("- Before any task action, run `skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"`, preserve the printed `run_dir`, then run `skillspec act ./skill.spec.yml --input='<user task>' --run <run_dir> --phase <phase-id>`, and read the ordered phase plan plus current-route action checklist.\n");
         output.push_str("- Until that plan and checklist are read, the only allowed actions are loading this `SKILL.md`, loading the colocated `skill.spec.yml`, and running SkillSpec navigation or decision commands for this spec.\n");
         output.push_str("- The selected route and matched rules in the checklist override lower-level skill defaults. If a tool is forbidden, stop and report that the SkillSpec blocks it.\n");
-        output.push_str("- After each phase action, record structured progress in `<run_dir>/execution.jsonl` and run `skillspec progress show ./skill.spec.yml --run <run_dir>` before moving to the next phase.\n");
+        output.push_str("- After each phase action, record structured progress in `<run_dir>/execution.jsonl` and use `skillspec progress show ./skill.spec.yml --run <run_dir>` as an internal gate check before moving to the next phase. Surface only the gate result unless detail is requested or needed for a blocker/failure.\n");
     }
     if !entry.supersedes_skills.is_empty() {
         let _ = writeln!(
@@ -1085,9 +1085,9 @@ fn write_runtime_commands(output: &mut String) {
         "skillspec act <skill-folder>/skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n",
     );
     output.push_str(
-        "skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>\n",
+        "skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>\n",
     );
-    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <rote-workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress final-response \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings\n");
     output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --events \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\"\n");
@@ -1099,7 +1099,7 @@ fn write_runtime_commands(output: &mut String) {
     );
     output.push_str("skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec trace compact \"${PWD}/.skillspec/traces/<run-id>\"\n");
-    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\"\n");
+    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\" --summary\n");
     output.push_str("```\n");
 }
 
@@ -1351,7 +1351,8 @@ mod tests {
         assert!(output.contains("Harness Presentation Contract"));
         assert!(output.contains("step `description` as the default visible text"));
         assert!(output.contains("collapsed by default in normal progress UI"));
-        assert!(output.contains("evidence gaps"));
+        assert!(output.contains("trace align --summary"));
+        assert!(output.contains("compact alignment summary"));
         assert!(output.contains("skillspec act ./skill.spec.yml"));
         assert!(output.contains("active execution SOP"));
         assert!(output.contains("The selected route and matched rules"));

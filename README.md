@@ -164,7 +164,7 @@ important to leave as instructions alone.
 | --- | --- | --- |
 | "My skill is over 1000+ lines and the agent is not following instructions." | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` | Turns a long skill into a smaller, followable contract: routes, rules, dependencies, tests, installed harness files, and an alignment report that shows what the agent actually followed. |
 | "I switched from Codex to Claude and need proof at the end of execution." | `/skillspec complete the task and print an alignment report` | Runs the task through the same contract shape across harnesses, then prints selected route, required steps, missing evidence if any, and final alignment status. |
-| "I designed a CLI, API, or MCP and want skills that use it correctly." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"` | Uses [Rote by Modiqo](https://www.modiqo.ai) as the trace substrate, captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, and preserves command and dependency proof. |
+| "I designed a CLI, API, or MCP and want skills that use it correctly." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"` | Uses the optional durable-executor trace substrate, captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, and preserves command and dependency proof. |
 | "I have too many skills and my agent environment shortened descriptions to fit context." | `/skillspec install router` | Installs the SkillSpec router, builds an index, routes to the right skill on demand, and frees context for the skill that actually matters. |
 | "I need to prove a skill before release." | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
 | "I need a read-only view of installed SkillSpec state." | `/skillspec status` | Reports router and [durable-executor](#rote-prerequisite-for-agent-traces) installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy text-only skills. |
@@ -181,7 +181,7 @@ chat.
 | Route a large skill library | `/skillspec install router` |
 | Temporarily turn router mode off | `/skillspec disable router` |
 | Turn router mode back on | `/skillspec enable router` |
-| Capture a tool-backed workflow | `/skillspec install durable-executor from /path/or/public-uri`<br>Requires [Rote by Modiqo](https://www.modiqo.ai) for agent traces. |
+| Capture a tool-backed workflow | `/skillspec install durable-executor from /path/or/public-uri`<br>Requires the durable-executor prerequisite for agent traces. |
 | Synthesize a skill from observed work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` |
 | Turn durable first-hop off | `/skillspec disable durable-executor`<br>Keeps the [durable-executor](#rote-prerequisite-for-agent-traces) files installed but stops automatic routing. |
 
@@ -199,17 +199,17 @@ Once SkillSpec is installed, these commands manage the local skill environment.
 | `/skillspec disable router` | Keeps router files installed but makes the router explicit-only and restores routed skills to implicit/default discovery. |
 | `/skillspec enable router` | Turns router mode back on and rebuilds the index from current roots. |
 | `/skillspec update router` | Backs up config, manifest, index, and generated router skills, rewrites recorded harness roots, preserves enabled/disabled state, and warns you to restart active sessions. |
-| `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional [durable-executor](#rote-prerequisite-for-agent-traces) first-hop after checking [Rote by Modiqo](https://www.modiqo.ai) is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
+| `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional [durable-executor](#rote-prerequisite-for-agent-traces) first-hop after checking its trace substrate is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
 | `/skillspec disable durable-executor` | Keeps [durable-executor](#rote-prerequisite-for-agent-traces) installed but makes it explicit-only. |
-| `/skillspec enable durable-executor` | Checks [Rote by Modiqo](https://www.modiqo.ai) on `PATH` before making [durable-executor](#rote-prerequisite-for-agent-traces) implicit again. |
+| `/skillspec enable durable-executor` | Checks the trace substrate on `PATH` before making [durable-executor](#rote-prerequisite-for-agent-traces) implicit again. |
 
 If a skill is later added outside SkillSpec, `skillspec router index status`
 detects text-only versus SkillSpec-backed additions and
 `skillspec router index refresh` reapplies explicit invocation controls and
 rebuilds the index. Observed-workspace synthesis refuses to write until the
-observed result and evidence summary are approved; if live
-[Rote by Modiqo](https://www.modiqo.ai) workspace lookup is unreliable, pass
-pre-captured stats, log, and metadata files explicitly.
+observed result and evidence summary are approved; if live durable workspace
+lookup is unreliable, pass pre-captured stats, log, and metadata files
+explicitly.
 
 The lower-level `skillspec index` command is router-specific. It only builds the
 SQLite catalog used by `skillspec route` and the optional skill-router; it is not
@@ -329,13 +329,12 @@ estimated token metrics, including cache hits and misses for workspace import.
 Full reports and package proof remain on disk at the paths shown in the summary.
 Use `--json` when a caller needs the full machine report on stdout.
 
-These summary metrics do not require Rote. They estimate output economy from
-what the agent sees versus the proof artifacts preserved on disk. Rote-backed
-durable runs add measured workspace token stats when exact consumption is
-available.
+These summary metrics estimate output economy from what the agent sees versus
+the proof artifacts preserved on disk. Durable-executor runs can additionally
+add measured workspace token stats when exact consumption is available.
 
-To include non-Rote summary metrics in `trace align`, record the printed metrics
-into the run ledger before alignment:
+To include direct-run summary metrics in `trace align --summary`, record the printed
+metrics into the run ledger before alignment:
 
 ```bash
 skillspec progress stats .skillspec/traces/<run-id> \
@@ -471,8 +470,8 @@ Proof is the difference between "the agent probably followed the skill" and
 | Plan | `skillspec plan ...` | The input selects the expected route and phase order. |
 | Act | `skillspec act ...` | The next phase has a concrete checklist and tool boundary. |
 | Record | `skillspec progress record ...` | The run ledger captures phase, requirement, and evidence events. |
-| Review | `skillspec progress show ...` | The execution ledger has progress events and no observed forbidden actions. |
-| Align | `skillspec trace align ...` | The current spec can replay the decision and match execution evidence to obligations. |
+| Review | `skillspec progress show ...` | The execution ledger has progress events and no observed forbidden actions. Use it as an internal gate check unless details are needed. |
+| Align | `skillspec trace align ... --summary` | The current spec can replay the decision and match execution evidence to obligations while keeping full detail in `alignment.json`. |
 
 Run a realistic task through the spec:
 
@@ -503,7 +502,8 @@ Align decision and execution proof:
 ```sh
 skillspec trace align ./my-skill/skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl
+  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
+  --summary
 ```
 
 ### What The Report Tells You

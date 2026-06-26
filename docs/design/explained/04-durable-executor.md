@@ -137,7 +137,8 @@ skillspec progress stats <run-dir> \
   --workspace-stats-report <file>
 skillspec trace align <spec> \
   --decision-trace <run-dir> \
-  --execution-trace <run-dir>/execution.jsonl
+  --execution-trace <run-dir>/execution.jsonl \
+  --summary
 ```
 
 Review check:

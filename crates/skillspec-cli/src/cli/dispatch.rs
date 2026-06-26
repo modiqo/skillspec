@@ -422,16 +422,20 @@ pub(super) fn run(command: Command) -> Result<()> {
                 path,
                 decision_trace,
                 execution_trace,
+                summary,
                 json,
             } => {
                 let spec = parser::load_spec(&path)?;
                 let report =
                     align::align_decision_trace(&spec, &path, &decision_trace, &execution_trace)?;
                 let alignment_report = align::write_report_json(&decision_trace, &report)?;
-                report::alignment_written(&alignment_report)?;
                 if json {
+                    report::alignment_written(&alignment_report)?;
                     report::json(&report)?;
+                } else if summary {
+                    report::align_summary(&report, &alignment_report)?;
                 } else {
+                    report::alignment_written(&alignment_report)?;
                     report::align(&report)?;
                 }
                 if report.has_failures() {

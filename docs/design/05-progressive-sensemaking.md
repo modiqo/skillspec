@@ -285,13 +285,13 @@ commands, browser work, network work, and file changes.
 After a traced decision, run:
 
 ```sh
-skillspec trace align ./skill.spec.yml --decision-trace <run_dir>
+skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --summary
 ```
 
 If structured execution evidence exists, include it:
 
 ```sh
-skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <jsonl>
+skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <jsonl> --summary
 ```
 
 Decision replay can prove deterministic steering behavior. Execution obligations

@@ -147,7 +147,8 @@ Grounded command:
 ```sh
 skillspec trace align ./skill.spec.yml \
   --decision-trace <run-dir> \
-  --execution-trace <run-dir>/execution.jsonl
+  --execution-trace <run-dir>/execution.jsonl \
+  --summary
 ```
 
 Review check:
