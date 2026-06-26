@@ -45,6 +45,10 @@ them before execution.
 
 ## Import-Skill Strategy
 
+Classify the source before choosing the command. Single atomic skills use the
+one-shot path; parent folders with many `SKILL.md` files or plugin markers use
+workspace map/import; existing reviewed `skill.spec.yml` files use revision.
+
 For one atomic prose skill, prefer:
 
 ```sh

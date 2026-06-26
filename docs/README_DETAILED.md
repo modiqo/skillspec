@@ -150,6 +150,15 @@ enabled router mode, `skillspec router index refresh` is usually the better
 maintenance command because it also reapplies visibility and checks
 preparedness.
 
+Before importing, classify the source shape:
+
+| Source shape | Command path |
+| --- | --- |
+| Exactly one `SKILL.md` and package-local resources | `skillspec port-one-shot` |
+| Multiple `SKILL.md` files or cross-skill file references | `skillspec workspace map`, then validate/import/converge/compile |
+| Plugin-shaped root with `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
+| Existing reviewed `skill.spec.yml` | revise the spec from grammar/current-spec handles; do not re-import |
+
 For one atomic skill package, prefer the bundled porting path:
 
 ```sh
@@ -212,8 +221,9 @@ SkillSpec construct with confidence, status, and review notes before install.
 
 ## Map A Multi-Skill Or Plugin Workspace
 
-When a source root contains many `SKILL.md` files, do not import the parent
-folder as one skill. Map the workspace first:
+When a source root contains many `SKILL.md` files, cross-skill references, or
+plugin markers, do not import the parent folder as one skill. Map the workspace
+first:
 
 ```sh
 skillspec workspace map ./skills --out ./build/skillspec.workspace.yml --summary

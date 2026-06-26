@@ -39,7 +39,7 @@ skillspec <COMMAND>
 | `deps <COMMAND>` | Check declared SkillSpec dependencies. |
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
-| `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from a local skill file or folder, optionally gated by a fresh source map. |
+| `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from one local atomic skill file or folder, optionally gated by a fresh source map. |
 | `port-one-shot <source> --out <dir> [--target <target>] [--prove]` | Bundle grammar preflight, source map, doctor, import, QA, compile, report, and optional estimated metric recording for one atomic prose skill. |
 | `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
 | `index --roots <path>... --out <index-file-or-router-dir>` | Build the router-specific SQLite skill catalog used by `skillspec route` and the optional skill-router. |
@@ -1047,6 +1047,15 @@ Options:
   event. Repeat for multiple requirements.
 - `--json`: emit JSON instead of the compact human report.
 
+Choose the import path before running `port-one-shot`:
+
+| Source shape | Path |
+| --- | --- |
+| Exactly one `SKILL.md` under the selected source root | `port-one-shot` |
+| Multiple `SKILL.md` files, shared standards packages, or cross-skill file references | `workspace map`, `workspace validate`, `workspace import`, then converge/compile |
+| Plugin-shaped source root with `skills/` and `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
+| Existing reviewed `skill.spec.yml` | revise the existing spec; do not re-import the folder |
+
 `port-one-shot` is the safe default for one atomic prose skill. It bundles:
 
 - embedded grammar porting guide, checklist, and JSON Schema artifacts;
@@ -1063,7 +1072,10 @@ The next semantic promotion step is agent-guided, not automatic: use the source
 map, shape crib, and coverage matrix to promote only source-backed behavior, run
 the QA ladder once, then fix failures by class.
 Parent folders containing multiple `SKILL.md` files are rejected; use
-`workspace map` and `workspace import` for those.
+`workspace map` and `workspace import` for those. Existing reviewed
+`skill.spec.yml` files should enter the revision path, because import is a
+mechanical scaffold generator, not a safe way to update an already-authored
+contract.
 
 ## `synthesize-from-workspace`
 

@@ -214,15 +214,16 @@ routes:
   - id: local_skill_port
     label: Port local skill
     rank: 1
-    description: Use when the source is a local SKILL.md file or local skill folder.
+    description: Use when source-shape recon proves exactly one atomic local prose skill package. If the source has multiple SKILL.md files, plugin markers, cross-skill references, or an existing reviewed skill.spec.yml, route to workspace or revision instead.
     execution_plan:
       mode: ordered
-      reason: Local ports need source preservation, grammar preflight, a mechanical draft, semantic promotion, QA, and a value report.
+      reason: Local ports need source-shape classification, source preservation, grammar preflight, a mechanical draft, semantic promotion, QA, and a value report. One-shot is allowed only after recon confirms a single atomic prose package.
       phases:
         - id: resolve_local_source
           owner_skill: skillspec
-          description: Resolve the user-supplied local path to one skill folder and preserve sibling resources.
+          description: Resolve the user-supplied local path, classify the source shape, and preserve package-local sibling resources. Use one-shot only for exactly one SKILL.md with no workspace/plugin markers; hand multi-skill, cross-referenced, or plugin-shaped roots to workspace map; hand existing reviewed skill.spec.yml changes to the revision route.
           requires:
+            - decide_import_mode_from_source_shape
             - inventory_source_folder
             - doctor_source_skill
             - source_map_create
@@ -234,6 +235,10 @@ routes:
           forbid:
             - copy_only_skill_md_when_resources_exist
             - load_large_source_without_source_map
+            - use_port_one_shot_without_shape_recon
+            - use_port_one_shot_for_workspace_root
+            - use_port_one_shot_for_plugin_root
+            - revise_existing_spec_through_import
         - id: grammar_preflight
           owner_skill: skillspec
           description: Run the grammar sensemaking and checklist commands before import or YAML editing.
@@ -252,12 +257,16 @@ routes:
             - infer_grammar_from_memory
         - id: mechanical_import
           owner_skill: skillspec
-          description: Generate and inspect the draft spec without treating it as final truth. Prefer port-one-shot for ordinary one-package ports so grammar proof, source map, doctor, import, QA, compile, and estimated metrics are bundled.
+          description: Generate and inspect the draft spec without treating it as final truth. Run port-one-shot only when source-shape recon has proven one atomic prose package; otherwise stop and switch to workspace or revision flow.
           requires:
             - port_one_shot_or_manual_import
             - import_skill_draft
             - sensemake_draft
             - produce_mechanical_draft
+          forbid:
+            - port_one_shot_for_multi_skill_workspace
+            - port_one_shot_for_plugin_workspace
+            - port_one_shot_for_existing_reviewed_spec
         - id: semantic_promotion
           owner_skill: skillspec
           description: Guide the agent through a small source-backed promotion pass instead of auto-filling the scaffold. Fill the coverage matrix from the current source only, split source code into package-local resources/code entries, and promote only evidenced activation, routes, rules, deps, imports, resources, commands, recipes, states, closures, tests, and review notes.
@@ -1019,6 +1028,24 @@ routes:
           requires:
             - value_report
 rules:
+  - id: single_atomic_source_uses_one_shot
+    when:
+      user_says_any:
+        - single atomic skill
+        - one SKILL.md
+        - one-shot port
+        - port-one-shot
+        - single skill folder
+        - atomic skill package
+    prefer: local_skill_port
+    forbid:
+      - use_port_one_shot_without_shape_recon
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+    reason: One-shot is the fast path only after source-shape recon proves there is exactly one atomic prose skill package.
   - id: route_multi_skill_repos_to_workspace_recon
     when:
       user_says_any:
@@ -1041,13 +1068,23 @@ rules:
         - fanout converge
         - shared standards package
         - cross-skill references
+        - cross references another skill
+        - references another skill
+        - coding-standards/SKILL.md
         - skill dependency graph
         - skill depends on another skill
+        - plugin.json
+        - .claude-plugin
+        - CLAUDE.md plugin
+        - MCP plugin
+        - same skill name collision
     prefer: workspace_skill_authoring
     forbid:
       - use_router_index_for_authoring_recon
       - import_workspace_root_as_single_skill
       - proceed_with_circular_skill_dependencies
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
     after_success:
       - report_workspace_recon
     reason: A folder containing multiple SKILL.md packages or plugin-shaped skill roots must be mapped as a workspace before any single-skill import or fanout/converge plan.
@@ -1561,6 +1598,10 @@ rules:
         - route coverage
         - improve this spec
         - update skill.spec.yml
+        - already has skill.spec.yml
+        - existing skill.spec.yml
+        - revise skill.spec.yml instead of import
+        - do not reimport existing spec
         - update the spec
         - update existing spec
         - patch the YAML
@@ -2111,6 +2152,13 @@ commands:
   inventory_source_folder:
     description: Inventory source files before import so resources, scripts, examples, and sibling references are not dropped.
     template: rg --files <source-skill-folder>
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  decide_import_mode_from_source_shape:
+    description: Decide whether the source path is a single atomic prose skill, a multi-skill workspace, a plugin-shaped workspace, or an existing SkillSpec revision before choosing one-shot versus workspace/revision.
+    template: "rg --files <source-root> | rg '(^|/)SKILL\\.md$|(^|/)skill\\.spec\\.yml$|(^|/)(\\.claude-plugin/plugin\\.json|\\.mcp\\.json|CLAUDE\\.md)$'"
     safety: local_read
     requires:
       dependencies:
@@ -3302,6 +3350,20 @@ tests:
         - route_local_sources_to_local_port
       after_success:
         - local_porting_loop
+  - name: single atomic source uses one-shot decision gate
+    input: Port one atomic skill package with one SKILL.md using port-one-shot
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - single_atomic_source_uses_one_shot
+        - route_local_sources_to_local_port
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+      forbid:
+        - use_port_one_shot_without_shape_recon
+        - use_port_one_shot_for_workspace_root
+        - use_port_one_shot_for_plugin_root
   - name: multi-skill repo maps before fanout import
     input: /skillspec map /Users/me/tulving/skills with many SKILL.md files, shared standards package, and cross-skill references
     expect:
@@ -3313,6 +3375,19 @@ tests:
       forbid:
         - use_router_index_for_authoring_recon
         - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_workspace_root
+  - name: cross referenced skill repo uses workspace map instead of single import
+    input: /skillspec import this folder with multiple SKILL.md files where one skill references ../coding-standards/SKILL.md
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_workspace_root
+        - use_port_one_shot_for_plugin_root
   - name: plugin-shaped repo maps with namespaces
     input: /skillspec map /Users/me/tulving/claude-for-legal plugin namespace repo with repeated skill names and plugin slash commands
     expect:
@@ -3324,6 +3399,7 @@ tests:
       forbid:
         - use_router_index_for_authoring_recon
         - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_plugin_root
   - name: workspace manifest fanout imports package drafts
     input: /skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
     expect:
@@ -3659,6 +3735,15 @@ tests:
         - skip_current_spec_sensemake
   - name: update existing skillspec routes to revision
     input: Update skillspec existing skillspec yaml with plan act progress command goodness
+    expect:
+      route: revise_existing_skillspec
+      matched_rules:
+        - revision_starts_with_grammar_and_current_spec
+      forbid:
+        - patch_yaml_from_memory
+        - skip_current_spec_sensemake
+  - name: existing skill spec revises instead of reimporting
+    input: This folder already has skill.spec.yml; revise skill.spec.yml instead of import
     expect:
       route: revise_existing_skillspec
       matched_rules:

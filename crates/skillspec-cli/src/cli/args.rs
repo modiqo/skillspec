@@ -211,7 +211,7 @@ pub(super) enum Command {
     },
     #[command(
         about = "Create a mechanical draft SkillSpec from a local skill file or folder",
-        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or single skill folder. Parent folders with multiple SKILL.md files are workspaces and are rejected; run `skillspec workspace map <source-root> --out <build-dir>/skillspec.workspace.yml` first. For large or code-heavy single-skill sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
+        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or single skill folder after confirming the source is one atomic package. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers are workspaces and should start with `skillspec workspace map <source-root> --out <build-dir>/skillspec.workspace.yml`. Existing reviewed skill.spec.yml files should be revised from grammar/current-spec handles, not re-imported. For large or code-heavy single-skill sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
     )]
     ImportSkill {
         /// Local SKILL.md file or skill folder to import.
@@ -225,7 +225,7 @@ pub(super) enum Command {
     },
     #[command(
         about = "Port one atomic prose skill through grammar preflight, import, QA, compile, and metrics",
-        long_about = "Bundle the safe single-skill porting ladder in one command: embedded grammar/schema/checklist artifacts, source map, doctor report, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, scenario tests, compile, compact proof report, and optional non-Rote estimated progress stats. This is for one atomic skill package only; parent folders with multiple SKILL.md files must use workspace map/import."
+        long_about = "Bundle the safe single-skill porting ladder in one command: embedded grammar/schema/checklist artifacts, source map, doctor report, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, scenario tests, compile, compact proof report, and optional non-Rote estimated progress stats. This is for one atomic skill package only. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers must use workspace map/import. Existing reviewed skill.spec.yml files should use the revision path instead of one-shot import."
     )]
     PortOneShot {
         /// Local SKILL.md file or single skill folder to port.

@@ -359,6 +359,15 @@ dependencies.
 
 ### 2. Map And Import
 
+Choose the path before running an import command:
+
+| Source shape | Use this path | Why |
+| --- | --- | --- |
+| One folder with exactly one `SKILL.md` | `skillspec port-one-shot` | Fast single-skill port with grammar proof, source map, QA, compile, and compact metrics. |
+| Parent folder with many `SKILL.md` files | `skillspec workspace map`, then `workspace import` | Preserves each atomic skill separately and records dependency edges. |
+| Plugin-shaped repo | `skillspec workspace map`, then workspace flow | Preserves plugin namespaces so repeated skill names do not collide. |
+| Existing reviewed `skill.spec.yml` | revision flow | Keeps the current contract and changes it with grammar/current-spec sensemaking instead of re-importing. |
+
 For one atomic skill package, use the bundled porting command. It runs grammar
 preflight, source map, doctor, mechanical import, validation, imports check,
 deps check, tests, compile, and a compact proof report in one path.

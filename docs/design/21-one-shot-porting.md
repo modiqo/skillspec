@@ -24,6 +24,34 @@ One-shot porting makes the safe path the default path.
 - do not hide dependency gaps by deleting dependency evidence;
 - do not replace workspace map/import for parent folders with multiple skills.
 
+## Decision Gate
+
+`port-one-shot` is a single-skill accelerator, not the default for every source
+folder. Before invoking it, the agent or caller must inspect the source shape.
+
+Use one-shot when:
+
+- the selected root contains exactly one `SKILL.md`;
+- sibling folders are resources for that same package;
+- there are no plugin markers;
+- there is no existing reviewed `skill.spec.yml` that should be revised.
+
+Use workspace flow instead when:
+
+- the selected root contains multiple `SKILL.md` files;
+- a skill references a sibling package, such as `../coding-standards/SKILL.md`;
+- the source is plugin-shaped, with `skills/` plus `.claude-plugin/plugin.json`,
+  `.mcp.json`, or `CLAUDE.md`;
+- repeated skill names need namespaced install slugs.
+
+Use revision flow instead when:
+
+- a reviewed `skill.spec.yml` already exists and the task is to improve,
+  correct, or extend that contract.
+
+The fast path still performs source map, doctor, QA, compile, and optional
+metric recording. It does not replace the agent's guided semantic promotion pass.
+
 ## SOP
 
 1. Grammar preflight

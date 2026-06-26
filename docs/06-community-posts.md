@@ -24,9 +24,14 @@ A prose skill can explain intent, but it usually cannot prove behavior.
 
 SkillSpec adds the missing testable layer:
 
+For one atomic skill:
+
 ```sh
 skillspec port-one-shot path/to/SKILL.md --out ./draft --target codex-skill --prove
 ```
+
+For multi-skill or plugin-shaped repos, start with `skillspec workspace map`.
+For an existing `skill.spec.yml`, revise the contract instead of re-importing.
 
 The lower-level commands remain available when you need to inspect one gate:
 

@@ -10,6 +10,24 @@ answers "which installed skill should handle this task?" Workspace mapping
 answers "what packages exist in this source tree, how are they named, what do
 they reference, and what can be imported safely?"
 
+## Operator Decision Gate
+
+Agents should classify the selected source before choosing an import command.
+This avoids treating `port-one-shot` as a universal shortcut.
+
+| Observed source | Route | Command path |
+| --- | --- | --- |
+| Exactly one `SKILL.md` below the selected root, no plugin markers, no reviewed `skill.spec.yml` to revise | Single atomic skill | `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove` |
+| More than one `SKILL.md`, shared standards packages, or relative references into sibling skill folders | Ordinary multi-skill workspace | `skillspec workspace map`, `workspace validate`, `workspace import`, `workspace converge`, `workspace compile` |
+| A root with `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | Plugin-shaped workspace | Workspace flow with plugin namespace preservation |
+| A reviewed `skill.spec.yml` already exists and the request is to improve it | Existing SkillSpec revision | `skillspec grammar sensemake`, `skillspec sensemake`, precise `query`/`refs`, then validate/test/compile |
+
+The source shape wins over command convenience. If a user asks for one-shot on a
+parent folder that contains multiple skills or plugin boundaries, the correct
+response is to map the workspace and explain why. If a user asks to import a
+folder that already has a reviewed `skill.spec.yml`, the correct response is to
+revise that spec instead of generating a new scaffold.
+
 ## Compatibility Boundary
 
 The workspace flow must not change the simple single-skill path.

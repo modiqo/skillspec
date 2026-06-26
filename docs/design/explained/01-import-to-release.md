@@ -56,6 +56,11 @@ Review check:
 
 ## 2. Scaffold, Do Not Finish
 
+Choose the path from the source shape first. One atomic skill can use
+`port-one-shot`; a parent folder with many skills or plugin boundaries starts
+with workspace map/import; a folder that already has a reviewed
+`skill.spec.yml` starts with revision.
+
 For one atomic prose skill, `port-one-shot` runs the safe bundle: grammar
 preflight, source map, doctor, typed import, QA, compile, and compact report.
 Underneath that bundle, `import-skill` creates the mechanical draft. It

@@ -39,6 +39,10 @@ SkillSpec is worth the overhead when:
 
 ## Migration Path
 
+Use this for one atomic skill package. Use workspace map/import for a parent
+folder with many skills or plugin boundaries, and revise an existing
+`skill.spec.yml` instead of re-importing it.
+
 ```sh
 skillspec port-one-shot path/to/SKILL.md --out ./draft --target codex-skill --prove
 ```

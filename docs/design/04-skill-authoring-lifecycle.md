@@ -57,7 +57,12 @@ elicitations, dependencies, and proof obligations into the structured spec.
 
 ## Prose Import Path
 
-The import path is for an existing `SKILL.md` or a directory of Markdown files.
+The one-shot import path is for one atomic prose skill package: exactly one
+`SKILL.md` plus package-local Markdown, references, resources, and scripts.
+Parent folders with multiple `SKILL.md` files, cross-skill references, or plugin
+markers should start with `skillspec workspace map` instead. Existing reviewed
+`skill.spec.yml` files should be revised from current grammar and spec handles,
+not re-imported.
 
 The CLI command is:
 
