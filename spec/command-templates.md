@@ -58,8 +58,10 @@ skillspec port-one-shot SKILL.md --out ./draft --target codex-skill --prove
 It writes grammar/schema/checklist proof, a typed shape crib, source map, doctor
 report, mechanical draft, QA results, compile output, and a compact report. Use
 the lower-level commands when debugging one gate or building a custom import
-flow. During manual promotion, quote string values containing `: ` and remember
-that artifact producers/consumers are only `command`, `code`, or `recipe` refs.
+flow. During manual promotion, quote string values containing `: `, especially
+elicitation questions, descriptions, `steps[].note`, recipe/procedure notes, and
+review notes. Artifact producers/consumers are only `command`, `code`, or
+`recipe` refs.
 
 `skillspec source map SKILL.md --out .skillspec/source-map` should run before
 `skillspec import-skill SKILL.md --out skill.spec.yml --source-map

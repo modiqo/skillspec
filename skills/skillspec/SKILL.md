@@ -60,7 +60,7 @@ skillspec grammar checklist --for import-skill
 - Fill or update a coverage matrix with `prose_span | obligation | skillspec_construct | confidence | status | review_note` before installing or releasing a changed skill.
 - Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
 - Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
-- Quote YAML string values that contain `: `, especially `elicitations.*.question`, descriptions, and review notes.
+- Quote YAML string values that contain `: `, especially `elicitations.*.question`, descriptions, `steps[].note`, recipe/procedure notes, and review notes.
 - Artifact `produced_by` and `consumed_by` entries can only reference `command`, `code`, or `recipe`; use route checks, recipe steps, or imports/resources `used_by` for route-level linkage.
 - Before porting, classify the source shape: one atomic prose skill can use `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove`; multiple `SKILL.md` files, cross-skill references, or plugin markers must use workspace map/import/converge/compile; an existing reviewed `skill.spec.yml` must use the revision path.
 - For read-only shape questions such as "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url", run `skillspec doctor <source-skill-folder-or-repo-uri> --json`, report the shape and recommended next command, and stop before import, port, compile, install, or remote candidate selection.

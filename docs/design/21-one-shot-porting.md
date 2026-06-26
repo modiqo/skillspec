@@ -104,7 +104,7 @@ The guided pass should stay short:
    closures, and tests;
 3. fill the coverage matrix for promoted obligations and unresolved gaps;
 4. quote YAML strings containing `: `, especially elicitation questions,
-   descriptions, and review notes;
+   descriptions, `steps[].note`, recipe/procedure notes, and review notes;
 5. keep artifact `produced_by` and `consumed_by` refs limited to commands, code
    blocks, and recipes;
 6. run the QA ladder once;

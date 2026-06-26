@@ -50,7 +50,7 @@ pub(super) fn write_authoring_contract(output: &mut String) {
 ");
     output.push_str("- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
 ");
-    output.push_str("- Quote YAML string values that contain `: `, especially `elicitations.*.question`, descriptions, and review notes.
+    output.push_str("- Quote YAML string values that contain `: `, especially `elicitations.*.question`, descriptions, `steps[].note`, recipe/procedure notes, and review notes.
 ");
     output.push_str("- Artifact `produced_by` and `consumed_by` entries can only reference `command`, `code`, or `recipe`; use route checks, recipe steps, or imports/resources `used_by` for route-level linkage.
 ");

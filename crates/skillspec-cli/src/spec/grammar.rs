@@ -498,8 +498,8 @@ fn import_skill_checklist() -> Vec<ChecklistItem> {
         },
         ChecklistItem {
             id: "elicitations",
-            prompt: "Model user approvals and bounded choices before side effects. Quote question strings that contain colon-space or other YAML-sensitive punctuation.",
-            evidence: "elicitations referenced by rules, recipes, or states, with YAML-safe quoted question strings when needed",
+            prompt: "Model user approvals and bounded choices before side effects. Quote question and note strings that contain colon-space or other YAML-sensitive punctuation.",
+            evidence: "elicitations referenced by rules, recipes, or states, with YAML-safe quoted question and note strings when needed",
             status_values: &["good", "partial", "missing", "not_applicable"],
         },
         ChecklistItem {

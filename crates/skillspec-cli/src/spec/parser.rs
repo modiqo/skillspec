@@ -83,7 +83,7 @@ fn yaml_parse_hint(content: &str, source: &serde_yaml::Error) -> Option<String> 
     let line = content.lines().nth(line_number.saturating_sub(1))?.trim();
     if looks_like_unquoted_scalar_with_colon(line) {
         return Some(format!(
-            "line {line_number} looks like an unquoted string containing `: `. Quote the value or use a block scalar, for example `question: \"...: ...\"`. Suspect line: {line}"
+            "line {line_number} looks like an unquoted string containing `: `. Quote the value or use a block scalar, for example `note: \"...: ...\"` or `question: \"...: ...\"`. Suspect line: {line}"
         ));
     }
     Some(
@@ -200,6 +200,26 @@ elicitations:
 
         assert!(hint.contains("line 8"), "unexpected hint: {hint}");
         assert!(hint.contains("question:"), "unexpected hint: {hint}");
+        assert!(hint.contains("Quote the value"), "unexpected hint: {hint}");
+    }
+
+    #[test]
+    fn parse_hint_flags_unquoted_note_colon() {
+        let yaml = r#"
+schema: skillspec/v0
+id: bad
+title: Bad
+description: Bad
+recipes:
+  guidance:
+    steps:
+      - note: Offer concrete next tasks: DPA review.
+"#;
+        let error = serde_yaml::from_str::<SkillSpec>(yaml).unwrap_err();
+        let hint = yaml_parse_hint(yaml, &error).expect("expected YAML colon hint");
+
+        assert!(hint.contains("line 9"), "unexpected hint: {hint}");
+        assert!(hint.contains("note:"), "unexpected hint: {hint}");
         assert!(hint.contains("Quote the value"), "unexpected hint: {hint}");
     }
 
