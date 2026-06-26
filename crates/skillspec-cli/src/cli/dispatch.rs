@@ -541,6 +541,17 @@ pub(super) fn run(command: Command) -> Result<()> {
                     })?;
                 report::json(&event)?;
             }
+            ProgressCommand::Batch { run, events, json } => {
+                let report = progress::record_batch(progress::BatchRecordOptions {
+                    run_dir: run,
+                    events,
+                })?;
+                if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&progress::render_batch_report(&report))?;
+                }
+            }
         },
         Command::Deps { command } => match command {
             DepsCommand::Check { path, command } => {

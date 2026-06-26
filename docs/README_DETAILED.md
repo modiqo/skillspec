@@ -460,6 +460,8 @@ skillspec progress final-response .skillspec/traces/<run-id> \
   --requirement record_final_response_sent_event \
   --requirement report_workspace_evidence_and_token_math \
   --result --evidence --alignment --token-savings
+skillspec progress batch .skillspec/traces/<run-id> \
+  --events .skillspec/traces/<run-id>/final-proof.jsonl
 skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```
@@ -503,6 +505,11 @@ drafting the final report sections, run `progress final-response --result
 --evidence --alignment --token-savings` with the durable closure phase and
 requirements, then rerun `trace align` so the final alignment proves the
 response included evidence, alignment, and token usage.
+
+When final closure needs several route, elicitation, forbid/no-violation, or
+after-success proof rows, write them to a JSONL proof file and run
+`skillspec progress batch` once. This keeps `execution.jsonl` exact without
+making the user watch a parade of bookkeeping commands.
 
 The agent remains the executor. SkillSpec supplies the contract and the phase
 tracker so the harness can ask "what is the current phase?" and "what remains?"

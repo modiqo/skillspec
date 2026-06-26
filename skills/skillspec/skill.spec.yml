@@ -2081,6 +2081,8 @@ artifacts:
         id: progress_record_phase
       - kind: command
         id: progress_record_requirement
+      - kind: command
+        id: progress_batch
     consumed_by:
       - kind: command
         id: progress_show
@@ -2344,6 +2346,13 @@ commands:
   progress_record_requirement:
     description: Append structured evidence that a phase requirement was satisfied or failed.
     template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_batch:
+    description: Append several final route, closure, elicitation, forbid/no-violation, or evidence proof events from one JSONL file so final alignment proof does not become a visible progress parade.
+    template: skillspec progress batch <trace-dir> --events <trace-dir>/final-proof.jsonl
     safety: local_write
     requires:
       dependencies:
@@ -2845,6 +2854,8 @@ recipes:
       - run_command: act_named_phase
       - run_command: progress_record_requirement
       - run_command: progress_record_phase
+      - note: For final route, closure, elicitation, forbid/no-violation, or evidence proof rows, write <trace-dir>/final-proof.jsonl and run progress_batch once instead of showing one progress command per row.
+      - run_command: progress_batch
       - run_command: progress_show
       - run_command: decide_demo
       - run_command: trace_align

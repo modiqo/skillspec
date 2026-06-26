@@ -1073,6 +1073,17 @@ pub(super) enum ProgressCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Append multiple structured progress events from JSONL or JSON array")]
+    Batch {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// JSONL file or JSON array of execution events to append.
+        #[arg(long)]
+        events: PathBuf,
+        /// Emit JSON for the compact batch report.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]

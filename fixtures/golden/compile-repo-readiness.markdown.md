@@ -324,6 +324,7 @@ skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <p
 skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --workspace <rote-workspace> --workspace-stats-report "${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt" --phase <phase-id> --requirement <stats-requirement-id>
 skillspec progress stats "${PWD}/.skillspec/traces/<run-id>" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
 skillspec progress final-response "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings
+skillspec progress batch "${PWD}/.skillspec/traces/<run-id>" --events "${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl"
 skillspec progress show <skill-folder>/skill.spec.yml --run "${PWD}/.skillspec/traces/<run-id>"
 skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"

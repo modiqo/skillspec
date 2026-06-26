@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::model::SkillSpec;
 use crate::trace::{self, TraceEnvelope};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -169,6 +169,23 @@ pub struct FinalResponseRecordOptions {
     pub included_alignment: bool,
     pub included_token_savings: bool,
     pub message: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BatchRecordOptions {
+    pub run_dir: PathBuf,
+    pub events: PathBuf,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BatchRecordReport {
+    pub schema: String,
+    pub run_id: String,
+    pub run_dir: String,
+    pub ledger: String,
+    pub events_file: String,
+    pub appended: usize,
+    pub by_event: BTreeMap<String, usize>,
 }
 
 pub fn show(spec: &SkillSpec, run_dir: &Path) -> Result<ProgressReport> {
@@ -436,6 +453,60 @@ pub fn record_final_response(options: FinalResponseRecordOptions) -> Result<Exec
     Ok(event)
 }
 
+pub fn record_batch(options: BatchRecordOptions) -> Result<BatchRecordReport> {
+    fs::create_dir_all(&options.run_dir).map_err(|source| Error::Write {
+        path: options.run_dir.clone(),
+        source,
+    })?;
+    let run_id = options
+        .run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    let ledger_path = execution_ledger_path(&options.run_dir);
+    let mut events = read_batch_events(&options.events)?;
+    if events.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "progress batch requires at least one event".to_owned(),
+        });
+    }
+
+    for event in &mut events {
+        normalize_batch_event(event, &run_id)?;
+    }
+
+    let mut by_event = BTreeMap::<String, usize>::new();
+    for event in &events {
+        *by_event.entry(event.event.clone()).or_default() += 1;
+        append_execution_event(&ledger_path, event)?;
+    }
+
+    Ok(BatchRecordReport {
+        schema: "skillspec.progress.batch.v0".to_owned(),
+        run_id,
+        run_dir: options.run_dir.display().to_string(),
+        ledger: ledger_path.display().to_string(),
+        events_file: options.events.display().to_string(),
+        appended: events.len(),
+        by_event,
+    })
+}
+
+pub fn render_batch_report(report: &BatchRecordReport) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "progress batch: appended {} events\n",
+        report.appended
+    ));
+    output.push_str(&format!("- ledger: {}\n", report.ledger));
+    output.push_str("- event counts:\n");
+    for (event, count) in &report.by_event {
+        output.push_str(&format!("  - {event}: {count}\n"));
+    }
+    output
+}
+
 #[derive(Clone, Debug, Default)]
 struct WorkspaceStatsReport {
     workspace: Option<String>,
@@ -650,6 +721,80 @@ fn read_execution_events(path: &Path) -> Result<Vec<ExecutionEvent>> {
         events.push(event);
     }
     Ok(events)
+}
+
+fn read_batch_events(path: &Path) -> Result<Vec<ExecutionEvent>> {
+    let content = fs::read_to_string(path).map_err(|source| Error::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+    if trimmed.starts_with('[') {
+        return serde_json::from_str::<Vec<ExecutionEvent>>(trimmed).map_err(|source| {
+            Error::ParseJson {
+                path: path.to_path_buf(),
+                source,
+            }
+        });
+    }
+
+    let mut events = Vec::new();
+    for line in content.lines().filter(|line| !line.trim().is_empty()) {
+        let event =
+            serde_json::from_str::<ExecutionEvent>(line).map_err(|source| Error::ParseJson {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        events.push(event);
+    }
+    Ok(events)
+}
+
+fn normalize_batch_event(event: &mut ExecutionEvent, run_id: &str) -> Result<()> {
+    event.schema = EXECUTION_SCHEMA.to_owned();
+    event.run_id.get_or_insert_with(|| run_id.to_owned());
+    event.event = event.event.replace('-', "_");
+    if !is_known_progress_event(&event.event) {
+        return Err(Error::InvalidInput {
+            message: format!("unknown progress batch event {:?}", event.event),
+        });
+    }
+    if event.requirement.is_some() && event.phase.is_none() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "progress batch event {:?} records a requirement without a phase",
+                event.event
+            ),
+        });
+    }
+    event.at_unix_ms.get_or_insert_with(unix_ms);
+    Ok(())
+}
+
+fn is_known_progress_event(event: &str) -> bool {
+    matches!(
+        event,
+        "phase_started"
+            | "requirement_started"
+            | "requirement_satisfied"
+            | "requirement_failed"
+            | "stats_collected"
+            | "obligation_satisfied"
+            | "route_fulfilled"
+            | "after_success_completed"
+            | "evidence_attached"
+            | "handoff_started"
+            | "handoff_completed"
+            | "phase_completed"
+            | "phase_blocked"
+            | "final_response_sent"
+            | "forbidden_action"
+            | "forbidden_action_observed"
+            | "forbid_violated"
+    )
 }
 
 fn append_execution_event(path: &Path, event: &ExecutionEvent) -> Result<()> {

@@ -197,6 +197,26 @@ Progress events should be recorded after actual work, not before. A progress
 event is a proof claim. If the work did not happen or the evidence is missing,
 the event should not claim success.
 
+### `progress batch`
+
+`progress batch` appends many structured execution events from one JSONL file or
+JSON array:
+
+```sh
+skillspec progress batch .skillspec/traces/<run-id> \
+  --events .skillspec/traces/<run-id>/final-proof.jsonl
+```
+
+Use it near the end of a run when the agent needs to record several proof rows:
+route fulfillment, after-success closures, elicitation approvals, evidence
+attachments, and no-violation proof for forbids. This keeps the ledger exact
+while avoiding a visible progress parade. The user-facing update should be one
+gate-level note, such as "final proof recorded; rerunning alignment."
+
+Each JSONL row is the same execution event shape used by `progress record`. The
+CLI fills missing `schema`, `run_id`, and timestamp fields and normalizes event
+names from hyphen form to underscore form.
+
 ### `progress show`
 
 `progress show` reads the decision trace and `execution.jsonl`, then writes a

@@ -30,6 +30,7 @@ These are the commands an agent or harness uses during a SkillSpec-backed run.
 | `skillspec progress stats` | `<run-dir>`, `--workspace <name>`, `--workspace-stats-report <path>`, `--workspace-stats-json <path>`, token metric flags, `--agent-visible-tokens <n>`, `--artifact-tokens-preserved <n>`, `--avoided-tokens <n>`, `--metrics-source <source>`, `--phase <id>`, `--requirement <id>`, `--message <text>`, `--json` | Appends a `stats_collected` event with workspace/token metrics so `trace align` can report measured consumption/savings or non-Rote estimated output economy from `--summary` blocks. | `skillspec progress stats .skillspec/traces/run-123 --agent-visible-tokens 190 --artifact-tokens-preserved 96190 --avoided-tokens 96000 --metrics-source estimated` |
 | `skillspec progress final-response` | `<run-dir>`, `--result`, `--evidence`, `--alignment`, `--token-savings`, `--phase <id>`, `--requirement <id>`, `--message <text>`, `--json` | Appends `final_response_sent` proof that the final answer includes result, evidence, alignment, and token math sections. | `skillspec progress final-response .skillspec/traces/run-123 --result --evidence --alignment --token-savings` |
 | `skillspec progress show` | `<path>`, `--run <run-dir>`, `--json` | Reads the decision trace plus `execution.jsonl`, derives `progress.json`, and reports completed, current, blocked, and remaining phases plus open requirements. | `skillspec progress show ./skill.spec.yml --run .skillspec/traces/run-123` |
+| `skillspec progress batch` | `<run-dir>`, `--events <jsonl-or-json-array>`, `--json` | Appends several structured progress/proof events to `execution.jsonl` in one command and prints one compact summary. Use for final route, closure, elicitation, forbid/no-violation, and evidence proof that would otherwise create a visible progress parade. | `skillspec progress batch .skillspec/traces/run-123 --events .skillspec/traces/run-123/final-proof.jsonl` |
 | `skillspec trace align` | `<path>`, `--decision-trace <run-dir>`, `--execution-trace <jsonl>`, `--json` | Replays the decision trace against the current spec and checks structured execution evidence for obligations. Writes `<run-dir>/alignment.json`. | `skillspec trace align ./skill.spec.yml --decision-trace .skillspec/traces/run-123 --execution-trace .skillspec/traces/run-123/execution.jsonl` |
 
 ## Authoring And QA Commands
@@ -128,6 +129,10 @@ no domain SkillSpec exists yet.
 ## Important Event Values
 
 `skillspec progress record` accepts these event values:
+
+For final closure, prefer `skillspec progress batch` with a JSONL proof file
+when several events need to be recorded together. It keeps the ledger exact
+without making the user watch one command per obligation.
 
 | Event | Meaning | Example |
 | --- | --- | --- |

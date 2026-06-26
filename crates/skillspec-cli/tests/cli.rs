@@ -4654,6 +4654,42 @@ fn progress_final_response_records_report_section_proof() {
 }
 
 #[test]
+fn progress_batch_records_multiple_events_with_compact_output() {
+    let dir = TempDir::new("progress-batch");
+    let run_dir = dir.path().join("run-progress-batch");
+    fs::create_dir_all(&run_dir).unwrap();
+    let events = dir.path().join("final-proof.jsonl");
+    write_file(
+        &events,
+        r#"{"event":"route-fulfilled","id":"local_skill_port","status":"pass","evidence":{"kind":"directory","ref":"./draft"}}
+{"event":"after_success_completed","id":"generate_value_report","status":"pass","evidence":{"kind":"report","ref":"alignment.json"}}
+{"event":"obligation_satisfied","id":"install_from_remote_checkout","status":"pass","message":"remote source was staged only"}
+"#,
+    );
+
+    let progress_batch = Command::new(bin())
+        .arg("progress")
+        .arg("batch")
+        .arg(&run_dir)
+        .arg("--events")
+        .arg(&events)
+        .output()
+        .unwrap();
+    assert_success(&progress_batch);
+    let text = stdout(&progress_batch);
+    assert!(text.contains("progress batch: appended 3 events"));
+    assert!(text.contains("- route_fulfilled: 1"));
+    assert!(text.contains("- after_success_completed: 1"));
+    assert!(text.contains("- obligation_satisfied: 1"));
+
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert!(ledger.contains("\"event\":\"route_fulfilled\""));
+    assert!(ledger.contains("\"event\":\"after_success_completed\""));
+    assert!(ledger.contains("\"event\":\"obligation_satisfied\""));
+    assert!(ledger.contains("\"run_id\":\"run-progress-batch\""));
+}
+
+#[test]
 fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     let dir = TempDir::new("align-execution");
     let spec = dir.path().join("skill.spec.yml");

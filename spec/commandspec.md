@@ -815,6 +815,30 @@ Options:
 - `--message <MESSAGE>`: human-readable event note.
 - `--json`: emit JSON for the appended event.
 
+### `progress batch`
+
+```text
+skillspec progress batch <RUN> --events <EVENTS>
+```
+
+Arguments:
+
+- `<RUN>`: trace run directory containing `execution.jsonl`.
+
+Options:
+
+- `--events <EVENTS>`: JSONL file or JSON array of execution events to append.
+  Missing `schema`, `run_id`, and `at_unix_ms` fields are filled by the CLI.
+  Event names may use hyphens or underscores.
+- `--json`: emit JSON for the compact batch report.
+
+`progress batch` records several proof events in one command and prints one
+compact summary by default. Use it for final closure proof that would otherwise
+create a visible progress parade: route fulfillment, after-success closures,
+elicitation approvals, forbid/no-violation proof, and evidence attachments. It
+preserves the same `execution.jsonl` ledger shape as `progress record`; it only
+reduces command chatter.
+
 ### `progress stats`
 
 ```text
