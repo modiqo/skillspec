@@ -1,10 +1,10 @@
 schema: skillspec/v0
 id: skillspec
 title: SkillSpec
-description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+description: SkillSpec post-install setup and skill-authoring multiplexer for inspecting skill/repo shape with doctor, mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
   summary: >
-    Multiplex SkillSpec post-install setup: map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from
+    Multiplex SkillSpec post-install setup: inspect skill/repo shape with doctor, map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from
     local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally
     install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
     revise SkillSpec YAML, and prove value before install or release.
@@ -16,6 +16,14 @@ activation:
     - import SKILL.md
     - import existing skill
     - port skill
+    - what is the shape of this skill
+    - what is the shape of skill
+    - shape of skill
+    - skill shape
+    - source shape
+    - classify skill repo
+    - run doctor on this repo
+    - run doctor on this url
     - port-one-shot
     - one-shot port
     - workspace map
@@ -135,6 +143,7 @@ activation:
 applies_when:
   - user_intent:
       - run SkillSpec post-install setup inside the harness prompt
+      - inspect the shape of a skill, skill folder, repository, or URL without importing it
       - convert a prose SKILL.md to skill.spec.yml
       - port a local skill folder into SkillSpec
       - run one-shot porting for one atomic skill package
@@ -163,7 +172,7 @@ applies_when:
       - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, map multi-skill and plugin-shaped workspaces before import, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, answer read-only source-shape questions with doctor, map multi-skill and plugin-shaped workspaces before import, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -211,6 +220,49 @@ entry:
       - any_new_provider_or_adapter
       - any_external_side_effect
 routes:
+  - id: inspect_source_shape
+    label: Inspect source shape
+    rank: 12
+    description: Use when the user asks what shape a skill, skill folder, repository, or URL has, or asks to run doctor without requesting import, port, compile, install, or proof.
+    execution_plan:
+      mode: ordered
+      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before import or mutation.
+      phases:
+        - id: run_shape_doctor
+          owner_skill: skillspec
+          description: Run skillspec doctor on the supplied local folder, skill folder, or public GitHub repo URI and capture the shape report.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+              - git
+            permission_required_for:
+              - network_access
+              - any_unlisted_tool
+          requires:
+            - doctor_source_shape
+          forbid:
+            - port_one_shot_or_manual_import
+            - import_skill_draft
+            - workspace_import_packages
+            - workspace_converge_build
+            - workspace_compile_build
+            - workspace_install_packages
+            - workspace_install_apply_visibility
+            - install_from_remote_checkout
+            - execute_imported_snippets_during_staging
+        - id: report_shape
+          owner_skill: skillspec
+          description: Explain the detected shape, the recommended next command, and whether full structural scoring ran or stopped as shape_only.
+          requires:
+            - report_source_shape
+          forbid:
+            - port_one_shot_or_manual_import
+            - import_skill_draft
+            - workspace_import_packages
+            - workspace_compile_build
+            - workspace_install_packages
   - id: local_skill_port
     label: Port local skill
     rank: 1
@@ -1191,6 +1243,15 @@ rules:
         - tree/main
         - public repo
         - remote skill
+      user_says_all_groups:
+        - - import
+          - port
+          - convert
+          - compile
+          - install
+          - prove
+          - stage
+          - as a SkillSpec
     prefer: remote_skill_port
     elicit:
       - approve_remote_source_access
@@ -1199,6 +1260,36 @@ rules:
       - install_from_remote_checkout
       - execute_imported_snippets_during_staging
     reason: Remote inputs must be staged locally before import and install.
+  - id: route_source_shape_questions_to_doctor
+    when:
+      user_says_any:
+        - what is the shape of this skill
+        - what is the shape of skill
+        - shape of skill
+        - skill shape
+        - source shape
+        - classify this skill repo
+        - classify skill repo
+        - run doctor
+        - run doctor on this repo
+        - run doctor on this url
+        - doctor on this repo
+        - doctor on this url
+        - diagnose source shape
+    prefer: inspect_source_shape
+    forbid:
+      - port_one_shot_or_manual_import
+      - import_skill_draft
+      - workspace_import_packages
+      - workspace_converge_build
+      - workspace_compile_build
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+      - install_from_remote_checkout
+      - execute_imported_snippets_during_staging
+    after_success:
+      - report_source_shape
+    reason: Shape questions should run the static doctor shape gate and stop; they should not import, port, compile, install, or choose a remote candidate.
   - id: post_install_setup_routes_to_multiplexer
     when:
       user_says_any:
@@ -2170,6 +2261,13 @@ commands:
   doctor_source_skill:
     description: Run the static doctor shape gate and, only for a simple atomic SKILL.md package, score reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. The target may be a local folder, public GitHub skill folder, or public GitHub repo URI; multi-skill, entry-with-subskills, plugin-shaped, and non-skill code repos return shape-only reports with the recommended next command.
     template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  doctor_source_shape:
+    description: Print a read-only source shape report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command.
+    template: skillspec doctor <source-skill-folder-or-repo-uri> --json
     safety: local_write
     requires:
       dependencies:
@@ -3226,6 +3324,10 @@ closures:
     commands:
       - workspace_map_source
       - workspace_validate_manifest
+  report_source_shape:
+    description: Summarize the doctor shape report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, and whether full structural scoring was run. Do not import, port, compile, install, or choose a remote candidate during shape-only inspection.
+    commands:
+      - doctor_source_shape
   produce_mechanical_draft:
     description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
   produce_reviewed_spec:
@@ -3377,6 +3479,50 @@ tests:
         - use_port_one_shot_without_shape_recon
         - use_port_one_shot_for_workspace_root
         - use_port_one_shot_for_plugin_root
+  - name: shape question runs doctor instead of remote port
+    input: what is the shape of this skill https://github.com/org/repo
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - port_one_shot_or_manual_import
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_compile_build
+        - workspace_install_packages
+        - install_from_remote_checkout
+  - name: run doctor on repo url stays read only
+    input: run doctor on this repo/url https://github.com/org/repo/tree/main
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_install_packages
+        - execute_imported_snippets_during_staging
+  - name: shape of local skill runs doctor
+    input: shape of skill /Users/me/tulving/skills
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      after_success:
+        - report_source_shape
+      forbid:
+        - port_one_shot_or_manual_import
+        - import_skill_draft
+        - workspace_import_packages
   - name: multi-skill repo maps before fanout import
     input: /skillspec map /Users/me/tulving/skills with many SKILL.md files, shared standards package, and cross-skill references
     expect:

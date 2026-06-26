@@ -1,11 +1,11 @@
 ---
 name: skillspec
-description: "Multiplex SkillSpec post-install setup: map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, workspace import, workspace converge and workspace compile. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec"
+description: "Multiplex SkillSpec post-install setup: inspect skill/repo shape with doctor, map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, what is the shape of this skill, shape of skill, run doctor on this repo, import SKILL.md, import existing skill, port skill, workspace map, workspace validate, workspace import, workspace converge and workspace compile. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, classify a skill source, convert a prose SKILL.md to skill.spec.yml, port a local skill folder into SkillSpec"
 ---
 
 # SkillSpec
 
-SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+SkillSpec post-install setup and skill-authoring multiplexer for inspecting source shape with doctor, mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 
 ## Entry Gate
 
@@ -63,6 +63,7 @@ skillspec grammar checklist --for import-skill
 - Quote YAML string values that contain `: `, especially `elicitations.*.question`, descriptions, and review notes.
 - Artifact `produced_by` and `consumed_by` entries can only reference `command`, `code`, or `recipe`; use route checks, recipe steps, or imports/resources `used_by` for route-level linkage.
 - Before porting, classify the source shape: one atomic prose skill can use `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove`; multiple `SKILL.md` files, cross-skill references, or plugin markers must use workspace map/import/converge/compile; an existing reviewed `skill.spec.yml` must use the revision path.
+- For read-only shape questions such as "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url", run `skillspec doctor <source-skill-folder-or-repo-uri> --json`, report the shape and recommended next command, and stop before import, port, compile, install, or remote candidate selection.
 - For one atomic prose skill, prefer `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove` before hand-editing. It writes grammar/schema proof, a typed shape crib, source map, doctor report, mechanical draft, QA results, compile output, and optional estimated non-Rote stats when `--run-dir` is supplied.
 - Do not auto-fill the scaffold. Use the source map, shape crib, and coverage matrix to promote only source-backed behavior, then report progress by gates: staged/mapped, draft generated, semantic spec patched, QA running, compiled/proof ready.
 
@@ -113,6 +114,7 @@ only when the full machine report needs to be consumed from stdout.
 
 ```bash
 skillspec sensemake ./skill.spec.yml --view index
+skillspec doctor <source-skill-folder-or-repo-uri> --json
 skillspec run-loop ./skill.spec.yml --input='<user task>' --view index --trace-dir "${PWD}/.skillspec/traces"
 skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>

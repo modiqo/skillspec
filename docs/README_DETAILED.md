@@ -166,6 +166,11 @@ could be a repo URI or parent folder. It reports `simple_skill`,
 workspace/plugin/code-repo shapes stop with `analysis_status: shape_only` and a
 recommended next command.
 
+Inside the installed `/skillspec` skill, plain prompts such as "what is the
+shape of this skill", "shape of skill", and "run doctor on this repo/url" route
+to this doctor-only inspection path. They do not import, port, compile, install,
+or choose a remote candidate.
+
 For one atomic skill package, prefer the bundled porting path:
 
 ```sh
