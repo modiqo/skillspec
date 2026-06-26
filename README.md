@@ -285,9 +285,27 @@ skillspec doctor https://github.com/anthropics/skills/tree/main/skills/pdf
 It stages the requested folder temporarily and rejects parent folders that
 contain multiple `SKILL.md` files.
 
+If the source is a whole skills repo with many `SKILL.md` files, map the
+workspace first. This is authoring-side structure recon, not router indexing:
+
+```sh
+skillspec workspace map ./skills --out ./build/skillspec.workspace.yml
+skillspec workspace validate ./build/skillspec.workspace.yml
+skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
+skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
+```
+
+The workspace manifest names each atomic skill package, records deterministic
+install slugs, and captures cross-skill references such as shared standards
+packages before fanout import. The import step writes one generated package per
+atomic skill under the build root; it does not compile, install, or refresh the
+router. The converge step verifies those generated package drafts against the
+workspace graph before any compile or install work.
+
 ### 2. Map And Import
 
-These commands preserve source structure before generating the first contract.
+These commands preserve source structure before generating the first contract
+for one atomic skill package.
 
 ```sh
 skillspec source map ./my-skill --out ./my-skill/.skillspec/source-map

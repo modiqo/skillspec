@@ -123,6 +123,7 @@ pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
         }
     }
     materialize_preserved_source_skill(&mut spec, &source, out_dir)?;
+    materialize_import_documents(&mut spec, &source, out_dir)?;
     import_dependency_ledger::materialize(&spec, out_dir)?;
     materialize_inline_code_resources(&mut spec, out_dir)?;
     Ok(spec)
@@ -153,6 +154,50 @@ fn materialize_preserved_source_skill(
         resource.path = path_to_spec_string(&relative_path);
         resource.description = Some(format!(
             "Preserved original prose source from {} under a non-discoverable filename.",
+            document.relative_path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn materialize_import_documents(
+    spec: &mut SkillSpec,
+    source: &SkillSource,
+    out_dir: &Path,
+) -> Result<()> {
+    for document in source
+        .documents
+        .iter()
+        .filter(|document| document.is_import_candidate())
+    {
+        let Some(import) = spec.imports.get_mut(&document.resource_id) else {
+            continue;
+        };
+        let extension = document
+            .relative_path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .filter(|extension| !extension.trim().is_empty())
+            .unwrap_or("md");
+        let relative_path = PathBuf::from("imports").join(format!(
+            "{}.{}",
+            file_stem(&document.resource_id),
+            extension
+        ));
+        let destination = out_dir.join(&relative_path);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|source| Error::Write {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+        }
+        fs::write(&destination, &document.content).map_err(|source| Error::Write {
+            path: destination,
+            source,
+        })?;
+        import.path = path_to_spec_string(&relative_path);
+        import.description = Some(format!(
+            "Imported runtime guidance from {} materialized under package-local imports.",
             document.relative_path.display()
         ));
     }
@@ -394,6 +439,10 @@ fn imports_resources_and_code(
                     kind: ImportUseKind::Code,
                     id: id.clone(),
                 })
+                .chain(std::iter::once(ImportUse {
+                    kind: ImportUseKind::Snippet,
+                    id: "source_summary".to_owned(),
+                }))
                 .collect::<Vec<_>>();
             imports.insert(
                 document.resource_id.clone(),

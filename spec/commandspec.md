@@ -31,6 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
+| `workspace <COMMAND>` | Map, validate, fanout-import, and converge multi-skill workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -318,6 +319,128 @@ Options:
 Use `--view index` to inspect structural headings and code blocks, `--view
 summary` to inspect compact classifications with line ranges and previews, and
 `--view full` on a specific node handle to recover the exact source span.
+
+## `workspace`
+
+```text
+skillspec workspace <COMMAND>
+```
+
+Subcommands:
+
+- `map <source-root> --out <skillspec.workspace.yml> [--json]`
+- `validate <skillspec.workspace.yml> [--json]`
+- `import <skillspec.workspace.yml> --out <build-root> [--json]`
+- `converge <skillspec.workspace.yml> --build-root <build-root> [--json]`
+
+`workspace` is the authoring-side structure recon surface for repositories that
+contain multiple atomic skill packages. It is separate from `skillspec index`,
+which remains router/runtime catalog infrastructure.
+
+### `workspace map`
+
+```text
+skillspec workspace map <SOURCE_ROOT> --out <OUT>
+```
+
+Arguments:
+
+- `<SOURCE_ROOT>`: local folder containing one or more skill packages.
+
+Options:
+
+- `--out <OUT>`: output path for `skillspec.workspace.yml`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace map` discovers every folder with `SKILL.md`, parses frontmatter names
+and invocation visibility, assigns package ids, assigns deterministic install
+slugs, scans Markdown for cross-package references such as
+`../coding-standards/...`, infers `depends_on` edges, and writes a markdown
+report beside the manifest.
+
+It does not import skills, compile loaders, install files, or build a router
+index.
+
+### `workspace validate`
+
+```text
+skillspec workspace validate <MANIFEST>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to `skillspec.workspace.yml`.
+
+Options:
+
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace validate` checks the package graph before fanout import. It verifies
+that package paths exist, each package has exactly one `SKILL.md`, dependencies
+resolve, self-dependencies are absent, the graph is acyclic, install slugs are
+unique, and cross-package references are covered by declared dependencies.
+Duplicate public names are reported as warnings until an install target is
+being planned.
+
+### `workspace import`
+
+```text
+skillspec workspace import <MANIFEST> --out <BUILD_ROOT>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--out <BUILD_ROOT>`: parent folder where mirrored package outputs are
+  written.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace import` runs the existing single-package pipeline for each workspace
+package in topological order:
+
+```text
+doctor -> source map -> import-skill
+```
+
+It writes package outputs under one mirrored build root, preserves successful
+packages if another package fails, and marks dependents of failed packages as
+blocked. It also writes:
+
+- `<BUILD_ROOT>/skillspec.workspace.yml`
+- `<BUILD_ROOT>/workspace-import.report.md`
+- `<BUILD_ROOT>/<package>/.skillspec/workspace-import.json`
+- per-package doctor reports and source maps
+
+It does not compile loaders, install skills, or refresh router indexes.
+
+### `workspace converge`
+
+```text
+skillspec workspace converge <MANIFEST> --build-root <BUILD_ROOT>
+```
+
+Arguments:
+
+- `<MANIFEST>`: path to a validated `skillspec.workspace.yml`.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: parent folder containing mirrored package
+  outputs from `workspace import`.
+- `--json`: emit JSON instead of a concise human report.
+
+`workspace converge` verifies the generated package drafts against the manifest
+before compile or install. It checks that each manifest package has either a
+ready generated `skill.spec.yml` or explicit package-level failure evidence,
+validates generated specs and package-local imports/resources, blocks dependents
+whose dependencies are not ready, and writes:
+
+- `<BUILD_ROOT>/workspace-converge.report.md`
+
+It does not compile loaders, install skills, or refresh router indexes.
 
 ### `source coverage`
 
@@ -721,6 +844,9 @@ Notes:
   risk, and degraded proof impact.
 - If no dependencies are found after review, keep the generated ledger with
   `dependency_count = 0`; do not replace it with a byte-empty `deps.toml`.
+- Parent folders containing multiple `SKILL.md` files are rejected. Run
+  `skillspec workspace map` first so SkillSpec can identify atomic packages,
+  dependency edges, and name collisions before fanout import.
 
 ## `synthesize-from-workspace`
 
