@@ -31,7 +31,7 @@ skillspec <COMMAND>
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
 | `doctor <target> [--json]` | Scan one prose skill folder, local or public GitHub, for static reliability and context-burden debt without executing it. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
-| `workspace <COMMAND>` | Map, validate, fanout-import, converge, and compile multi-skill workspaces. |
+| `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
 | `trace <COMMAND>` | Inspect, compact, or align SkillSpec decision traces. |
 | `progress <COMMAND>` | Show or record SkillSpec execution progress for a trace run. |
@@ -40,7 +40,7 @@ skillspec <COMMAND>
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from a local skill file or folder, optionally gated by a fresh source map. |
 | `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
-| `index --roots <path>... --out <index-file-or-router-dir>` | Build a searchable skill catalog outside model context. |
+| `index --roots <path>... --out <index-file-or-router-dir>` | Build the router-specific SQLite skill catalog used by `skillspec route` and the optional skill-router. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
 | `visibility <COMMAND>` | Plan, apply, or restore harness-native skill visibility controls. |
@@ -356,9 +356,21 @@ Options:
 
 `workspace map` discovers every folder with `SKILL.md`, parses frontmatter names
 and invocation visibility, assigns package ids, assigns deterministic install
-slugs, scans Markdown for cross-package references such as
-`../coding-standards/...`, infers `depends_on` edges, and writes a markdown
-report beside the manifest.
+slugs, scans Markdown for cross-package references, and writes a markdown report
+beside the manifest.
+
+When the source has plugin-shaped folders, the mapper preserves those boundaries
+as namespaces instead of flattening names. A folder with `skills/` plus
+`.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` is treated as a plugin
+root. Its `plugin.json` name, or the folder slug when no plugin name exists, is
+used to create skill-safe public names such as
+`commercial-legal-cold-start-interview`. Same-plugin slash references such as
+`/cold-start-interview` resolve inside that namespace, while explicit references
+such as `/privacy-legal:use-case-triage` resolve across namespaces.
+
+Relative file references such as `../coding-standards/...` infer hard
+`depends_on` edges. Plugin slash-command references are recorded as workflow
+references without becoming hard dependency edges.
 
 It does not import skills, compile loaders, install files, or build a router
 index.
@@ -380,9 +392,10 @@ Options:
 `workspace validate` checks the package graph before fanout import. It verifies
 that package paths exist, each package has exactly one `SKILL.md`, dependencies
 resolve, self-dependencies are absent, the graph is acyclic, install slugs are
-unique, and cross-package references are covered by declared dependencies.
-Duplicate public names are reported as warnings until an install target is
-being planned.
+unique, and hard cross-package references are covered by declared dependencies.
+Duplicate public names are reported as warnings until an install target is being
+planned. Plugin slash-command workflow references may cross packages without a
+`depends_on` edge; file references still require dependency coverage.
 
 ### `workspace import`
 
@@ -928,7 +941,8 @@ Notes:
   `dependency_count = 0`; do not replace it with a byte-empty `deps.toml`.
 - Parent folders containing multiple `SKILL.md` files are rejected. Run
   `skillspec workspace map` first so SkillSpec can identify atomic packages,
-  dependency edges, and name collisions before fanout import.
+  plugin namespaces, hard dependency edges, workflow references, and name
+  collisions before fanout import.
 
 ## `synthesize-from-workspace`
 
@@ -1005,6 +1019,21 @@ The indexer scans `SKILL.md` frontmatter, optional `agents/openai.yaml`, Claude
 `.claude/settings.json` skill overrides, Claude `disable-model-invocation`
 frontmatter, and optional `skill.spec.yml` routing metadata. It stores skill
 text, routing hints, visibility, checksums, and source paths in SQLite.
+
+`skillspec index` is router-specific runtime discovery. It is not source
+analysis, workspace recon, or skill import. Use `skillspec source map` for one
+prose skill and `skillspec workspace map` for source roots that contain multiple
+atomic skills or plugin-shaped packages.
+
+When run directly, `skillspec index` emits warnings that describe router state:
+
+- no router config: the index is a standalone catalog for manual
+  `skillspec route` lookup and does not install or activate the skill-router;
+- disabled router config: the index will not affect implicit skill selection
+  until `skillspec router enable` is run;
+- enabled router config: prefer `skillspec router index refresh` for installed
+  router maintenance because refresh reapplies router-managed visibility and
+  checks preparedness, while direct `skillspec index` only rewrites the catalog.
 
 ## `route`
 

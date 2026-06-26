@@ -298,17 +298,18 @@ pub(super) fn run(command: Command) -> Result<()> {
                     .into_iter()
                     .map(HarnessTarget::from)
                     .collect::<Vec<_>>();
-                let install_report = workspace::install_workspace(
-                    &manifest,
-                    &build_root,
-                    &targets,
-                    all_detected,
-                    dry_run,
-                    retire_existing,
-                    visibility_policy.into(),
-                    apply_visibility,
-                    visibility_manifest.as_deref(),
-                )?;
+                let install_report =
+                    workspace::install_workspace(workspace::WorkspaceInstallRequest {
+                        manifest_path: &manifest,
+                        build_root: &build_root,
+                        targets: &targets,
+                        all_detected,
+                        dry_run,
+                        retire_existing,
+                        visibility_policy: visibility_policy.into(),
+                        apply_visibility,
+                        visibility_manifest: visibility_manifest.as_deref(),
+                    })?;
                 let ok = install_report.ok;
                 if json {
                     report::json(&install_report)?;
@@ -557,11 +558,14 @@ pub(super) fn run(command: Command) -> Result<()> {
             visibility_manifest,
             json,
         } => {
-            let report = router::index(router::IndexOptions {
+            let mut report = router::index(router::IndexOptions {
                 roots,
                 out,
                 visibility_manifest,
             })?;
+            report
+                .warnings
+                .extend(router_lifecycle::direct_index_warnings());
             if json {
                 report::json(&report)?;
             } else {

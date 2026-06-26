@@ -14,6 +14,12 @@ The router does not replace native skills and does not execute the selected
 skill. It builds a local SQLite catalog, ranks candidate skills for a user
 request, and returns the selected `SKILL.md` path plus confidence and candidates.
 
+The top-level `skillspec index` command is part of this router surface. It is
+not a general repository search command, source map, workspace map, or import
+planner. When run directly, it prints router-state warnings so operators and
+agents know whether the catalog is standalone, blocked behind disabled router
+mode, or better maintained through `skillspec router index refresh`.
+
 ## Current Implementation
 
 The implemented CLI surface is:
@@ -143,6 +149,13 @@ exception, rebuilds the index, and checks preparedness. SkillSpec-backed
 out-of-band additions are indexed directly; prose-only additions are still made
 explicit-only and indexed, but the report advises converting them with
 `skillspec import-skill`.
+
+Direct `skillspec index` still exists for manual catalog creation and
+`skillspec route --index ...` lookup. It should not be used as an authoring
+recon substitute. If router config exists but is disabled, direct indexing does
+not make the router implicit or change routed-skill visibility; run
+`skillspec router enable` to reactivate router mode, or keep using
+`skillspec route` manually against the standalone index.
 
 ## Visibility Model
 

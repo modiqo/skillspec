@@ -184,113 +184,111 @@ struct WorkspaceInstalledTarget {
     backup_path: Option<String>,
 }
 
-pub fn install_workspace(
-    manifest_path: &Path,
-    build_root: &Path,
-    targets: &[HarnessTarget],
+pub struct WorkspaceInstallRequest<'a> {
+    pub manifest_path: &'a Path,
+    pub build_root: &'a Path,
+    pub targets: &'a [HarnessTarget],
+    pub all_detected: bool,
+    pub dry_run: bool,
+    pub retire_existing: bool,
+    pub visibility_policy: WorkspaceVisibilityPolicy,
+    pub apply_visibility: bool,
+    pub visibility_manifest: Option<&'a Path>,
+}
+
+struct PreflightContext<'a> {
+    build_root: &'a Path,
+    targets: &'a [HarnessTarget],
     all_detected: bool,
-    dry_run: bool,
     retire_existing: bool,
+    roots: &'a [HarnessRoot],
+    duplicate_public_names: &'a BTreeMap<String, Vec<String>>,
+    visibility_policy: WorkspaceVisibilityPolicy,
+}
+
+struct InstallReportContext<'a> {
+    manifest_path: &'a Path,
+    build_root: &'a Path,
+    dry_run: bool,
+    roots: &'a [HarnessRoot],
+    manifest: &'a WorkspaceManifest,
     visibility_policy: WorkspaceVisibilityPolicy,
     apply_visibility: bool,
-    visibility_manifest: Option<&Path>,
-) -> Result<WorkspaceInstallReport> {
-    let validation = validate_workspace(manifest_path)?;
+    visibility_manifest: Option<&'a Path>,
+}
+
+pub fn install_workspace(request: WorkspaceInstallRequest<'_>) -> Result<WorkspaceInstallReport> {
+    let validation = validate_workspace(request.manifest_path)?;
     if !validation.ok {
         return Err(Error::InvalidInput {
             message: format!(
                 "workspace install requires a valid manifest; run `skillspec workspace validate {}` first. Errors: {}",
-                manifest_path.display(),
+                request.manifest_path.display(),
                 validation.errors.join("; ")
             ),
         });
     }
-    if !build_root.is_dir() {
+    if !request.build_root.is_dir() {
         return Err(Error::InvalidInput {
             message: format!(
                 "workspace install build root is not a directory: {}",
-                build_root.display()
+                request.build_root.display()
             ),
         });
     }
 
-    let roots = install::selected_roots(targets, all_detected)?;
+    let roots = install::selected_roots(request.targets, request.all_detected)?;
     if roots.is_empty() {
         return Err(Error::InvalidInput {
             message: "no install targets selected; use --target or --all-detected".to_owned(),
         });
     }
 
-    let manifest = load_manifest(manifest_path)?;
+    let manifest = load_manifest(request.manifest_path)?;
     let duplicate_public_names = duplicate_public_names(&manifest);
-    let mut package_reports = preflight_packages(
-        &manifest,
-        build_root,
-        targets,
-        all_detected,
-        retire_existing,
-        &roots,
-        &duplicate_public_names,
-        visibility_policy,
-    )?;
+    let preflight_context = PreflightContext {
+        build_root: request.build_root,
+        targets: request.targets,
+        all_detected: request.all_detected,
+        retire_existing: request.retire_existing,
+        roots: &roots,
+        duplicate_public_names: &duplicate_public_names,
+        visibility_policy: request.visibility_policy,
+    };
+    let report_context = InstallReportContext {
+        manifest_path: request.manifest_path,
+        build_root: request.build_root,
+        dry_run: request.dry_run,
+        roots: &roots,
+        manifest: &manifest,
+        visibility_policy: request.visibility_policy,
+        apply_visibility: request.apply_visibility,
+        visibility_manifest: request.visibility_manifest,
+    };
+    let mut package_reports = preflight_packages(&manifest, &preflight_context)?;
 
-    let mut report = install_report(
-        manifest_path,
-        build_root,
-        dry_run,
-        &roots,
-        &manifest,
-        package_reports,
-        visibility_policy,
-        apply_visibility,
-        visibility_manifest,
-        Vec::new(),
-        Vec::new(),
-    );
+    let mut report = install_report(&report_context, package_reports, Vec::new(), Vec::new());
 
-    if report.ok && !dry_run {
+    if report.ok && !request.dry_run {
         package_reports = install_packages(
             &manifest,
-            build_root,
-            targets,
-            all_detected,
-            retire_existing,
+            request.build_root,
+            request.targets,
+            request.all_detected,
+            request.retire_existing,
             report.packages,
         )?;
-        report = install_report(
-            manifest_path,
-            build_root,
-            dry_run,
-            &roots,
-            &manifest,
-            package_reports,
-            visibility_policy,
-            apply_visibility,
-            visibility_manifest,
-            Vec::new(),
-            Vec::new(),
-        );
-        if apply_visibility && visibility_policy != WorkspaceVisibilityPolicy::None {
+        report = install_report(&report_context, package_reports, Vec::new(), Vec::new());
+        if request.apply_visibility && request.visibility_policy != WorkspaceVisibilityPolicy::None
+        {
             let (changes, warnings) = apply_workspace_visibility(
                 &report,
                 &roots,
-                visibility_policy,
-                visibility_manifest_path(build_root, visibility_manifest),
+                request.visibility_policy,
+                visibility_manifest_path(request.build_root, request.visibility_manifest),
             )?;
             let packages = report.packages;
-            report = install_report(
-                manifest_path,
-                build_root,
-                dry_run,
-                &roots,
-                &manifest,
-                packages,
-                visibility_policy,
-                apply_visibility,
-                visibility_manifest,
-                changes,
-                warnings,
-            );
+            report = install_report(&report_context, packages, changes, warnings);
         }
         if !report.installed.is_empty() {
             write_install_manifest(&report, &manifest)?;
@@ -457,13 +455,7 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
 
 fn preflight_packages(
     manifest: &WorkspaceManifest,
-    build_root: &Path,
-    targets: &[HarnessTarget],
-    all_detected: bool,
-    retire_existing: bool,
-    roots: &[HarnessRoot],
-    duplicate_public_names: &BTreeMap<String, Vec<String>>,
-    visibility_policy: WorkspaceVisibilityPolicy,
+    context: &PreflightContext<'_>,
 ) -> Result<Vec<WorkspaceInstallPackageReport>> {
     let mut statuses = BTreeMap::<String, WorkspaceInstallStatus>::new();
     let mut reports = Vec::new();
@@ -481,21 +473,12 @@ fn preflight_packages(
             .cloned()
             .collect::<Vec<_>>();
         let report = if blocked_by.is_empty() {
-            preflight_one_package(
-                package,
-                build_root,
-                targets,
-                all_detected,
-                retire_existing,
-                roots,
-                duplicate_public_names,
-                visibility_policy,
-            )?
+            preflight_one_package(package, context)?
         } else {
             blocked_package_report(
                 package,
-                build_root,
-                roots,
+                context.build_root,
+                context.roots,
                 format!(
                     "dependency packages are not install-ready: {}",
                     blocked_by.join(", ")
@@ -510,22 +493,16 @@ fn preflight_packages(
 
 fn preflight_one_package(
     package: &WorkspacePackage,
-    build_root: &Path,
-    targets: &[HarnessTarget],
-    all_detected: bool,
-    retire_existing: bool,
-    roots: &[HarnessRoot],
-    duplicate_public_names: &BTreeMap<String, Vec<String>>,
-    visibility_policy: WorkspaceVisibilityPolicy,
+    context: &PreflightContext<'_>,
 ) -> Result<WorkspaceInstallPackageReport> {
-    let source_dir = output_package_dir(package, build_root)?;
+    let source_dir = output_package_dir(package, context.build_root)?;
     let loader_path = source_dir.join("SKILL.md");
     let spec_path = source_dir.join("skill.spec.yml");
     if !loader_path.is_file() || !spec_path.is_file() {
         return missing_package_report(
             package,
             &source_dir,
-            roots,
+            context.roots,
             format!(
                 "compiled package is missing {}; run workspace compile before install",
                 if !loader_path.is_file() {
@@ -539,11 +516,11 @@ fn preflight_one_package(
 
     let dry_run = install::install_skill_without_router_hook(
         &source_dir,
-        targets,
-        all_detected,
+        context.targets,
+        context.all_detected,
         true,
         false,
-        retire_existing,
+        context.retire_existing,
         Some(&package.install_slug),
     );
     let mut target_reports = match dry_run {
@@ -562,12 +539,12 @@ fn preflight_one_package(
             })
             .collect::<Vec<_>>(),
         Err(error) => {
-            return failed_package_report(package, &source_dir, roots, error.to_string());
+            return failed_package_report(package, &source_dir, context.roots, error.to_string());
         }
     };
 
     let mut blockers = Vec::new();
-    if let Some(packages) = duplicate_public_names.get(&package.public_name) {
+    if let Some(packages) = context.duplicate_public_names.get(&package.public_name) {
         blockers.push(format!(
             "public_name {:?} is used by multiple workspace packages: {}",
             package.public_name,
@@ -577,7 +554,7 @@ fn preflight_one_package(
 
     for target in &mut target_reports {
         let install_dir = PathBuf::from(&target.path);
-        if target.existed && !retire_existing {
+        if target.existed && !context.retire_existing {
             let message = format!(
                 "install folder already exists; rerun with --retire-existing only after reviewing backup behavior: {}",
                 install_dir.display()
@@ -588,7 +565,11 @@ fn preflight_one_package(
             continue;
         }
 
-        let Some(root) = roots.iter().find(|root| root.target == target.target) else {
+        let Some(root) = context
+            .roots
+            .iter()
+            .find(|root| root.target == target.target)
+        else {
             continue;
         };
         match public_name_collision(&root.path, &install_dir, &package.public_name) {
@@ -622,7 +603,7 @@ fn preflight_one_package(
         public_name: package.public_name.clone(),
         install_slug: package.install_slug.clone(),
         kind: package.kind.clone(),
-        visibility: visibility_assignment(package, visibility_policy),
+        visibility: visibility_assignment(package, context.visibility_policy),
         status: if blockers.is_empty() {
             WorkspaceInstallStatus::Planned
         } else {
@@ -717,46 +698,47 @@ fn install_packages(
 }
 
 fn install_report(
-    manifest_path: &Path,
-    build_root: &Path,
-    dry_run: bool,
-    roots: &[HarnessRoot],
-    manifest: &WorkspaceManifest,
+    context: &InstallReportContext<'_>,
     packages: Vec<WorkspaceInstallPackageReport>,
-    visibility_policy: WorkspaceVisibilityPolicy,
-    apply_visibility: bool,
-    visibility_manifest: Option<&Path>,
     visibility_changes: Vec<visibility::VisibilityChangeReport>,
     visibility_warnings: Vec<String>,
 ) -> WorkspaceInstallReport {
-    let report_path = build_root.join("workspace-install.report.md");
-    let install_manifest_path = build_root.join("workspace-install.manifest.json");
+    let report_path = context.build_root.join("workspace-install.report.md");
+    let install_manifest_path = context.build_root.join("workspace-install.manifest.json");
     let installed = package_ids_by_status(&packages, WorkspaceInstallStatus::Installed);
     let planned = package_ids_by_status(&packages, WorkspaceInstallStatus::Planned);
     let failed = package_ids_by_status(&packages, WorkspaceInstallStatus::Failed);
     let blocked = package_ids_by_status(&packages, WorkspaceInstallStatus::Blocked);
     let missing = package_ids_by_status(&packages, WorkspaceInstallStatus::Missing);
-    let visibility = visibility_reports(&packages, visibility_policy, apply_visibility);
-    let visibility_manifest_path = (visibility_policy != WorkspaceVisibilityPolicy::None)
-        .then(|| visibility_manifest_path(build_root, visibility_manifest))
+    let visibility = visibility_reports(
+        &packages,
+        context.visibility_policy,
+        context.apply_visibility,
+    );
+    let visibility_manifest_path = (context.visibility_policy != WorkspaceVisibilityPolicy::None)
+        .then(|| visibility_manifest_path(context.build_root, context.visibility_manifest))
         .flatten();
-    let router_refresh_recommended = !dry_run && !installed.is_empty();
+    let router_refresh_recommended = !context.dry_run && !installed.is_empty();
     WorkspaceInstallReport {
         ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
-        dry_run,
-        manifest_path: path_to_string(manifest_path),
-        build_root: path_to_string(build_root),
+        dry_run: context.dry_run,
+        manifest_path: path_to_string(context.manifest_path),
+        build_root: path_to_string(context.build_root),
         report_path: path_to_string(&report_path),
         install_manifest_path: path_to_string(&install_manifest_path),
-        package_count: manifest.packages.len(),
-        targets: roots.iter().map(|root| root.id.to_owned()).collect(),
+        package_count: context.manifest.packages.len(),
+        targets: context
+            .roots
+            .iter()
+            .map(|root| root.id.to_owned())
+            .collect(),
         installed,
         planned,
         failed,
         blocked,
         missing,
-        visibility_policy,
-        apply_visibility,
+        visibility_policy: context.visibility_policy,
+        apply_visibility: context.apply_visibility,
         visibility_manifest_path: visibility_manifest_path
             .as_ref()
             .map(|path| path_to_string(path)),
@@ -764,10 +746,17 @@ fn install_report(
         visibility_changes,
         visibility_warnings,
         router_refresh_recommended,
-        router_refresh_advice: router_refresh_advice(roots, visibility_manifest_path.as_deref()),
-        dependency_edges: dependency_edges(manifest),
+        router_refresh_advice: router_refresh_advice(
+            context.roots,
+            visibility_manifest_path.as_deref(),
+        ),
+        dependency_edges: dependency_edges(context.manifest),
         packages,
-        next: install_next_steps(dry_run, visibility_policy, apply_visibility),
+        next: install_next_steps(
+            context.dry_run,
+            context.visibility_policy,
+            context.apply_visibility,
+        ),
     }
 }
 

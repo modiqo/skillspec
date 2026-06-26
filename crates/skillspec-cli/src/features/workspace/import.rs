@@ -377,6 +377,8 @@ mod tests {
         WorkspacePackage {
             package_id: id.to_owned(),
             path: id.to_owned(),
+            namespace: None,
+            local_name: None,
             kind: super::super::WorkspacePackageKind::Helper,
             entrypoint: "SKILL.md".to_owned(),
             public_name: id.to_owned(),

@@ -146,7 +146,9 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: SourceCommand,
     },
-    #[command(about = "Map, validate, import, compile, and install multi-skill workspaces")]
+    #[command(
+        about = "Map, validate, import, converge, compile, and install multi-skill or plugin-shaped workspaces"
+    )]
     Workspace {
         #[command(subcommand)]
         command: WorkspaceCommand,
@@ -239,7 +241,10 @@ pub(super) enum Command {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Build a searchable skill catalog outside model context")]
+    #[command(
+        about = "Build a router-specific skill catalog for skill-router/manual route lookup",
+        long_about = "Build the SQLite catalog used by `skillspec route` and the optional skill-router. This is router-specific runtime discovery, not source analysis, workspace recon, or skill import. If router mode is disabled or not installed, this command only writes a standalone catalog; it does not activate the router or change harness visibility. For installed router maintenance, prefer `skillspec router index refresh`."
+    )]
     Index {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]
@@ -383,8 +388,8 @@ pub(super) enum SourceCommand {
 #[derive(Debug, Subcommand)]
 pub(super) enum WorkspaceCommand {
     #[command(
-        about = "Create a skillspec.workspace.yml graph from a folder with one or more SKILL.md packages",
-        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, public names, deterministic install slugs, cross-package references, inferred dependencies, duplicate public names, and duplicate install slugs before fanout import."
+        about = "Create a skillspec.workspace.yml graph from a folder with SKILL.md packages or plugin-shaped roots",
+        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
     )]
     Map {
         /// Local source root containing one or more skill packages.
@@ -398,7 +403,7 @@ pub(super) enum WorkspaceCommand {
     },
     #[command(
         about = "Validate a skillspec.workspace.yml package graph",
-        long_about = "Validate a skillspec.workspace.yml package graph before fanout import. Checks package paths, one SKILL.md per package, dependency references, self-dependencies, cycles, duplicate install slugs, uncovered cross-package references, and public-name collision warnings."
+        long_about = "Validate a skillspec.workspace.yml package graph before fanout import. Checks package paths, one SKILL.md per package, dependency references, self-dependencies, cycles, duplicate install slugs, uncovered hard cross-package references, and public-name collision warnings. Plugin slash-command workflow references are allowed without depends_on edges; file references still require dependency coverage."
     )]
     Validate {
         /// Path to skillspec.workspace.yml.

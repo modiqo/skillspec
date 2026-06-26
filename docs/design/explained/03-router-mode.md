@@ -14,6 +14,12 @@ Router mode moves skill discovery out of the prompt and into a local catalog:
 - the prompt receives selected skill handles and candidates, not every skill
   description.
 
+The top-level `skillspec index` command only builds that router catalog. It is
+not source analysis, workspace recon, or skill import. If router mode is
+disabled, direct `skillspec index` can rewrite the catalog, but it will not make
+the router implicit or affect implicit skill selection until `skillspec router
+enable` runs.
+
 ## 1. The Problem
 
 Without router mode, more skills means more context pressure and more ambiguous

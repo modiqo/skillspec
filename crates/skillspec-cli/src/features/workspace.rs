@@ -15,7 +15,8 @@ pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileRepo
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
 pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
 pub use install::{
-    install_workspace, render_install_report, WorkspaceInstallReport, WorkspaceVisibilityPolicy,
+    install_workspace, render_install_report, WorkspaceInstallReport, WorkspaceInstallRequest,
+    WorkspaceVisibilityPolicy,
 };
 
 pub const WORKSPACE_SCHEMA: &str = "skillspec/workspace/v0";
@@ -37,6 +38,10 @@ pub struct WorkspaceManifest {
 pub struct WorkspacePackage {
     pub package_id: String,
     pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_name: Option<String>,
     pub kind: WorkspacePackageKind,
     pub entrypoint: String,
     pub public_name: String,
@@ -71,10 +76,29 @@ pub struct WorkspaceReference {
     pub from_package: String,
     pub source_path: String,
     pub line: usize,
+    #[serde(default)]
+    pub kind: WorkspaceReferenceKind,
     pub raw: String,
     pub resolved_path: String,
     #[serde(default)]
     pub target_package: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceReferenceKind {
+    #[default]
+    File,
+    SkillInvocation,
+}
+
+impl WorkspaceReferenceKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::SkillInvocation => "skill_invocation",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -83,6 +107,7 @@ pub struct WorkspaceMapReport {
     pub report_path: String,
     pub source_root: String,
     pub workspace_slug: String,
+    pub plugin_namespaces: Vec<WorkspacePluginNamespaceReport>,
     pub package_count: usize,
     pub dependency_edges: Vec<WorkspaceDependencyEdge>,
     pub duplicate_public_names: Vec<WorkspaceDuplicate>,
@@ -105,6 +130,13 @@ pub struct WorkspaceDuplicate {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct WorkspacePluginNamespaceReport {
+    pub namespace: String,
+    pub path: String,
+    pub packages: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct WorkspaceValidationReport {
     pub ok: bool,
     pub manifest_path: String,
@@ -118,9 +150,17 @@ pub struct WorkspaceValidationReport {
 struct SkillPackageSource {
     package_id: String,
     path: PathBuf,
+    namespace: Option<String>,
+    local_name: Option<String>,
     public_name: String,
     description: Option<String>,
     disable_model_invocation: bool,
+}
+
+#[derive(Clone, Debug)]
+struct PluginRoot {
+    path: PathBuf,
+    namespace: String,
 }
 
 pub fn guard_single_skill_source(path: &Path, command_name: &str) -> Result<()> {
@@ -164,6 +204,8 @@ pub fn map_workspace(source_root: &Path, manifest_path: &Path) -> Result<Workspa
             WorkspacePackage {
                 package_id: package.package_id,
                 path: path_to_string(&package.path),
+                namespace: package.namespace,
+                local_name: package.local_name,
                 kind,
                 entrypoint: "SKILL.md".to_owned(),
                 public_name: package.public_name,
@@ -218,13 +260,38 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
     output.push_str(&format!("- report: {}\n", report.report_path));
     output.push('\n');
 
+    if !report.plugin_namespaces.is_empty() {
+        output.push_str("## Plugin Namespaces\n\n");
+        for namespace in &report.plugin_namespaces {
+            output.push_str(&format!(
+                "- {} path={} packages={}\n",
+                namespace.namespace,
+                namespace.path,
+                namespace.packages.len()
+            ));
+        }
+        output.push('\n');
+    }
+
     output.push_str("## Packages\n\n");
     for package in manifest.packages.values() {
+        let namespace = package
+            .namespace
+            .as_deref()
+            .map(|namespace| {
+                format!(
+                    " namespace={} local_name={}",
+                    namespace,
+                    package.local_name.as_deref().unwrap_or("unknown")
+                )
+            })
+            .unwrap_or_default();
         output.push_str(&format!(
-            "- {} ({}) path={} public_name={} install_slug={}\n",
+            "- {} ({}) path={}{} public_name={} install_slug={}\n",
             package.package_id,
             package.kind.as_str(),
             package.path,
+            namespace,
             package.public_name,
             package.install_slug
         ));
@@ -256,9 +323,10 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
     } else {
         for reference in cross_refs {
             output.push_str(&format!(
-                "- {}:{} {} -> {}\n",
+                "- {}:{} [{}] {} -> {}\n",
                 reference.source_path,
                 reference.line,
+                reference.kind.as_str(),
                 reference.raw,
                 reference.target_package.as_deref().unwrap_or("unknown")
             ));
@@ -269,8 +337,12 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
         output.push_str("\n## Unresolved References\n\n");
         for reference in &report.unresolved_references {
             output.push_str(&format!(
-                "- {}:{} {} resolved to {}\n",
-                reference.source_path, reference.line, reference.raw, reference.resolved_path
+                "- {}:{} [{}] {} resolved to {}\n",
+                reference.source_path,
+                reference.line,
+                reference.kind.as_str(),
+                reference.raw,
+                reference.resolved_path
             ));
         }
     }
@@ -448,7 +520,10 @@ fn validate_manifest(path: &Path, manifest: &WorkspaceManifest) -> WorkspaceVali
             ));
             continue;
         };
-        if target_package != &package.package_id && !package.depends_on.contains(target_package) {
+        if reference_creates_dependency(reference, manifest)
+            && target_package != &package.package_id
+            && !package.depends_on.contains(target_package)
+        {
             errors.push(format!(
                 "uncovered cross-package reference: {}:{} {} targets {}, but {} does not depend_on it",
                 reference.source_path,
@@ -477,17 +552,23 @@ fn validate_manifest(path: &Path, manifest: &WorkspaceManifest) -> WorkspaceVali
 }
 
 fn discover_packages(source_root: &Path) -> Result<Vec<SkillPackageSource>> {
+    let plugin_roots = discover_plugin_roots(source_root)?;
     let mut skill_files = discover_skill_files(source_root)?;
     skill_files.sort();
     skill_files
         .into_iter()
-        .map(|skill_path| package_from_skill_file(source_root, &skill_path))
+        .map(|skill_path| package_from_skill_file(source_root, &skill_path, &plugin_roots))
         .collect()
 }
 
-fn package_from_skill_file(source_root: &Path, skill_path: &Path) -> Result<SkillPackageSource> {
+fn package_from_skill_file(
+    source_root: &Path,
+    skill_path: &Path,
+    plugin_roots: &[PluginRoot],
+) -> Result<SkillPackageSource> {
     let package_root = skill_path.parent().unwrap_or(source_root);
     let relative_package = strip_prefix(package_root, source_root);
+    let plugin_root = plugin_root_for_package(plugin_roots, &relative_package);
     let content = fs::read_to_string(skill_path).map_err(|source| Error::Read {
         path: skill_path.to_path_buf(),
         source,
@@ -499,12 +580,19 @@ fn package_from_skill_file(source_root: &Path, skill_path: &Path) -> Result<Skil
         .filter(|name| !name.is_empty())
         .unwrap_or("skill")
         .to_owned();
-    let public_name = frontmatter
+    let raw_public_name = frontmatter
         .get("name")
         .and_then(|value| value.as_str())
         .filter(|value| !value.trim().is_empty())
         .map(|value| value.trim().to_owned())
         .unwrap_or(fallback_name);
+    let local_name = plugin_local_name(
+        &raw_public_name,
+        plugin_root.map(|root| root.namespace.as_str()),
+    );
+    let public_name = plugin_root
+        .map(|root| namespaced_public_name(&root.namespace, &local_name))
+        .unwrap_or_else(|| raw_public_name.clone());
     let description = frontmatter
         .get("description")
         .and_then(|value| value.as_str())
@@ -518,10 +606,141 @@ fn package_from_skill_file(source_root: &Path, skill_path: &Path) -> Result<Skil
     Ok(SkillPackageSource {
         package_id,
         path: relative_package,
+        namespace: plugin_root.map(|root| root.namespace.clone()),
+        local_name: plugin_root.map(|_| local_name),
         public_name,
         description,
         disable_model_invocation,
     })
+}
+
+fn discover_plugin_roots(source_root: &Path) -> Result<Vec<PluginRoot>> {
+    let mut roots = Vec::new();
+    collect_plugin_roots(source_root, source_root, &mut roots)?;
+    roots.sort_by(|left, right| {
+        right
+            .path
+            .components()
+            .count()
+            .cmp(&left.path.components().count())
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    Ok(roots)
+}
+
+fn collect_plugin_roots(source_root: &Path, dir: &Path, roots: &mut Vec<PluginRoot>) -> Result<()> {
+    if is_plugin_root(dir) {
+        roots.push(PluginRoot {
+            path: strip_prefix(dir, source_root),
+            namespace: plugin_namespace(dir),
+        });
+    }
+
+    let entries = fs::read_dir(dir).map_err(|source| Error::Read {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::Read {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+        if should_skip_dir(file_name) {
+            continue;
+        }
+        collect_plugin_roots(source_root, &path, roots)?;
+    }
+    Ok(())
+}
+
+fn is_plugin_root(path: &Path) -> bool {
+    path.join("skills").is_dir()
+        && (path.join(".claude-plugin/plugin.json").is_file()
+            || path.join(".mcp.json").is_file()
+            || path.join("CLAUDE.md").is_file())
+}
+
+fn plugin_namespace(plugin_root: &Path) -> String {
+    plugin_json_namespace(plugin_root)
+        .or_else(|| {
+            plugin_root
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+        })
+        .map(|value| slugify(&value))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "plugin".to_owned())
+}
+
+fn plugin_json_namespace(plugin_root: &Path) -> Option<String> {
+    let plugin_json = plugin_root.join(".claude-plugin/plugin.json");
+    let content = fs::read_to_string(plugin_json).ok()?;
+    let parsed = serde_json::from_str::<serde_json::Value>(&content).ok()?;
+    parsed
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
+fn plugin_root_for_package<'a>(
+    plugin_roots: &'a [PluginRoot],
+    package_path: &Path,
+) -> Option<&'a PluginRoot> {
+    plugin_roots
+        .iter()
+        .find(|plugin_root| package_is_under_plugin_skills(&plugin_root.path, package_path))
+}
+
+fn package_is_under_plugin_skills(plugin_path: &Path, package_path: &Path) -> bool {
+    path_is_prefix(&plugin_path.join("skills"), package_path)
+}
+
+fn plugin_local_name(raw_public_name: &str, namespace: Option<&str>) -> String {
+    let candidate = if let Some((_, local)) = split_plugin_name(raw_public_name) {
+        local.to_owned()
+    } else if let Some(namespace) = namespace {
+        let namespace = slugify(namespace);
+        let raw_slug = slugify(raw_public_name);
+        raw_slug
+            .strip_prefix(&format!("{namespace}-"))
+            .unwrap_or(&raw_slug)
+            .to_owned()
+    } else {
+        raw_public_name.to_owned()
+    };
+    let slug = slugify(&candidate);
+    if slug.is_empty() {
+        "skill".to_owned()
+    } else {
+        slug
+    }
+}
+
+fn namespaced_public_name(namespace: &str, local_name: &str) -> String {
+    let namespace = slugify(namespace);
+    let local_name = slugify(local_name);
+    match (namespace.is_empty(), local_name.is_empty()) {
+        (true, true) => "skill".to_owned(),
+        (true, false) => local_name,
+        (false, true) => namespace,
+        (false, false) => format!("{namespace}-{local_name}"),
+    }
+}
+
+fn split_plugin_name(value: &str) -> Option<(&str, &str)> {
+    let (namespace, local) = value.split_once(':')?;
+    (!namespace.trim().is_empty() && !local.trim().is_empty()).then_some((namespace, local))
 }
 
 fn discover_skill_files(root: &Path) -> Result<Vec<PathBuf>> {
@@ -563,10 +782,11 @@ fn discover_references(
 ) -> Result<Vec<WorkspaceReference>> {
     let reference_regex = Regex::new(r"\.\./[A-Za-z0-9_./-]+").expect("reference regex compiles");
     let slash_skill_regex =
-        Regex::new(r"/[A-Za-z0-9][A-Za-z0-9_-]*").expect("slash skill regex compiles");
+        Regex::new(r"/[A-Za-z0-9][A-Za-z0-9_-]*(?::[A-Za-z0-9][A-Za-z0-9_-]*)?")
+            .expect("slash skill regex compiles");
     let mut references = Vec::new();
     let package_paths = package_paths(manifest);
-    let skill_name_targets = skill_name_targets(manifest);
+    let invocation_index = skill_invocation_index(manifest);
 
     for package in manifest.packages.values() {
         let package_root = source_root.join(&package.path);
@@ -601,6 +821,7 @@ fn discover_references(
                         from_package: package.package_id.clone(),
                         source_path: path_to_string(&relative_file),
                         line: index + 1,
+                        kind: WorkspaceReferenceKind::File,
                         raw: raw.to_owned(),
                         resolved_path: path_to_string(&resolved),
                         target_package,
@@ -611,9 +832,12 @@ fn discover_references(
                         continue;
                     }
                     let raw = trim_reference(matched.as_str());
-                    let Some((resolved_path, target_package)) =
-                        find_package_for_skill_invocation(&skill_name_targets, raw)
-                    else {
+                    let Some((resolved_path, target_package)) = find_package_for_skill_invocation(
+                        &invocation_index,
+                        manifest,
+                        &package.package_id,
+                        raw,
+                    ) else {
                         continue;
                     };
                     if target_package.as_deref() == Some(package.package_id.as_str()) {
@@ -623,6 +847,7 @@ fn discover_references(
                         from_package: package.package_id.clone(),
                         source_path: path_to_string(&relative_file),
                         line: index + 1,
+                        kind: WorkspaceReferenceKind::SkillInvocation,
                         raw: raw.to_owned(),
                         resolved_path,
                         target_package,
@@ -693,6 +918,9 @@ fn infer_dependencies(manifest: &mut WorkspaceManifest) {
         if target == &reference.from_package {
             continue;
         }
+        if !reference_creates_dependency(reference, manifest) {
+            continue;
+        }
         dependencies
             .entry(reference.from_package.clone())
             .or_default()
@@ -728,6 +956,7 @@ fn map_report(
         report_path: path_to_string(report_path),
         source_root: manifest.source_root.clone(),
         workspace_slug: manifest.workspace_slug.clone(),
+        plugin_namespaces: plugin_namespace_reports(manifest),
         package_count: manifest.packages.len(),
         dependency_edges: dependency_edges(manifest),
         duplicate_public_names,
@@ -738,6 +967,48 @@ fn map_report(
             "skillspec workspace validate {}",
             manifest_path.display()
         )],
+    }
+}
+
+fn plugin_namespace_reports(manifest: &WorkspaceManifest) -> Vec<WorkspacePluginNamespaceReport> {
+    let mut groups = BTreeMap::<String, (String, Vec<String>)>::new();
+    for package in manifest.packages.values() {
+        let Some(namespace) = &package.namespace else {
+            continue;
+        };
+        let entry = groups
+            .entry(namespace.clone())
+            .or_insert_with(|| (plugin_path_for_package(&package.path), Vec::new()));
+        entry.1.push(package.package_id.clone());
+    }
+    groups
+        .into_iter()
+        .map(|(namespace, (path, mut packages))| {
+            packages.sort();
+            WorkspacePluginNamespaceReport {
+                namespace,
+                path,
+                packages,
+            }
+        })
+        .collect()
+}
+
+fn plugin_path_for_package(package_path: &str) -> String {
+    let mut root = PathBuf::new();
+    for component in Path::new(package_path).components() {
+        let Component::Normal(part) = component else {
+            continue;
+        };
+        if part == "skills" {
+            break;
+        }
+        root.push(part);
+    }
+    if root.as_os_str().is_empty() {
+        ".".to_owned()
+    } else {
+        path_to_string(&root)
     }
 }
 
@@ -876,30 +1147,76 @@ fn package_paths(manifest: &WorkspaceManifest) -> Vec<(String, PathBuf)> {
     paths
 }
 
-fn skill_name_targets(manifest: &WorkspaceManifest) -> BTreeMap<String, Vec<(String, PathBuf)>> {
-    let mut targets = BTreeMap::<String, Vec<(String, PathBuf)>>::new();
-    for package in manifest.packages.values() {
-        push_skill_name_target(&mut targets, &package.public_name, package);
-        if let Some(last_segment) = package.package_id.rsplit('.').next() {
-            push_skill_name_target(&mut targets, last_segment, package);
-        }
-    }
-    targets
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SkillInvocationTarget {
+    package_id: String,
+    path: PathBuf,
 }
 
-fn push_skill_name_target(
-    targets: &mut BTreeMap<String, Vec<(String, PathBuf)>>,
-    name: &str,
+#[derive(Debug, Default)]
+struct SkillInvocationIndex {
+    global: BTreeMap<String, Vec<SkillInvocationTarget>>,
+    namespaced: BTreeMap<(String, String), Vec<SkillInvocationTarget>>,
+}
+
+fn skill_invocation_index(manifest: &WorkspaceManifest) -> SkillInvocationIndex {
+    let mut index = SkillInvocationIndex::default();
+    for package in manifest.packages.values() {
+        push_global_invocation_target(&mut index, &package.public_name, package);
+        let last_segment = package
+            .package_id
+            .rsplit('.')
+            .next()
+            .unwrap_or(&package.package_id);
+        if let Some(namespace) = &package.namespace {
+            let local_name = package.local_name.as_deref().unwrap_or(last_segment);
+            push_namespaced_invocation_target(&mut index, namespace, local_name, package);
+            push_namespaced_invocation_target(&mut index, namespace, last_segment, package);
+        } else {
+            push_global_invocation_target(&mut index, last_segment, package);
+        }
+    }
+    index
+}
+
+fn push_global_invocation_target(
+    index: &mut SkillInvocationIndex,
+    alias: &str,
     package: &WorkspacePackage,
 ) {
-    let key = slugify(name);
+    let key = slugify(alias);
     if key.is_empty() {
         return;
     }
-    let entry = targets.entry(key).or_default();
-    let value = (package.package_id.clone(), PathBuf::from(&package.path));
+    let value = invocation_target(package);
+    let entry = index.global.entry(key).or_default();
     if !entry.contains(&value) {
         entry.push(value);
+    }
+}
+
+fn push_namespaced_invocation_target(
+    index: &mut SkillInvocationIndex,
+    namespace: &str,
+    alias: &str,
+    package: &WorkspacePackage,
+) {
+    let namespace = slugify(namespace);
+    let alias = slugify(alias);
+    if namespace.is_empty() || alias.is_empty() {
+        return;
+    }
+    let value = invocation_target(package);
+    let entry = index.namespaced.entry((namespace, alias)).or_default();
+    if !entry.contains(&value) {
+        entry.push(value);
+    }
+}
+
+fn invocation_target(package: &WorkspacePackage) -> SkillInvocationTarget {
+    SkillInvocationTarget {
+        package_id: package.package_id.clone(),
+        path: PathBuf::from(&package.path),
     }
 }
 
@@ -911,22 +1228,62 @@ fn find_package_for_path(package_paths: &[(String, PathBuf)], target: &Path) -> 
 }
 
 fn find_package_for_skill_invocation(
-    skill_name_targets: &BTreeMap<String, Vec<(String, PathBuf)>>,
+    index: &SkillInvocationIndex,
+    manifest: &WorkspaceManifest,
+    from_package: &str,
     raw: &str,
 ) -> Option<(String, Option<String>)> {
     let name = raw.trim_start_matches('/');
+    if let Some((namespace, local_name)) = split_plugin_name(name) {
+        let key = (slugify(namespace), slugify(local_name));
+        return resolve_invocation_targets(raw, index.namespaced.get(&key));
+    }
+
+    if let Some(package) = manifest.packages.get(from_package) {
+        if let Some(namespace) = &package.namespace {
+            let key = (slugify(namespace), slugify(name));
+            if let Some(resolved) = resolve_invocation_targets(raw, index.namespaced.get(&key)) {
+                return Some(resolved);
+            }
+        }
+    }
+
     let key = slugify(name);
-    let targets = skill_name_targets.get(&key)?;
+    resolve_invocation_targets(raw, index.global.get(&key))
+}
+
+fn resolve_invocation_targets(
+    raw: &str,
+    targets: Option<&Vec<SkillInvocationTarget>>,
+) -> Option<(String, Option<String>)> {
+    let targets = targets?;
     if targets.len() == 1 {
-        let (package_id, package_path) = &targets[0];
-        return Some((path_to_string(package_path), Some(package_id.clone())));
+        let target = &targets[0];
+        return Some((
+            path_to_string(&target.path),
+            Some(target.package_id.clone()),
+        ));
     }
     let packages = targets
         .iter()
-        .map(|(package_id, _)| package_id.as_str())
+        .map(|target| target.package_id.as_str())
         .collect::<Vec<_>>()
         .join(", ");
     Some((format!("ambiguous skill name {raw}: {packages}"), None))
+}
+
+fn reference_creates_dependency(
+    reference: &WorkspaceReference,
+    manifest: &WorkspaceManifest,
+) -> bool {
+    match reference.kind {
+        WorkspaceReferenceKind::File => true,
+        WorkspaceReferenceKind::SkillInvocation => manifest
+            .packages
+            .get(&reference.from_package)
+            .and_then(|package| package.namespace.as_ref())
+            .is_none(),
+    }
 }
 
 fn is_standalone_skill_invocation(line: &str, start: usize) -> bool {

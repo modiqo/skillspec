@@ -91,6 +91,11 @@ skillspec sensemake --help
 skillspec query --help
 skillspec refs --help
 skillspec capability --help
+skillspec index --help
+skillspec router index refresh --help
+skillspec workspace --help
+skillspec workspace map --help
+skillspec workspace install --help
 ```
 
 ## SkillSpec Prompt Setup
@@ -100,6 +105,7 @@ authoring multiplexer:
 
 ```text
 /skillspec import <local-skill-folder-or-github-url>
+/skillspec map <multi-skill-or-plugin-workspace>
 /skillspec install router
 /skillspec install durable-executor from <local-skill-folder-or-github-url>
 /skillspec observe durable workspace <workspace> and create a spec skill
@@ -110,6 +116,7 @@ Examples:
 ```text
 /skillspec import /Users/me/.agents/skills/durable-executor
 /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf
+/skillspec map /Users/me/tulving/claude-for-legal
 ```
 
 The `skillspec` prompt skill does the careful path:
@@ -132,6 +139,16 @@ supplies an approved source. When a skill is added outside `skillspec install
 skill`, `skillspec router index status` detects prose-only versus
 SkillSpec-backed additions and `skillspec router index refresh` reapplies
 explicit invocation controls before rebuilding the index.
+
+Use the lower-level `skillspec index` command only when you intentionally want
+to build the router SQLite catalog for `skillspec route` or the optional
+skill-router. It is not a repository search command, source map, workspace map,
+or import planner. Direct execution prints router-state warnings: without router
+config it is standalone manual lookup only; with disabled router mode it will
+not affect implicit skill selection until `skillspec router enable` runs; with
+enabled router mode, `skillspec router index refresh` is usually the better
+maintenance command because it also reapplies visibility and checks
+preparedness.
 
 The mechanical importer is available directly when you only want a draft:
 
@@ -167,6 +184,38 @@ without reading repository source. Use `--view index` for the section map,
 full import command sequence plus the coverage matrix. `grammar checklist --for
 import-skill` is the review gate: every prose obligation should map to a
 SkillSpec construct with confidence, status, and review notes before install.
+
+## Map A Multi-Skill Or Plugin Workspace
+
+When a source root contains many `SKILL.md` files, do not import the parent
+folder as one skill. Map the workspace first:
+
+```sh
+skillspec workspace map ./skills --out ./build/skillspec.workspace.yml
+skillspec workspace validate ./build/skillspec.workspace.yml
+skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
+skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
+skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility
+```
+
+This is authoring recon, not router indexing. `workspace map` creates a
+`skillspec.workspace.yml` manifest with one package per atomic `SKILL.md`,
+deterministic install slugs, references, and dependency edges. `workspace
+import` fans out one draft package per skill under a mirrored build root.
+`workspace converge` verifies those drafts before compile. `workspace compile`
+writes harness-ready loaders. `workspace install` preflights every write,
+blocks collisions, and can apply the workspace visibility policy.
+
+Plugin-shaped repositories keep their plugin boundaries. A folder with `skills/`
+plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` becomes a plugin
+namespace. Repeated names are made skill-safe by prefixing the plugin name, so
+`commercial-legal/skills/cold-start-interview` becomes
+`commercial-legal-cold-start-interview`. Inside that plugin,
+`/cold-start-interview` resolves locally; `/privacy-legal:use-case-triage`
+resolves across plugins. Those slash-command references are workflow links, not
+hard dependency edges. Relative file references remain hard dependencies.
 
 ## Install A SkillSpec-Backed Skill
 

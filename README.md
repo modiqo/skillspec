@@ -207,6 +207,12 @@ observed result and evidence summary are approved; if live
 [Rote by Modiqo](https://www.modiqo.ai) workspace lookup is unreliable, pass
 pre-captured stats, log, and metadata files explicitly.
 
+The lower-level `skillspec index` command is router-specific. It only builds the
+SQLite catalog used by `skillspec route` and the optional skill-router; it is not
+source analysis or workspace recon. If router mode is disabled, direct
+`skillspec index` warns that the catalog will not affect implicit skill
+selection until `skillspec router enable` is run.
+
 ### Rote Prerequisite For Agent Traces
 
 The [durable-executor](#rote-prerequisite-for-agent-traces) path is optional,
@@ -310,6 +316,18 @@ also reports workspace visibility using the default `entry-implicit` policy:
 entry skills stay visible, while shared/helper/wrapper packages become
 manual-only support skills when `--apply-visibility` is used. Router index
 refresh is still separate runtime work.
+
+Plugin-shaped repos are preserved instead of flattened. If a folder has
+`skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`,
+`workspace map` treats that folder as a plugin namespace. Repeated skill names
+are made skill-safe by prefixing the plugin name, so
+`commercial-legal/skills/cold-start-interview` becomes
+`commercial-legal-cold-start-interview` and does not collide with
+`privacy-legal-cold-start-interview`. Inside a plugin, `/cold-start-interview`
+resolves to that plugin's skill; `/privacy-legal:use-case-triage` resolves
+across plugins. Those slash-command links are recorded as workflow references.
+Relative file links such as `../coding-standards/SKILL.md` remain hard
+dependencies.
 
 ### 2. Map And Import
 

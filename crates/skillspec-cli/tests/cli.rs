@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -527,14 +527,16 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&workspace);
     let workspace_help = stdout(&workspace);
-    assert!(workspace_help
-        .contains("Map, validate, import, compile, and install multi-skill workspaces"));
+    assert!(workspace_help.contains(
+        "Map, validate, import, converge, compile, and install multi-skill or plugin-shaped workspaces"
+    ));
     assert!(workspace_help.contains("map"));
     assert!(workspace_help.contains("validate"));
     assert!(workspace_help.contains("import"));
     assert!(workspace_help.contains("converge"));
     assert!(workspace_help.contains("compile"));
     assert!(workspace_help.contains("install"));
+    assert!(workspace_help.contains("plugin-shaped"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -545,6 +547,17 @@ fn help_lists_trace_align_arguments() {
     let import_help = stdout(&import_skill);
     assert!(import_help.contains("--source-map"));
     assert!(import_help.contains("source-map.json"));
+
+    let index = Command::new(bin())
+        .arg("index")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&index);
+    let index_help = stdout(&index);
+    assert!(index_help.contains("router-specific"));
+    assert!(index_help.contains("not source analysis"));
+    assert!(index_help.contains("router index refresh"));
 
     let install_skill = Command::new(bin())
         .arg("install")
@@ -774,6 +787,85 @@ description: Helps with notes.
         .unwrap()
         .iter()
         .any(|name| name == "pdf"));
+}
+
+#[test]
+fn direct_index_warns_about_router_scope_and_disabled_router_mode() {
+    let dir = TempDir::new("direct-index-warning");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("skill-index.sqlite");
+
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Use when organizing personal notes. Do not use for PDF extraction.
+---
+# Notes
+"#,
+    );
+
+    let standalone = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&standalone);
+    let standalone_report = json_stdout(&standalone);
+    let standalone_warnings = standalone_report["warnings"].as_array().unwrap();
+    assert!(standalone_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("router-specific"))));
+    assert!(standalone_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("No installed router config"))));
+
+    write_file(
+        &skillspec_home.join("router/config.json"),
+        &serde_json::to_string_pretty(&json!({
+            "schema": "skillspec/router-config/v1",
+            "created_at_unix": 0,
+            "enabled": false,
+            "roots": [root.to_string_lossy().to_string()],
+            "router_skill_dirs": [root.join("skill-router").to_string_lossy().to_string()],
+            "index": index.to_string_lossy().to_string(),
+            "manifest": skillspec_home
+                .join("router/visibility-manifest.json")
+                .to_string_lossy()
+                .to_string(),
+            "router_name": "skill-router"
+        }))
+        .unwrap(),
+    );
+
+    let disabled = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disabled);
+    let disabled_report = json_stdout(&disabled);
+    let disabled_warnings = disabled_report["warnings"].as_array().unwrap();
+    assert!(disabled_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("installed but disabled"))));
+    assert!(disabled_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("will not affect implicit skill selection"))));
 }
 
 #[test]
@@ -2809,6 +2901,89 @@ commands:
     assert!(out.contains("diagnose prose reliability debt"));
     assert!(out.contains("skillspec doctor <source-skill-folder-or-uri> --json"));
     assert!(out.contains("run doctor before import"));
+}
+
+#[test]
+fn sensemake_teaches_workspace_authoring_when_spec_uses_it() {
+    let dir = TempDir::new("sensemake-workspace");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Workspace authoring fixture.
+commands:
+  workspace_map_source:
+    description: Map a multi-skill or plugin-shaped source root.
+    template: skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml
+    safety: local_write
+  workspace_validate_manifest:
+    description: Validate the workspace graph.
+    template: skillspec workspace validate <build>/skillspec.workspace.yml
+    safety: local_read
+  workspace_import_packages:
+    description: Fanout import the workspace graph.
+    template: skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build>
+    safety: local_write
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("map workspace source root"));
+    assert!(
+        out.contains("skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml")
+    );
+    assert!(out.contains("fanout import workspace packages"));
+    assert!(out.contains("multi-skill or plugin-shaped source roots"));
+}
+
+#[test]
+fn sensemake_teaches_router_index_boundary_when_spec_uses_router_lifecycle() {
+    let dir = TempDir::new("sensemake-router-index-boundary");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Router lifecycle fixture.
+commands:
+  router_install:
+    description: Install router mode.
+    template: skillspec router install --roots <skill-roots> --index <router-index>
+    safety: local_write
+  router_enable:
+    description: Enable router mode.
+    template: skillspec router enable --json
+    safety: local_write
+  status_lifecycle_inventory:
+    description: Inspect lifecycle status.
+    template: skillspec status --json
+    safety: read_only
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("direct `skillspec index`"));
+    assert!(out.contains("router-specific catalog construction"));
+    assert!(
+        out.contains("skillspec router index refresh --roots <skill-roots> --index <router-index>")
+    );
 }
 
 #[test]
@@ -4944,6 +5119,206 @@ Run `/coding-standards` before the wrapper.
     assert_success(&validate);
     let validate_report = json_stdout(&validate);
     assert_eq!(validate_report["ok"], true);
+}
+
+#[test]
+fn workspace_map_preserves_plugin_namespaces() {
+    let dir = TempDir::new("workspace-plugin-map");
+    let root = dir.path().join("claude-for-legal");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"commercial-legal","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"privacy-legal","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+        r#"---
+name: cold-start-interview
+description: Commercial intake.
+---
+# Commercial Intake
+"#,
+    );
+    write_file(
+        &root
+            .join("commercial-legal")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+        r#"---
+name: review
+description: Review a commercial agreement.
+---
+# Review
+
+Run `/cold-start-interview`.
+Use `/privacy-legal:use-case-triage` when privacy review is needed.
+Read `../cold-start-interview/SKILL.md`.
+"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+        r#"---
+name: cold-start-interview
+description: Privacy intake.
+---
+# Privacy Intake
+"#,
+    );
+    write_file(
+        &root
+            .join("privacy-legal")
+            .join("skills")
+            .join("use-case-triage")
+            .join("SKILL.md"),
+        r#"---
+name: use-case-triage
+description: Privacy use-case triage.
+---
+# Use Case Triage
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["package_count"], 4);
+    assert!(map_report["duplicate_public_names"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    let namespaces = map_report["plugin_namespaces"].as_array().unwrap();
+    assert!(namespaces.iter().any(|namespace| {
+        namespace["namespace"] == "commercial-legal"
+            && namespace["path"] == "commercial-legal"
+            && namespace["packages"].as_array().unwrap().len() == 2
+    }));
+    assert!(namespaces.iter().any(|namespace| {
+        namespace["namespace"] == "privacy-legal"
+            && namespace["path"] == "privacy-legal"
+            && namespace["packages"].as_array().unwrap().len() == 2
+    }));
+
+    let references = map_report["references"].as_array().unwrap();
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "/cold-start-interview"
+            && reference["kind"] == "skill_invocation"
+            && reference["target_package"] == "commercial-legal.skills.cold-start-interview"
+    }));
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "/privacy-legal:use-case-triage"
+            && reference["kind"] == "skill_invocation"
+            && reference["target_package"] == "privacy-legal.skills.use-case-triage"
+    }));
+    assert!(references.iter().any(|reference| {
+        reference["from_package"] == "commercial-legal.skills.review"
+            && reference["raw"] == "../cold-start-interview/SKILL.md"
+            && reference["kind"] == "file"
+            && reference["target_package"] == "commercial-legal.skills.cold-start-interview"
+    }));
+
+    let edges = map_report["dependency_edges"].as_array().unwrap();
+    assert!(edges.iter().any(|edge| {
+        edge["from"] == "commercial-legal.skills.review"
+            && edge["to"] == "commercial-legal.skills.cold-start-interview"
+    }));
+    assert!(!edges.iter().any(|edge| {
+        edge["from"] == "commercial-legal.skills.review"
+            && edge["to"] == "privacy-legal.skills.use-case-triage"
+    }));
+
+    let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("namespace: commercial-legal"));
+    assert!(manifest_yaml.contains("local_name: review"));
+    assert!(manifest_yaml.contains("public_name: commercial-legal-review"));
+    assert!(manifest_yaml.contains("public_name: privacy-legal-cold-start-interview"));
+
+    let validate = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    let validate_report = json_stdout(&validate);
+    assert_eq!(validate_report["ok"], true);
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&compile);
+    let compile_report = json_stdout(&compile);
+    assert_eq!(compile_report["ok"], true);
+
+    let commercial_loader = fs::read_to_string(
+        build
+            .join("commercial-legal")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+    )
+    .unwrap();
+    assert!(commercial_loader.contains("name: commercial-legal-review"));
+    let privacy_loader = fs::read_to_string(
+        build
+            .join("privacy-legal")
+            .join("skills")
+            .join("cold-start-interview")
+            .join("SKILL.md"),
+    )
+    .unwrap();
+    assert!(privacy_loader.contains("name: privacy-legal-cold-start-interview"));
 }
 
 #[test]
