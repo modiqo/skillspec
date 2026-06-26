@@ -4,6 +4,8 @@ use super::{
 };
 use crate::error::{Error, Result};
 use crate::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
+use crate::router::Visibility;
+use crate::visibility;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -26,6 +28,15 @@ pub struct WorkspaceInstallReport {
     pub failed: Vec<String>,
     pub blocked: Vec<String>,
     pub missing: Vec<String>,
+    pub visibility_policy: WorkspaceVisibilityPolicy,
+    pub apply_visibility: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility_manifest_path: Option<String>,
+    pub visibility: Vec<WorkspaceVisibilityReport>,
+    pub visibility_changes: Vec<visibility::VisibilityChangeReport>,
+    pub visibility_warnings: Vec<String>,
+    pub router_refresh_recommended: bool,
+    pub router_refresh_advice: Vec<String>,
     pub dependency_edges: Vec<WorkspaceDependencyEdge>,
     pub packages: Vec<WorkspaceInstallPackageReport>,
     pub next: Vec<String>,
@@ -36,10 +47,52 @@ pub struct WorkspaceInstallPackageReport {
     pub package_id: String,
     pub public_name: String,
     pub install_slug: String,
+    pub kind: super::WorkspacePackageKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<WorkspaceVisibilityAssignment>,
     pub status: WorkspaceInstallStatus,
     pub source_dir: String,
     pub dependencies: Vec<String>,
     pub targets: Vec<WorkspaceInstallTargetReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WorkspaceVisibilityPolicy {
+    EntryImplicit,
+    AllImplicit,
+    AllManual,
+    None,
+}
+
+impl WorkspaceVisibilityPolicy {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::EntryImplicit => "entry-implicit",
+            Self::AllImplicit => "all-implicit",
+            Self::AllManual => "all-manual",
+            Self::None => "none",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct WorkspaceVisibilityAssignment {
+    pub target: Visibility,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceVisibilityReport {
+    pub package_id: String,
+    pub public_name: String,
+    pub install_slug: String,
+    pub kind: super::WorkspacePackageKind,
+    pub target_visibility: Visibility,
+    pub applied: bool,
+    pub target_paths: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
@@ -114,6 +167,9 @@ struct WorkspaceInstalledPackage {
     package_id: String,
     public_name: String,
     install_slug: String,
+    kind: super::WorkspacePackageKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visibility: Option<WorkspaceVisibilityAssignment>,
     dependencies: Vec<String>,
     installs: Vec<WorkspaceInstalledTarget>,
 }
@@ -135,6 +191,9 @@ pub fn install_workspace(
     all_detected: bool,
     dry_run: bool,
     retire_existing: bool,
+    visibility_policy: WorkspaceVisibilityPolicy,
+    apply_visibility: bool,
+    visibility_manifest: Option<&Path>,
 ) -> Result<WorkspaceInstallReport> {
     let validation = validate_workspace(manifest_path)?;
     if !validation.ok {
@@ -172,6 +231,7 @@ pub fn install_workspace(
         retire_existing,
         &roots,
         &duplicate_public_names,
+        visibility_policy,
     )?;
 
     let mut report = install_report(
@@ -181,6 +241,11 @@ pub fn install_workspace(
         &roots,
         &manifest,
         package_reports,
+        visibility_policy,
+        apply_visibility,
+        visibility_manifest,
+        Vec::new(),
+        Vec::new(),
     );
 
     if report.ok && !dry_run {
@@ -199,7 +264,34 @@ pub fn install_workspace(
             &roots,
             &manifest,
             package_reports,
+            visibility_policy,
+            apply_visibility,
+            visibility_manifest,
+            Vec::new(),
+            Vec::new(),
         );
+        if apply_visibility && visibility_policy != WorkspaceVisibilityPolicy::None {
+            let (changes, warnings) = apply_workspace_visibility(
+                &report,
+                &roots,
+                visibility_policy,
+                visibility_manifest_path(build_root, visibility_manifest),
+            )?;
+            let packages = report.packages;
+            report = install_report(
+                manifest_path,
+                build_root,
+                dry_run,
+                &roots,
+                &manifest,
+                packages,
+                visibility_policy,
+                apply_visibility,
+                visibility_manifest,
+                changes,
+                warnings,
+            );
+        }
         if !report.installed.is_empty() {
             write_install_manifest(&report, &manifest)?;
         }
@@ -224,6 +316,17 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
     output.push_str(&format!("- targets: {}\n", report.targets.join(", ")));
     output.push_str(&format!("- packages: {}\n", report.package_count));
     output.push_str(&format!(
+        "- visibility_policy: {}\n",
+        report.visibility_policy.as_str()
+    ));
+    output.push_str(&format!(
+        "- apply_visibility: {}\n",
+        report.apply_visibility
+    ));
+    if let Some(path) = &report.visibility_manifest_path {
+        output.push_str(&format!("- visibility_manifest: {path}\n"));
+    }
+    output.push_str(&format!(
         "- status: {}\n",
         if report.ok { "ok" } else { "failed" }
     ));
@@ -243,13 +346,17 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
     output.push_str("\n## Packages\n\n");
     for package in &report.packages {
         output.push_str(&format!(
-            "- {}: {} public_name={} install_slug={} source={}\n",
+            "- {}: {} kind={} public_name={} install_slug={} source={}\n",
             package.package_id,
             package.status.as_str(),
+            package.kind.as_str(),
             package.public_name,
             package.install_slug,
             package.source_dir
         ));
+        if let Some(visibility) = &package.visibility {
+            output.push_str(&format!("  visibility: {}\n", visibility.target.as_str()));
+        }
         if !package.dependencies.is_empty() {
             output.push_str(&format!(
                 "  depends_on: {}\n",
@@ -282,6 +389,52 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
         }
     }
 
+    output.push_str("\n## Visibility\n\n");
+    if report.visibility.is_empty() {
+        output.push_str("- none\n");
+    } else {
+        for visibility in &report.visibility {
+            output.push_str(&format!(
+                "- {}: {} ({}) -> {} applied={}\n",
+                visibility.package_id,
+                visibility.public_name,
+                visibility.kind.as_str(),
+                visibility.target_visibility.as_str(),
+                visibility.applied
+            ));
+            if let Some(message) = &visibility.message {
+                output.push_str(&format!("  message: {message}\n"));
+            }
+        }
+    }
+    if !report.visibility_changes.is_empty() {
+        output.push_str("\n## Native Visibility Changes\n\n");
+        for change in &report.visibility_changes {
+            output.push_str(&format!(
+                "- {}: {} -> {} ({:?})\n",
+                change.skill,
+                change.before_visibility.as_str(),
+                change.after_visibility.as_str(),
+                change.status
+            ));
+        }
+    }
+    if !report.visibility_warnings.is_empty() {
+        output.push_str("\n## Visibility Warnings\n\n");
+        for warning in &report.visibility_warnings {
+            output.push_str(&format!("- {warning}\n"));
+        }
+    }
+
+    output.push_str("\n## Router Refresh\n\n");
+    if report.router_refresh_recommended {
+        for advice in &report.router_refresh_advice {
+            output.push_str(&format!("- {advice}\n"));
+        }
+    } else {
+        output.push_str("- not needed for dry-run or no-op install\n");
+    }
+
     output.push_str("\n## Dependency Graph\n\n");
     if report.dependency_edges.is_empty() {
         output.push_str("- none\n");
@@ -310,6 +463,7 @@ fn preflight_packages(
     retire_existing: bool,
     roots: &[HarnessRoot],
     duplicate_public_names: &BTreeMap<String, Vec<String>>,
+    visibility_policy: WorkspaceVisibilityPolicy,
 ) -> Result<Vec<WorkspaceInstallPackageReport>> {
     let mut statuses = BTreeMap::<String, WorkspaceInstallStatus>::new();
     let mut reports = Vec::new();
@@ -335,6 +489,7 @@ fn preflight_packages(
                 retire_existing,
                 roots,
                 duplicate_public_names,
+                visibility_policy,
             )?
         } else {
             blocked_package_report(
@@ -361,6 +516,7 @@ fn preflight_one_package(
     retire_existing: bool,
     roots: &[HarnessRoot],
     duplicate_public_names: &BTreeMap<String, Vec<String>>,
+    visibility_policy: WorkspaceVisibilityPolicy,
 ) -> Result<WorkspaceInstallPackageReport> {
     let source_dir = output_package_dir(package, build_root)?;
     let loader_path = source_dir.join("SKILL.md");
@@ -465,6 +621,8 @@ fn preflight_one_package(
         package_id: package.package_id.clone(),
         public_name: package.public_name.clone(),
         install_slug: package.install_slug.clone(),
+        kind: package.kind.clone(),
+        visibility: visibility_assignment(package, visibility_policy),
         status: if blockers.is_empty() {
             WorkspaceInstallStatus::Planned
         } else {
@@ -565,6 +723,11 @@ fn install_report(
     roots: &[HarnessRoot],
     manifest: &WorkspaceManifest,
     packages: Vec<WorkspaceInstallPackageReport>,
+    visibility_policy: WorkspaceVisibilityPolicy,
+    apply_visibility: bool,
+    visibility_manifest: Option<&Path>,
+    visibility_changes: Vec<visibility::VisibilityChangeReport>,
+    visibility_warnings: Vec<String>,
 ) -> WorkspaceInstallReport {
     let report_path = build_root.join("workspace-install.report.md");
     let install_manifest_path = build_root.join("workspace-install.manifest.json");
@@ -573,6 +736,11 @@ fn install_report(
     let failed = package_ids_by_status(&packages, WorkspaceInstallStatus::Failed);
     let blocked = package_ids_by_status(&packages, WorkspaceInstallStatus::Blocked);
     let missing = package_ids_by_status(&packages, WorkspaceInstallStatus::Missing);
+    let visibility = visibility_reports(&packages, visibility_policy, apply_visibility);
+    let visibility_manifest_path = (visibility_policy != WorkspaceVisibilityPolicy::None)
+        .then(|| visibility_manifest_path(build_root, visibility_manifest))
+        .flatten();
+    let router_refresh_recommended = !dry_run && !installed.is_empty();
     WorkspaceInstallReport {
         ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
         dry_run,
@@ -587,20 +755,50 @@ fn install_report(
         failed,
         blocked,
         missing,
+        visibility_policy,
+        apply_visibility,
+        visibility_manifest_path: visibility_manifest_path
+            .as_ref()
+            .map(|path| path_to_string(path)),
+        visibility,
+        visibility_changes,
+        visibility_warnings,
+        router_refresh_recommended,
+        router_refresh_advice: router_refresh_advice(roots, visibility_manifest_path.as_deref()),
         dependency_edges: dependency_edges(manifest),
         packages,
-        next: if dry_run {
-            vec![
-                "rerun the same command without --dry-run after reviewing planned writes"
-                    .to_owned(),
-            ]
-        } else {
-            vec![
-                "inspect workspace-install.manifest.json for installed package ids, slugs, public names, and target paths".to_owned(),
-                "refresh router indexes separately if this harness uses router mode".to_owned(),
-            ]
-        },
+        next: install_next_steps(dry_run, visibility_policy, apply_visibility),
     }
+}
+
+fn install_next_steps(
+    dry_run: bool,
+    visibility_policy: WorkspaceVisibilityPolicy,
+    apply_visibility: bool,
+) -> Vec<String> {
+    if dry_run {
+        return vec![
+            "rerun the same command without --dry-run after reviewing planned writes and visibility targets".to_owned(),
+        ];
+    }
+
+    let mut next = vec![
+        "inspect workspace-install.manifest.json for installed package ids, slugs, public names, visibility targets, and target paths".to_owned(),
+    ];
+    if visibility_policy != WorkspaceVisibilityPolicy::None {
+        if apply_visibility {
+            next.push(
+                "inspect workspace-visibility.manifest.json for reversible native visibility changes"
+                    .to_owned(),
+            );
+        } else {
+            next.push(
+                "inspect visibility targets in the install report; rerun with --apply-visibility to write native visibility metadata when ready".to_owned(),
+            );
+        }
+    }
+    next.push("refresh router indexes separately if this harness uses router mode".to_owned());
+    next
 }
 
 fn write_install_manifest(
@@ -620,6 +818,8 @@ fn write_install_manifest(
                 package_id: package.package_id.clone(),
                 public_name: package.public_name.clone(),
                 install_slug: package.install_slug.clone(),
+                kind: package.kind.clone(),
+                visibility: package.visibility,
                 dependencies: manifest
                     .packages
                     .get(&package.package_id)
@@ -646,6 +846,140 @@ fn write_install_manifest(
     )
 }
 
+fn visibility_assignment(
+    package: &WorkspacePackage,
+    policy: WorkspaceVisibilityPolicy,
+) -> Option<WorkspaceVisibilityAssignment> {
+    visibility_target(&package.kind, policy).map(|target| WorkspaceVisibilityAssignment { target })
+}
+
+fn visibility_target(
+    kind: &super::WorkspacePackageKind,
+    policy: WorkspaceVisibilityPolicy,
+) -> Option<Visibility> {
+    match policy {
+        WorkspaceVisibilityPolicy::None => None,
+        WorkspaceVisibilityPolicy::AllImplicit => Some(Visibility::Implicit),
+        WorkspaceVisibilityPolicy::AllManual => Some(Visibility::ManualOnly),
+        WorkspaceVisibilityPolicy::EntryImplicit => match kind {
+            super::WorkspacePackageKind::Entry => Some(Visibility::Implicit),
+            super::WorkspacePackageKind::Shared
+            | super::WorkspacePackageKind::Helper
+            | super::WorkspacePackageKind::Wrapper => Some(Visibility::ManualOnly),
+        },
+    }
+}
+
+fn visibility_reports(
+    packages: &[WorkspaceInstallPackageReport],
+    policy: WorkspaceVisibilityPolicy,
+    apply_visibility: bool,
+) -> Vec<WorkspaceVisibilityReport> {
+    if policy == WorkspaceVisibilityPolicy::None {
+        return Vec::new();
+    }
+    packages
+        .iter()
+        .filter_map(|package| {
+            let visibility = package.visibility?;
+            Some(WorkspaceVisibilityReport {
+                package_id: package.package_id.clone(),
+                public_name: package.public_name.clone(),
+                install_slug: package.install_slug.clone(),
+                kind: package.kind.clone(),
+                target_visibility: visibility.target,
+                applied: apply_visibility && package.status == WorkspaceInstallStatus::Installed,
+                target_paths: package
+                    .targets
+                    .iter()
+                    .map(|target| target.path.clone())
+                    .collect(),
+                message: Some(match visibility.target {
+                    Visibility::Implicit => {
+                        "user-facing package remains visible for native selection".to_owned()
+                    }
+                    Visibility::ManualOnly => {
+                        "support package is installed but not implicitly selected".to_owned()
+                    }
+                    Visibility::NameOnly => "package is name-only for router selection".to_owned(),
+                    Visibility::Off => "package is hidden from router selection".to_owned(),
+                }),
+            })
+        })
+        .collect()
+}
+
+fn apply_workspace_visibility(
+    report: &WorkspaceInstallReport,
+    roots: &[HarnessRoot],
+    policy: WorkspaceVisibilityPolicy,
+    manifest_path: Option<PathBuf>,
+) -> Result<(Vec<visibility::VisibilityChangeReport>, Vec<String>)> {
+    let Some(manifest_path) = manifest_path else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+    let roots = roots
+        .iter()
+        .map(|root| root.path.clone())
+        .collect::<Vec<_>>();
+    let skills = report
+        .packages
+        .iter()
+        .filter(|package| package.status == WorkspaceInstallStatus::Installed)
+        .filter_map(|package| {
+            let target = package.visibility.map(|assignment| assignment.target)?;
+            Some(visibility::SkillVisibilityTarget {
+                skill: package.public_name.clone(),
+                visibility: target,
+            })
+        })
+        .collect::<Vec<_>>();
+    let apply_report = visibility::set_visibilities(visibility::SetVisibilitiesOptions {
+        roots,
+        skills,
+        manifest: manifest_path,
+        dry_run: false,
+    })?;
+    let changes = apply_report.changes;
+    let mut warnings = apply_report.warnings;
+    if policy == WorkspaceVisibilityPolicy::EntryImplicit
+        && !changes
+            .iter()
+            .any(|change| change.after_visibility == Visibility::ManualOnly)
+    {
+        warnings.push(
+            "entry-implicit policy applied, but no support package required native visibility files"
+                .to_owned(),
+        );
+    }
+    Ok((changes, warnings))
+}
+
+fn visibility_manifest_path(build_root: &Path, override_path: Option<&Path>) -> Option<PathBuf> {
+    Some(
+        override_path
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| build_root.join("workspace-visibility.manifest.json")),
+    )
+}
+
+fn router_refresh_advice(roots: &[HarnessRoot], visibility_manifest: Option<&Path>) -> Vec<String> {
+    let roots_arg = roots
+        .iter()
+        .map(|root| format!("--roots {}", root.path.display()))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let visibility_arg = visibility_manifest
+        .map(|path| format!(" --visibility-manifest {}", path.display()))
+        .unwrap_or_default();
+    vec![
+        "workspace install does not refresh router indexes".to_owned(),
+        format!(
+            "if router mode is enabled, run `skillspec router index refresh {roots_arg} --index <router-index>{visibility_arg}`"
+        ),
+    ]
+}
+
 fn missing_package_report(
     package: &WorkspacePackage,
     source_dir: &Path,
@@ -656,6 +990,8 @@ fn missing_package_report(
         package_id: package.package_id.clone(),
         public_name: package.public_name.clone(),
         install_slug: package.install_slug.clone(),
+        kind: package.kind.clone(),
+        visibility: None,
         status: WorkspaceInstallStatus::Missing,
         source_dir: path_to_string(source_dir),
         dependencies: package.depends_on.clone(),
@@ -674,6 +1010,8 @@ fn failed_package_report(
         package_id: package.package_id.clone(),
         public_name: package.public_name.clone(),
         install_slug: package.install_slug.clone(),
+        kind: package.kind.clone(),
+        visibility: None,
         status: WorkspaceInstallStatus::Failed,
         source_dir: path_to_string(source_dir),
         dependencies: package.depends_on.clone(),
@@ -693,6 +1031,8 @@ fn blocked_package_report(
         package_id: package.package_id.clone(),
         public_name: package.public_name.clone(),
         install_slug: package.install_slug.clone(),
+        kind: package.kind.clone(),
+        visibility: None,
         status: WorkspaceInstallStatus::Blocked,
         source_dir: path_to_string(&source_dir),
         dependencies: package.depends_on.clone(),

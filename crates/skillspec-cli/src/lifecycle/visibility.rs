@@ -82,6 +82,20 @@ pub struct SetVisibilityOptions {
 }
 
 #[derive(Clone, Debug)]
+pub struct SkillVisibilityTarget {
+    pub skill: String,
+    pub visibility: Visibility,
+}
+
+#[derive(Clone, Debug)]
+pub struct SetVisibilitiesOptions {
+    pub roots: Vec<PathBuf>,
+    pub skills: Vec<SkillVisibilityTarget>,
+    pub manifest: PathBuf,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct VisibilityRestoreOptions {
     pub manifest: PathBuf,
     pub dry_run: bool,
@@ -228,24 +242,38 @@ pub fn apply_router_mode(options: RouterModeVisibilityOptions) -> Result<Visibil
 }
 
 pub fn set_visibility(options: SetVisibilityOptions) -> Result<VisibilityApplyReport> {
-    let (entries, warnings) = scan(&options.roots)?;
-    let matches = entries
-        .iter()
-        .filter(|entry| entry.name == options.skill)
-        .collect::<Vec<_>>();
-    if matches.is_empty() {
-        return Err(Error::InvalidInput {
-            message: format!("no skill named {:?} found in supplied roots", options.skill),
-        });
-    }
+    set_visibilities(SetVisibilitiesOptions {
+        roots: options.roots,
+        skills: vec![SkillVisibilityTarget {
+            skill: options.skill,
+            visibility: options.visibility,
+        }],
+        manifest: options.manifest,
+        dry_run: options.dry_run,
+    })
+}
 
+pub fn set_visibilities(options: SetVisibilitiesOptions) -> Result<VisibilityApplyReport> {
+    let (entries, warnings) = scan(&options.roots)?;
     let mut prepared = Vec::new();
-    for entry in matches {
-        prepared.extend(prepare_changes(
-            entry,
-            options.visibility,
-            VisibilityProfile::Explicit,
-        )?);
+    for skill in &options.skills {
+        let matches = entries
+            .iter()
+            .filter(|entry| entry.name == skill.skill)
+            .collect::<Vec<_>>();
+        if matches.is_empty() {
+            return Err(Error::InvalidInput {
+                message: format!("no skill named {:?} found in supplied roots", skill.skill),
+            });
+        }
+
+        for entry in matches {
+            prepared.extend(prepare_changes(
+                entry,
+                skill.visibility,
+                VisibilityProfile::Explicit,
+            )?);
+        }
     }
     for change in &mut prepared {
         change.report.status = if options.dry_run {

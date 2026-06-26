@@ -2,11 +2,17 @@ use super::Target;
 use crate::model::{DependencyKind, SkillSpec};
 use std::fmt::Write;
 
-pub(super) fn write_frontmatter(output: &mut String, spec: &SkillSpec, target: Target) {
+pub(super) fn write_frontmatter(
+    output: &mut String,
+    spec: &SkillSpec,
+    target: Target,
+    name: Option<&str>,
+) {
     match target {
         Target::CodexSkill | Target::ClaudeSkill => {
             let _ = writeln!(output, "---");
-            let _ = writeln!(output, "name: {}", skill_name(&spec.id));
+            let name = name.unwrap_or(spec.id.as_str());
+            let _ = writeln!(output, "name: {}", skill_name(name));
             let _ = writeln!(output, "description: {:?}", selection_description(spec));
             let _ = writeln!(output, "---");
             output.push('\n');

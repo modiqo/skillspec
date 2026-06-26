@@ -1,11 +1,11 @@
 schema: skillspec/v0
 id: skillspec
 title: SkillSpec
-description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+description: SkillSpec post-install setup and skill-authoring multiplexer for mapping multi-skill workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
 activation:
   summary: >
     Multiplex SkillSpec post-install setup: map multi-skill repositories before fanout import, import existing SKILL.md skills from
-    local folders or public URIs, inspect installed status, install compiled workspaces, install/update/enable/disable router mode, optionally
+    local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally
     install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
     revise SkillSpec YAML, and prove value before install or release.
   keywords:
@@ -38,6 +38,14 @@ activation:
     - workspace install proof
     - workspace-install.report.md
     - workspace-install.manifest.json
+    - workspace visibility
+    - workspace visibility policy
+    - visibility-policy
+    - apply visibility
+    - apply-visibility
+    - entry-implicit
+    - manual-only support skill
+    - workspace-visibility.manifest.json
     - import workspace packages
     - cross-skill references
     - skill dependency graph
@@ -441,10 +449,10 @@ routes:
   - id: workspace_install
     label: Install workspace build
     rank: 7
-    description: Use when compiled workspace packages should be dry-run planned or installed into harness roots using manifest install_slug folders.
+    description: Use when compiled workspace packages should be dry-run planned or installed into harness roots using manifest install_slug folders, with explicit workspace visibility policy planning.
     execution_plan:
       mode: ordered
-      reason: Workspace install is the Phase 7 gate after compile; it must prove the full install plan, block collisions before mutation, install dependencies first, and leave router refresh separate.
+      reason: Workspace install is the Phase 7 gate after compile; it must prove the full install plan, block collisions before mutation, install dependencies first, report entry/support visibility, and leave router refresh separate.
       phases:
         - id: validate_workspace_for_install
           owner_skill: skillspec
@@ -454,7 +462,7 @@ routes:
             - validate_workspace_graph
         - id: plan_workspace_install
           owner_skill: skillspec
-          description: Run the workspace install dry-run so every harness write, collision, missing loader, and dependency blocker is visible before mutation.
+          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -464,12 +472,13 @@ routes:
           requires:
             - workspace_install_dry_run
             - produce_workspace_install_report
+            - produce_workspace_visibility_plan
           forbid:
             - install_without_workspace_dry_run
             - refresh_router_during_workspace_install
         - id: install_workspace_packages
           owner_skill: skillspec
-          description: Install the compiled packages only after the dry-run report is clean or the user explicitly requested install with reviewed collision behavior.
+          description: Install the compiled packages only after the dry-run report is clean or the user explicitly requested install with reviewed collision and visibility behavior.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -480,12 +489,13 @@ routes:
           requires:
             - workspace_install_packages
             - produce_workspace_install_manifest
+            - produce_workspace_visibility_plan
           forbid:
             - install_without_workspace_dry_run
             - refresh_router_during_workspace_install
         - id: report_workspace_install
           owner_skill: skillspec
-          description: Report installed, planned, failed, blocked, and missing packages plus install manifest paths and router-refresh separation.
+          description: Report installed, planned, failed, blocked, and missing packages plus install manifest paths, visibility policy, optional visibility manifest, and router-refresh separation.
           requires:
             - report_workspace_install
   - id: install_skill_router
@@ -1047,6 +1057,13 @@ rules:
         - workspace install dry-run
         - workspace-install.report.md
         - workspace-install.manifest.json
+        - workspace visibility
+        - workspace visibility policy
+        - apply visibility
+        - --apply-visibility
+        - entry-implicit
+        - manual-only support skills
+        - workspace-visibility.manifest.json
     prefer: workspace_install
     forbid:
       - install_without_workspace_dry_run
@@ -1054,7 +1071,7 @@ rules:
       - use_router_index_for_authoring_recon
     after_success:
       - report_workspace_install
-    reason: Workspace install runs after compile, plans every harness write first, uses install_slug folders, blocks collisions, and keeps router refresh separate.
+    reason: Workspace install runs after compile, plans every harness write and visibility target first, uses install_slug folders, blocks collisions, optionally applies native visibility metadata, and keeps router refresh separate.
   - id: route_local_sources_to_local_port
     when:
       user_says_any:
@@ -1843,7 +1860,7 @@ artifacts:
   workspace_install_report:
     kind: report
     path: workspace-build/workspace-install.report.md
-    description: Workspace-level install report naming installed, planned, failed, blocked, and missing packages plus target paths, collision blockers, and router-refresh separation.
+    description: Workspace-level install report naming installed, planned, failed, blocked, and missing packages plus target paths, collision blockers, visibility policy, optional native visibility changes, and router-refresh separation.
     produced_by:
       - kind: command
         id: workspace_install_dry_run
@@ -1859,6 +1876,18 @@ artifacts:
     produced_by:
       - kind: command
         id: workspace_install_packages
+      - kind: command
+        id: workspace_install_apply_visibility
+    consumed_by:
+      - kind: recipe
+        id: workspace_install_loop
+  workspace_visibility_manifest:
+    kind: file
+    path: workspace-build/workspace-visibility.manifest.json
+    description: Reversible native visibility manifest written when workspace install is run with --apply-visibility; by default entry packages stay implicit and shared/helper/wrapper packages become manual-only.
+    produced_by:
+      - kind: command
+        id: workspace_install_apply_visibility
     consumed_by:
       - kind: recipe
         id: workspace_install_loop
@@ -2115,15 +2144,22 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_install_dry_run:
-    description: Preflight a compiled workspace install into harness roots, showing every planned write and blocking missing loaders, folder collisions, public-name collisions, and dependency blockers without writing harness files.
+    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run
     safety: local_read
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_packages:
-    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, without refreshing router indexes.
+    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_install_apply_visibility:
+    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility
     safety: local_write
     requires:
       dependencies:
@@ -2583,7 +2619,7 @@ recipes:
       - note: Do not install skills, retire existing skills, mutate harness roots, refresh router indexes, or change visibility during workspace compile.
       - note: Report compiled, failed, blocked, missing, and skipped packages, then stop before Phase 7 install planning.
   workspace_install_loop:
-    description: "Phase 7 workspace install: dry-run the compiled workspace install, block collisions before mutation, install packages in dependency order, and report installed paths without refreshing router indexes."
+    description: "Phase 7 workspace install: dry-run the compiled workspace install, block collisions before mutation, install packages in dependency order, report entry/support visibility, and keep router refresh separate."
     ordered: true
     requires:
       dependencies:
@@ -2598,12 +2634,13 @@ recipes:
       - run_command: workspace_validate_manifest
       - run_command: workspace_install_dry_run
       - produce_artifact: workspace_install_report
-      - note: Review the dry-run report before actual install; missing loaders, folder collisions, public-name collisions, or blocked dependencies must stop the install.
+      - note: Review the dry-run report before actual install; missing loaders, folder collisions, public-name collisions, blocked dependencies, or surprising visibility targets must stop the install.
       - run_command: workspace_install_packages
       - produce_artifact: workspace_install_manifest
       - produce_artifact: workspace_install_report
+      - note: Use workspace_install_apply_visibility instead of the plain install command when the user wants native visibility metadata written; the reversible manifest is workspace-visibility.manifest.json by default.
       - note: Install packages using manifest install_slug folders and dependency order only.
-      - note: Do not refresh router indexes, change visibility, or silently overwrite existing skills during workspace install.
+      - note: Do not refresh router indexes or silently overwrite existing skills during workspace install; router refresh remains a separate runtime command after install.
   local_porting_loop:
     description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
     ordered: true
@@ -2962,14 +2999,22 @@ closures:
     commands:
       - workspace_compile_build
   produce_workspace_install_report:
-    description: Run workspace install dry-run or install and write a report that names installed, planned, failed, blocked, and missing packages plus target paths and collision blockers.
+    description: Run workspace install dry-run or install and write a report that names installed, planned, failed, blocked, and missing packages plus target paths, collision blockers, visibility policy, and router-refresh advice.
     commands:
       - workspace_install_dry_run
       - workspace_install_packages
+      - workspace_install_apply_visibility
   produce_workspace_install_manifest:
-    description: Install compiled workspace packages and write workspace-install.manifest.json with package ids, install slugs, public names, dependencies, and target paths.
+    description: Install compiled workspace packages and write workspace-install.manifest.json with package ids, install slugs, public names, dependencies, target paths, and intended visibility.
     commands:
       - workspace_install_packages
+      - workspace_install_apply_visibility
+  produce_workspace_visibility_plan:
+    description: "Report the workspace visibility policy before router refresh: entry packages implicit by default, shared/helper/wrapper packages manual-only when --apply-visibility is used, and policy none/all-* when explicitly selected."
+    commands:
+      - workspace_install_dry_run
+      - workspace_install_packages
+      - workspace_install_apply_visibility
   report_workspace_import:
     description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
     commands:
@@ -2983,10 +3028,11 @@ closures:
     commands:
       - workspace_compile_build
   report_workspace_install:
-    description: Summarize the workspace install dry-run or install result, installed target paths, blockers, install manifest, and the fact that router refresh is separate.
+    description: Summarize the workspace install dry-run or install result, installed target paths, blockers, install manifest, visibility policy or manifest, and the fact that router refresh is separate.
     commands:
       - workspace_install_dry_run
       - workspace_install_packages
+      - workspace_install_apply_visibility
   report_workspace_recon:
     description: Summarize the workspace package map, dependency graph, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
     commands:
@@ -3088,7 +3134,7 @@ proof:
     - workspace fanout import writes one generated package draft per atomic skill and reports built, failed, skipped, and blocked packages
     - workspace converge validates generated package drafts against the workspace graph and reports ready, failed, blocked, missing, validation warnings, and dependency-readiness proof before compile or install
     - workspace compile rechecks convergence, writes SKILL.md loaders only for ready packages whose dependencies compiled, and reports compiled, failed, blocked, missing, and skipped packages before install
-    - workspace install dry-runs compiled package installs, blocks collisions before mutation, writes install proof, and keeps router refresh separate
+    - workspace install dry-runs compiled package installs, blocks collisions before mutation, writes install and visibility proof, optionally applies native visibility metadata, and keeps router refresh separate
     - source package mapped with source-map.json before import and exact spans queried as needed
     - post-install router setup avoids a separate router root and verifies the router index
     - durable-executor install is optional and source-aware
@@ -3175,6 +3221,19 @@ tests:
         - refresh_router_during_workspace_compile
   - name: compiled workspace installs after dry-run proof
     input: /skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
+    expect:
+      route: workspace_install
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_install_to_phase7
+      after_success:
+        - report_workspace_install
+      forbid:
+        - use_router_index_for_authoring_recon
+        - install_without_workspace_dry_run
+        - refresh_router_during_workspace_install
+  - name: workspace install can apply entry support visibility
+    input: /skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility with entry-implicit visibility
     expect:
       route: workspace_install
       matched_rules:

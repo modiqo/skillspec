@@ -295,6 +295,7 @@ skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-bui
 skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
 skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
 skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
+skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility
 ```
 
 The workspace manifest names each atomic skill package, records deterministic
@@ -304,8 +305,11 @@ atomic skill under the build root; it does not compile, install, or refresh the
 router. The converge step verifies those generated package drafts against the
 workspace graph. The compile step writes harness-ready `SKILL.md` loaders for
 ready packages only. The install step plans every harness write first, uses the
-manifest `install_slug` folders, blocks collisions, and writes install proof; it
-still does not refresh the router.
+manifest `install_slug` folders, blocks collisions, and writes install proof. It
+also reports workspace visibility using the default `entry-implicit` policy:
+entry skills stay visible, while shared/helper/wrapper packages become
+manual-only support skills when `--apply-visibility` is used. Router index
+refresh is still separate runtime work.
 
 ### 2. Map And Import
 
