@@ -241,7 +241,10 @@ pub(super) enum Command {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Build a searchable skill catalog outside model context")]
+    #[command(
+        about = "Build a router-specific skill catalog for skill-router/manual route lookup",
+        long_about = "Build the SQLite catalog used by `skillspec route` and the optional skill-router. This is router-specific runtime discovery, not source analysis, workspace recon, or skill import. If router mode is disabled or not installed, this command only writes a standalone catalog; it does not activate the router or change harness visibility. For installed router maintenance, prefer `skillspec router index refresh`."
+    )]
     Index {
         /// Skill roots to scan. Repeat or pass multiple paths.
         #[arg(long = "roots", num_args = 1.., required = true)]

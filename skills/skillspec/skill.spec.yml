@@ -2397,6 +2397,13 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  router_index_refresh:
+    description: Refresh an installed router index through the router lifecycle; prefer this over direct skillspec index because refresh also reapplies router-managed visibility and checks preparedness.
+    template: skillspec router index refresh --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
   find_durable_executor:
     description: Check whether durable-executor is already present in the selected skill roots or source path.
     template: rg --files <skill-roots-or-source> | rg '(^|/)durable-executor/(SKILL.md|skill.spec.yml)$'
@@ -2769,6 +2776,7 @@ recipes:
       - note: Choose roots explicitly; do not use or ask for a separate router root.
       - run_command: router_install
       - run_command: verify_router_install
+      - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.
@@ -2780,6 +2788,7 @@ recipes:
       - run_command: router_help
       - run_command: router_update
       - note: Report the backup path, every updated router root, preparedness status, durable-executor status, and the harness restart warning.
+      - note: For index-only repair of an installed router, prefer skillspec router index refresh over direct skillspec index.
   router_switch_loop:
     description: Reversible router mode switch through the prompt skill.
     ordered: true
@@ -2791,6 +2800,7 @@ recipes:
       - run_command: router_enable_or_disable
       - run_command: verify_router_install
       - note: For enable, report index rebuild and preparedness. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
+      - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
   status_inspection_loop:
     description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.
     ordered: true

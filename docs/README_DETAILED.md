@@ -91,6 +91,8 @@ skillspec sensemake --help
 skillspec query --help
 skillspec refs --help
 skillspec capability --help
+skillspec index --help
+skillspec router index refresh --help
 skillspec workspace --help
 skillspec workspace map --help
 skillspec workspace install --help
@@ -137,6 +139,16 @@ supplies an approved source. When a skill is added outside `skillspec install
 skill`, `skillspec router index status` detects prose-only versus
 SkillSpec-backed additions and `skillspec router index refresh` reapplies
 explicit invocation controls before rebuilding the index.
+
+Use the lower-level `skillspec index` command only when you intentionally want
+to build the router SQLite catalog for `skillspec route` or the optional
+skill-router. It is not a repository search command, source map, workspace map,
+or import planner. Direct execution prints router-state warnings: without router
+config it is standalone manual lookup only; with disabled router mode it will
+not affect implicit skill selection until `skillspec router enable` runs; with
+enabled router mode, `skillspec router index refresh` is usually the better
+maintenance command because it also reapplies visibility and checks
+preparedness.
 
 The mechanical importer is available directly when you only want a draft:
 

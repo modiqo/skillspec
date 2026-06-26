@@ -40,7 +40,7 @@ skillspec <COMMAND>
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from a local skill file or folder, optionally gated by a fresh source map. |
 | `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
-| `index --roots <path>... --out <index-file-or-router-dir>` | Build a searchable skill catalog outside model context. |
+| `index --roots <path>... --out <index-file-or-router-dir>` | Build the router-specific SQLite skill catalog used by `skillspec route` and the optional skill-router. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
 | `skills <COMMAND>` | Audit or control installed skill visibility. |
 | `visibility <COMMAND>` | Plan, apply, or restore harness-native skill visibility controls. |
@@ -1019,6 +1019,21 @@ The indexer scans `SKILL.md` frontmatter, optional `agents/openai.yaml`, Claude
 `.claude/settings.json` skill overrides, Claude `disable-model-invocation`
 frontmatter, and optional `skill.spec.yml` routing metadata. It stores skill
 text, routing hints, visibility, checksums, and source paths in SQLite.
+
+`skillspec index` is router-specific runtime discovery. It is not source
+analysis, workspace recon, or skill import. Use `skillspec source map` for one
+prose skill and `skillspec workspace map` for source roots that contain multiple
+atomic skills or plugin-shaped packages.
+
+When run directly, `skillspec index` emits warnings that describe router state:
+
+- no router config: the index is a standalone catalog for manual
+  `skillspec route` lookup and does not install or activate the skill-router;
+- disabled router config: the index will not affect implicit skill selection
+  until `skillspec router enable` is run;
+- enabled router config: prefer `skillspec router index refresh` for installed
+  router maintenance because refresh reapplies router-managed visibility and
+  checks preparedness, while direct `skillspec index` only rewrites the catalog.
 
 ## `route`
 

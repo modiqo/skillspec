@@ -557,11 +557,14 @@ pub(super) fn run(command: Command) -> Result<()> {
             visibility_manifest,
             json,
         } => {
-            let report = router::index(router::IndexOptions {
+            let mut report = router::index(router::IndexOptions {
                 roots,
                 out,
                 visibility_manifest,
             })?;
+            report
+                .warnings
+                .extend(router_lifecycle::direct_index_warnings());
             if json {
                 report::json(&report)?;
             } else {

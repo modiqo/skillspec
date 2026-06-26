@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -548,6 +548,17 @@ fn help_lists_trace_align_arguments() {
     assert!(import_help.contains("--source-map"));
     assert!(import_help.contains("source-map.json"));
 
+    let index = Command::new(bin())
+        .arg("index")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&index);
+    let index_help = stdout(&index);
+    assert!(index_help.contains("router-specific"));
+    assert!(index_help.contains("not source analysis"));
+    assert!(index_help.contains("router index refresh"));
+
     let install_skill = Command::new(bin())
         .arg("install")
         .arg("skill")
@@ -776,6 +787,85 @@ description: Helps with notes.
         .unwrap()
         .iter()
         .any(|name| name == "pdf"));
+}
+
+#[test]
+fn direct_index_warns_about_router_scope_and_disabled_router_mode() {
+    let dir = TempDir::new("direct-index-warning");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("skill-index.sqlite");
+
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Use when organizing personal notes. Do not use for PDF extraction.
+---
+# Notes
+"#,
+    );
+
+    let standalone = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&standalone);
+    let standalone_report = json_stdout(&standalone);
+    let standalone_warnings = standalone_report["warnings"].as_array().unwrap();
+    assert!(standalone_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("router-specific"))));
+    assert!(standalone_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("No installed router config"))));
+
+    write_file(
+        &skillspec_home.join("router/config.json"),
+        &serde_json::to_string_pretty(&json!({
+            "schema": "skillspec/router-config/v1",
+            "created_at_unix": 0,
+            "enabled": false,
+            "roots": [root.to_string_lossy().to_string()],
+            "router_skill_dirs": [root.join("skill-router").to_string_lossy().to_string()],
+            "index": index.to_string_lossy().to_string(),
+            "manifest": skillspec_home
+                .join("router/visibility-manifest.json")
+                .to_string_lossy()
+                .to_string(),
+            "router_name": "skill-router"
+        }))
+        .unwrap(),
+    );
+
+    let disabled = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disabled);
+    let disabled_report = json_stdout(&disabled);
+    let disabled_warnings = disabled_report["warnings"].as_array().unwrap();
+    assert!(disabled_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("installed but disabled"))));
+    assert!(disabled_warnings.iter().any(|warning| warning
+        .as_str()
+        .is_some_and(|text| text.contains("will not affect implicit skill selection"))));
 }
 
 #[test]
@@ -2853,6 +2943,47 @@ commands:
     );
     assert!(out.contains("fanout import workspace packages"));
     assert!(out.contains("multi-skill or plugin-shaped source roots"));
+}
+
+#[test]
+fn sensemake_teaches_router_index_boundary_when_spec_uses_router_lifecycle() {
+    let dir = TempDir::new("sensemake-router-index-boundary");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Router lifecycle fixture.
+commands:
+  router_install:
+    description: Install router mode.
+    template: skillspec router install --roots <skill-roots> --index <router-index>
+    safety: local_write
+  router_enable:
+    description: Enable router mode.
+    template: skillspec router enable --json
+    safety: local_write
+  status_lifecycle_inventory:
+    description: Inspect lifecycle status.
+    template: skillspec status --json
+    safety: read_only
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("direct `skillspec index`"));
+    assert!(out.contains("router-specific catalog construction"));
+    assert!(
+        out.contains("skillspec router index refresh --roots <skill-roots> --index <router-index>")
+    );
 }
 
 #[test]

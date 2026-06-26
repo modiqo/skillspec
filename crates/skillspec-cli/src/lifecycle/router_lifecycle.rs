@@ -231,6 +231,43 @@ pub fn default_router_name() -> &'static str {
     DEFAULT_ROUTER_NAME
 }
 
+pub fn direct_index_warnings() -> Vec<String> {
+    let mut warnings = vec![
+        "`skillspec index` is router-specific: it builds the SQLite catalog used by `skillspec route` and the optional skill-router. It is not source analysis, workspace recon, or skill import; use `skillspec source map` for one prose skill and `skillspec workspace map` for multi-skill/plugin source roots.".to_owned(),
+    ];
+
+    let config_path = match config_path() {
+        Ok(path) => path,
+        Err(error) => {
+            warnings.push(format!(
+                "Could not locate router config while checking router state: {error}. The index was still written, but router activation state is unknown."
+            ));
+            return warnings;
+        }
+    };
+
+    match read_config_optional() {
+        Ok(Some(config)) if config.enabled => warnings.push(
+            "Router mode is installed and enabled. For installed-router maintenance, prefer `skillspec router index refresh` because it reapplies router-managed visibility and checks preparedness; direct `skillspec index` only rewrites the catalog."
+                .to_owned(),
+        ),
+        Ok(Some(_)) => warnings.push(format!(
+            "Router mode is installed but disabled in {}. This index will not affect implicit skill selection until router mode is enabled. Use `skillspec route --index <index> --query <task>` for manual lookup, or run `skillspec router enable` to reactivate router mode.",
+            config_path.display()
+        )),
+        Ok(None) => warnings.push(
+            "No installed router config was found. This index is a standalone router catalog for manual `skillspec route`; it does not install or activate the skill-router. Run `skillspec router install` to activate router mode."
+                .to_owned(),
+        ),
+        Err(error) => warnings.push(format!(
+            "Could not inspect router config at {}: {error}. The index was still written, but router activation state is unknown.",
+            config_path.display()
+        )),
+    }
+
+    warnings
+}
+
 pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
     if options.roots.is_empty() {
         return Err(Error::InvalidInput {

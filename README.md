@@ -207,6 +207,12 @@ observed result and evidence summary are approved; if live
 [Rote by Modiqo](https://www.modiqo.ai) workspace lookup is unreliable, pass
 pre-captured stats, log, and metadata files explicitly.
 
+The lower-level `skillspec index` command is router-specific. It only builds the
+SQLite catalog used by `skillspec route` and the optional skill-router; it is not
+source analysis or workspace recon. If router mode is disabled, direct
+`skillspec index` warns that the catalog will not affect implicit skill
+selection until `skillspec router enable` is run.
+
 ### Rote Prerequisite For Agent Traces
 
 The [durable-executor](#rote-prerequisite-for-agent-traces) path is optional,

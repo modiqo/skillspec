@@ -124,6 +124,12 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
                 .to_owned(),
         );
     }
+    if has_router_lifecycle(spec) {
+        items.push(
+            "treat direct `skillspec index` as router-specific catalog construction only; for installed router maintenance use `skillspec router index refresh`, and for authoring recon use source/workspace map"
+                .to_owned(),
+        );
+    }
     if has_retire_existing_install(spec) {
         items.push(
             "for installs that replace an existing active prose skill, ask for retirement approval and use --retire-existing so the old skill is backed up outside harness discovery roots"
@@ -457,6 +463,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             NavigationHint {
                 intent: "disable router mode without uninstalling",
                 command: "skillspec router disable --json".to_owned(),
+            },
+            NavigationHint {
+                intent: "refresh installed router index",
+                command:
+                    "skillspec router index refresh --roots <skill-roots> --index <router-index>"
+                        .to_owned(),
             },
         ]);
     }
