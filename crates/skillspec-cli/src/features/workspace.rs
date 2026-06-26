@@ -15,7 +15,8 @@ pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileRepo
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
 pub use import::{import_workspace, render_import_report, WorkspaceImportReport};
 pub use install::{
-    install_workspace, render_install_report, WorkspaceInstallReport, WorkspaceVisibilityPolicy,
+    install_workspace, render_install_report, WorkspaceInstallReport, WorkspaceInstallRequest,
+    WorkspaceVisibilityPolicy,
 };
 
 pub const WORKSPACE_SCHEMA: &str = "skillspec/workspace/v0";
