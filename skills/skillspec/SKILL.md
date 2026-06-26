@@ -79,7 +79,7 @@ Before the first task action, use `skillspec plan` and `skillspec act` to conver
 
 - `route`: the selected route is the strategy to use. If no route is selected, stop and ask for the missing task shape instead of inventing a fallback.
 - execution plan: if the selected route has `execution_plan`, execute its phases in order before using any tool outside the current phase. A later handoff phase does not license skipping an earlier shell or adapter phase. If a phase declares `jumps`, take the first matching jump condition and continue at the named phase.
-- execution strategy: keep the plan sequential at phase boundaries. Parallelize only independent package/read/build/proof work with isolated artifacts and evidence labels. Keep dependency resolution, convergence gates, installs, visibility changes, router lifecycle, and user approvals sequential.
+- execution strategy: keep the plan sequential at phase boundaries. Parallelize only independent package/read/build/proof work with isolated artifacts and evidence labels. Workspace import may fan out dependency-ready packages and reuse unchanged package outputs from the workspace cache; keep dependency resolution, convergence gates, installs, visibility changes, router lifecycle, and user approvals sequential.
 - token economy: keep full evidence on disk and expose compact proof in chat. Prefer summaries, indexes, handles, and report paths; load full JSON, full reports, or full source spans only when exact evidence is required.
 - phase tool boundary: `skillspec act` renders the effective `tool_boundary` inherited from entry, route, and phase. Treat it as hard. If a needed tool or substrate is not listed, stop and ask permission before using it.
 - route handoff: if the selected route has `handoff`, treat it as a hard execution boundary. Follow the handoff target and boundary before using tools from the current skill; `stop_current_skill` means do not continue current-skill execution except to pass the declared context.
@@ -102,11 +102,13 @@ If every allowed route is blocked by missing dependencies, auth, permissions, or
 For workspace map/import/converge/compile/install flows, prefer `--summary` in
 the harness. It prints wall-clock and estimated token metrics while preserving
 full reports, source maps, loaders, install manifests, and package evidence on
-disk at the printed paths. Use `--json` only when the full machine report needs
-to be consumed from stdout.
+disk at the printed paths. Workspace import summaries also report cached package
+hits/misses from `<build-root>/.skillspec/workspace-cache.json`. Use `--json`
+only when the full machine report needs to be consumed from stdout.
 
 ```bash
 skillspec sensemake ./skill.spec.yml --view index
+skillspec run-loop ./skill.spec.yml --input='<user task>' --view index --trace-dir "${PWD}/.skillspec/traces"
 skillspec plan ./skill.spec.yml --input='<user task>' --trace-dir "${PWD}/.skillspec/traces"
 skillspec act ./skill.spec.yml --input='<user task>' --run "${PWD}/.skillspec/traces/<run-id>" --phase <phase-id>
 skillspec progress record "${PWD}/.skillspec/traces/<run-id>" phase-completed <phase-id> --evidence-kind rote_response --evidence-ref <ref>

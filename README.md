@@ -311,10 +311,13 @@ skillspec workspace install ./build/skillspec.workspace.yml --build-root ./works
 The workspace manifest names each atomic skill package, records deterministic
 install slugs, and captures cross-skill references such as shared standards
 packages before fanout import. The import step writes one generated package per
-atomic skill under the build root; it does not compile, install, or refresh the
-router. The converge step verifies those generated package drafts against the
-workspace graph. The compile step writes harness-ready `SKILL.md` loaders for
-ready packages only. The install step plans every harness write first, uses the
+atomic skill under the build root. Dependency-ready packages can import in
+parallel, and unchanged packages are reused from
+`<build-root>/.skillspec/workspace-cache.json` when their source hash and proof
+artifacts still match. Import does not compile, install, or refresh the router.
+The converge step verifies those generated package drafts against the workspace
+graph. The compile step writes harness-ready `SKILL.md` loaders for ready
+packages only. The install step plans every harness write first, uses the
 manifest `install_slug` folders, blocks collisions, and writes install proof. It
 also reports workspace visibility using the default `entry-implicit` policy:
 entry skills stay visible, while shared/helper/wrapper packages become
@@ -322,9 +325,9 @@ manual-only support skills when `--apply-visibility` is used. Router index
 refresh is still separate runtime work.
 
 `--summary` keeps the agent-facing output compact and prints wall-clock plus
-estimated token metrics. Full reports and package proof remain on disk at the
-paths shown in the summary. Use `--json` when a caller needs the full machine
-report on stdout.
+estimated token metrics, including cache hits and misses for workspace import.
+Full reports and package proof remain on disk at the paths shown in the summary.
+Use `--json` when a caller needs the full machine report on stdout.
 
 These summary metrics do not require Rote. They estimate output economy from
 what the agent sees versus the proof artifacts preserved on disk. Rote-backed

@@ -249,7 +249,7 @@ fn converge_one_package(
                 .and_then(|evidence| evidence.message.clone())
                 .or_else(|| Some("package was skipped during workspace import".to_owned())),
         ),
-        Some("built") | None => {
+        Some("built") | Some("cached") | None => {
             if !spec_path.is_file() {
                 (
                     WorkspaceConvergeStatus::Missing,

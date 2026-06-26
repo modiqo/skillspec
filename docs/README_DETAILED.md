@@ -204,14 +204,18 @@ This is authoring recon, not router indexing. `workspace map` creates a
 `skillspec.workspace.yml` manifest with one package per atomic `SKILL.md`,
 deterministic install slugs, references, and dependency edges. `workspace
 import` fans out one draft package per skill under a mirrored build root.
+Dependency-ready packages can import in parallel, and unchanged packages are
+reused from `<build-root>/.skillspec/workspace-cache.json` when source hashes and
+proof artifacts still match.
 `workspace converge` verifies those drafts before compile. `workspace compile`
 writes harness-ready loaders. `workspace install` preflights every write,
 blocks collisions, and can apply the workspace visibility policy.
 
 Use `--summary` for harness-friendly output with wall-clock and estimated token
-metrics. The detailed reports, source maps, package evidence, loaders, and
-install manifests remain on disk at the printed paths. Use `--json` when a
-machine caller needs the full report on stdout.
+metrics, including cache hits and misses where applicable. The detailed reports,
+source maps, package evidence, loaders, and install manifests remain on disk at
+the printed paths. Use `--json` when a machine caller needs the full report on
+stdout.
 
 This does not require Rote. Non-Rote summaries estimate output economy from the
 compact agent-visible response versus artifacts preserved on disk. Rote-backed

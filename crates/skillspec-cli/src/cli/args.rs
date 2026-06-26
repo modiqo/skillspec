@@ -71,6 +71,29 @@ pub(super) enum Command {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Batch sensemake, decide, plan, and first action checklist in one spec load",
+        long_about = "Load one skill.spec.yml once, then produce a compact planning-loop report containing sensemake navigation, routing decision, phase plan, and the first or requested action checklist. This is a read/planning convenience wrapper; it does not execute tools or mutate external systems except optional decision trace output."
+    )]
+    RunLoop {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// User task text to route. Strip skill invocation prefixes before passing it.
+        #[arg(long, allow_hyphen_values = true)]
+        input: String,
+        /// Sensemake detail level included in the batch report.
+        #[arg(long, value_enum, default_value_t = SenseViewArg::Index)]
+        view: SenseViewArg,
+        /// Directory where append-only decision trace events should be written.
+        #[arg(long)]
+        trace_dir: Option<PathBuf>,
+        /// Expand this execution phase instead of the first pending phase.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Emit JSON instead of a compact human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(about = "Explain routing decisions for a user task")]
     Explain {
         /// Path to a skill.spec.yml file.
@@ -420,7 +443,7 @@ pub(super) enum WorkspaceCommand {
     },
     #[command(
         about = "Import every package in a validated skillspec.workspace.yml graph",
-        long_about = "Run the existing single-package doctor, source map, and import-skill pipeline for every package in a validated skillspec.workspace.yml graph. Outputs are written under one mirrored build root. Successful package outputs are preserved when another package fails; dependents of failed packages are reported as blocked."
+        long_about = "Run the existing single-package doctor, source map, and import-skill pipeline for every package in a validated skillspec.workspace.yml graph. Independent dependency-ready packages are imported in parallel, unchanged packages with intact artifacts are reused from <build-root>/.skillspec/workspace-cache.json, and outputs are written under one mirrored build root. Successful package outputs are preserved when another package fails; dependents of failed packages are reported as blocked."
     )]
     Import {
         /// Path to skillspec.workspace.yml.

@@ -41,6 +41,12 @@ activation:
     - parent folder with multiple skills
     - fanout converge
     - fanout import
+    - workspace cache
+    - workspace-cache.json
+    - cache hits
+    - run-loop
+    - command batching
+    - chunked source map
     - parallel strategy
     - sequential strategy
     - converge workspace
@@ -2163,7 +2169,7 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_import_packages:
-    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Use summary mode to keep agent-visible output small while full source maps and package evidence stay on disk.
+    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
     template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root> --summary
     safety: local_write
     requires:
@@ -2293,6 +2299,13 @@ commands:
   progress_show:
     description: Show completed, current, blocked, and remaining phases from the run execution ledger and write progress.json.
     template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_loop:
+    description: Batch sensemake, decide, plan, and the first or requested action checklist in one spec load to reduce repeated CLI invocations during the common planning loop.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --view index --trace-dir <trace-dir>
     safety: local_write
     requires:
       dependencies:
@@ -2644,9 +2657,10 @@ recipes:
       - produce_artifact: workspace_package_drafts
       - note: Do not compile loaders, install skills, or refresh router indexes during workspace import.
       - note: Fanout is valid only for independent package import units with isolated output folders, source-map evidence, and package-scoped failures; keep dependency blockers and the phase boundary sequential.
+      - note: Treat cached package imports as ready only when the workspace cache reports unchanged source hashes and required proof artifacts still exist.
       - note: Prefer the compact import summary in chat. Open per-package reports, source maps, or full generated specs only for failed packages, review, or exact proof.
       - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
-      - note: Report built, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
+      - note: Report built, cached, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
   workspace_converge_loop:
     description: "Phase 5 workspace converge: verify generated package drafts and dependency readiness against the workspace graph before compile or install."
     ordered: true

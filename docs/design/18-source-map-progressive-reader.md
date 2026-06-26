@@ -50,6 +50,12 @@ frontmatter, code blocks, and references. Heuristic string scans are limited to
 classifying parsed spans, such as dependency phrases or package imports inside
 fenced code.
 
+For oversized Markdown files, SkillSpec uses a chunked fallback instead of
+building one full AST. The fallback records heading, code, and paragraph-chunk
+nodes with byte ranges, line ranges, hashes, previews, dependency/modal
+classifications, and Markdown link references. This keeps source-map generation
+bounded for large skills while preserving handles for targeted review.
+
 Frontmatter is handled before Markdown parsing so leading `---` metadata is
 preserved as a `frontmatter:<file>` node instead of being interpreted as a
 thematic break and heading.

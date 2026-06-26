@@ -2,3 +2,5 @@
 **/*.rs.bk
 .DS_Store
 .skillspec/traces/
+**/.skillspec/cache/
+**/.skillspec/workspace-cache.json

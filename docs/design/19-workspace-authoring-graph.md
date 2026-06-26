@@ -311,7 +311,10 @@ skillspec workspace install <build>/skillspec.workspace.yml --build-root <worksp
 ```
 
 `map` and `validate` are the structure recon gate. `import` fans out one draft
-package per atomic skill. `converge` checks generated drafts against the graph.
+package per atomic skill. Dependency-ready packages in the same graph level may
+import in parallel, and unchanged packages with intact proof artifacts are
+reused from `<workspace-build>/.skillspec/workspace-cache.json` and reported as
+`cached`. `converge` checks generated drafts against the graph.
 `--summary` keeps agent-facing output compact by printing wall-clock and
 estimated token metrics while preserving full reports and package evidence on
 disk.

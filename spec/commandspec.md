@@ -24,6 +24,7 @@ skillspec <COMMAND>
 | `test <path>` | Run scenario tests declared in a SkillSpec. |
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
+| `run-loop <path> --input <text> [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and action checklist in one spec load. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
@@ -109,6 +110,34 @@ Options:
 `plan` emits the selected route, ordered execution phase ids, current phase,
 and transition obligations. It is the pre-action view a harness can use to
 know which phase names exist and in what order they should run.
+
+## `run-loop`
+
+```text
+skillspec run-loop [OPTIONS] <PATH> --input <INPUT>
+```
+
+Arguments:
+
+- `<PATH>`: path to a `skill.spec.yml` file.
+
+Options:
+
+- `--input <INPUT>`: user task text to route. Strip skill invocation prefixes
+  before passing it.
+- `--view <VIEW>`: sensemake detail level included in the batch report. Values
+  are `index`, `summary`, and `full`. Defaults to `index`.
+- `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
+  should be written.
+- `--phase <PHASE>`: expand this execution phase instead of the first pending
+  phase.
+- `--json`: emit JSON instead of a compact human report.
+
+`run-loop` is a batching convenience for the common agent planning path. It
+loads the spec once, runs sensemake, decision, plan, and action-checklist
+construction in process, and prints a compact summary with wall-clock and
+estimated output metrics. It does not execute tools or mutate external systems
+except optional decision trace output.
 
 ## `act`
 
@@ -271,10 +300,11 @@ Subcommands:
 - `stale <source-map.json> [--root <path>] [--json]`
 
 `source` is the progressive reader for prose skills and other import sources.
-It uses a Markdown AST with source positions to write `source-map.json` and a
-human-readable `source-map.md`. Agents should run it before importing large or
-resource-heavy skills, then query structural handles and exact spans instead of
-loading the entire source into model context.
+It uses a Markdown AST with source positions for normal Markdown files and a
+chunked heading/code/paragraph mapper for oversized Markdown files to write
+`source-map.json` and a human-readable `source-map.md`. Agents should run it
+before importing large or resource-heavy skills, then query structural handles
+and exact spans instead of loading the entire source into model context.
 
 ### `source map`
 
@@ -426,7 +456,9 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace import` runs the existing single-package pipeline for each workspace
-package in topological order:
+package in dependency order. Independent packages in the same dependency level
+may run in parallel, and unchanged packages with intact artifacts are reused
+from `<BUILD_ROOT>/.skillspec/workspace-cache.json`:
 
 ```text
 doctor -> source map -> import-skill
@@ -434,10 +466,12 @@ doctor -> source map -> import-skill
 
 It writes package outputs under one mirrored build root, preserves successful
 packages if another package fails, and marks dependents of failed packages as
-blocked. It also writes:
+blocked. Cached packages are reported as `cached`, counted as cache hits in
+`--summary`, and treated as ready by `workspace converge`. It also writes:
 
 - `<BUILD_ROOT>/skillspec.workspace.yml`
 - `<BUILD_ROOT>/workspace-import.report.md`
+- `<BUILD_ROOT>/.skillspec/workspace-cache.json`
 - `<BUILD_ROOT>/<package>/.skillspec/workspace-import.json`
 - per-package doctor reports and source maps
 

@@ -14,6 +14,10 @@ const PRESERVED_SOURCE_SKILL_PATH: &str = "source/SKILL_md.old";
 
 pub fn import_skill(path: &Path) -> Result<SkillSpec> {
     let source = SkillSource::read(path)?;
+    import_skill_from_source(path, &source)
+}
+
+fn import_skill_from_source(path: &Path, source: &SkillSource) -> Result<SkillSpec> {
     let analysis = SkillAnalysis::from_source(&source);
     let mut dependencies = dependencies_from_analysis(&analysis);
     dependencies.insert(
@@ -112,8 +116,8 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
 }
 
 pub fn import_skill_for_output(path: &Path, out: &Path) -> Result<SkillSpec> {
-    let mut spec = import_skill(path)?;
     let source = SkillSource::read(path)?;
+    let mut spec = import_skill_from_source(path, &source)?;
     let source_root = source_root(path);
     let out_dir = out.parent().unwrap_or_else(|| Path::new("."));
     for import in spec.imports.values_mut() {

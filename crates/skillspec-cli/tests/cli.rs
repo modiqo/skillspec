@@ -451,11 +451,77 @@ fn validate_and_test_rich_spec_through_cli() {
 }
 
 #[test]
+fn validate_writes_persistent_spec_cache() {
+    let dir = TempDir::new("spec-cache");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&validate);
+    assert!(dir
+        .path()
+        .join(".skillspec/cache/spec-cache.json")
+        .is_file());
+
+    let validate_cached = Command::new(bin())
+        .arg("validate")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&validate_cached);
+}
+
+#[test]
+fn run_loop_batches_common_planning_commands() {
+    let dir = TempDir::new("run-loop");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+
+    let run_loop = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the app")
+        .arg("--view")
+        .arg("index")
+        .arg("--trace-dir")
+        .arg(dir.path().join("traces"))
+        .output()
+        .unwrap();
+    assert_success(&run_loop);
+    let out = stdout(&run_loop);
+    assert!(out.contains("SkillSpec run-loop summary"));
+    assert!(out.contains("selected_route: browser"));
+    assert!(out.contains("batched_commands: sensemake, decide, plan, act"));
+    assert!(out.contains("avoided_cli_invocations: 3"));
+
+    let run_loop_json = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the app")
+        .arg("--trace-dir")
+        .arg(dir.path().join("traces-json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&run_loop_json);
+    let report = json_stdout(&run_loop_json);
+    assert_eq!(report["decision"]["route"], "browser");
+    assert_eq!(report["batched_commands"].as_array().unwrap().len(), 4);
+}
+
+#[test]
 fn help_lists_trace_align_arguments() {
     let top = Command::new(bin()).arg("--help").output().unwrap();
     assert_success(&top);
     assert!(stdout(&top).contains("trace"));
     assert!(stdout(&top).contains("sensemake"));
+    assert!(stdout(&top).contains("run-loop"));
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
     assert!(stdout(&top).contains("doctor"));
@@ -537,6 +603,17 @@ fn help_lists_trace_align_arguments() {
     assert!(workspace_help.contains("compile"));
     assert!(workspace_help.contains("install"));
     assert!(workspace_help.contains("plugin-shaped"));
+
+    let run_loop = Command::new(bin())
+        .arg("run-loop")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&run_loop);
+    let run_loop_help = stdout(&run_loop);
+    assert!(run_loop_help.contains("planning-loop report"));
+    assert!(run_loop_help.contains("--input"));
+    assert!(run_loop_help.contains("--phase"));
 
     let import_skill = Command::new(bin())
         .arg("import-skill")
@@ -4912,7 +4989,7 @@ import { chromium } from "playwright";
         .arg(map_dir.join("source-map.json"))
         .arg("nodes")
         .arg("--view")
-        .arg("index")
+        .arg("summary")
         .arg("--json")
         .output()
         .unwrap();
@@ -5010,6 +5087,80 @@ import { chromium } from "playwright";
     assert_failure(&stale_import);
     assert!(stderr(&stale_import).contains("source map"));
     assert!(stderr(&stale_import).contains("stale"));
+}
+
+#[test]
+fn source_map_chunks_oversized_markdown_without_full_ast() {
+    let dir = TempDir::new("source-map-chunked");
+    let skill_dir = dir.path().join("source-skill");
+    let map_dir = dir.path().join("source-map");
+    let mut body = String::from(
+        r#"---
+name: large-skill
+description: Use when a large skill needs chunked source mapping.
+---
+
+# Large Skill
+
+Always inspect the generated source map.
+
+See [reference](reference.md).
+
+```python
+import pypdf
+```
+
+"#,
+    );
+    for index in 0..7000 {
+        body.push_str(&format!(
+            "Paragraph {index} must preserve review handles and dependency context.\n\n"
+        ));
+    }
+    write_file(&skill_dir.join("SKILL.md"), &body);
+    write_file(
+        &skill_dir.join("reference.md"),
+        "# Reference\n\nNever skip this.\n",
+    );
+
+    let map = Command::new(bin())
+        .arg("source")
+        .arg("map")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    let nodes = Command::new(bin())
+        .arg("source")
+        .arg("query")
+        .arg(map_dir.join("source-map.json"))
+        .arg("nodes")
+        .arg("--view")
+        .arg("summary")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&nodes);
+    let nodes = json_stdout(&nodes);
+    let nodes = nodes.as_array().unwrap();
+    assert!(nodes.iter().any(|node| node["kind"] == "paragraph_chunk"));
+    assert!(nodes.iter().any(|node| node["kind"] == "code"));
+
+    let deps = Command::new(bin())
+        .arg("source")
+        .arg("query")
+        .arg(map_dir.join("source-map.json"))
+        .arg("dependencies")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&deps);
+    let deps_text = serde_json::to_string(&json_stdout(&deps)).unwrap();
+    assert!(deps_text.contains("pypdf"));
 }
 
 #[test]
@@ -5516,12 +5667,17 @@ Read `../coding-standards/SKILL.md`.
     assert_success(&import_summary);
     let import_summary = stdout(&import_summary);
     assert!(import_summary.contains("Workspace import summary"));
+    assert!(import_summary.contains("- built: 0"));
+    assert!(import_summary.contains("- cached: 2"));
     assert!(import_summary.contains("metrics:"));
     assert!(import_summary.contains("wall_clock:"));
     assert!(import_summary.contains("agent_visible_tokens: ~"));
     assert!(import_summary.contains("artifact_tokens_preserved: ~"));
     assert!(import_summary.contains("avoided_tokens: ~"));
+    assert!(import_summary.contains("cache_hits: 2"));
+    assert!(import_summary.contains("cache_misses: 0"));
     assert!(import_summary.contains("report:"));
+    assert!(build.join(".skillspec/workspace-cache.json").is_file());
 
     let validate_shared = Command::new(bin())
         .arg("validate")

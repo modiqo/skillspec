@@ -2,6 +2,8 @@ use super::*;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+const CHUNKED_MARKDOWN_THRESHOLD_BYTES: usize = 256 * 1024;
+
 pub(super) fn build(source: &Path) -> Result<SourceMap> {
     let source_root = source_root(source);
     let files = discover_files(source, &source_root)?;
@@ -140,6 +142,17 @@ fn parse_markdown_file(
         }
         None => (content.as_str(), 0, 0),
     };
+    if body.len() > CHUNKED_MARKDOWN_THRESHOLD_BYTES {
+        return parse_markdown_file_chunked(
+            source_root,
+            file,
+            &content,
+            body,
+            byte_offset,
+            line_offset,
+            frontmatter,
+        );
+    }
     let mdast = markdown::to_mdast(body, &markdown::ParseOptions::gfm()).map_err(|message| {
         Error::InvalidInput {
             message: format!("failed to parse Markdown {}: {message:?}", file.path),
@@ -166,6 +179,204 @@ fn parse_markdown_file(
         nodes: ctx.nodes,
         classifications: ctx.classifications,
         references: ctx.references,
+    })
+}
+
+fn parse_markdown_file_chunked(
+    source_root: &Path,
+    file: &SourceFileRecord,
+    content: &str,
+    body: &str,
+    byte_offset: usize,
+    line_offset: usize,
+    frontmatter: Option<SourceNodeRecord>,
+) -> Result<ParsedMarkdown> {
+    let file_slug = file.id.trim_start_matches("file:");
+    let mut nodes = Vec::new();
+    let mut classifications = Vec::new();
+    let mut references = Vec::new();
+    let mut children = Vec::new();
+    let mut counters = BTreeMap::<String, usize>::new();
+    let mut heading_slugs = BTreeMap::<String, usize>::new();
+    if let Some(frontmatter) = frontmatter {
+        children.push(frontmatter.id.clone());
+        nodes.push(frontmatter);
+    }
+
+    let mut paragraph_start: Option<(usize, usize)> = None;
+    let mut paragraph = String::new();
+    let mut in_code: Option<(String, usize, usize, usize)> = None;
+    let mut code = String::new();
+    let mut cursor = byte_offset;
+
+    for (index, line) in body.split_inclusive('\n').enumerate() {
+        let line_number = line_offset + index + 1;
+        let line_start = cursor;
+        cursor += line.len();
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        let fence = code_fence(trimmed);
+
+        if let Some((language, start_line, start_byte, fence_len)) = in_code.as_ref().cloned() {
+            if fence.is_some_and(|(_, current_fence_len)| current_fence_len >= fence_len) {
+                let id = next_node_id(file_slug, "code", &mut counters);
+                let end_byte = cursor;
+                let record = SourceNodeRecord {
+                    id: id.clone(),
+                    file: file.id.clone(),
+                    kind: "code".to_owned(),
+                    depth: None,
+                    title: None,
+                    language: (!language.is_empty()).then_some(language.clone()),
+                    parent: Some(format!("root:{file_slug}")),
+                    children: Vec::new(),
+                    byte_range: Some([start_byte, end_byte]),
+                    line_range: Some([start_line, line_number]),
+                    hash: Some(sha256_hex(
+                        source_slice(content, Some([start_byte, end_byte])).as_bytes(),
+                    )),
+                    text_preview: preview(&code),
+                    coverage_status: SourceCoverageStatus::Mapped,
+                };
+                classify_code_text(&mut classifications, &record, &language, &code);
+                children.push(id);
+                nodes.push(record);
+                in_code = None;
+                code.clear();
+            } else {
+                code.push_str(line);
+            }
+            continue;
+        }
+
+        if let Some((language, fence_len)) = fence {
+            flush_paragraph_chunk(
+                source_root,
+                file,
+                content,
+                &mut nodes,
+                &mut classifications,
+                &mut references,
+                &mut children,
+                &mut counters,
+                paragraph_start.take(),
+                &mut paragraph,
+                line_start,
+                line_number,
+            );
+            in_code = Some((language, line_number, line_start, fence_len));
+            continue;
+        }
+
+        if let Some(title) = heading_title(trimmed) {
+            flush_paragraph_chunk(
+                source_root,
+                file,
+                content,
+                &mut nodes,
+                &mut classifications,
+                &mut references,
+                &mut children,
+                &mut counters,
+                paragraph_start.take(),
+                &mut paragraph,
+                line_start,
+                line_number,
+            );
+            let slug = slug(&title);
+            let key = format!("{file_slug}:{slug}");
+            let count = heading_slugs.entry(key).or_insert(0);
+            *count += 1;
+            let id = if *count == 1 {
+                format!("heading:{file_slug}.{slug}")
+            } else {
+                format!("heading:{file_slug}.{slug}-{count}")
+            };
+            let depth = trimmed.chars().take_while(|char| *char == '#').count() as u8;
+            let record = SourceNodeRecord {
+                id: id.clone(),
+                file: file.id.clone(),
+                kind: "heading".to_owned(),
+                depth: Some(depth),
+                title: Some(title.clone()),
+                language: None,
+                parent: Some(format!("root:{file_slug}")),
+                children: Vec::new(),
+                byte_range: Some([line_start, cursor]),
+                line_range: Some([line_number, line_number]),
+                hash: Some(sha256_hex(line.as_bytes())),
+                text_preview: preview(&title),
+                coverage_status: SourceCoverageStatus::Mapped,
+            };
+            classify_text_record(&mut classifications, &record, &title);
+            collect_text_references(source_root, file, &record.id, &title, &mut references);
+            children.push(id);
+            nodes.push(record);
+            continue;
+        }
+
+        if trimmed.trim().is_empty() {
+            flush_paragraph_chunk(
+                source_root,
+                file,
+                content,
+                &mut nodes,
+                &mut classifications,
+                &mut references,
+                &mut children,
+                &mut counters,
+                paragraph_start.take(),
+                &mut paragraph,
+                line_start,
+                line_number,
+            );
+            continue;
+        }
+
+        if paragraph_start.is_none() {
+            paragraph_start = Some((line_number, line_start));
+        }
+        paragraph.push_str(line);
+    }
+
+    flush_paragraph_chunk(
+        source_root,
+        file,
+        content,
+        &mut nodes,
+        &mut classifications,
+        &mut references,
+        &mut children,
+        &mut counters,
+        paragraph_start,
+        &mut paragraph,
+        cursor,
+        line_offset + body.lines().count().max(1),
+    );
+
+    let root_id = format!("root:{file_slug}");
+    nodes.insert(
+        0,
+        SourceNodeRecord {
+            id: root_id,
+            file: file.id.clone(),
+            kind: "root".to_owned(),
+            depth: None,
+            title: Some("Markdown root (chunked)".to_owned()),
+            language: None,
+            parent: None,
+            children,
+            byte_range: Some([byte_offset, content.len()]),
+            line_range: Some([line_offset + 1, content.lines().count()]),
+            hash: Some(sha256_hex(body.as_bytes())),
+            text_preview: Some("Large Markdown file mapped in chunked mode.".to_owned()),
+            coverage_status: SourceCoverageStatus::Mapped,
+        },
+    );
+
+    Ok(ParsedMarkdown {
+        nodes,
+        classifications,
+        references,
     })
 }
 
@@ -303,6 +514,227 @@ fn classify_node(ctx: &mut ParseContext<'_>, record: &SourceNodeRecord, node: &V
             coverage_status: SourceCoverageStatus::ReviewRequired,
         });
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn flush_paragraph_chunk(
+    source_root: &Path,
+    file: &SourceFileRecord,
+    content: &str,
+    nodes: &mut Vec<SourceNodeRecord>,
+    classifications: &mut Vec<SourceClassificationRecord>,
+    references: &mut Vec<SourceReferenceRecord>,
+    children: &mut Vec<String>,
+    counters: &mut BTreeMap<String, usize>,
+    start: Option<(usize, usize)>,
+    paragraph: &mut String,
+    end_byte: usize,
+    end_line: usize,
+) {
+    let Some((start_line, start_byte)) = start else {
+        paragraph.clear();
+        return;
+    };
+    let text = paragraph.trim();
+    if text.is_empty() {
+        paragraph.clear();
+        return;
+    }
+    let file_slug = file.id.trim_start_matches("file:");
+    let id = next_node_id(file_slug, "paragraph_chunk", counters);
+    let end_byte = end_byte.min(content.len());
+    let record = SourceNodeRecord {
+        id: id.clone(),
+        file: file.id.clone(),
+        kind: "paragraph_chunk".to_owned(),
+        depth: None,
+        title: None,
+        language: None,
+        parent: Some(format!("root:{file_slug}")),
+        children: Vec::new(),
+        byte_range: Some([start_byte, end_byte]),
+        line_range: Some([start_line, end_line.saturating_sub(1).max(start_line)]),
+        hash: Some(sha256_hex(text.as_bytes())),
+        text_preview: preview(text),
+        coverage_status: SourceCoverageStatus::Mapped,
+    };
+    classify_text_record(classifications, &record, text);
+    collect_text_references(source_root, file, &record.id, text, references);
+    children.push(id);
+    nodes.push(record);
+    paragraph.clear();
+}
+
+fn classify_text_record(
+    classifications: &mut Vec<SourceClassificationRecord>,
+    record: &SourceNodeRecord,
+    text: &str,
+) {
+    let lowered = text.to_ascii_lowercase();
+    let modal_signals = signals(
+        &lowered,
+        &["must", "never", "only", "always", "avoid", "forbid"],
+    );
+    if !modal_signals.is_empty() {
+        classifications.push(SourceClassificationRecord {
+            id: format!("class:{}:modal", record.id),
+            target: record.id.clone(),
+            kind: SourceClassificationKind::ModalObligation,
+            signals: modal_signals,
+            suggested_constructs: vec!["rule".to_owned()],
+            confidence: "medium".to_owned(),
+            reason: "Text contains modal obligation language.".to_owned(),
+            coverage_status: SourceCoverageStatus::ReviewRequired,
+        });
+    }
+
+    let dependency_signals = signals(
+        &lowered,
+        &[
+            "requires",
+            "dependency",
+            "dependencies",
+            "pip install",
+            "npm install",
+            "cargo install",
+            "brew install",
+        ],
+    );
+    if !dependency_signals.is_empty() {
+        classifications.push(SourceClassificationRecord {
+            id: format!("class:{}:dependency", record.id),
+            target: record.id.clone(),
+            kind: SourceClassificationKind::DependencyMention,
+            signals: dependency_signals,
+            suggested_constructs: vec!["dependency".to_owned(), "deps.toml".to_owned()],
+            confidence: "medium".to_owned(),
+            reason: "Text mentions dependency or install language.".to_owned(),
+            coverage_status: SourceCoverageStatus::ReviewRequired,
+        });
+    }
+}
+
+fn classify_code_text(
+    classifications: &mut Vec<SourceClassificationRecord>,
+    record: &SourceNodeRecord,
+    language: &str,
+    text: &str,
+) {
+    classifications.push(SourceClassificationRecord {
+        id: format!("class:{}:code", record.id),
+        target: record.id.clone(),
+        kind: SourceClassificationKind::CodeBlock,
+        signals: (!language.is_empty())
+            .then(|| language.to_owned())
+            .into_iter()
+            .collect(),
+        suggested_constructs: vec!["code".to_owned(), "resource".to_owned()],
+        confidence: "high".to_owned(),
+        reason: "Fenced code block parsed from a large Markdown chunk.".to_owned(),
+        coverage_status: SourceCoverageStatus::ReviewRequired,
+    });
+
+    let lang = language.to_ascii_lowercase();
+    let packages = if matches!(lang.as_str(), "python" | "py") {
+        python_imports(text)
+    } else if matches!(lang.as_str(), "javascript" | "js" | "typescript" | "ts") {
+        javascript_imports(text)
+    } else {
+        BTreeSet::new()
+    };
+    for package in packages {
+        classifications.push(SourceClassificationRecord {
+            id: format!("class:{}:dependency:{package}", record.id),
+            target: record.id.clone(),
+            kind: SourceClassificationKind::DependencyMention,
+            signals: vec![package],
+            suggested_constructs: vec!["dependency".to_owned(), "deps.toml".to_owned()],
+            confidence: "high".to_owned(),
+            reason: "Package import parsed from fenced code chunk.".to_owned(),
+            coverage_status: SourceCoverageStatus::ReviewRequired,
+        });
+    }
+}
+
+fn collect_text_references(
+    source_root: &Path,
+    file: &SourceFileRecord,
+    source_id: &str,
+    text: &str,
+    references: &mut Vec<SourceReferenceRecord>,
+) {
+    for target in markdown_link_targets(text) {
+        let target_kind = if target.starts_with("http://") || target.starts_with("https://") {
+            SourceReferenceKind::ExternalUri
+        } else if target.starts_with('#') {
+            SourceReferenceKind::Anchor
+        } else if target.trim().is_empty() {
+            SourceReferenceKind::Unknown
+        } else {
+            SourceReferenceKind::LocalFile
+        };
+        let resolved_file = (target_kind == SourceReferenceKind::LocalFile)
+            .then(|| resolve_local_reference(source_root, &file.path, &target))
+            .flatten();
+        references.push(SourceReferenceRecord {
+            id: format!("ref:{}:{}", source_id, references.len() + 1),
+            source: source_id.to_owned(),
+            target,
+            target_kind,
+            resolved_file,
+        });
+    }
+}
+
+fn markdown_link_targets(text: &str) -> Vec<String> {
+    let mut targets = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("](") {
+        let after = &rest[start + 2..];
+        let Some(end) = after.find(')') else {
+            break;
+        };
+        targets.push(after[..end].trim().to_owned());
+        rest = &after[end + 1..];
+    }
+    targets
+}
+
+fn code_fence(line: &str) -> Option<(String, usize)> {
+    let trimmed = line.trim_start();
+    for marker in ["```", "~~~"] {
+        if trimmed.starts_with(marker) {
+            let count = trimmed
+                .chars()
+                .take_while(|char| *char == marker.chars().next().unwrap())
+                .count();
+            if count >= 3 {
+                let language = trimmed[count..]
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_owned();
+                return Some((language, count));
+            }
+        }
+    }
+    None
+}
+
+fn heading_title(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let depth = trimmed.chars().take_while(|char| *char == '#').count();
+    if !(1..=6).contains(&depth) {
+        return None;
+    }
+    let rest = trimmed[depth..].trim();
+    (!rest.is_empty()).then(|| rest.to_owned())
+}
+
+fn next_node_id(file_slug: &str, kind: &str, counters: &mut BTreeMap<String, usize>) -> String {
+    let counter = counters.entry(kind.to_owned()).or_insert(0);
+    *counter += 1;
+    format!("{kind}:{file_slug}.{counter}")
 }
 
 fn classify_code_dependencies(ctx: &mut ParseContext<'_>, record: &SourceNodeRecord, node: &Value) {

@@ -6,7 +6,7 @@ use super::args::{
 use skillspec::{
     act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
     importer, imports, install, model, parser, progress, report, router, router_lifecycle,
-    sensemake, source_map, status, trace, visibility, workspace, workspace_synthesizer,
+    run_loop, sensemake, source_map, status, trace, visibility, workspace, workspace_synthesizer,
 };
 use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
@@ -95,6 +95,32 @@ pub(super) fn run(command: Command) -> Result<()> {
                 report::json(&act_report)?;
             } else {
                 report::text(&act::render_plan(&act_report))?;
+            }
+        }
+        Command::RunLoop {
+            path,
+            input,
+            view,
+            trace_dir,
+            phase,
+            json,
+        } => {
+            let started = Instant::now();
+            let spec = parser::load_spec(&path)?;
+            ensure_trace_available(&spec, trace_dir.as_ref())?;
+            let run_loop_report = run_loop::build_report(
+                &spec,
+                &path,
+                &input,
+                view.into(),
+                trace_dir.as_deref(),
+                phase.as_deref(),
+            )?;
+            let elapsed = started.elapsed();
+            if json {
+                report::json(&run_loop_report)?;
+            } else {
+                report::text(&run_loop::render_summary(&run_loop_report, elapsed))?;
             }
         }
         Command::Explain {

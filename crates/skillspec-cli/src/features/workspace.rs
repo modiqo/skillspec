@@ -480,7 +480,9 @@ pub fn render_validation_summary(report: &WorkspaceValidationReport, elapsed: Du
 }
 
 pub fn render_import_summary(report: &WorkspaceImportReport, elapsed: Duration) -> String {
-    let metrics = MetricSummary::new(elapsed, artifact_bytes(import_artifacts(report)));
+    let mut metrics = MetricSummary::new(elapsed, artifact_bytes(import_artifacts(report)));
+    metrics.cache_hits = report.cache_hits;
+    metrics.cache_misses = report.cache_misses;
     metrics::render_with_metrics(metrics, |metrics| {
         let mut output = String::new();
         output.push_str("Workspace import summary\n\n");
@@ -489,6 +491,7 @@ pub fn render_import_summary(report: &WorkspaceImportReport, elapsed: Duration) 
         output.push_str(&format!("- build_root: {}\n", report.build_root));
         output.push_str(&format!("- packages: {}\n", report.package_count));
         output.push_str(&format!("- built: {}\n", report.built.len()));
+        output.push_str(&format!("- cached: {}\n", report.cached.len()));
         output.push_str(&format!("- failed: {}\n", report.failed.len()));
         output.push_str(&format!("- blocked: {}\n", report.blocked.len()));
         output.push_str(&format!("- skipped: {}\n", report.skipped.len()));
@@ -496,7 +499,7 @@ pub fn render_import_summary(report: &WorkspaceImportReport, elapsed: Duration) 
         output.push_str(&format!("- manifest_copy: {}\n", report.manifest_copy_path));
         push_package_messages(
             &mut output,
-            "Package blockers",
+            "Package notes",
             report.packages.iter().filter_map(|package| {
                 package.message.as_ref().map(|message| {
                     format!(
