@@ -40,6 +40,7 @@ skillspec <COMMAND>
 | `imports <COMMAND>` | Validate and report SkillSpec imports. |
 | `compile <path> --target <target>` | Compile a SkillSpec into harness guidance. |
 | `import-skill <path> --out <path> [--source-map <path>]` | Create a mechanical draft SkillSpec from a local skill file or folder, optionally gated by a fresh source map. |
+| `port-one-shot <source> --out <dir> [--target <target>] [--prove]` | Bundle grammar preflight, source map, doctor, import, QA, compile, report, and optional estimated metric recording for one atomic prose skill. |
 | `synthesize-from-workspace <workspace> --out <folder>` | Rote-specific optional integration that synthesizes a draft SkillSpec from durable rote workspace stats, command log, metadata, and optional dependency evidence. |
 | `index --roots <path>... --out <index-file-or-router-dir>` | Build the router-specific SQLite skill catalog used by `skillspec route` and the optional skill-router. |
 | `route --index <index-file-or-router-dir> --query <text>` | Route a user request to candidate skills from an index. |
@@ -1019,6 +1020,47 @@ Notes:
   `skillspec workspace map` first so SkillSpec can identify atomic packages,
   plugin namespaces, hard dependency edges, workflow references, and name
   collisions before fanout import.
+
+## `port-one-shot`
+
+```text
+skillspec port-one-shot <SOURCE> --out <OUT> [--target <TARGET>] [--prove]
+```
+
+Arguments:
+
+- `<SOURCE>`: local `SKILL.md` file or single skill folder to port.
+
+Options:
+
+- `--out <OUT>`: output skill folder. The command writes `<OUT>/skill.spec.yml`
+  and proof under `<OUT>/.skillspec/`.
+- `--target <TARGET>`: compile target used for the QA compile gate. Values are
+  `codex-skill`, `claude-skill`, and `markdown`. Defaults to `codex-skill`.
+- `--prove`: treat failed required QA gates as a failed proof run.
+- `--force`: overwrite an existing `<OUT>/skill.spec.yml` draft.
+- `--run-dir <RUN_DIR>`: existing trace run directory where estimated non-Rote
+  token metrics should be recorded.
+- `--phase <PHASE>`: phase id whose requirement(s) the estimated stats event
+  satisfies.
+- `--requirement <REQUIREMENT>`: requirement id satisfied by the estimated stats
+  event. Repeat for multiple requirements.
+- `--json`: emit JSON instead of the compact human report.
+
+`port-one-shot` is the safe default for one atomic prose skill. It bundles:
+
+- embedded grammar porting guide, checklist, and JSON Schema artifacts;
+- a generated typed shape crib for schema-sensitive YAML sections;
+- source map and doctor reports;
+- mechanical import through typed Rust structs;
+- validate, imports check, deps check, scenario tests, and compile;
+- compact report with wall-clock and estimated output-economy metrics;
+- optional `progress stats` recording for non-Rote trace runs.
+
+The command does not claim semantic completion. Missing scenario tests and
+dependency gaps are reported as `review_required` so the port stays honest.
+Parent folders containing multiple `SKILL.md` files are rejected; use
+`workspace map` and `workspace import` for those.
 
 ## `synthesize-from-workspace`
 

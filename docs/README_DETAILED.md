@@ -150,12 +150,31 @@ enabled router mode, `skillspec router index refresh` is usually the better
 maintenance command because it also reapplies visibility and checks
 preparedness.
 
-The mechanical importer is available directly when you only want a draft:
+For one atomic skill package, prefer the bundled porting path:
+
+```sh
+skillspec port-one-shot path/to/skill-folder \
+  --out path/to/skill-folder \
+  --target codex-skill \
+  --prove
+```
+
+It writes grammar/schema/checklist proof, a source map, doctor report, typed
+mechanical draft, shape crib, QA results, compiled loader, and compact report
+under `.skillspec/`. When a trace run is supplied with `--run-dir`, it also
+records estimated non-Rote token metrics so alignment does not report token
+usage as missing.
+
+The lower-level mechanical importer is still available when you only want a
+draft or need to debug one gate:
 
 ```sh
 skillspec grammar sensemake --view index
 skillspec grammar sensemake --view porting
-skillspec import-skill path/to/skill-folder --out skill.spec.yml
+skillspec source map path/to/skill-folder --out path/to/skill-folder/.skillspec/source-map
+skillspec import-skill path/to/skill-folder \
+  --out skill.spec.yml \
+  --source-map path/to/skill-folder/.skillspec/source-map/source-map.json
 skillspec sensemake skill.spec.yml --view index
 skillspec grammar checklist --for import-skill
 skillspec validate skill.spec.yml

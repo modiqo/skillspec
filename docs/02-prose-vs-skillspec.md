@@ -40,6 +40,13 @@ SkillSpec is worth the overhead when:
 ## Migration Path
 
 ```sh
+skillspec port-one-shot path/to/SKILL.md --out ./draft --target codex-skill --prove
+```
+
+The lower-level ladder remains available when a maintainer needs to inspect or
+debug one gate:
+
+```sh
 skillspec source map path/to/SKILL.md --out .skillspec/source-map
 skillspec source coverage .skillspec/source-map/source-map.json
 skillspec source query .skillspec/source-map/source-map.json nodes --view index

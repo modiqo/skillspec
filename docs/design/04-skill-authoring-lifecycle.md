@@ -62,6 +62,13 @@ The import path is for an existing `SKILL.md` or a directory of Markdown files.
 The CLI command is:
 
 ```sh
+skillspec port-one-shot <path> --out <draft> --target codex-skill --prove
+```
+
+When debugging one gate or building a custom import flow, use the lower-level
+commands:
+
+```sh
 skillspec source map <path> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index

@@ -224,6 +224,38 @@ pub(super) enum Command {
         source_map: Option<PathBuf>,
     },
     #[command(
+        about = "Port one atomic prose skill through grammar preflight, import, QA, compile, and metrics",
+        long_about = "Bundle the safe single-skill porting ladder in one command: embedded grammar/schema/checklist artifacts, source map, doctor report, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, scenario tests, compile, compact proof report, and optional non-Rote estimated progress stats. This is for one atomic skill package only; parent folders with multiple SKILL.md files must use workspace map/import."
+    )]
+    PortOneShot {
+        /// Local SKILL.md file or single skill folder to port.
+        source: PathBuf,
+        /// Output skill folder. The command writes <out>/skill.spec.yml and proof under <out>/.skillspec/.
+        #[arg(long)]
+        out: PathBuf,
+        /// Compile target used for the QA compile gate.
+        #[arg(long, value_enum, default_value = "codex-skill")]
+        target: CompileTarget,
+        /// Treat failed required QA gates as a failed proof run.
+        #[arg(long)]
+        prove: bool,
+        /// Overwrite an existing <out>/skill.spec.yml draft.
+        #[arg(long)]
+        force: bool,
+        /// Existing trace run directory where estimated non-Rote token metrics should be recorded.
+        #[arg(long)]
+        run_dir: Option<PathBuf>,
+        /// Phase id whose requirement(s) the estimated stats event satisfies.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Requirement id satisfied by the estimated stats event. Repeat for multiple requirements.
+        #[arg(long = "requirement")]
+        requirements: Vec<String>,
+        /// Emit JSON instead of a compact human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
         about = "Synthesize a draft SkillSpec from a durable rote workspace (rote-specific)",
         long_about = "Synthesize a draft SkillSpec from rote-specific durable execution evidence. This optional integration requires a rote workspace name and validates workspace stats, command log, and metadata evidence. If pre-captured evidence files are supplied, synthesis does not need live rote workspace lookup. The command refuses to write the scaffold until --observation-approved confirms the observed result and evidence summary were shown and accepted."
     )]

@@ -49,6 +49,8 @@ pub(super) fn write_authoring_contract(output: &mut String) {
     output.push_str("- Use `skillspec grammar schema --json` when a harness needs the exact embedded JSON schema.
 ");
     output.push_str("- Do not patch YAML by memory when the binary can teach the current grammar. Run the grammar commands again after CLI upgrades or when a spec shape is unfamiliar.
+");
+    output.push_str("- For one atomic prose skill, prefer `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove` before hand-editing. It writes grammar/schema proof, a typed shape crib, source map, doctor report, mechanical draft, QA results, compile output, and optional estimated non-Rote stats when `--run-dir` is supplied.
 
 ");
 }

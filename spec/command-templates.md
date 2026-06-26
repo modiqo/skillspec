@@ -45,6 +45,17 @@ them before execution.
 
 ## Import-Skill Strategy
 
+For one atomic prose skill, prefer:
+
+```sh
+skillspec port-one-shot SKILL.md --out ./draft --target codex-skill --prove
+```
+
+It writes grammar/schema/checklist proof, a typed shape crib, source map, doctor
+report, mechanical draft, QA results, compile output, and a compact report. Use
+the lower-level commands when debugging one gate or building a custom import
+flow.
+
 `skillspec source map SKILL.md --out .skillspec/source-map` should run before
 `skillspec import-skill SKILL.md --out skill.spec.yml --source-map
 .skillspec/source-map/source-map.json`. Import scaffolding should not pretend to

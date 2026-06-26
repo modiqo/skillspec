@@ -359,8 +359,19 @@ dependencies.
 
 ### 2. Map And Import
 
-These commands preserve source structure before generating the first contract
-for one atomic skill package.
+For one atomic skill package, use the bundled porting command. It runs grammar
+preflight, source map, doctor, mechanical import, validation, imports check,
+deps check, tests, compile, and a compact proof report in one path.
+
+```sh
+skillspec port-one-shot ./my-skill \
+  --out ./my-skill \
+  --target codex-skill \
+  --prove
+```
+
+The generated `skill.spec.yml` is still a scaffold until reviewed. If you need
+manual control, run the lower-level steps directly:
 
 ```sh
 skillspec source map ./my-skill --out ./my-skill/.skillspec/source-map

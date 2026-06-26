@@ -16,6 +16,8 @@ activation:
     - import SKILL.md
     - import existing skill
     - port skill
+    - port-one-shot
+    - one-shot port
     - workspace map
     - workspace validate
     - workspace import
@@ -108,6 +110,7 @@ activation:
     - prose skill to skillspec
     - skill.spec.yml
     - skillspec import-skill
+    - skillspec port-one-shot
     - skillspec doctor
     - skillspec source map
     - skillspec source query
@@ -126,12 +129,15 @@ activation:
     - backup old skill
     - prove value
     - value report
+    - schema-safe port
+    - typed shape crib
   priority: domain
 applies_when:
   - user_intent:
       - run SkillSpec post-install setup inside the harness prompt
       - convert a prose SKILL.md to skill.spec.yml
       - port a local skill folder into SkillSpec
+      - run one-shot porting for one atomic skill package
       - map a skills repository that contains multiple SKILL.md packages before import
       - map a plugin-shaped skills repository without flattening repeated skill names
       - validate a multi-skill workspace graph before fanout import
@@ -246,8 +252,9 @@ routes:
             - infer_grammar_from_memory
         - id: mechanical_import
           owner_skill: skillspec
-          description: Generate and inspect the draft spec without treating it as final truth.
+          description: Generate and inspect the draft spec without treating it as final truth. Prefer port-one-shot for ordinary one-package ports so grammar proof, source map, doctor, import, QA, compile, and estimated metrics are bundled.
           requires:
+            - port_one_shot_or_manual_import
             - import_skill_draft
             - sensemake_draft
             - produce_mechanical_draft
@@ -2235,6 +2242,13 @@ commands:
   import_skill_draft:
     description: Generate a deterministic draft from a local skill folder after verifying the staged source map is fresh.
     template: skillspec import-skill <source-skill-folder> --out <draft-dir>/skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  port_one_shot:
+    description: Bundle grammar preflight, source map, doctor, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, tests, compile, compact report, and optional estimated non-Rote stats for one atomic local skill package.
+    template: skillspec port-one-shot <source-skill-folder> --out <draft-dir> --target codex-skill --prove --run-dir <trace-dir> --phase mechanical_import --requirement estimated_token_metrics
     safety: local_write
     requires:
       dependencies:

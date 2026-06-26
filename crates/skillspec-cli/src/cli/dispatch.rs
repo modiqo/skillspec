@@ -5,8 +5,9 @@ use super::args::{
 };
 use skillspec::{
     act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
-    importer, imports, install, model, parser, progress, report, router, router_lifecycle,
-    run_loop, sensemake, source_map, status, trace, visibility, workspace, workspace_synthesizer,
+    importer, imports, install, model, parser, port_one_shot, progress, report, router,
+    router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility, workspace,
+    workspace_synthesizer,
 };
 use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
@@ -590,6 +591,42 @@ pub(super) fn run(command: Command) -> Result<()> {
             let imported = importer::import_skill_for_output(&path, &out)?;
             parser::write_spec(&out, &imported)?;
             report::import_ok(&path, &out, &imported)?;
+        }
+        Command::PortOneShot {
+            source,
+            out,
+            target,
+            prove,
+            force,
+            run_dir,
+            phase,
+            requirements,
+            json,
+        } => {
+            let started = Instant::now();
+            let mut port_report = port_one_shot::run(port_one_shot::PortOneShotOptions {
+                source,
+                out,
+                target: target.into(),
+                prove,
+                force,
+                run_dir,
+                phase,
+                requirements,
+            })?;
+            let elapsed = started.elapsed();
+            let preview = port_one_shot::render_summary(&port_report, elapsed);
+            port_one_shot::record_estimated_stats(&mut port_report, elapsed, preview.len() as u64)?;
+            let rendered = port_one_shot::render_summary(&port_report, elapsed);
+            port_one_shot::write_report(&port_report, &rendered)?;
+            if json {
+                report::json(&port_report)?;
+            } else {
+                report::text(&rendered)?;
+            }
+            if prove && !port_report.ok {
+                std::process::exit(1);
+            }
         }
         Command::SynthesizeFromWorkspace {
             workspace,

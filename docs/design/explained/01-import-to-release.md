@@ -56,8 +56,11 @@ Review check:
 
 ## 2. Scaffold, Do Not Finish
 
-`import-skill` creates a mechanical draft. It preserves material and identifies
-review work; it does not claim the behavioral contract is complete.
+For one atomic prose skill, `port-one-shot` runs the safe bundle: grammar
+preflight, source map, doctor, typed import, QA, compile, and compact report.
+Underneath that bundle, `import-skill` creates the mechanical draft. It
+preserves material and identifies review work; it does not claim the behavioral
+contract is complete.
 
 ```mermaid
 flowchart LR
@@ -72,6 +75,8 @@ flowchart LR
 Grounded command:
 
 ```sh
+skillspec port-one-shot <source-skill> --out <draft> --target codex-skill --prove
+
 skillspec import-skill <source-skill> \
   --out <draft>/skill.spec.yml \
   --source-map <draft>/.skillspec/source-map/source-map.json

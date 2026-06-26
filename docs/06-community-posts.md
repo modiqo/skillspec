@@ -25,6 +25,12 @@ A prose skill can explain intent, but it usually cannot prove behavior.
 SkillSpec adds the missing testable layer:
 
 ```sh
+skillspec port-one-shot path/to/SKILL.md --out ./draft --target codex-skill --prove
+```
+
+The lower-level commands remain available when you need to inspect one gate:
+
+```sh
 skillspec source map path/to/SKILL.md --out .skillspec/source-map
 skillspec source coverage .skillspec/source-map/source-map.json
 skillspec import-skill path/to/SKILL.md --out skill.spec.yml --source-map .skillspec/source-map/source-map.json

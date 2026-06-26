@@ -516,12 +516,87 @@ fn run_loop_batches_common_planning_commands() {
 }
 
 #[test]
+fn port_one_shot_runs_import_qa_compile_and_records_stats() {
+    let dir = TempDir::new("port-one-shot");
+    let source = dir.path().join("source-skill");
+    write_file(
+        &source.join("SKILL.md"),
+        r#"---
+name: simple-port
+description: Use this skill when a simple port fixture is needed for tests.
+---
+# Simple Port
+
+Use this skill when the user asks for a simple port fixture.
+
+Steps:
+
+1. Inspect the input.
+2. Run the local command.
+
+```sh
+echo ok
+```
+"#,
+    );
+    let out_dir = dir.path().join("draft");
+    let run_dir = dir.path().join("trace-run");
+
+    let port = Command::new(bin())
+        .arg("port-one-shot")
+        .arg(&source)
+        .arg("--out")
+        .arg(&out_dir)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--prove")
+        .arg("--run-dir")
+        .arg(&run_dir)
+        .arg("--phase")
+        .arg("import_skill")
+        .arg("--requirement")
+        .arg("estimated_token_metrics")
+        .output()
+        .unwrap();
+    assert_success(&port);
+    let out = stdout(&port);
+    assert!(out.contains("SkillSpec port-one-shot summary"));
+    assert!(out.contains("semantic_status: review_required"));
+    assert!(out.contains("validate: ok"));
+    assert!(out.contains("compile: ok"));
+    assert!(out.contains("agent_visible_tokens"));
+    assert!(out_dir.join("skill.spec.yml").is_file());
+    assert!(out_dir
+        .join(".skillspec/source-map/source-map.json")
+        .is_file());
+    assert!(out_dir.join(".skillspec/port/schema.json").is_file());
+    assert!(out_dir.join(".skillspec/port/shape-crib.yml").is_file());
+    assert!(out_dir
+        .join(".skillspec/port/compiled.codex-skill.md")
+        .is_file());
+    assert!(out_dir
+        .join(".skillspec/port/port-one-shot.report.md")
+        .is_file());
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert!(ledger.contains("stats_collected"));
+    assert!(ledger.contains("agent_visible_tokens"));
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(out_dir.join("skill.spec.yml"))
+        .output()
+        .unwrap();
+    assert_success(&validate);
+}
+
+#[test]
 fn help_lists_trace_align_arguments() {
     let top = Command::new(bin()).arg("--help").output().unwrap();
     assert_success(&top);
     assert!(stdout(&top).contains("trace"));
     assert!(stdout(&top).contains("sensemake"));
     assert!(stdout(&top).contains("run-loop"));
+    assert!(stdout(&top).contains("port-one-shot"));
     assert!(stdout(&top).contains("query"));
     assert!(stdout(&top).contains("refs"));
     assert!(stdout(&top).contains("doctor"));

@@ -114,7 +114,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_source_import(spec) {
         items.push(
-            "for prose imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for one atomic prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
@@ -523,9 +523,9 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                         .to_owned(),
             },
             NavigationHint {
-                intent: "import from fresh source map",
+                intent: "one-shot port atomic prose skill",
                 command:
-                    "skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json"
+                    "skillspec port-one-shot <source-skill> --out <draft> --target codex-skill --prove"
                         .to_owned(),
             },
         ]);
