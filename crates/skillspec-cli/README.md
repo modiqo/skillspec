@@ -6,6 +6,9 @@ format for agent skills.
 It validates, tests, imports, compiles, routes, runs guided loops, records
 progress, and prints alignment reports for SkillSpec-backed skills.
 
+This crate is published so users can install the CLI with Cargo. Its Rust
+modules are implementation details for now, not a stable library API.
+
 Install from crates.io:
 
 ```sh

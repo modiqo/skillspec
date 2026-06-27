@@ -1,5 +1,18 @@
+//! Implementation crate for the `skillspec` command-line tool.
+//!
+//! SkillSpec is primarily distributed as a CLI. The supported integration
+//! surface is the `skillspec` binary and the documented command behavior in the
+//! project repository.
+//!
+//! The Rust modules in this crate are public so the binary and integration
+//! tests can share implementation code, but they are not yet a stable library
+//! API. They are hidden from generated API documentation until SkillSpec has an
+//! intentionally designed Rust API with compatibility guarantees.
+
+#[doc(hidden)]
 pub mod error;
 
+#[doc(hidden)]
 pub mod spec {
     pub mod grammar;
     pub mod import_dependency_ledger;
@@ -8,6 +21,7 @@ pub mod spec {
     pub mod parser;
 }
 
+#[doc(hidden)]
 pub mod execution {
     pub mod act;
     pub mod align;
@@ -19,6 +33,7 @@ pub mod execution {
     pub mod trace;
 }
 
+#[doc(hidden)]
 pub mod lifecycle {
     pub mod durable_lifecycle;
     pub mod install;
@@ -28,6 +43,7 @@ pub mod lifecycle {
     pub mod visibility;
 }
 
+#[doc(hidden)]
 pub mod features {
     pub mod capability;
     pub mod compiler;
@@ -44,10 +60,14 @@ pub mod features {
     pub mod workspace_synthesizer;
 }
 
+#[doc(hidden)]
 pub use execution::{act, align, command_path, decision, deps, progress, report, trace};
+#[doc(hidden)]
 pub use features::{
     capability, compiler, doctor, guide, importer, metrics, port_one_shot, remote_source, run_loop,
     sensemake, source_map, workspace, workspace_synthesizer,
 };
+#[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
+#[doc(hidden)]
 pub use spec::{grammar, import_dependency_ledger, imports, model, parser};
