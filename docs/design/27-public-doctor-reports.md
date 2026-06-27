@@ -75,8 +75,10 @@ skillspec doctor "$target" --html > doctor-report.html
 skillspec doctor "$target" --json > doctor-report.json
 ```
 
-The issue comment includes the formatted text report inside a fenced block, so a
-public user can read the result directly in GitHub. The artifact contains:
+The Actions run summary and issue comment both include the formatted text report
+inside a fenced block, so a public user can read the result directly in GitHub
+without downloading an artifact. Long reports are truncated in GitHub surfaces
+and preserved in full in the artifact. The artifact contains:
 
 - `doctor-report.txt`
 - `doctor-report.html`
