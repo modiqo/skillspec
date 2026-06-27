@@ -56,6 +56,7 @@ directory listings.
 | 22 | [Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md) | How `skillspec doctor` scores static skill risk: frontmatter discovery, activation/context load, obligation position, proof gaps, workspace/package shape, contract mitigation, cited basis registry, and policy-threshold model. |
 | 23 | [Guided Run Loop From Doctor Dogfood](23-guided-run-loop-from-doctor-dogfood.md) | Why doctor dogfood led to moving trampoline guidance into `run-loop --guide agent`, how the CLI tracks current/next/end actions, how resume uses persistent traces, and how the self trampoline stays optimal. |
 | 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
+| 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
 
 ## Visual Explainers
 
@@ -85,6 +86,7 @@ Every design claim should be grounded in one or more of these sources:
 | Route and rule decisions | `crates/skillspec-cli/src/execution/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
 | Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-cli/src/features/compiler.rs` |
 | Runtime phase loop | `crates/skillspec-cli/src/execution/act.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md` |
+| Progressive agent guidance | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/features/remote_source.rs`, `crates/skillspec-cli/src/features/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/execution/align.rs`, `docs/design/25-progressive-agent-guidance.md` |
 | Phase tool boundaries | `crates/skillspec-cli/src/spec/model.rs`, `crates/skillspec-cli/src/execution/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Command log | `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/spec/imports.rs`, `crates/skillspec-cli/src/spec/parser/validation.rs` |
