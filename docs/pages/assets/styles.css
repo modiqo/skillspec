@@ -244,6 +244,19 @@ button:focus-visible,
   color: var(--muted);
 }
 
+.input-help {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.input-help code {
+  border-radius: 4px;
+  padding: 0.05em 0.25em;
+  background: #edf2f7;
+}
+
 .form-message.error {
   color: var(--red);
 }

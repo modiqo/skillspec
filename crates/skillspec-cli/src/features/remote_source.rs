@@ -99,15 +99,10 @@ pub fn parse_target(target: &str) -> Result<Option<RemoteSkillSource>> {
 
     let owner = parts[0];
     let repo = parts[1].trim_end_matches(".git");
-    if parts.get(2) == Some(&"blob") {
-        return Err(Error::InvalidInput {
-            message: "remote source expects a skill folder URL, not a blob/SKILL.md URL".to_owned(),
-        });
-    }
-    let (branch, path_parts) = if parts.get(2) == Some(&"tree") {
+    let (branch, path_parts) = if matches!(parts.get(2), Some(&"tree" | &"blob")) {
         if parts.len() < 4 {
             return Err(Error::InvalidInput {
-                message: "GitHub tree URL must include a branch".to_owned(),
+                message: "GitHub tree/blob URL must include a branch".to_owned(),
             });
         }
         (Some(parts[3].to_owned()), &parts[4..])
@@ -572,6 +567,24 @@ mod tests {
     }
 
     #[test]
+    fn parses_github_blob_skill_folder_url() {
+        let remote = parse_target(
+            "https://github.com/anthropics/claude-for-legal/blob/main/employment-legal/skills/international-expansion",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://github.com/anthropics/claude-for-legal.git"
+        );
+        assert_eq!(remote.branch.as_deref(), Some("main"));
+        assert_eq!(
+            remote.path.as_deref(),
+            Some("employment-legal/skills/international-expansion")
+        );
+    }
+
+    #[test]
     fn parses_github_owner_repo_path_shorthand() {
         let remote = parse_target("anthropics/skills/skills/pdf")
             .unwrap()
@@ -602,12 +615,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_github_blob_urls() {
+    fn rejects_github_blob_skill_md_file_urls() {
         let error =
             parse_target("https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md")
                 .unwrap_err()
                 .to_string();
-        assert!(error.contains("not a blob"));
+        assert!(error.contains("not a SKILL.md blob"));
     }
 
     #[test]

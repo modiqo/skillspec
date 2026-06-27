@@ -61,9 +61,12 @@ so first-time setup mistakes do not silently skip public requests. The parser
 prefers the issue-form body and falls back to a GitHub URL in the title.
 
 The workflow accepts only normalized `https://github.com/<owner>/<repo>` URLs
-and public GitHub folder URLs under them. It rejects URLs with credentials,
-query strings, fragments, non-GitHub hosts, unsupported owner/repo characters,
-or excessive length.
+and public GitHub folder URLs under them. Canonical GitHub folder URLs use
+`/tree/<branch>/<path>`, but public requests also accept `/blob/<branch>/<path>`
+when users copy a folder-like URL from the GitHub UI and the path resolves to a
+folder rather than `SKILL.md`. It rejects URLs with credentials, query strings,
+fragments, non-GitHub hosts, unsupported owner/repo characters, or excessive
+length.
 
 After syntax validation, the workflow calls the GitHub repository API for
 `owner/repo`. If the repository is private or cannot be read publicly, the

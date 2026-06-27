@@ -151,10 +151,13 @@ pub(super) enum Command {
     },
     #[command(
         about = "Scan skills and skill workspaces for static drift, discovery, and context risk",
-        long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. Doctor first builds a current-skill baseline: simple SKILL.md packages receive full agent follow-through risk analysis; multi-skill workspaces, root skills with subskills, and plugin-shaped workspaces receive aggregate workspace risk plus one package report per SKILL.md; non-skill code repos return a shape-only report so doctor does not waste work on ordinary code. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Human reports explain risk in plain language: how likely the current skill shape is to make an agent skip, reorder, improvise, use the wrong surface, or finish without proof. JSON preserves machine fields including score_model, structural_score, frontmatter discovery risk, activation-loaded surface, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
+        long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. GitHub folder URLs may use /tree/<branch>/...; /blob/<branch>/... is also accepted when the path resolves to a folder rather than SKILL.md. Doctor first builds a current-skill baseline: simple SKILL.md packages receive full agent follow-through risk analysis; multi-skill workspaces, root skills with subskills, and plugin-shaped workspaces receive aggregate workspace risk plus one package report per SKILL.md; non-skill code repos return a shape-only report so doctor does not waste work on ordinary code. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Human reports explain risk in plain language: how likely the current skill shape is to make an agent skip, reorder, improvise, use the wrong surface, or finish without proof. JSON preserves machine fields including score_model, structural_score, frontmatter discovery risk, activation-loaded surface, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
     )]
     Doctor {
         /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
+        ///
+        /// GitHub folder URLs may use /tree/<branch>/...; /blob/<branch>/...
+        /// is also accepted when the path resolves to a folder rather than SKILL.md.
         path: String,
         /// Emit machine-readable JSON instead of the formatted human report.
         #[arg(long, conflicts_with_all = ["html", "markdown"])]
@@ -408,10 +411,10 @@ pub(super) enum RouterExecutionModeArg {
 pub(super) enum SourceCommand {
     #[command(
         about = "Stage a public GitHub skill URI locally before doctor, source map, or import",
-        long_about = "Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, source map, import-skill, workspace map, or port-one-shot. Use this for import/port prompts that contain a URI; do not use web search or raw GitHub fallback to locate the same source."
+        long_about = "Stage a public GitHub repository, tree URL, blob-style folder URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, source map, import-skill, workspace map, or port-one-shot. Use this for import/port prompts that contain a URI; do not use web search or raw GitHub fallback to locate the same source."
     )]
     Stage {
-        /// Public GitHub repo URI, tree URI, owner/repo shorthand, or owner/repo/path shorthand.
+        /// Public GitHub repo URI, tree URI, blob-style folder URI, owner/repo shorthand, or owner/repo/path shorthand.
         uri: String,
         /// Output directory to create for the persistent sparse checkout. Defaults to .skillspec/staged/<repo>-<timestamp>.
         #[arg(long)]

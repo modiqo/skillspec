@@ -20,7 +20,7 @@ body:
     id: skill_repo_url
     attributes:
       label: Public GitHub skill URL
-      description: Use a public GitHub repository URL or a public folder URL that contains one or more SKILL.md files.
+      description: Use a public GitHub repository URL or a public folder URL that contains one or more SKILL.md files. Canonical folder URLs use /tree/<branch>/..., but /blob/<branch>/... is accepted when the path is a folder.
       placeholder: https://github.com/org/repo/tree/main/skills/example
     validations:
       required: true
