@@ -194,7 +194,7 @@ fn relative_to(root: &Path, path: &Path) -> Option<PathBuf> {
 
 fn path_label(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
-    let text = path.display().to_string();
+    let text = path.display().to_string().replace('\\', "/");
     if text.is_empty() {
         ".".to_owned()
     } else {
