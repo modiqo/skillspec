@@ -24,13 +24,13 @@ skillspec <COMMAND>
 | `test <path>` | Run scenario tests declared in a SkillSpec. |
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
-| `run-loop <path> --input <text> [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and action checklist in one spec load. |
+| `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and action checklist in one spec load; with `--guide`, emit start/current/end anchors and persisted resume state. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
-| `doctor <target> [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static single-skill reliability and context-burden debt when the shape is atomic. |
+| `doctor <target> [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
@@ -115,7 +115,7 @@ know which phase names exist and in what order they should run.
 ## `run-loop`
 
 ```text
-skillspec run-loop [OPTIONS] <PATH> --input <INPUT>
+skillspec run-loop [OPTIONS] <PATH>
 ```
 
 Arguments:
@@ -125,13 +125,18 @@ Arguments:
 Options:
 
 - `--input <INPUT>`: user task text to route. Strip skill invocation prefixes
-  before passing it.
+  before passing it. Mutually exclusive with `--resume`.
+- `--resume <RUN_DIR>`: resume an existing guided run from its trace run
+  directory. Requires `--guide`.
 - `--view <VIEW>`: sensemake detail level included in the batch report. Values
   are `index`, `summary`, and `full`. Defaults to `index`.
 - `--trace-dir <TRACE_DIR>`: directory where append-only decision trace events
   should be written.
 - `--phase <PHASE>`: expand this execution phase instead of the first pending
   phase.
+- `--guide <GUIDE>`: emit a stateful guide. Values are `agent` and `full`.
+  `agent` prints compact start/current/end anchors plus next commands; `full`
+  adds fingerprints and progress-record detail.
 - `--json`: emit JSON instead of a compact human report.
 
 `run-loop` is a batching convenience for the common agent planning path. It
@@ -139,6 +144,18 @@ loads the spec once, runs sensemake, decision, plan, and action-checklist
 construction in process, and prints a compact summary with wall-clock and
 estimated output metrics. It does not execute tools or mutate external systems
 except optional decision trace output.
+
+With `--guide agent`, `run-loop` also writes:
+
+- `<run-dir>/guide-state.json`: machine-readable resume anchor with selected
+  route, matched rules, current phase, open requirements, fingerprints, next
+  commands, and end proof.
+- `<run-dir>/guide-summary.md`: compact human resume note for context
+  compaction recovery.
+
+Use `--resume <run-dir> --guide agent` after compaction or interruption. Resume
+recovers the original input from the decision trace, verifies fingerprints,
+replays the decision, reads `execution.jsonl`, and prints the current gate.
 
 ## `act`
 
@@ -204,10 +221,10 @@ Options:
   `full`. Defaults to `index`.
 - `--json`: emit JSON instead of a concise human report.
 
-`sensemake` is the progressive-disclosure entry point for a spec. It reports
-section counts, ids, query handles, and navigation commands so an agent can
-inspect only the route, rule, command, state, dependency, or proof detail
-needed for the active task.
+`sensemake` is the progressive-disclosure entry point for a spec. Index view is
+compact: it reports section counts, roles, and navigation commands without
+dumping every handle. Use `--view full` when the agent needs exhaustive route,
+rule, command, state, dependency, or test handles.
 
 ## `query`
 
@@ -273,17 +290,20 @@ a model, or simulate a task. It first runs a cheap shape gate and reports one of
 these shapes:
 
 - `simple_skill`: exactly one atomic `SKILL.md` package. Doctor continues into
-  the full Markdown/source-map analysis and reports structural score,
-  activation-loaded surface percentage, frontmatter/activation/deferred surface
-  split, and issue list.
+  the full Markdown/source-map analysis and reports structural score, agent
+  drift risk, frontmatter discovery risk, activation-loaded surface percentage,
+  frontmatter/activation/deferred surface split, and issue list.
 - `entry_skill_with_subskills`: a root `SKILL.md` plus nested skill packages.
-  Doctor stops with `analysis_status: shape_only` and recommends
-  `skillspec workspace map`.
+  Doctor reports `analysis_status: workspace`, aggregate workspace risk, one
+  package report per `SKILL.md`, and recommends `skillspec workspace map` before
+  import/converge work.
 - `multi_skill_workspace`: multiple `SKILL.md` packages without a plugin
-  namespace marker. Doctor stops with `analysis_status: shape_only`.
+  namespace marker. Doctor reports `analysis_status: workspace`, aggregate
+  workspace risk, and one package report per `SKILL.md`.
 - `plugin_workspace`: a plugin-shaped root with `skills/` plus
-  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`. Doctor stops with
-  `analysis_status: shape_only` so namespaces are preserved.
+  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`. Doctor reports
+  `analysis_status: workspace`, preserves plugin namespaces in package ids, and
+  emits one package report per plugin skill.
 - `non_skill_repository`: no `SKILL.md` was found. Doctor stops before
   source-map parsing and reports code/manifest signals instead of wasting time
   on a normal code repo.
@@ -295,10 +315,12 @@ and removes it after the report. Supported remote forms include
 `owner/repo/path/to/skill`.
 
 The issue model is grounded in the reliability-gap and contract-trace
-methodology: instruction-density degradation, primacy-bias exposure, code mixed
-with activation instructions, ambiguous code fences, implicit dependency
-contracts, missing local references, missing behavior contracts, and missing
-trace/proof surfaces.
+methodology plus cited frontmatter/discovery research: malformed or ambiguous
+frontmatter, shortened discovery text, instruction-density degradation,
+primacy-bias exposure, code mixed with activation instructions, ambiguous code
+fences, implicit dependency contracts, missing local references, missing
+behavior contracts, missing trace/proof surfaces, cross-skill references, and
+workspace name collisions.
 
 The verdict is about context and reliability burden, not observed runtime
 failure. Dynamic behavior remains `unproven` until a trace can be aligned.

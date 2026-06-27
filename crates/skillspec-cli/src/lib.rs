@@ -32,9 +32,11 @@ pub mod features {
     pub mod capability;
     pub mod compiler;
     pub mod doctor;
+    pub mod guide;
     pub mod importer;
     pub mod metrics;
     pub mod port_one_shot;
+    pub mod remote_source;
     pub mod run_loop;
     pub mod sensemake;
     pub mod source_map;
@@ -44,8 +46,8 @@ pub mod features {
 
 pub use execution::{act, align, command_path, decision, deps, progress, report, trace};
 pub use features::{
-    capability, compiler, doctor, importer, metrics, port_one_shot, run_loop, sensemake,
-    source_map, workspace, workspace_synthesizer,
+    capability, compiler, doctor, guide, importer, metrics, port_one_shot, remote_source, run_loop,
+    sensemake, source_map, workspace, workspace_synthesizer,
 };
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 pub use spec::{grammar, import_dependency_ledger, imports, model, parser};

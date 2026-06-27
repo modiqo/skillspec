@@ -386,10 +386,11 @@ routes:
           owner_skill: skillspec
           requires:
             - stage_remote_folder
-            - find_skill_candidates
           forbid:
             - install_from_remote_checkout
             - execute_imported_snippets_during_staging
+            - web_search_for_remote_source
+            - fetch_raw_github_skill_md_for_import
         - id: continue_as_local_port
           owner_skill: skillspec
           route: local_skill_port
@@ -1259,6 +1260,8 @@ rules:
     forbid:
       - install_from_remote_checkout
       - execute_imported_snippets_during_staging
+      - web_search_for_remote_source
+      - fetch_raw_github_skill_md_for_import
     reason: Remote inputs must be staged locally before import and install.
   - id: route_source_shape_questions_to_doctor
     when:
@@ -2084,7 +2087,7 @@ artifacts:
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
-    description: Static doctor report that first classifies source shape, then runs full reliability-debt and context-burden scoring only for one atomic prose source; local folders, public GitHub skill folders, and public GitHub repo URIs may return shape-only reports for multi-skill, entry-with-subskills, plugin-shaped, or non-skill code repo targets.
+    description: Static doctor report that first classifies source shape, then reports frontmatter discovery risk, agent drift risk, token/context pressure, proof gaps, and workspace/package risk; non-skill code repo targets remain shape-only.
     produced_by:
       - kind: command
         id: doctor_source_skill
@@ -2291,7 +2294,7 @@ commands:
       dependencies:
         - rg_cli
   doctor_source_skill:
-    description: Run the static doctor shape gate and, only for a simple atomic SKILL.md package, score reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. The target may be a local folder, public GitHub skill folder, or public GitHub repo URI; multi-skill, entry-with-subskills, plugin-shaped, and non-skill code repos return shape-only reports with the recommended next command.
+    description: Run the static doctor shape gate and score frontmatter discovery risk, agent drift risk, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. Multi-skill, entry-with-subskills, and plugin-shaped roots return workspace reports with one package report per SKILL.md; non-skill code repos return shape-only reports.
     template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
     safety: local_write
     requires:
@@ -2411,14 +2414,15 @@ commands:
     template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
     safety: local_write
   stage_remote_folder:
-    description: Stage a public GitHub repository path locally with sparse checkout when possible.
-    template: git clone --depth 1 --filter=blob:none --sparse <repo-url> <tmp-root>/<repo-name>
+    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser; use the returned selected_source_path or candidates.source_path for doctor, source map, import-skill, workspace map, or port-one-shot. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
+    template: skillspec source stage <github-skill-uri> --out <staging-root> --json
     safety: network_read
     requires:
       dependencies:
+        - skillspec_cli
         - git_cli
   find_skill_candidates:
-    description: Find candidate SKILL.md files inside a staged repository when the user supplied only a repo.
+    description: Fallback only when source stage was run with candidate detection disabled or a staged local checkout already exists; otherwise use candidates returned by skillspec source stage.
     template: rg --files <staged-repo> | rg '/SKILL\\.md$'
     safety: local_read
     requires:
@@ -2510,8 +2514,15 @@ commands:
       dependencies:
         - skillspec_cli
   run_loop:
-    description: Batch sensemake, decide, plan, and the first or requested action checklist in one spec load to reduce repeated CLI invocations during the common planning loop.
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --view index --trace-dir <trace-dir>
+    description: "Start the stateful agent guide in one spec load: select route, write trace, print start/current/end anchors, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_loop_resume:
+    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and printing the current gate.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent
     safety: local_write
     requires:
       dependencies:
@@ -3001,9 +3012,9 @@ recipes:
     steps:
       - ask: approve_remote_source_access
       - run_command: stage_remote_folder
-      - run_command: find_skill_candidates
+      - note: If source stage returns selected_source_path, use that local folder as the source and do not run additional remote discovery. If it returns multiple candidates, ask choose_candidate_skill using candidates.source_path. If it returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
       - ask: choose_candidate_skill
-      - note: If there is exactly one candidate, use it as the default local source; otherwise honor the selected candidate.
+      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the authoritative URI-to-local-source gate.
       - branch:
           if: candidate selected or exactly one candidate exists
           then: local_porting_loop
@@ -3358,7 +3369,7 @@ closures:
       - workspace_map_source
       - workspace_validate_manifest
   report_source_shape:
-    description: Summarize the doctor shape report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, and whether full structural scoring was run. Do not import, port, compile, install, or choose a remote candidate during shape-only inspection.
+    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not import, port, compile, install, or choose a remote candidate during read-only inspection.
     commands:
       - doctor_source_shape
   produce_mechanical_draft:
@@ -3669,6 +3680,8 @@ tests:
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
   - name: prompt skill is named skillspec
     input: /skillspec import /Users/me/.agents/skills/durable-executor
     expect:
@@ -3862,6 +3875,8 @@ tests:
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
         - consult_existing_ports_without_user_request
         - drop_imported_dependency_mentions
         - work_around_missing_dependency_without_waiver
@@ -3884,6 +3899,8 @@ tests:
         - show_dependency_surface
         - report_dependency_waiver
       forbid:
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
         - drop_imported_dependency_mentions
         - mutate_dependency_set_to_pass_qa
         - work_around_missing_dependency_without_waiver
@@ -4003,6 +4020,7 @@ tests:
 review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
+  - Remote import/port requests must use `skillspec source stage <uri> --json` before doctor, source map, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after the staging command fails and the user approves.
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an explicit local durable-executor source folder, and remote sources must be staged before lifecycle install.
   - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
@@ -4073,8 +4091,8 @@ metadata:
       status: reviewed
       review_note: Source examples are represented as command templates rather than executable snippets.
     - prose_span: Revising Existing SkillSpecs and Done Definition
-      obligation: For revisions use grammar/current spec handles, plan ordered phases, act on the current phase, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value.
-      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
+      obligation: For revisions start or resume the guided run-loop, use grammar/current spec handles, follow the current gate, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value. Plan and act remain lower-level primitives behind the guide.
+      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.run_loop, commands.run_loop_resume, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
       confidence: high
       status: proven_by_tests
       review_note: Execution alignment can remain unproven if no real execution ledger is available.

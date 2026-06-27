@@ -3,13 +3,19 @@
 The runtime loop is the main way an agent should execute a SkillSpec-backed
 skill.
 
-It is:
+The preferred operator-facing loop is now:
+
+```text
+run-loop --guide agent -> follow current gate -> record progress -> resume -> align
+```
+
+The lower-level primitive loop remains:
 
 ```text
 sensemake -> plan -> act -> record progress -> show progress -> align
 ```
 
-The short form is:
+The primitive short form is:
 
 ```text
 plan -> act -> progress
@@ -26,6 +32,8 @@ the execution proof.
 The current CLI implements these runtime commands:
 
 ```sh
+skillspec run-loop <spec> --input '<task>' --trace-dir .skillspec/traces --guide agent
+skillspec run-loop <spec> --resume .skillspec/traces/<run-id> --guide agent
 skillspec sensemake <spec> --view index
 skillspec plan <spec> --input '<task>' --trace-dir .skillspec/traces
 skillspec act <spec> --input '<task>' --run .skillspec/traces/<run-id> --phase <phase-id>

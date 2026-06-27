@@ -440,6 +440,15 @@ pub fn align_summary(
         "  Alignment: {}",
         report.summary.completion.alignment
     )?;
+    writeln!(stdout, "summary_meaning:")?;
+    writeln!(
+        stdout,
+        "  Decision replay: replays the current spec against the captured input; pass means routing is reproducible."
+    )?;
+    writeln!(
+        stdout,
+        "  Execution proof: checks execution.jsonl for structured evidence; partial or unproven means evidence is missing or incomplete, not that decision replay failed."
+    )?;
     writeln!(stdout, "token_usage:")?;
     writeln!(
         stdout,

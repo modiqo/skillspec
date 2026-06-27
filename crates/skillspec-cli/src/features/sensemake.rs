@@ -90,6 +90,7 @@ pub fn sensemake(spec: &SkillSpec, path: &Path, view: View) -> SensemakeReport {
 fn escalation(spec: &SkillSpec) -> Vec<String> {
     let mut items = vec![
         "start with sensemake --view index only when unfamiliar".to_owned(),
+        "for active task execution, prefer run-loop --guide agent so the CLI prints start/current/end anchors and persists resume state".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
         "escalate index -> summary -> full only when needed".to_owned(),
@@ -108,13 +109,13 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap shape gate; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
+            "for source diagnostics, run doctor before import as a cheap shape gate; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
                 .to_owned(),
         );
     }
     if has_source_import(spec) {
         items.push(
-            "for one atomic prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for URI imports, first run source stage and use the returned selected_source_path/candidates; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
@@ -203,13 +204,27 @@ pub fn render_sensemake(report: &SensemakeReport) -> String {
     }
     writeln!(output).unwrap();
     writeln!(output, "Query handles:").unwrap();
-    for section in &report.sections {
-        let ids = if section.ids.is_empty() {
-            "<none>".to_owned()
-        } else {
-            section.ids.join(", ")
-        };
-        writeln!(output, "- {}: {}", section.name, ids).unwrap();
+    if report.view == View::Index {
+        for section in &report.sections {
+            output.push_str(&format!(
+                "- {}: {} handle(s) hidden in index view\n",
+                section.name, section.count
+            ));
+        }
+        output.push_str(&format!(
+            "- full handles: `skillspec sensemake {} --view full`",
+            report.spec_path
+        ));
+        output.push('\n');
+    } else {
+        for section in &report.sections {
+            let ids = if section.ids.is_empty() {
+                "<none>".to_owned()
+            } else {
+                section.ids.join(", ")
+            };
+            output.push_str(&format!("- {}: {}\n", section.name, ids));
+        }
     }
     writeln!(output).unwrap();
     writeln!(output, "Navigation:").unwrap();
@@ -362,6 +377,16 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             command: format!("skillspec sensemake {spec_path} --view index"),
         },
         NavigationHint {
+            intent: "start guided task execution",
+            command: format!(
+                "skillspec run-loop {spec_path} --input '<task>' --trace-dir .skillspec/traces --guide agent"
+            ),
+        },
+        NavigationHint {
+            intent: "resume guided task execution",
+            command: format!("skillspec run-loop {spec_path} --resume <run-dir> --guide agent"),
+        },
+        NavigationHint {
             intent: "task routing",
             command: format!("skillspec decide {spec_path} --input '<task>'"),
         },
@@ -506,6 +531,11 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     }
     if has_source_import(spec) {
         hints.extend([
+            NavigationHint {
+                intent: "stage remote source URI before import",
+                command: "skillspec source stage <github-skill-uri> --out <staging-root> --json"
+                    .to_owned(),
+            },
             NavigationHint {
                 intent: "diagnose source shape and prose reliability debt",
                 command: "skillspec doctor <source-skill-folder-or-repo-uri> --json".to_owned(),

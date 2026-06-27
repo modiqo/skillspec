@@ -8,6 +8,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(name = "skillspec")]
 #[command(about = "Structured skills for agent behavior")]
+#[command(version)]
 pub(super) struct Cli {
     #[command(subcommand)]
     pub(super) command: Command,
@@ -72,15 +73,18 @@ pub(super) enum Command {
         json: bool,
     },
     #[command(
-        about = "Batch sensemake, decide, plan, and first action checklist in one spec load",
-        long_about = "Load one skill.spec.yml once, then produce a compact planning-loop report containing sensemake navigation, routing decision, phase plan, and the first or requested action checklist. This is a read/planning convenience wrapper; it does not execute tools or mutate external systems except optional decision trace output."
+        about = "Batch routing, planning, action guidance, and optional resume anchors",
+        long_about = "Load one skill.spec.yml once, then produce a compact planning-loop report containing sensemake navigation, routing decision, phase plan, and the first or requested action checklist. With --guide agent, write guide-state.json and guide-summary.md, print start/current/end anchors, and support --resume from an existing run directory. This is a read/planning convenience wrapper; it does not execute tools or mutate external systems except optional trace and guide-state output."
     )]
     RunLoop {
         /// Path to a skill.spec.yml file.
         path: PathBuf,
         /// User task text to route. Strip skill invocation prefixes before passing it.
-        #[arg(long, allow_hyphen_values = true)]
-        input: String,
+        #[arg(long, allow_hyphen_values = true, conflicts_with = "resume")]
+        input: Option<String>,
+        /// Resume an existing guided run from its run directory.
+        #[arg(long, value_name = "RUN_DIR", conflicts_with = "input")]
+        resume: Option<PathBuf>,
         /// Sensemake detail level included in the batch report.
         #[arg(long, value_enum, default_value_t = SenseViewArg::Index)]
         view: SenseViewArg,
@@ -90,6 +94,9 @@ pub(super) enum Command {
         /// Expand this execution phase instead of the first pending phase.
         #[arg(long)]
         phase: Option<String>,
+        /// Emit a stateful agent guide with start/current/end anchors.
+        #[arg(long, value_enum)]
+        guide: Option<GuideModeArg>,
         /// Emit JSON instead of a compact human report.
         #[arg(long)]
         json: bool,
@@ -143,8 +150,8 @@ pub(super) enum Command {
         json: bool,
     },
     #[command(
-        about = "Scan a prose skill for static reliability and context-burden debt",
-        long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. Doctor first runs a cheap shape gate: simple SKILL.md packages receive full structural analysis, while multi-skill workspaces, root skills with subskills, plugin-shaped workspaces, and non-skill code repos return a shape-only report with the recommended next command. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Full single-skill analysis reports structural score, activation-loaded surface percentage, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
+        about = "Scan skills and skill workspaces for static drift, discovery, and context risk",
+        long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. Doctor first runs a cheap shape gate: simple SKILL.md packages receive full structural analysis; multi-skill workspaces, root skills with subskills, and plugin-shaped workspaces receive aggregate workspace risk plus one package report per SKILL.md; non-skill code repos return a shape-only report so doctor does not waste work on ordinary code. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Analysis reports structural score, agent drift risk, frontmatter discovery risk, activation-loaded surface, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
     )]
     Doctor {
         /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
@@ -393,6 +400,23 @@ pub(super) enum RouterExecutionModeArg {
 
 #[derive(Debug, Subcommand)]
 pub(super) enum SourceCommand {
+    #[command(
+        about = "Stage a public GitHub skill URI locally before doctor, source map, or import",
+        long_about = "Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, source map, import-skill, workspace map, or port-one-shot. Use this for import/port prompts that contain a URI; do not use web search or raw GitHub fallback to locate the same source."
+    )]
+    Stage {
+        /// Public GitHub repo URI, tree URI, owner/repo shorthand, or owner/repo/path shorthand.
+        uri: String,
+        /// Output directory to create for the persistent sparse checkout. Defaults to .skillspec/staged/<repo>-<timestamp>.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Skip candidate discovery for repo-root targets.
+        #[arg(long)]
+        no_detect_candidates: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(
         about = "Create source-map.json and source-map.md from a SKILL.md file or skill folder"
     )]
@@ -1382,6 +1406,12 @@ pub(super) enum InstallTargetArg {
 pub(super) enum SenseViewArg {
     Index,
     Summary,
+    Full,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub(super) enum GuideModeArg {
+    Agent,
     Full,
 }
 

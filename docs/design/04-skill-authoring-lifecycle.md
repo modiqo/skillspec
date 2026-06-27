@@ -74,6 +74,10 @@ When debugging one gate or building a custom import flow, use the lower-level
 commands:
 
 ```sh
+# URI sources only:
+skillspec source stage <github-skill-uri> --out <staging-root> --json
+
+# Local source path or selected_source_path from source stage:
 skillspec source map <path> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index

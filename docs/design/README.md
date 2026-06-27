@@ -53,6 +53,10 @@ directory listings.
 | 19 | [Workspace Authoring Graph](19-workspace-authoring-graph.md) | How source-shape detection chooses single-skill, multi-skill, plugin-shaped, or revision flow, and how `skillspec workspace map/validate/import/converge/compile/install` handles workspace roots before install. |
 | 20 | [Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md) | How SkillSpec separates wall-clock speed from token economy, then adds spec caching, workspace incremental cache, parallel fanout, batching, and source reuse. |
 | 21 | [One-Shot Porting Workflow](21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated direct-run metric recording for one atomic prose skill without replacing workspace or revision flows. |
+| 22 | [Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md) | How `skillspec doctor` scores static skill risk: frontmatter discovery, activation/context load, obligation position, proof gaps, workspace/package shape, contract mitigation, cited basis registry, and policy-threshold model. |
+| 23 | [Guided Run Loop From Doctor Dogfood](23-guided-run-loop-from-doctor-dogfood.md) | Why doctor dogfood led to moving trampoline guidance into `run-loop --guide agent`, how the CLI tracks current/next/end actions, how resume uses persistent traces, and how the self trampoline stays optimal. |
+| 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
+| 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
 
 ## Visual Explainers
 
@@ -82,6 +86,7 @@ Every design claim should be grounded in one or more of these sources:
 | Route and rule decisions | `crates/skillspec-cli/src/execution/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
 | Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-cli/src/features/compiler.rs` |
 | Runtime phase loop | `crates/skillspec-cli/src/execution/act.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md` |
+| Progressive agent guidance | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/features/remote_source.rs`, `crates/skillspec-cli/src/features/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/execution/align.rs`, `docs/design/25-progressive-agent-guidance.md` |
 | Phase tool boundaries | `crates/skillspec-cli/src/spec/model.rs`, `crates/skillspec-cli/src/execution/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Command log | `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-cli/src/spec/imports.rs`, `crates/skillspec-cli/src/spec/parser/validation.rs` |
@@ -89,6 +94,8 @@ Every design claim should be grounded in one or more of these sources:
 | One-shot porting | `crates/skillspec-cli/src/features/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `docs/design/21-one-shot-porting.md` |
 | Source-map progressive imports | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
 | Workspace authoring graph | `crates/skillspec-cli/src/features/workspace.rs`, `crates/skillspec-cli/src/features/workspace/`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
+| Doctor agent drift risk | `crates/skillspec-cli/src/features/doctor.rs`, `crates/skillspec-cli/src/features/doctor/`, `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
+| Guided run-loop and trampoline dogfood | `crates/skillspec-cli/src/features/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-cli/src/features/doctor.rs`, `crates/skillspec-cli/src/execution/trace.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/24-guided-trampoline.md` |
 | Performance and token economy | `crates/skillspec-cli/src/features/metrics.rs`, `crates/skillspec-cli/src/spec/parser.rs`, `crates/skillspec-cli/src/features/workspace/import.rs`, `docs/design/20-performance-token-speed.md` |
 | Thin loader generation | `crates/skillspec-cli/src/features/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/execution/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |

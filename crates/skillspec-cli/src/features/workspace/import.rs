@@ -11,7 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
 
-const WORKSPACE_CACHE_SCHEMA: &str = "skillspec/workspace-cache/v1";
+const WORKSPACE_CACHE_SCHEMA: &str = "skillspec/workspace-cache/v2";
 const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 const IMPORT_COMMAND_OPTIONS: &str = "workspace-import/default";
 
@@ -584,7 +584,7 @@ fn package_source_hash(source: &Path) -> Result<String> {
     paths.sort();
     let mut hasher = Sha256::new();
     for path in paths {
-        hasher.update(path.display().to_string().as_bytes());
+        hasher.update(path_to_string(&path).as_bytes());
         hasher.update([0]);
         let bytes = fs::read(&path).map_err(|source| Error::Read {
             path: path.clone(),

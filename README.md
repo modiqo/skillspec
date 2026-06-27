@@ -295,6 +295,14 @@ skillspec doctor https://github.com/anthropics/skills/tree/main/skills/pdf
 It stages the requested folder temporarily and rejects parent folders that
 contain multiple `SKILL.md` files.
 
+For an actual URI import, stage the remote source persistently first and import
+from the returned local path:
+
+```sh
+skillspec source stage https://github.com/anthropics/skills/tree/main/skills/pdf --out ./.skillspec/staged/pdf --json
+skillspec doctor ./.skillspec/staged/pdf/repo/skills/pdf
+```
+
 If the source is a whole skills repo with many `SKILL.md` files, map the
 workspace first. This is authoring-side structure recon, not router indexing:
 

@@ -1,14 +1,25 @@
 use crate::error::{Error, Result};
+use crate::remote_source::{self, RemoteSkillSource};
 use crate::source_map::{
     self, SourceClassificationKind, SourceFileKind, SourceFileLoadStatus, SourceMap,
     SourceReferenceKind,
 };
+use crate::{model::SkillSpec, parser};
+mod frontmatter;
+mod metrics;
+mod risk;
+mod types;
+mod workspace_report;
+
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use types::{
+    AgentDriftRiskReport, ContractMitigationLevel, ContractMitigationReport,
+    DoctorPackageRiskReport, FrontmatterDiscoveryRiskReport, RawActivationRiskReport, RiskLevel,
+    WorkspaceAgentDriftRiskReport,
+};
 
 const LARGE_BODY_LINES: usize = 500;
 const LARGE_BODY_TOKENS: usize = 5_000;
@@ -28,6 +39,18 @@ pub struct DoctorReport {
     pub surface: SurfaceReport,
     pub counts: DoctorCounts,
     pub issues: Vec<DoctorIssue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frontmatter_discovery_risk: Option<FrontmatterDiscoveryRiskReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_drift_risk: Option<AgentDriftRiskReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_activation_risk: Option<RawActivationRiskReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_mitigation: Option<ContractMitigationReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_agent_drift_risk: Option<WorkspaceAgentDriftRiskReport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub packages: Vec<DoctorPackageRiskReport>,
     pub basis: Vec<DoctorBasis>,
     pub suggested_next_steps: Vec<String>,
 }
@@ -95,6 +118,8 @@ pub struct DoctorIssue {
 #[derive(Clone, Debug, Serialize)]
 pub struct DoctorBasis {
     pub id: String,
+    pub kind: String,
+    pub citation: String,
     pub source: String,
     pub claim: String,
 }
@@ -107,24 +132,6 @@ struct SkillBody {
     body_start_line: usize,
 }
 
-#[derive(Debug)]
-struct RemoteSkillSource {
-    repo_url: String,
-    branch: Option<String>,
-    path: Option<String>,
-}
-
-struct StagedRemote {
-    root: PathBuf,
-    checkout_dir: PathBuf,
-}
-
-impl Drop for StagedRemote {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
-
 pub fn inspect_target(target: &str) -> Result<DoctorReport> {
     let target_path = Path::new(target);
     if target_path.exists() {
@@ -133,19 +140,19 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
         return Ok(report);
     }
 
-    let Some(remote) = remote_from_target(target)? else {
+    let Some(remote) = remote_source::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
                 "doctor target {target:?} does not exist locally; remote doctor supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
             ),
         });
     };
-    let staged = clone_remote(&remote)?;
-    let mut report = match inspect_staged_remote(target, &remote, &staged.checkout_dir) {
+    let staged = remote_source::clone_remote_temp(&remote, "skillspec-doctor")?;
+    let mut report = match inspect_staged_remote(target, &remote, staged.checkout_dir()) {
         Ok(report) => report,
-        Err(error) => return Err(rewrite_remote_error(error, &staged.checkout_dir, target)),
+        Err(error) => return Err(rewrite_remote_error(error, staged.checkout_dir(), target)),
     };
-    rewrite_remote_locations(&mut report, &staged.checkout_dir, target);
+    rewrite_remote_locations(&mut report, staged.checkout_dir(), target);
     report.target = target.to_owned();
     report.source_kind = "remote_github".to_owned();
     report.staged_from = Some(remote.repo_url);
@@ -158,13 +165,16 @@ pub fn inspect(path: &Path) -> Result<DoctorReport> {
 
 fn inspect_local_target(path: &Path) -> Result<DoctorReport> {
     let classification = classify_local(path)?;
-    if classification.shape.kind != "simple_skill" {
+    if classification.shape.kind == "non_skill_repository" {
         return Ok(shape_only_report_from_classification(
             &path.display().to_string(),
             "local",
             None,
             classification,
         ));
+    }
+    if classification.shape.kind != "simple_skill" {
+        return workspace_report::inspect_local_target(path, classification);
     }
     let shape = classification.shape;
     let package_root = shape
@@ -182,15 +192,57 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
     let map = source_map::build(path)?;
     let source_root = PathBuf::from(&map.source_root);
     let skill = load_skill_body(&map, &source_root)?;
+    let skill_sections = frontmatter::split_skill(&format!("{}{}", skill.frontmatter, skill.body));
+    let frontmatter_discovery_risk = frontmatter::analyze(&skill.path, &skill_sections);
     let shape = simple_shape_for_source_root(&source_root)?;
     let surface = surface_report(&map, &skill);
     let counts = counts(&map, &skill);
-    let has_skill_spec = source_root.join("skill.spec.yml").exists();
+    let skill_spec_path = source_root.join("skill.spec.yml");
+    let has_skill_spec_file = skill_spec_path.exists();
+    let (contract_source, invalid_contract_issue) = if has_skill_spec_file {
+        match parser::load_spec(&skill_spec_path) {
+            Ok(spec) => (Some((skill_spec_path.clone(), spec)), None),
+            Err(error) => (
+                None,
+                Some(with_location(
+                    issue(
+                        "invalid_behavior_contract",
+                        "high",
+                        "SkillSpec contract is present but invalid",
+                        format!("skill.spec.yml could not be loaded: {error}"),
+                        vec![
+                            "contract_trace_behavioral_contract",
+                            "contract_trace_static_well_formedness",
+                        ],
+                        "Fix `skill.spec.yml` validation errors before relying on this skill; an invalid contract cannot mitigate prose drift.",
+                        18,
+                    ),
+                    skill_spec_path.display().to_string(),
+                )),
+            ),
+        }
+    } else {
+        (None, None)
+    };
+    let has_valid_skill_spec = contract_source.is_some();
+    let has_structured_dependencies = contract_source
+        .as_ref()
+        .is_some_and(|(_, spec)| !spec.dependencies.is_empty());
     let has_deps_toml = source_root.join("deps.toml").exists();
-    let has_tests = source_root.join(".skillspec").exists() || has_skill_spec;
+    let has_tests = source_root.join(".skillspec").exists()
+        || contract_source
+            .as_ref()
+            .is_some_and(|(_, spec)| !spec.tests.is_empty());
     let mut issues = Vec::new();
+    if let Some(issue) = invalid_contract_issue {
+        issues.push(issue);
+    }
+    issues.extend(frontmatter_issues(
+        &frontmatter_discovery_risk,
+        &skill.path.display().to_string(),
+    ));
 
-    let large_surface_percentage = percentage(
+    let large_surface_percentage = metrics::percentage(
         surface.activation_bytes,
         surface.frontmatter_bytes + surface.activation_bytes + surface.deferred_bytes,
     );
@@ -306,7 +358,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
 
     if counts.code_blocks_in_skill > 0 {
         let code_bytes = skill_code_bytes(&map, &skill.file_id);
-        let code_percent = percentage(code_bytes, surface.activation_bytes);
+        let code_percent = metrics::percentage(code_bytes, surface.activation_bytes);
         issues.push(with_location(
             issue(
                 "code_mixed_with_activation_instructions",
@@ -345,7 +397,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         ));
     }
 
-    if operational_prose(&skill.body) && !has_skill_spec {
+    if operational_prose(&skill.body) && !has_valid_skill_spec {
         issues.push(with_location(
             issue(
                 "ambiguous_execution_substrate",
@@ -368,6 +420,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         || counts.manifest_files > 0
         || counts.code_blocks_in_skill > 0)
         && !has_deps_toml
+        && !has_structured_dependencies
     {
         issues.push(with_location(
             issue(
@@ -425,7 +478,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         ));
     }
 
-    if !has_skill_spec {
+    if !has_valid_skill_spec {
         issues.push(with_location(
             issue(
                 "missing_behavior_contract",
@@ -467,6 +520,33 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
     let structural_score = u8::try_from(100usize.saturating_sub(penalty)).unwrap_or(0);
     let verdict = verdict(structural_score);
 
+    let basis = basis();
+    let raw_activation_risk = raw_activation_risk(&surface, &counts, structural_score);
+    let contract_mitigation = contract_source
+        .as_ref()
+        .map(|(path, spec)| contract_mitigation(path, spec, raw_activation_risk.score));
+    let mut agent_drift_risk = risk::agent_report(
+        structural_score,
+        &issues,
+        Some(frontmatter_discovery_risk.clone()),
+        &basis,
+    );
+    if let Some(mitigation) = &contract_mitigation {
+        agent_drift_risk.summary = format!(
+            "{} raw activation risk; SkillSpec contract mitigation is {}. Residual risk is {} because activation-loaded prose still has to stay small.",
+            raw_activation_risk.level.as_str(),
+            mitigation.level.as_str(),
+            mitigation.residual_risk_level.as_str()
+        );
+        agent_drift_risk.recommended_mode = "thin_trampoline_and_use_guided_cli".to_owned();
+    }
+    let suggested_next_steps = next_steps(
+        has_valid_skill_spec,
+        has_deps_toml,
+        has_structured_dependencies,
+        raw_activation_risk.score,
+    );
+
     Ok(DoctorReport {
         target: source_root.display().to_string(),
         source_kind: "local".to_owned(),
@@ -479,8 +559,14 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         surface,
         counts,
         issues,
-        basis: basis(),
-        suggested_next_steps: next_steps(has_skill_spec, has_deps_toml),
+        frontmatter_discovery_risk: Some(frontmatter_discovery_risk),
+        agent_drift_risk: Some(agent_drift_risk),
+        raw_activation_risk: Some(raw_activation_risk),
+        contract_mitigation,
+        workspace_agent_drift_risk: None,
+        packages: Vec::new(),
+        basis,
+        suggested_next_steps,
     })
 }
 
@@ -496,7 +582,7 @@ fn inspect_staged_remote(
     checkout_dir: &Path,
 ) -> Result<DoctorReport> {
     if let Some(path) = &remote.path {
-        set_sparse_path(checkout_dir, path)?;
+        remote_source::set_sparse_path(checkout_dir, path)?;
         let scope_path = checkout_dir.join(path);
         if !scope_path.exists() {
             return Err(Error::InvalidInput {
@@ -509,12 +595,12 @@ fn inspect_staged_remote(
         return inspect_local_target(&scope_path);
     }
 
-    let tree_files = git_tree_files(checkout_dir)?;
+    let tree_files = remote_source::git_tree_files(checkout_dir)?;
     let root_skill_content = if tree_files
         .iter()
         .any(|path| path.to_string_lossy().eq_ignore_ascii_case("SKILL.md"))
     {
-        git_show_text(checkout_dir, "SKILL.md").ok()
+        remote_source::git_show_text(checkout_dir, "SKILL.md").ok()
     } else {
         None
     };
@@ -525,12 +611,15 @@ fn inspect_staged_remote(
         root_skill_content.as_deref(),
     )?;
     if classification.shape.kind != "simple_skill" {
-        return Ok(shape_only_report_from_classification(
-            target,
-            "remote_github",
-            None,
-            classification,
-        ));
+        if classification.shape.kind == "non_skill_repository" {
+            return Ok(shape_only_report_from_classification(
+                target,
+                "remote_github",
+                None,
+                classification,
+            ));
+        }
+        return workspace_report::inspect_remote_target(target, checkout_dir, classification);
     }
 
     let primary = classification
@@ -543,7 +632,7 @@ fn inspect_staged_remote(
         .map(path_to_slash)
         .filter(|path| !path.is_empty())
         .unwrap_or_else(|| ".".to_owned());
-    set_sparse_path(checkout_dir, &package_path)?;
+    remote_source::set_sparse_path(checkout_dir, &package_path)?;
     let scope_path = if package_path == "." {
         checkout_dir.to_path_buf()
     } else {
@@ -653,6 +742,7 @@ fn shape_only_report_from_classification(
     let shape = classification.shape;
     let counts = classification.counts;
     let issues = shape_issues(&shape, &counts);
+    let basis = basis();
     DoctorReport {
         target: target.to_owned(),
         source_kind: source_kind.to_owned(),
@@ -665,8 +755,51 @@ fn shape_only_report_from_classification(
         surface: SurfaceReport::default(),
         counts,
         issues,
-        basis: basis(),
+        frontmatter_discovery_risk: None,
+        agent_drift_risk: None,
+        raw_activation_risk: None,
+        contract_mitigation: None,
+        workspace_agent_drift_risk: None,
+        packages: Vec::new(),
+        basis,
         suggested_next_steps: shape_next_steps(),
+    }
+}
+
+fn frontmatter_issues(report: &FrontmatterDiscoveryRiskReport, location: &str) -> Vec<DoctorIssue> {
+    report
+        .conditions
+        .iter()
+        .filter(|condition| condition.score_delta > 0)
+        .map(|condition| {
+            with_location(
+                issue(
+                    &condition.id,
+                    condition.level.as_str(),
+                    frontmatter_issue_title(&condition.id),
+                    condition
+                        .evidence
+                        .first()
+                        .map(|evidence| evidence.text_preview.clone())
+                        .unwrap_or_else(|| condition.consequence.clone()),
+                    condition.basis_ids.iter().map(String::as_str).collect(),
+                    &condition.recommended_action,
+                    condition.score_delta.min(20),
+                ),
+                location.to_owned(),
+            )
+        })
+        .collect()
+}
+
+fn frontmatter_issue_title(id: &str) -> &str {
+    match id {
+        "missing_or_malformed_frontmatter" => "Frontmatter is missing or malformed",
+        "ambiguous_short_description" => "Frontmatter description is too ambiguous",
+        "overbroad_description" => "Frontmatter description is overbroad",
+        "description_listing_budget_risk" => "Frontmatter discovery text risks truncation",
+        "manual_only_visibility" => "Skill is manual-only for automatic discovery",
+        _ => "Frontmatter discovery risk",
     }
 }
 
@@ -726,6 +859,62 @@ pub fn render(report: &DoctorReport) -> String {
             "structural_score: {}/100\n",
             report.structural_score
         ));
+    }
+    if let Some(risk) = &report.agent_drift_risk {
+        output.push_str(&format!(
+            "agent_drift_risk: {} ({}/100)\n",
+            risk.level.as_str(),
+            risk.score
+        ));
+    }
+    if let Some(risk) = &report.raw_activation_risk {
+        output.push_str(&format!(
+            "raw_activation_risk: {} ({}/100)\n",
+            risk.level.as_str(),
+            risk.score
+        ));
+    }
+    if let Some(mitigation) = &report.contract_mitigation {
+        output.push_str(&format!(
+            "contract_mitigation: {} (routes={}, rules={}, commands={}, dependencies={}, tests={})\n",
+            mitigation.level.as_str(),
+            mitigation.routes,
+            mitigation.rules,
+            mitigation.commands,
+            mitigation.dependencies,
+            mitigation.tests
+        ));
+        output.push_str(&format!(
+            "residual_agent_drift_risk: {} ({}/100)\n",
+            mitigation.residual_risk_level.as_str(),
+            mitigation.residual_risk_score
+        ));
+    }
+    if let Some(risk) = &report.workspace_agent_drift_risk {
+        output.push_str(&format!(
+            "workspace_risk: {} ({}/100)\n",
+            risk.level.as_str(),
+            risk.score
+        ));
+    }
+    if let Some(frontmatter) = &report.frontmatter_discovery_risk {
+        output.push_str(&format!(
+            "frontmatter_discovery_risk: {} ({}/100)\n",
+            frontmatter.level.as_str(),
+            frontmatter.score
+        ));
+    }
+    if !report.packages.is_empty() {
+        output.push_str(&format!("packages_analyzed: {}\n", report.packages.len()));
+        for package in report.packages.iter().take(8) {
+            output.push_str(&format!(
+                "- {} path={} drift={} discovery={}\n",
+                package.package_id,
+                package.path,
+                package.agent_drift_risk.level.as_str(),
+                package.frontmatter_discovery_risk.level.as_str()
+            ));
+        }
     }
     output.push_str(&format!(
         "large_surface: {}% activation-loaded\n\n",
@@ -1204,121 +1393,6 @@ fn display_list(items: &[String]) -> String {
     }
 }
 
-fn remote_from_target(target: &str) -> Result<Option<RemoteSkillSource>> {
-    let trimmed = target.trim();
-    if let Some(path) = trimmed.strip_prefix("git@github.com:") {
-        let path = path.trim_end_matches(".git");
-        let parts = path
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<_>>();
-        if parts.len() < 2 {
-            return Err(Error::InvalidInput {
-                message: "remote doctor SSH shorthand requires git@github.com:<owner>/<repo>.git"
-                    .to_owned(),
-            });
-        }
-        return Ok(Some(RemoteSkillSource {
-            repo_url: format!("https://github.com/{}/{}.git", parts[0], parts[1]),
-            branch: None,
-            path: (parts.len() > 2).then(|| parts[2..].join("/")),
-        }));
-    }
-    let without_scheme = trimmed
-        .strip_prefix("https://")
-        .or_else(|| trimmed.strip_prefix("http://"))
-        .unwrap_or(trimmed);
-    let github_path = without_scheme
-        .strip_prefix("github.com/")
-        .or_else(|| trimmed.strip_prefix("github:"));
-    let Some(github_path) = github_path else {
-        if looks_like_github_shorthand(trimmed) {
-            return github_shorthand(trimmed).map(Some);
-        }
-        return Ok(None);
-    };
-    let parts = github_path
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    if parts.len() < 2 {
-        return Err(Error::InvalidInput {
-            message: "remote doctor requires a GitHub owner/repo target".to_owned(),
-        });
-    }
-    let owner = parts[0];
-    let repo = parts[1].trim_end_matches(".git");
-    if parts.get(2) == Some(&"blob") {
-        return Err(Error::InvalidInput {
-            message: "remote doctor expects a skill folder URL, not a blob/SKILL.md URL".to_owned(),
-        });
-    }
-    let (branch, path_parts) = if parts.get(2) == Some(&"tree") {
-        if parts.len() < 4 {
-            return Err(Error::InvalidInput {
-                message: "GitHub tree URL must include a branch".to_owned(),
-            });
-        }
-        (Some(parts[3].to_owned()), &parts[4..])
-    } else {
-        (None, parts.get(2..).unwrap_or(&[]))
-    };
-    let path = path_parts.join("/");
-    if is_skill_file_path(&path) {
-        return Err(Error::InvalidInput {
-            message: "remote doctor expects a skill folder or repo URL, not a SKILL.md blob"
-                .to_owned(),
-        });
-    }
-    Ok(Some(RemoteSkillSource {
-        repo_url: format!("https://github.com/{owner}/{repo}.git"),
-        branch,
-        path: (!path.is_empty()).then_some(path),
-    }))
-}
-
-fn looks_like_github_shorthand(target: &str) -> bool {
-    let parts = target
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    parts.len() >= 2
-        && !target.starts_with('/')
-        && !target.starts_with('.')
-        && !target.contains("://")
-        && parts[0]
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-        && parts[1]
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
-}
-
-fn github_shorthand(target: &str) -> Result<RemoteSkillSource> {
-    let parts = target
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    let path = parts.get(2..).unwrap_or(&[]).join("/");
-    if is_skill_file_path(&path) {
-        return Err(Error::InvalidInput {
-            message: "remote doctor shorthand expects owner/repo or owner/repo/<skill-folder>"
-                .to_owned(),
-        });
-    }
-    Ok(RemoteSkillSource {
-        repo_url: format!("https://github.com/{}/{}.git", parts[0], parts[1]),
-        branch: None,
-        path: (!path.is_empty()).then_some(path),
-    })
-}
-
-fn is_skill_file_path(path: &str) -> bool {
-    path.rsplit('/')
-        .next()
-        .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
-}
-
 fn rewrite_remote_locations(report: &mut DoctorReport, staged_skill_path: &Path, target: &str) {
     let Some(prefix) = staged_skill_path.to_str() else {
         return;
@@ -1351,124 +1425,6 @@ fn rewrite_remote_error(error: Error, staged_skill_path: &Path, target: &str) ->
     Error::InvalidInput {
         message: message.replace(prefix, target.trim_end_matches('/')),
     }
-}
-
-fn clone_remote(remote: &RemoteSkillSource) -> Result<StagedRemote> {
-    let root = std::env::temp_dir().join(format!(
-        "skillspec-doctor-{}-{}",
-        std::process::id(),
-        unique_nanos()
-    ));
-    let clone_dir = root.join("repo");
-    fs::create_dir_all(&root).map_err(|source| Error::Write {
-        path: root.clone(),
-        source,
-    })?;
-
-    let mut clone = Command::new("git");
-    clone
-        .arg("clone")
-        .arg("--depth")
-        .arg("1")
-        .arg("--filter=blob:none")
-        .arg("--sparse");
-    if let Some(branch) = &remote.branch {
-        clone.arg("--branch").arg(branch);
-    }
-    clone.arg(&remote.repo_url).arg(&clone_dir);
-    run_git(clone, "clone remote skill repository")?;
-    Ok(StagedRemote {
-        root,
-        checkout_dir: clone_dir,
-    })
-}
-
-fn set_sparse_path(checkout_dir: &Path, path: &str) -> Result<()> {
-    let mut sparse = Command::new("git");
-    sparse
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("sparse-checkout")
-        .arg("set")
-        .arg(path);
-    run_git(sparse, "sparse-checkout remote doctor target")
-}
-
-fn git_tree_files(checkout_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut command = Command::new("git");
-    command
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("ls-tree")
-        .arg("-r")
-        .arg("--name-only")
-        .arg("HEAD");
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to list remote repository tree: {source}"),
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr)
-            .lines()
-            .take(8)
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(Error::InvalidInput {
-            message: format!("git failed to list remote repository tree: {stderr}"),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(PathBuf::from)
-        .collect())
-}
-
-fn git_show_text(checkout_dir: &Path, path: &str) -> Result<String> {
-    let mut command = Command::new("git");
-    command
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("show")
-        .arg(format!("HEAD:{path}"));
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to read remote repository file {path}: {source}"),
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr)
-            .lines()
-            .take(8)
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(Error::InvalidInput {
-            message: format!("git failed to read remote repository file {path}: {stderr}"),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
-fn run_git(mut command: Command, action: &str) -> Result<()> {
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to run git for {action}: {source}"),
-    })?;
-    if output.status.success() {
-        return Ok(());
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr)
-        .lines()
-        .take(8)
-        .collect::<Vec<_>>()
-        .join("\n");
-    Err(Error::InvalidInput {
-        message: format!("git failed to {action}: {stderr}"),
-    })
-}
-
-fn unique_nanos() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0)
 }
 
 fn load_skill_body(map: &SourceMap, source_root: &Path) -> Result<SkillBody> {
@@ -1546,7 +1502,7 @@ fn surface_report(map: &SourceMap, skill: &SkillBody) -> SurfaceReport {
     let frontmatter_lines = skill.frontmatter.lines().count();
     let activation_bytes = skill.body.len();
     let activation_lines = skill.body.lines().count();
-    let activation_estimated_tokens = estimate_tokens(&skill.body);
+    let activation_estimated_tokens = metrics::estimate_tokens(&skill.body);
     let deferred_files = map
         .files
         .iter()
@@ -1701,20 +1657,6 @@ fn operational_prose(body: &str) -> bool {
     .any(|signal| lowered.contains(signal))
 }
 
-fn estimate_tokens(text: &str) -> usize {
-    let by_bytes = text.len().div_ceil(4);
-    let by_words = text.split_whitespace().count();
-    by_bytes.max(by_words)
-}
-
-fn percentage(numerator: usize, denominator: usize) -> u8 {
-    if denominator == 0 {
-        return 0;
-    }
-    let value = ((numerator as f64 / denominator as f64) * 100.0).round();
-    u8::try_from(value as usize).unwrap_or(100).min(100)
-}
-
 fn issue(
     id: &str,
     severity: &str,
@@ -1764,62 +1706,218 @@ fn basis() -> Vec<DoctorBasis> {
     vec![
         DoctorBasis {
             id: "reliability_gap_instruction_density".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
             source: "docs/00-skills-reliability-gap.md §3.1".to_owned(),
             claim: "Large, dense activation bodies increase dropped-step risk and later instructions suffer primacy bias.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_metadata_context_pressure".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
             source: "docs/00-skills-reliability-gap.md §3.2".to_owned(),
             claim: "Skill frontmatter metadata and activated bodies consume context; broad surfaces degrade routing and adherence.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_implicit_environment_contract".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
             source: "docs/00-skills-reliability-gap.md §3.3".to_owned(),
             claim: "Scripts and snippets carry dependency contracts whether or not the skill declares them.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_no_execution_guarantees".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
             source: "docs/00-skills-reliability-gap.md §3.5".to_owned(),
             claim: "Prose instructions and embedded snippets are guidance unless moved into checkable or enforced surfaces.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_unfilled_requirement".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
             source: "docs/00-skills-reliability-gap.md §5".to_owned(),
             claim: "Reliable skills need a portable, machine-checkable account of intended behavior, dependencies, and proof.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_activation_adherence_enforcement".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Contract Trace Methodology".to_owned(),
             source: "docs/08-contract-trace-methodology.md §3.1".to_owned(),
             claim: "Activation, adherence, and enforcement are separate gates; static prose mostly influences adherence, not enforcement.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_behavioral_contract".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Contract Trace Methodology".to_owned(),
             source: "docs/08-contract-trace-methodology.md §4.1".to_owned(),
             claim: "A behavioral contract makes steering, dependencies, forbids, and tests statically checkable.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_static_well_formedness".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Contract Trace Methodology".to_owned(),
             source: "docs/08-contract-trace-methodology.md §4.1".to_owned(),
             claim: "Reference closure, reachability, and typed structure are static pre-filters before execution.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_unproven_verdict".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Contract Trace Methodology".to_owned(),
             source: "docs/08-contract-trace-methodology.md §4.3".to_owned(),
             claim: "Missing trace evidence should be reported as unproven, not inferred as success.".to_owned(),
+        },
+        DoctorBasis {
+            id: "claude_skill_frontmatter_discovery".to_owned(),
+            kind: "harness_documentation".to_owned(),
+            citation: "Claude Code skills documentation".to_owned(),
+            source: "https://code.claude.com/docs/en/skills".to_owned(),
+            claim: "Skill frontmatter, especially description and when_to_use, is used for automatic discovery and can be shortened under listing budget pressure.".to_owned(),
+        },
+        DoctorBasis {
+            id: "skilldex_format_conformance".to_owned(),
+            kind: "research_paper".to_owned(),
+            citation: "Skilldex: A Package Manager and Registry for Agent Skill Packages with Hierarchical Scope-Based Distribution".to_owned(),
+            source: "https://arxiv.org/abs/2604.16911".to_owned(),
+            claim: "Skill package tooling can score frontmatter validity and description specificity as static package-quality diagnostics.".to_owned(),
+        },
+        DoctorBasis {
+            id: "skill_metadata_supply_chain".to_owned(),
+            kind: "research_paper".to_owned(),
+            citation: "Under the Hood of SKILL.md: Semantic Supply-chain Attacks on AI Agent Skill Registry".to_owned(),
+            source: "https://arxiv.org/abs/2605.11418".to_owned(),
+            claim: "Natural-language skill metadata and instructions affect which skills are surfaced, selected, and loaded.".to_owned(),
+        },
+        DoctorBasis {
+            id: "ruler_effective_context".to_owned(),
+            kind: "research_paper".to_owned(),
+            citation: "RULER: What's the Real Context Size of Your Long-Context Language Models?".to_owned(),
+            source: "https://arxiv.org/abs/2404.06654".to_owned(),
+            claim: "Reliable usable context can be smaller than advertised context length and varies by task.".to_owned(),
+        },
+        DoctorBasis {
+            id: "tiktoken_token_accounting".to_owned(),
+            kind: "tooling_documentation".to_owned(),
+            citation: "OpenAI tiktoken and token counting guide".to_owned(),
+            source: "https://github.com/openai/tiktoken".to_owned(),
+            claim: "Model/encoding-aware tokenization is the correct measurement surface for token load.".to_owned(),
+        },
+        DoctorBasis {
+            id: "skillsbench_focused_skills".to_owned(),
+            kind: "research_paper".to_owned(),
+            citation: "Can Skills Make AI Agents Competent?".to_owned(),
+            source: "https://arxiv.org/abs/2602.12670".to_owned(),
+            claim: "Focused, checkable skills are a better risk target than broad comprehensive documentation.".to_owned(),
+        },
+        DoctorBasis {
+            id: "skillspec_local_reliability_gap".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Skills Reliability Gap".to_owned(),
+            source: "docs/00-skills-reliability-gap.md".to_owned(),
+            claim: "Large activation bodies, implicit dependencies, mixed code/instructions, missing contracts, and missing proof surfaces create reliability debt.".to_owned(),
+        },
+        DoctorBasis {
+            id: "skillspec_local_contract_trace".to_owned(),
+            kind: "local_methodology".to_owned(),
+            citation: "SkillSpec Contract Trace Methodology".to_owned(),
+            source: "docs/08-contract-trace-methodology.md".to_owned(),
+            claim: "Route choice, forbids, dependencies, tool boundaries, tests, and trace/progress proof are the checkable surfaces that reduce drift.".to_owned(),
         },
     ]
 }
 
-fn next_steps(has_skill_spec: bool, has_deps_toml: bool) -> Vec<String> {
+fn raw_activation_risk(
+    surface: &SurfaceReport,
+    counts: &DoctorCounts,
+    structural_score: u8,
+) -> RawActivationRiskReport {
+    let score = 100u8.saturating_sub(structural_score);
+    let level = RiskLevel::from_score(score);
+    RawActivationRiskReport {
+        score,
+        level,
+        activation_estimated_tokens: surface.activation_estimated_tokens,
+        activation_lines: surface.activation_lines,
+        modal_obligations: counts.modal_obligations,
+        late_modal_obligations: counts.late_modal_obligations,
+        summary: format!(
+            "{} static activation risk before considering structured contract mitigation",
+            level.as_str()
+        ),
+    }
+}
+
+fn contract_mitigation(
+    spec_path: &Path,
+    spec: &SkillSpec,
+    raw_risk_score: u8,
+) -> ContractMitigationReport {
+    let level = contract_mitigation_level(spec);
+    let reduction = match level {
+        ContractMitigationLevel::Strong => 30,
+        ContractMitigationLevel::Partial => 18,
+        ContractMitigationLevel::Weak => 8,
+    };
+    let residual_risk_score = raw_risk_score.saturating_sub(reduction);
+    let residual_risk_level = RiskLevel::from_score(residual_risk_score);
+    ContractMitigationReport {
+        present: true,
+        spec_path: spec_path.display().to_string(),
+        routes: spec.routes.len(),
+        rules: spec.rules.len(),
+        commands: spec.commands.len(),
+        dependencies: spec.dependencies.len(),
+        tests: spec.tests.len(),
+        level,
+        residual_risk_score,
+        residual_risk_level,
+        summary: format!(
+            "Valid skill.spec.yml provides {} contract mitigation; residual risk stays {} until the activated trampoline is thin.",
+            level.as_str(),
+            residual_risk_level.as_str()
+        ),
+    }
+}
+
+fn contract_mitigation_level(spec: &SkillSpec) -> ContractMitigationLevel {
+    let core = usize::from(!spec.routes.is_empty())
+        + usize::from(!spec.rules.is_empty())
+        + usize::from(!spec.commands.is_empty())
+        + usize::from(!spec.dependencies.is_empty())
+        + usize::from(!spec.tests.is_empty());
+    match core {
+        5 => ContractMitigationLevel::Strong,
+        3..=4 => ContractMitigationLevel::Partial,
+        _ => ContractMitigationLevel::Weak,
+    }
+}
+
+fn next_steps(
+    has_valid_skill_spec: bool,
+    has_deps_toml: bool,
+    has_structured_dependencies: bool,
+    raw_activation_score: u8,
+) -> Vec<String> {
     let mut steps = Vec::new();
-    steps.push("Run `skillspec source map <skill> --out <dir>` to inspect exact source handles before conversion.".to_owned());
-    if !has_skill_spec {
+    if has_valid_skill_spec {
+        if raw_activation_score <= 24 {
+            steps.push("Keep the activated SKILL.md trampoline thin and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
+        } else {
+            steps.push("Thin the activated SKILL.md trampoline and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
+        }
+        steps.push("Use `skillspec run-loop <skill.spec.yml> --input '<task>' --trace-dir <dir> --guide agent` instead of loading the full spec or duplicating policy in prose.".to_owned());
+    } else {
+        steps.push("Run `skillspec source map <skill> --out <dir>` to inspect exact source handles before conversion.".to_owned());
         steps.push("Run `skillspec import-skill <skill> --out <skill>/skill.spec.yml --source-map <dir>/source-map.json` and review the scaffold.".to_owned());
     }
-    if !has_deps_toml {
+    if !has_deps_toml && !has_structured_dependencies {
         steps.push("Create or complete `deps.toml`; preserve dependency authority, local status, install risk, and degraded proof impact.".to_owned());
     }
-    steps.push("Promote operational prose into routes, rules, forbids, command templates, scenario tests, and trace/progress proof obligations.".to_owned());
+    if has_valid_skill_spec {
+        steps.push("Keep operational precision in routes, rules, forbids, command templates, tests, progress, and alignment proof, not in the trampoline prose.".to_owned());
+    } else {
+        steps.push("Promote operational prose into routes, rules, forbids, command templates, scenario tests, and trace/progress proof obligations.".to_owned());
+    }
     steps
 }
 
@@ -1831,68 +1929,9 @@ fn trim_trailing_newline(output: &mut String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{remote_from_target, rewrite_remote_error};
+    use super::rewrite_remote_error;
     use crate::error::Error;
     use std::path::Path;
-
-    #[test]
-    fn parses_github_tree_skill_folder_url() {
-        let remote =
-            remote_from_target("https://github.com/anthropics/skills/tree/main/skills/pdf")
-                .unwrap()
-                .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch.as_deref(), Some("main"));
-        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
-    }
-
-    #[test]
-    fn parses_github_owner_repo_path_shorthand() {
-        let remote = remote_from_target("anthropics/skills/skills/pdf")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch, None);
-        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
-    }
-
-    #[test]
-    fn parses_github_repo_root_url() {
-        let remote = remote_from_target("https://github.com/anthropics/skills")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch, None);
-        assert_eq!(remote.path, None);
-    }
-
-    #[test]
-    fn parses_github_tree_repo_root_url() {
-        let remote = remote_from_target("https://github.com/anthropics/skills/tree/main")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch.as_deref(), Some("main"));
-        assert_eq!(remote.path, None);
-    }
-
-    #[test]
-    fn rejects_github_blob_urls_for_remote_doctor() {
-        let error = remote_from_target(
-            "https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md",
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(error.contains("not a blob"));
-    }
-
-    #[test]
-    fn rejects_remote_skill_md_file_shorthand() {
-        let error = remote_from_target("anthropics/skills/skills/pdf/SKILL.md")
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("owner/repo or owner/repo/<skill-folder>"));
-    }
 
     #[test]
     fn rewrites_remote_error_locations() {

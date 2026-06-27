@@ -77,11 +77,15 @@ skillspec act ./skill.spec.yml --input "..." --phase <phase>
 ```
 
 Running each command as a fresh process repeats argument parsing, spec loading,
-validation, and rendering setup. SkillSpec should add a batching command for the
-common planning loop:
+validation, and rendering setup. SkillSpec should use a batching command for the
+common planning loop. The preferred agent-facing form is guided, because it also
+persists resume anchors and prints only the current gate:
 
 ```bash
-skillspec run-loop <skill.spec.yml> --input "<task>" --view summary
+skillspec run-loop <skill.spec.yml> \
+  --input "<task>" \
+  --trace-dir .skillspec/traces \
+  --guide agent
 ```
 
 The command should load the spec once, then emit a compact report with:
@@ -89,7 +93,8 @@ The command should load the spec once, then emit a compact report with:
 - sensemake navigation;
 - decision result;
 - plan;
-- first actionable phase;
+- first actionable phase or current resume gate;
+- guide-state and guide-summary files for compaction recovery;
 - report paths and metrics.
 
 The command is a convenience wrapper, not a new runtime. It must not execute
