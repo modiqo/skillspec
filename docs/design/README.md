@@ -53,6 +53,8 @@ directory listings.
 | 19 | [Workspace Authoring Graph](19-workspace-authoring-graph.md) | How source-shape detection chooses single-skill, multi-skill, plugin-shaped, or revision flow, and how `skillspec workspace map/validate/import/converge/compile/install` handles workspace roots before install. |
 | 20 | [Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md) | How SkillSpec separates wall-clock speed from token economy, then adds spec caching, workspace incremental cache, parallel fanout, batching, and source reuse. |
 | 21 | [One-Shot Porting Workflow](21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated direct-run metric recording for one atomic prose skill without replacing workspace or revision flows. |
+| 22 | [Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md) | How `skillspec doctor` scores static skill risk: frontmatter discovery, activation/context load, obligation position, proof gaps, workspace/package shape, contract mitigation, cited basis registry, and policy-threshold model. |
+| 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
 
 ## Visual Explainers
 
@@ -89,6 +91,7 @@ Every design claim should be grounded in one or more of these sources:
 | One-shot porting | `crates/skillspec-cli/src/features/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args.rs`, `crates/skillspec-cli/src/cli/dispatch.rs`, `docs/design/21-one-shot-porting.md` |
 | Source-map progressive imports | `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
 | Workspace authoring graph | `crates/skillspec-cli/src/features/workspace.rs`, `crates/skillspec-cli/src/features/workspace/`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
+| Doctor agent drift risk | `crates/skillspec-cli/src/features/doctor.rs`, `crates/skillspec-cli/src/features/doctor/`, `crates/skillspec-cli/src/features/source_map.rs`, `crates/skillspec-cli/src/cli/args.rs`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
 | Performance and token economy | `crates/skillspec-cli/src/features/metrics.rs`, `crates/skillspec-cli/src/spec/parser.rs`, `crates/skillspec-cli/src/features/workspace/import.rs`, `docs/design/20-performance-token-speed.md` |
 | Thin loader generation | `crates/skillspec-cli/src/features/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-cli/src/execution/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
