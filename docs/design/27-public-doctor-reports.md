@@ -39,6 +39,12 @@ The public issue form asks for one field:
 Public GitHub skill URL
 ```
 
+Requests are recognized by either the `doctor-report` label or a title that
+starts with `Doctor report:`. The label is still attached by the issue template
+when the repository label exists, but the workflow also accepts the title prefix
+so first-time setup mistakes do not silently skip public requests. The parser
+prefers the issue-form body and falls back to a GitHub URL in the title.
+
 The workflow accepts only normalized `https://github.com/<owner>/<repo>` URLs
 and public GitHub folder URLs under them. It rejects URLs with credentials,
 query strings, fragments, non-GitHub hosts, unsupported owner/repo characters,

@@ -105,7 +105,7 @@ These are repository automation surfaces, not `skillspec` CLI subcommands.
 | Surface | Trigger | Explanation |
 | --- | --- | --- |
 | CI dogfood doctor | Push or pull request quality run | Runs `skillspec doctor skills/skillspec/`, prints the formatted report to the GitHub job summary, and uploads text, HTML, and JSON artifacts. |
-| Doctor report request issue | `Doctor report request` issue form with label `doctor-report` | Validates a public `https://github.com/...` skill URL, rejects private or unreadable repositories with local-run instructions, runs `skillspec doctor` for accepted public targets, comments the formatted report, and uploads HTML/JSON/text artifacts. |
+| Doctor report request issue | `Doctor report request` issue form, `doctor-report` label, or `Doctor report:` title prefix | Validates a public `https://github.com/...` skill URL from the issue body or title, rejects private or unreadable repositories with local-run instructions, runs `skillspec doctor` for accepted public targets, comments the formatted report, and uploads HTML/JSON/text artifacts. |
 
 ## Durable Executor Lifecycle Commands
 

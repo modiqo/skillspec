@@ -6,6 +6,7 @@ on:
       - opened
       - edited
       - reopened
+      - labeled
 
 permissions:
   contents: read
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   doctor-report:
     name: Generate doctor report
-    if: contains(github.event.issue.labels.*.name, 'doctor-report')
+    if: contains(github.event.issue.labels.*.name, 'doctor-report') || startsWith(github.event.issue.title, 'Doctor report:')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -29,13 +30,18 @@ jobs:
         with:
           script: |
             const body = context.payload.issue.body || "";
-            const match = body.match(/### Public GitHub skill URL\s*\n([\s\S]*?)(?=\n### |\n---|$)/);
+            const match =
+              body.match(/### Public GitHub skill URL\s*\n([\s\S]*?)(?=\n### |\n---|$)/) ||
+              body.match(/### Skill repo URL\s*\n([\s\S]*?)(?=\n### |\n---|$)/);
+            const titleMatch = (context.payload.issue.title || "").match(/https:\/\/github\.com\/\S+/);
             const raw = match
               ? match[1]
                   .split(/\r?\n/)
                   .map((line) => line.trim())
                   .filter((line) => line && line !== "_No response_")[0] || ""
-              : "";
+              : titleMatch
+                ? titleMatch[0].replace(/[),.;]+$/, "")
+                : "";
 
             let valid = false;
             let reason = "The issue form did not include a public GitHub skill URL.";
