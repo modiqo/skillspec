@@ -645,6 +645,11 @@ fn run_loop_guide_resume_advances_from_execution_ledger(
 #[test]
 fn port_one_shot_runs_import_qa_compile_and_records_stats() {
     let dir = TempDir::new("port-one-shot");
+    write_file(&dir.path().join(".git/HEAD"), "ref: refs/heads/main\n");
+    write_file(
+        &dir.path().join(".git/config"),
+        "[remote \"origin\"]\n\turl = https://github.com/example/skills.git\n",
+    );
     let source = dir.path().join("source-skill");
     write_file(
         &source.join("SKILL.md"),
@@ -692,6 +697,11 @@ echo ok
     assert!(out.contains("validate: ok"));
     assert!(out.contains("compile: ok"));
     assert!(out.contains("agent_visible_tokens"));
+    assert!(out.contains("detected source git repo"));
+    assert!(out.contains("harness restart"));
+    assert!(out.contains("real agent interaction"));
+    assert!(out.contains("open a PR"));
+    assert!(out.contains("compiled.codex-skill.md"));
     assert!(out_dir.join("skill.spec.yml").is_file());
     assert!(out_dir
         .join(".skillspec/source-map/source-map.json")
@@ -1386,11 +1396,16 @@ description: Use as the durable execution first-hop for tool-backed requests tha
         .is_file());
     let router_skill = fs::read_to_string(root.join("skill-router/SKILL.md")).unwrap();
     assert!(router_skill.contains("skill.spec.yml"));
+    assert!(router_skill.contains("Primary implicit skill-discovery entry point"));
+    assert!(router_skill.contains("primary implicit discovery entry point"));
     assert!(router_skill.contains("explicit-only"));
+    assert!(router_skill.contains("load the selected skill explicitly"));
     assert!(router_skill.contains("durable-executor"));
     assert!(!router_skill.contains("visible discovery surface"));
     let router_spec = fs::read_to_string(root.join("skill-router/skill.spec.yml")).unwrap();
     assert!(router_spec.contains("schema: skillspec/v0"));
+    assert!(router_spec.contains("Primary implicit skill-discovery gateway"));
+    assert!(router_spec.contains("router first-hop"));
     assert!(!router_spec.contains("--router-root"));
     let validate_router_spec = Command::new(bin())
         .arg("validate")
@@ -5204,6 +5219,9 @@ fn compile_targets_render_loader_and_full_markdown() {
         "description: \"Universal CLI/API/shell router with trace and alignment benefits."
     ));
     assert!(loader_out.contains("thin loader"));
+    assert!(loader_out.contains("## SkillSpec CLI Required"));
+    assert!(loader_out.contains("skillspec --version"));
+    assert!(loader_out.contains("cargo install skillspec"));
     assert!(loader_out.contains("## Entry Gate"));
     assert!(loader_out.contains("skillspec act ./skill.spec.yml --input='<user task>'"));
     assert!(loader_out.contains("current-route action checklist"));

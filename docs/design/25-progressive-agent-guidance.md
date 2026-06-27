@@ -227,6 +227,15 @@ The agent sees summary counts, report paths, cache hits, cache misses, and token
 economy estimates. Full manifests, package reports, source maps, generated
 drafts, loaders, install manifests, and proof artifacts stay on disk.
 
+When the source root is a local Git checkout, the final import/install summaries
+can add one more progressive handoff: recommend a pull request back to the
+source skill repository after review, QA, compile, retired-skill install,
+harness restart, and a real agent interaction with the SkillSpec-backed skill.
+The recommendation should name the source repo detected from `.git`, the
+generated contracts and proof artifacts to include, and a suggested branch
+shape. It must remain advisory unless the user explicitly asks the agent to
+create a branch, push, or open a PR.
+
 This is the workspace version of the same product principle:
 
 ```text
@@ -334,4 +343,3 @@ trampoline instruction. Add or reuse a CLI gate that can answer:
 - Where is the full evidence preserved?
 
 If the answer only exists in prose, the workflow is not finished.
-

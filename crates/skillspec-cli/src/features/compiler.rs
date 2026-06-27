@@ -82,11 +82,22 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push('\n');
     write_entry_gate(output, spec);
     output.push_str("This skill is a thin loader for the colocated `skill.spec.yml`. The spec is the source of truth for routes, rules, dependencies, imports, resources, recipes, tests, and trace requirements. Do not treat the spec as background prose; treat it as the execution contract for this task.\n\n");
+    output.push_str("## SkillSpec CLI Required\n\n");
+    output.push_str("This SkillSpec-backed skill depends on the `skillspec` CLI for route selection, phase guidance, dependency checks, progress records, and alignment proof.\n\n");
+    output.push_str("Before task actions, run `skillspec --version`. If the CLI is missing, tell the user this skill requires SkillSpec and ask them to install it or approve installation before continuing:\n\n");
+    output.push_str("```bash\n");
+    output.push_str(
+        "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh\n",
+    );
+    output.push_str("# or, with Rust installed:\n");
+    output.push_str("cargo install skillspec\n");
+    output.push_str("```\n\n");
+    output.push_str("If installation is declined or impossible, read `skill.spec.yml` directly, follow the same contract manually, and report that alignment proof is partial because the CLI was unavailable.\n\n");
     output.push_str("## Runtime Contract\n\n");
     output.push_str(
         "1. Load `./skill.spec.yml` from this skill folder before taking task actions.\n",
     );
-    output.push_str("2. When the `skillspec` CLI is available and the spec shape is unfamiliar, run `skillspec sensemake ./skill.spec.yml --view index` to learn the section roles, counts, query handles, and navigation grammar without dumping the full YAML.\n");
+    output.push_str("2. Run `skillspec sensemake ./skill.spec.yml --view index` when the spec shape is unfamiliar to learn section roles, counts, query handles, and navigation grammar without dumping the full YAML.\n");
     output
         .push_str("3. Then create the ordered phase plan and current-route action checklist:\n\n");
     output.push_str("   ```bash\n");
@@ -104,7 +115,7 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("10. Choose the execution strategy before doing work. Treat route phases as sequential gates. Use parallel or fanout work only inside independent package/read/build/proof units with isolated output paths. Keep dependency ordering, installs, visibility changes, router lifecycle, and approval-boundary work sequential.\n");
     output.push_str("11. Before every substrate/tool call, apply the phase tool boundary and checklist allow/deny questions. Any unlisted tool, data source, execution substrate, provider, adapter, CLI, browser mode, API, or skill requires explicit user permission before use. The selected route and matched rules override lower-level skill defaults and generic tool preferences.\n");
     output.push_str("12. When the CLI is available after a trace exists, run `skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json` and, when structured action evidence exists, add `--execution-trace <run_dir>/execution.jsonl`. The command writes `<run_dir>/alignment.json` and a grouped proof digest; report only the compact alignment summary, token block, digest path, and trace path unless debugging, failure, or user request requires detailed checks.\n");
-    output.push_str("13. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI is unavailable, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
+    output.push_str("13. If `skillspec plan`, `skillspec act`, or `skillspec progress` is unavailable but another `skillspec` decision command works, fall back to `skillspec decide`, then manually construct the same ordered phase checklist and progress notes before using tools. If the CLI itself is unavailable after the user declines or cannot install it, read `skill.spec.yml` directly and apply the same contract manually. Do not expand this loader into a second source of truth.\n\n");
     write_harness_presentation_contract(output);
     write_authoring_contract(output);
     write_durable_handoff_contract(output);

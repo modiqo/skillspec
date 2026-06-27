@@ -8,8 +8,8 @@ use crate::model::{
     TraceConfig, TraceEventKind, TraceMode,
 };
 use crate::{
-    compiler, decision, deps, doctor, grammar, importer, imports, metrics, parser, progress,
-    source_map, workspace,
+    compiler, decision, deps, doctor, git_context, grammar, importer, imports, metrics, parser,
+    progress, source_map, workspace,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -296,6 +296,30 @@ pub fn run(options: PortOneShotOptions) -> Result<PortOneShotReport> {
         "passed"
     };
 
+    let mut next = vec![
+        "review source-map coverage and dependency ledger before semantic promotion".to_owned(),
+        format!(
+            "edit {}, then rerun validate/imports/deps/test/compile",
+            spec_path.display()
+        ),
+    ];
+    if ok {
+        let mut artifacts = vec![
+            spec_path.as_path(),
+            report_path.as_path(),
+            doctor_report_path.as_path(),
+            source_map_path.as_path(),
+        ];
+        if compiled.is_some() {
+            artifacts.push(compiled_path.as_path());
+        }
+        next.extend(git_context::port_pull_request_next_steps(
+            &options.source,
+            &options.out,
+            &artifacts,
+        ));
+    }
+
     Ok(PortOneShotReport {
         ok,
         status: status.to_owned(),
@@ -347,13 +371,7 @@ pub fn run(options: PortOneShotOptions) -> Result<PortOneShotReport> {
             avoided_tokens: 0,
             metrics_source: "estimated".to_owned(),
         }),
-        next: vec![
-            "review source-map coverage and dependency ledger before semantic promotion".to_owned(),
-            format!(
-                "edit {}, then rerun validate/imports/deps/test/compile",
-                spec_path.display()
-            ),
-        ],
+        next,
     })
 }
 

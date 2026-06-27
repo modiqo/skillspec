@@ -617,7 +617,7 @@ routes:
     description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, verify the implicit router surface, and verify routed skills are explicit-only.
+      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, verify the router is the primary implicit discovery entry point after harness restart, and verify routed skills are explicit-only.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -645,7 +645,7 @@ routes:
             - use_removed_router_root
         - id: report_router_mode
           owner_skill: skillspec
-          description: Report which roots were changed, whether the router is implicit, whether routed skills are explicit-only, and whether durable first-hop is unavailable.
+          description: Report which roots were changed, whether the router is the primary implicit discovery entry point after harness restart, whether routed skills are explicit-only, and whether durable first-hop is unavailable.
           requires:
             - verify_router_installed
   - id: update_skill_router
@@ -701,7 +701,7 @@ routes:
             - mutate_unrecorded_router_roots
         - id: switch_router_mode
           owner_skill: skillspec
-          description: Enable rebuilds the index from current roots and makes routed skills explicit-only; disable makes router explicit-only and restores routed skills to implicit/default visibility.
+          description: Enable rebuilds the index from current roots, makes the router the primary implicit discovery entry point after harness restart, and makes routed skills explicit-only; disable makes router explicit-only and restores routed skills to implicit/default visibility.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -2623,7 +2623,7 @@ commands:
       dependencies:
         - rote_cli
   router_install:
-    description: Install or refresh router mode in the selected skill roots, making router implicit and routed skills explicit-only.
+    description: Install or refresh router mode in the selected skill roots, making the router the primary implicit discovery entry point after harness restart and routed skills explicit-only.
     template: skillspec router install --roots <skill-roots> --index <router-index>
     safety: local_write
     requires:
@@ -3001,6 +3001,15 @@ recipes:
       - run_command: decide_demo
       - run_command: trace_align
       - run_command: value_report
+      - note: >-
+          If the source folder is inside a Git checkout, use the port report's
+          detected repo guidance or inspect the local .git metadata to recommend
+          a pull request after semantic review, QA, compile, local install,
+          harness restart, and a real agent interaction with the
+          SkillSpec-backed skill. The PR should include the baseline Doctor
+          report, reviewed skill.spec.yml, compiled SKILL.md loader, deps.toml,
+          preserved source material, and alignment/value report. Do not create
+          branches, push, or open a PR unless the user explicitly asks.
   remote_porting_loop:
     description: Stage a public remote source and continue through the local porting loop.
     ordered: true
@@ -3043,6 +3052,14 @@ recipes:
       - ask: approve_retire_existing_skill
       - note: If the user chooses `install_new_name`, use `install_skill_new_name` with an explicit non-conflicting name instead of `install_skill`.
       - run_command: install_skill
+      - note: >-
+          After the retired replacement has been installed locally, restart the
+          target harness and interact with the new SkillSpec-backed skill
+          through the agent on a representative task before recommending
+          publication back to the source skill repository through a pull
+          request. Include install/retirement behavior and alignment proof in
+          the PR notes. Do not push or open the PR unless the user explicitly
+          asks.
   router_install_loop:
     description: Post-install router setup through the prompt skill.
     ordered: true
@@ -3056,6 +3073,7 @@ recipes:
       - run_command: router_install
       - run_command: verify_router_install
       - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
+      - note: Report that the router guarantee applies after harness restart and only inside managed roots; stale sessions or unmanaged roots can still bypass it.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.
@@ -3078,7 +3096,7 @@ recipes:
       - run_command: router_help
       - run_command: router_enable_or_disable
       - run_command: verify_router_install
-      - note: For enable, report index rebuild and preparedness. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
+      - note: For enable, report index rebuild, preparedness, and that the router becomes the primary implicit discovery entry point after harness restart. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
       - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
   status_inspection_loop:
     description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.

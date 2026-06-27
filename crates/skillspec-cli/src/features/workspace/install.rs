@@ -3,6 +3,7 @@ use super::{
     validate_workspace, write_text, WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
 };
 use crate::error::{Error, Result};
+use crate::git_context;
 use crate::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
 use crate::router::Visibility;
 use crate::visibility;
@@ -756,6 +757,8 @@ fn install_report(
             context.dry_run,
             context.visibility_policy,
             context.apply_visibility,
+            &context.manifest.source_root,
+            context.build_root,
         ),
     }
 }
@@ -764,6 +767,8 @@ fn install_next_steps(
     dry_run: bool,
     visibility_policy: WorkspaceVisibilityPolicy,
     apply_visibility: bool,
+    source_root: &str,
+    build_root: &Path,
 ) -> Vec<String> {
     if dry_run {
         return vec![
@@ -787,6 +792,10 @@ fn install_next_steps(
         }
     }
     next.push("refresh router indexes separately if this harness uses router mode".to_owned());
+    next.extend(git_context::workspace_pull_request_next_steps(
+        Path::new(source_root),
+        build_root,
+    ));
     next
 }
 

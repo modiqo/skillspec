@@ -17,14 +17,19 @@ pub(super) fn render_router_spec(router_name: &str, index: &Path) -> String {
         r#"schema: skillspec/v0
 id: skill.router
 title: Skill Router
-description: Route user requests to the best local skill from a large indexed library and manage native visibility controls for Codex and Claude. The installed SKILL.md is only the native loader; this SkillSpec is the router contract.
+description: Primary implicit skill-discovery gateway for a SkillSpec-indexed local skill library. Route user requests to the best installed skill, keep routed skills out of native implicit competition, and manage Codex and Claude visibility controls. The installed SKILL.md is only the native loader; this SkillSpec is the router contract.
 
 activation:
-  summary: Use for skill discovery, large skill catalogs, shortened skill descriptions, router install/uninstall, index refresh/status, and Codex or Claude implicit invocation controls.
+  summary: Use first for local skill discovery when router mode is enabled, especially for large skill catalogs, shortened skill descriptions, router install/uninstall, index refresh/status, and Codex or Claude implicit invocation controls.
   keywords:
+    - primary skill discovery
+    - primary implicit router
     - skill router
     - route to a skill
     - choose the right skill
+    - choose from installed skills
+    - select local skill
+    - find matching skill
     - many skills installed
     - skill descriptions shortened
     - install router
@@ -43,6 +48,8 @@ activation:
 
 applies_when:
   - user_intent:
+      - route any request that may be handled by an installed local skill
+      - choose the correct skill before loading skill-specific instructions
       - select a skill from a large local skill library
       - route a request to the best SkillSpec or SKILL.md package
       - reduce native skill discovery context pressure
@@ -53,7 +60,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: Load this SkillSpec, route from the local index, then load only the selected skill or ask for direct versus durable execution.
+  prompt: If selected implicitly, treat this as the router first-hop for managed skill roots. Load this SkillSpec, route from the local index, then load only the selected skill or ask for direct versus durable execution.
   decision_required: true
   tool_boundary:
     default: deny
@@ -107,7 +114,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, enable, disable, update, uninstall, index refresh, or index status commands. Enable makes the router implicit, makes routed skills explicit-only, rebuilds the index, and checks preparedness. Disable makes the router explicit-only and restores routed skills to implicit/default without deleting router files.
+          description: Run router install, enable, disable, update, uninstall, index refresh, or index status commands. Enable makes the router the primary implicit discovery entry point after harness restart, makes routed skills explicit-only, rebuilds the index, and checks preparedness. Disable makes the router explicit-only and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change

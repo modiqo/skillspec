@@ -64,8 +64,9 @@ directory paths resolve to `skill-index.sqlite`.
 
 Router mode is the managed state created by `skillspec router install`:
 
-- when enabled, the generated `skill-router` skill is implicit and directly
-  invocable;
+- after install/enable and harness restart, the generated `skill-router` skill
+  is the primary implicit skill-discovery entry point for managed roots and is
+  directly invocable;
 - when enabled, indexed routed skills are made explicit-only/manual-only unless
   they are already `off`;
 - `durable-executor` is implicit only when it is present in the managed roots
@@ -83,6 +84,14 @@ Router install does not install or copy `durable-executor`. If
 enabled, router mode preserves it as the implicit first-hop. If it is missing,
 router install still succeeds and reports that durable first-hop execution is
 unavailable until durable-executor is installed separately.
+
+The router guarantee is visibility-backed, not prose-only. Within configured
+roots, router install/enable writes native metadata so the router remains
+implicit while routed skills stop competing for implicit selection. A harness
+restart is required before active sessions reliably observe those metadata
+changes. Skills outside the managed roots, stale harness sessions, or
+harness-specific selection bugs are outside the guarantee; `skillspec status`
+and `skillspec router index status` are the verification gates.
 
 `durable-executor` has its own managed lifecycle. `skillspec durable-executor
 install <source-folder>` first checks that `rote` is available on `PATH`, then
@@ -247,7 +256,7 @@ Normal routing:
 
 ```text
 user task
--> durable-executor implicit first-hop, or explicit skill-router invocation
+-> implicit skill-router first-hop after router install/enable and harness restart
 -> skillspec route
 -> selected domain skill
 -> normal execution when direct mode is selected

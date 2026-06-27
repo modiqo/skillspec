@@ -234,6 +234,17 @@ under `.skillspec/`. When a trace run is supplied with `--run-dir`, it also
 records estimated direct-run token metrics so alignment does not report token
 usage as missing.
 
+If the source folder is inside a local Git checkout, a successful
+`port-one-shot` report also prints pull-request guidance. That guidance is
+advisory: review the generated contract, run QA, compile, install locally, and
+restart the target harness. Then interact with the new SkillSpec-backed skill
+through the agent on a real representative task before proposing the PR. After
+that, copy or commit the reviewed `skill.spec.yml`, compiled `SKILL.md` loader,
+dependency ledger, preserved source material, Doctor report, and
+alignment/value proof back to the source skill repository. SkillSpec never
+creates a branch, pushes, or opens a PR unless the user explicitly asks for
+that Git operation.
+
 The command does not auto-fill behavior. After the scaffold, the agent should
 make one guided promotion pass: choose source-backed activation/routes, promote
 only evidenced rules/dependencies/recipes/tests, fill coverage rows for open
@@ -309,7 +320,12 @@ reused from `<build-root>/.skillspec/workspace-cache.json` when source hashes an
 proof artifacts still match.
 `workspace converge` verifies those drafts before compile. `workspace compile`
 writes harness-ready loaders. `workspace install` preflights every write,
-blocks collisions, and can apply the workspace visibility policy.
+blocks collisions, and can apply the workspace visibility policy. After an
+actual workspace install, if the original source root is inside a local Git
+checkout, the install summary recommends a PR handoff with the reviewed package
+contracts, compiled loaders, dependency ledgers, workspace reports, and proof
+artifacts after restarting the harness and interacting with the installed
+SkillSpec-backed skills through the agent.
 
 Use `--summary` for harness-friendly output with wall-clock and estimated token
 metrics, including cache hits and misses where applicable. The detailed reports,
@@ -735,6 +751,14 @@ loader points the agent at the colocated `skill.spec.yml`, tells it to run
 `skillspec plan ... --trace-dir`, `skillspec act ...`, preserve the emitted
 `run_dir`, record phase progress, and follow the spec. This keeps `SKILL.md`
 small and prevents it from becoming a second source of truth.
+
+The compiled loader also tells the agent to verify `skillspec --version` before
+task actions. If the CLI is missing, the loader explains how to install
+SkillSpec with the public install script or `cargo install skillspec`, because a
+SkillSpec-backed skill depends on the CLI for route selection, phase guidance,
+dependency checks, progress records, and alignment proof. If installation is
+declined or impossible, the loader falls back to direct `skill.spec.yml` reading
+and requires the final report to mark alignment proof as partial.
 
 Use the Markdown target when you want a full human-readable rendering of the
 contract. `--target markdown` includes routes, rules, dependencies, imports,
