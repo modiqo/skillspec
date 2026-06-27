@@ -386,10 +386,11 @@ routes:
           owner_skill: skillspec
           requires:
             - stage_remote_folder
-            - find_skill_candidates
           forbid:
             - install_from_remote_checkout
             - execute_imported_snippets_during_staging
+            - web_search_for_remote_source
+            - fetch_raw_github_skill_md_for_import
         - id: continue_as_local_port
           owner_skill: skillspec
           route: local_skill_port
@@ -1259,6 +1260,8 @@ rules:
     forbid:
       - install_from_remote_checkout
       - execute_imported_snippets_during_staging
+      - web_search_for_remote_source
+      - fetch_raw_github_skill_md_for_import
     reason: Remote inputs must be staged locally before import and install.
   - id: route_source_shape_questions_to_doctor
     when:
@@ -2411,14 +2414,15 @@ commands:
     template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
     safety: local_write
   stage_remote_folder:
-    description: Stage a public GitHub repository path locally with sparse checkout when possible.
-    template: git clone --depth 1 --filter=blob:none --sparse <repo-url> <tmp-root>/<repo-name>
+    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser; use the returned selected_source_path or candidates.source_path for doctor, source map, import-skill, workspace map, or port-one-shot. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
+    template: skillspec source stage <github-skill-uri> --out <staging-root> --json
     safety: network_read
     requires:
       dependencies:
+        - skillspec_cli
         - git_cli
   find_skill_candidates:
-    description: Find candidate SKILL.md files inside a staged repository when the user supplied only a repo.
+    description: Fallback only when source stage was run with candidate detection disabled or a staged local checkout already exists; otherwise use candidates returned by skillspec source stage.
     template: rg --files <staged-repo> | rg '/SKILL\\.md$'
     safety: local_read
     requires:
@@ -3008,9 +3012,9 @@ recipes:
     steps:
       - ask: approve_remote_source_access
       - run_command: stage_remote_folder
-      - run_command: find_skill_candidates
+      - note: If source stage returns selected_source_path, use that local folder as the source and do not run additional remote discovery. If it returns multiple candidates, ask choose_candidate_skill using candidates.source_path. If it returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
       - ask: choose_candidate_skill
-      - note: If there is exactly one candidate, use it as the default local source; otherwise honor the selected candidate.
+      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the authoritative URI-to-local-source gate.
       - branch:
           if: candidate selected or exactly one candidate exists
           then: local_porting_loop
@@ -3676,6 +3680,8 @@ tests:
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
   - name: prompt skill is named skillspec
     input: /skillspec import /Users/me/.agents/skills/durable-executor
     expect:
@@ -3869,6 +3875,8 @@ tests:
       forbid:
         - install_from_remote_checkout
         - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
         - consult_existing_ports_without_user_request
         - drop_imported_dependency_mentions
         - work_around_missing_dependency_without_waiver
@@ -3891,6 +3899,8 @@ tests:
         - show_dependency_surface
         - report_dependency_waiver
       forbid:
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
         - drop_imported_dependency_mentions
         - mutate_dependency_set_to_pass_qa
         - work_around_missing_dependency_without_waiver
@@ -4010,6 +4020,7 @@ tests:
 review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
+  - Remote import/port requests must use `skillspec source stage <uri> --json` before doctor, source map, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after the staging command fails and the user approves.
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an explicit local durable-executor source folder, and remote sources must be staged before lifecycle install.
   - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.

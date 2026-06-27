@@ -348,15 +348,19 @@ CURRENT GATE
 
 DO NOW
 - confirm remote source access or report that approval is missing
-- if approved, run doctor before import
+- if approved, run `skillspec source stage <uri> --json`
+- use `selected_source_path` or a chosen `candidates[].source_path` for doctor,
+  source map, and import
 
 DO NOT
 - do not install from the remote checkout
 - do not execute imported snippets
+- do not search the web or fetch raw GitHub files to locate the same URI
 - do not import before source shape is classified
 
 NEXT COMMANDS
-- skillspec doctor <source> --json
+- skillspec source stage <uri> --out <staging-root> --json
+- skillspec doctor <selected_source_path> --json
 - skillspec progress record <run_dir> requirement-satisfied approve_remote_source approve_remote_source_access --evidence-kind user_approval --evidence-ref <ref>
 
 LOAD MORE ONLY IF NEEDED
@@ -532,11 +536,13 @@ Proposed schema:
     "phase": "approve_remote_source",
     "description": "Approve read-only access before staging a remote source.",
     "do_now": [
-      "Confirm source access or report that approval is missing."
+      "Confirm source access or report that approval is missing.",
+      "If approved, stage the URI with skillspec source stage and continue from the returned local source path."
     ],
     "do_not": [
       "Do not install from remote checkout.",
-      "Do not execute imported snippets."
+      "Do not execute imported snippets.",
+      "Do not search the web or fetch raw GitHub files to locate the same URI."
     ],
     "allowed_commands": [
       "skillspec doctor <source> --json"

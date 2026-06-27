@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::remote_source::{self, RemoteSkillSource};
 use crate::source_map::{
     self, SourceClassificationKind, SourceFileKind, SourceFileLoadStatus, SourceMap,
     SourceReferenceKind,
@@ -14,8 +15,6 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 use types::{
     AgentDriftRiskReport, ContractMitigationLevel, ContractMitigationReport,
     DoctorPackageRiskReport, FrontmatterDiscoveryRiskReport, RawActivationRiskReport, RiskLevel,
@@ -133,24 +132,6 @@ struct SkillBody {
     body_start_line: usize,
 }
 
-#[derive(Debug)]
-struct RemoteSkillSource {
-    repo_url: String,
-    branch: Option<String>,
-    path: Option<String>,
-}
-
-struct StagedRemote {
-    root: PathBuf,
-    checkout_dir: PathBuf,
-}
-
-impl Drop for StagedRemote {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
-
 pub fn inspect_target(target: &str) -> Result<DoctorReport> {
     let target_path = Path::new(target);
     if target_path.exists() {
@@ -159,19 +140,19 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
         return Ok(report);
     }
 
-    let Some(remote) = remote_from_target(target)? else {
+    let Some(remote) = remote_source::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
                 "doctor target {target:?} does not exist locally; remote doctor supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
             ),
         });
     };
-    let staged = clone_remote(&remote)?;
-    let mut report = match inspect_staged_remote(target, &remote, &staged.checkout_dir) {
+    let staged = remote_source::clone_remote_temp(&remote, "skillspec-doctor")?;
+    let mut report = match inspect_staged_remote(target, &remote, staged.checkout_dir()) {
         Ok(report) => report,
-        Err(error) => return Err(rewrite_remote_error(error, &staged.checkout_dir, target)),
+        Err(error) => return Err(rewrite_remote_error(error, staged.checkout_dir(), target)),
     };
-    rewrite_remote_locations(&mut report, &staged.checkout_dir, target);
+    rewrite_remote_locations(&mut report, staged.checkout_dir(), target);
     report.target = target.to_owned();
     report.source_kind = "remote_github".to_owned();
     report.staged_from = Some(remote.repo_url);
@@ -601,7 +582,7 @@ fn inspect_staged_remote(
     checkout_dir: &Path,
 ) -> Result<DoctorReport> {
     if let Some(path) = &remote.path {
-        set_sparse_path(checkout_dir, path)?;
+        remote_source::set_sparse_path(checkout_dir, path)?;
         let scope_path = checkout_dir.join(path);
         if !scope_path.exists() {
             return Err(Error::InvalidInput {
@@ -614,12 +595,12 @@ fn inspect_staged_remote(
         return inspect_local_target(&scope_path);
     }
 
-    let tree_files = git_tree_files(checkout_dir)?;
+    let tree_files = remote_source::git_tree_files(checkout_dir)?;
     let root_skill_content = if tree_files
         .iter()
         .any(|path| path.to_string_lossy().eq_ignore_ascii_case("SKILL.md"))
     {
-        git_show_text(checkout_dir, "SKILL.md").ok()
+        remote_source::git_show_text(checkout_dir, "SKILL.md").ok()
     } else {
         None
     };
@@ -651,7 +632,7 @@ fn inspect_staged_remote(
         .map(path_to_slash)
         .filter(|path| !path.is_empty())
         .unwrap_or_else(|| ".".to_owned());
-    set_sparse_path(checkout_dir, &package_path)?;
+    remote_source::set_sparse_path(checkout_dir, &package_path)?;
     let scope_path = if package_path == "." {
         checkout_dir.to_path_buf()
     } else {
@@ -1412,121 +1393,6 @@ fn display_list(items: &[String]) -> String {
     }
 }
 
-fn remote_from_target(target: &str) -> Result<Option<RemoteSkillSource>> {
-    let trimmed = target.trim();
-    if let Some(path) = trimmed.strip_prefix("git@github.com:") {
-        let path = path.trim_end_matches(".git");
-        let parts = path
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<_>>();
-        if parts.len() < 2 {
-            return Err(Error::InvalidInput {
-                message: "remote doctor SSH shorthand requires git@github.com:<owner>/<repo>.git"
-                    .to_owned(),
-            });
-        }
-        return Ok(Some(RemoteSkillSource {
-            repo_url: format!("https://github.com/{}/{}.git", parts[0], parts[1]),
-            branch: None,
-            path: (parts.len() > 2).then(|| parts[2..].join("/")),
-        }));
-    }
-    let without_scheme = trimmed
-        .strip_prefix("https://")
-        .or_else(|| trimmed.strip_prefix("http://"))
-        .unwrap_or(trimmed);
-    let github_path = without_scheme
-        .strip_prefix("github.com/")
-        .or_else(|| trimmed.strip_prefix("github:"));
-    let Some(github_path) = github_path else {
-        if looks_like_github_shorthand(trimmed) {
-            return github_shorthand(trimmed).map(Some);
-        }
-        return Ok(None);
-    };
-    let parts = github_path
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    if parts.len() < 2 {
-        return Err(Error::InvalidInput {
-            message: "remote doctor requires a GitHub owner/repo target".to_owned(),
-        });
-    }
-    let owner = parts[0];
-    let repo = parts[1].trim_end_matches(".git");
-    if parts.get(2) == Some(&"blob") {
-        return Err(Error::InvalidInput {
-            message: "remote doctor expects a skill folder URL, not a blob/SKILL.md URL".to_owned(),
-        });
-    }
-    let (branch, path_parts) = if parts.get(2) == Some(&"tree") {
-        if parts.len() < 4 {
-            return Err(Error::InvalidInput {
-                message: "GitHub tree URL must include a branch".to_owned(),
-            });
-        }
-        (Some(parts[3].to_owned()), &parts[4..])
-    } else {
-        (None, parts.get(2..).unwrap_or(&[]))
-    };
-    let path = path_parts.join("/");
-    if is_skill_file_path(&path) {
-        return Err(Error::InvalidInput {
-            message: "remote doctor expects a skill folder or repo URL, not a SKILL.md blob"
-                .to_owned(),
-        });
-    }
-    Ok(Some(RemoteSkillSource {
-        repo_url: format!("https://github.com/{owner}/{repo}.git"),
-        branch,
-        path: (!path.is_empty()).then_some(path),
-    }))
-}
-
-fn looks_like_github_shorthand(target: &str) -> bool {
-    let parts = target
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    parts.len() >= 2
-        && !target.starts_with('/')
-        && !target.starts_with('.')
-        && !target.contains("://")
-        && parts[0]
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-        && parts[1]
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
-}
-
-fn github_shorthand(target: &str) -> Result<RemoteSkillSource> {
-    let parts = target
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    let path = parts.get(2..).unwrap_or(&[]).join("/");
-    if is_skill_file_path(&path) {
-        return Err(Error::InvalidInput {
-            message: "remote doctor shorthand expects owner/repo or owner/repo/<skill-folder>"
-                .to_owned(),
-        });
-    }
-    Ok(RemoteSkillSource {
-        repo_url: format!("https://github.com/{}/{}.git", parts[0], parts[1]),
-        branch: None,
-        path: (!path.is_empty()).then_some(path),
-    })
-}
-
-fn is_skill_file_path(path: &str) -> bool {
-    path.rsplit('/')
-        .next()
-        .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
-}
-
 fn rewrite_remote_locations(report: &mut DoctorReport, staged_skill_path: &Path, target: &str) {
     let Some(prefix) = staged_skill_path.to_str() else {
         return;
@@ -1559,124 +1425,6 @@ fn rewrite_remote_error(error: Error, staged_skill_path: &Path, target: &str) ->
     Error::InvalidInput {
         message: message.replace(prefix, target.trim_end_matches('/')),
     }
-}
-
-fn clone_remote(remote: &RemoteSkillSource) -> Result<StagedRemote> {
-    let root = std::env::temp_dir().join(format!(
-        "skillspec-doctor-{}-{}",
-        std::process::id(),
-        unique_nanos()
-    ));
-    let clone_dir = root.join("repo");
-    fs::create_dir_all(&root).map_err(|source| Error::Write {
-        path: root.clone(),
-        source,
-    })?;
-
-    let mut clone = Command::new("git");
-    clone
-        .arg("clone")
-        .arg("--depth")
-        .arg("1")
-        .arg("--filter=blob:none")
-        .arg("--sparse");
-    if let Some(branch) = &remote.branch {
-        clone.arg("--branch").arg(branch);
-    }
-    clone.arg(&remote.repo_url).arg(&clone_dir);
-    run_git(clone, "clone remote skill repository")?;
-    Ok(StagedRemote {
-        root,
-        checkout_dir: clone_dir,
-    })
-}
-
-fn set_sparse_path(checkout_dir: &Path, path: &str) -> Result<()> {
-    let mut sparse = Command::new("git");
-    sparse
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("sparse-checkout")
-        .arg("set")
-        .arg(path);
-    run_git(sparse, "sparse-checkout remote doctor target")
-}
-
-fn git_tree_files(checkout_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut command = Command::new("git");
-    command
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("ls-tree")
-        .arg("-r")
-        .arg("--name-only")
-        .arg("HEAD");
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to list remote repository tree: {source}"),
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr)
-            .lines()
-            .take(8)
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(Error::InvalidInput {
-            message: format!("git failed to list remote repository tree: {stderr}"),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(PathBuf::from)
-        .collect())
-}
-
-fn git_show_text(checkout_dir: &Path, path: &str) -> Result<String> {
-    let mut command = Command::new("git");
-    command
-        .arg("-C")
-        .arg(checkout_dir)
-        .arg("show")
-        .arg(format!("HEAD:{path}"));
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to read remote repository file {path}: {source}"),
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr)
-            .lines()
-            .take(8)
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(Error::InvalidInput {
-            message: format!("git failed to read remote repository file {path}: {stderr}"),
-        });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
-fn run_git(mut command: Command, action: &str) -> Result<()> {
-    let output = command.output().map_err(|source| Error::InvalidInput {
-        message: format!("failed to run git for {action}: {source}"),
-    })?;
-    if output.status.success() {
-        return Ok(());
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr)
-        .lines()
-        .take(8)
-        .collect::<Vec<_>>()
-        .join("\n");
-    Err(Error::InvalidInput {
-        message: format!("git failed to {action}: {stderr}"),
-    })
-}
-
-fn unique_nanos() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0)
 }
 
 fn load_skill_body(map: &SourceMap, source_root: &Path) -> Result<SkillBody> {
@@ -2181,68 +1929,9 @@ fn trim_trailing_newline(output: &mut String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{remote_from_target, rewrite_remote_error};
+    use super::rewrite_remote_error;
     use crate::error::Error;
     use std::path::Path;
-
-    #[test]
-    fn parses_github_tree_skill_folder_url() {
-        let remote =
-            remote_from_target("https://github.com/anthropics/skills/tree/main/skills/pdf")
-                .unwrap()
-                .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch.as_deref(), Some("main"));
-        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
-    }
-
-    #[test]
-    fn parses_github_owner_repo_path_shorthand() {
-        let remote = remote_from_target("anthropics/skills/skills/pdf")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch, None);
-        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
-    }
-
-    #[test]
-    fn parses_github_repo_root_url() {
-        let remote = remote_from_target("https://github.com/anthropics/skills")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch, None);
-        assert_eq!(remote.path, None);
-    }
-
-    #[test]
-    fn parses_github_tree_repo_root_url() {
-        let remote = remote_from_target("https://github.com/anthropics/skills/tree/main")
-            .unwrap()
-            .unwrap();
-        assert_eq!(remote.repo_url, "https://github.com/anthropics/skills.git");
-        assert_eq!(remote.branch.as_deref(), Some("main"));
-        assert_eq!(remote.path, None);
-    }
-
-    #[test]
-    fn rejects_github_blob_urls_for_remote_doctor() {
-        let error = remote_from_target(
-            "https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md",
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(error.contains("not a blob"));
-    }
-
-    #[test]
-    fn rejects_remote_skill_md_file_shorthand() {
-        let error = remote_from_target("anthropics/skills/skills/pdf/SKILL.md")
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("owner/repo or owner/repo/<skill-folder>"));
-    }
 
     #[test]
     fn rewrites_remote_error_locations() {

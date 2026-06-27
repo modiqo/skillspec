@@ -5,9 +5,9 @@ use super::args::{
 };
 use skillspec::{
     act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
-    guide, importer, imports, install, model, parser, port_one_shot, progress, report, router,
-    router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility, workspace,
-    workspace_synthesizer,
+    guide, importer, imports, install, model, parser, port_one_shot, progress, remote_source,
+    report, router, router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility,
+    workspace, workspace_synthesizer,
 };
 use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
@@ -222,6 +222,23 @@ pub(super) fn run(command: Command) -> Result<()> {
             }
         }
         Command::Source { command } => match command {
+            SourceCommand::Stage {
+                uri,
+                out,
+                no_detect_candidates,
+                json,
+            } => {
+                let stage_report = remote_source::stage_remote_source(
+                    &uri,
+                    out.as_deref(),
+                    !no_detect_candidates,
+                )?;
+                if json {
+                    report::json(&stage_report)?;
+                } else {
+                    report::text(&remote_source::render_stage_report(&stage_report))?;
+                }
+            }
             SourceCommand::Map { path, out, json } => {
                 let report = source_map::create_source_map(&path, &out)?;
                 if json {

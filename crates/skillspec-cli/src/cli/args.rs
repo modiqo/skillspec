@@ -8,6 +8,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(name = "skillspec")]
 #[command(about = "Structured skills for agent behavior")]
+#[command(version)]
 pub(super) struct Cli {
     #[command(subcommand)]
     pub(super) command: Command,
@@ -399,6 +400,23 @@ pub(super) enum RouterExecutionModeArg {
 
 #[derive(Debug, Subcommand)]
 pub(super) enum SourceCommand {
+    #[command(
+        about = "Stage a public GitHub skill URI locally before doctor, source map, or import",
+        long_about = "Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, source map, import-skill, workspace map, or port-one-shot. Use this for import/port prompts that contain a URI; do not use web search or raw GitHub fallback to locate the same source."
+    )]
+    Stage {
+        /// Public GitHub repo URI, tree URI, owner/repo shorthand, or owner/repo/path shorthand.
+        uri: String,
+        /// Output directory to create for the persistent sparse checkout. Defaults to .skillspec/staged/<repo>-<timestamp>.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Skip candidate discovery for repo-root targets.
+        #[arg(long)]
+        no_detect_candidates: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(
         about = "Create source-map.json and source-map.md from a SKILL.md file or skill folder"
     )]

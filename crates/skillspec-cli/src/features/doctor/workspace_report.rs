@@ -3,11 +3,12 @@ use super::types::{
     RiskLevel, WorkspaceAgentDriftRiskReport,
 };
 use super::{
-    basis, display_list, frontmatter, git_show_text, issue, metrics, path_to_slash, shape_root,
-    slugify, with_location, DoctorIssue, DoctorReport, DoctorShapeReport, Error, Result,
+    basis, display_list, frontmatter, issue, metrics, path_to_slash, shape_root, slugify,
+    with_location, DoctorIssue, DoctorReport, DoctorShapeReport, Error, Result,
     ShapeClassification, SurfaceReport, LARGE_BODY_LINES, LARGE_BODY_TOKENS,
 };
 use super::{risk, severity_rank};
+use crate::remote_source;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,7 +43,10 @@ pub(super) fn inspect_remote_target(
 ) -> Result<DoctorReport> {
     let mut skill_texts = Vec::new();
     for skill_file in &classification.shape.skill_files {
-        skill_texts.push((skill_file.clone(), git_show_text(checkout_dir, skill_file)?));
+        skill_texts.push((
+            skill_file.clone(),
+            remote_source::git_show_text(checkout_dir, skill_file)?,
+        ));
     }
     Ok(report_from_skill_texts(
         target,

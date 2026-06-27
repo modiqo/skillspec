@@ -27,6 +27,10 @@ That works for small files, but it is brittle for real skills:
 For imports, the expected flow is:
 
 ```bash
+# URI sources only:
+skillspec source stage <github-skill-uri> --out <staging-root> --json
+
+# Local source path or selected_source_path from source stage:
 skillspec source map <source-skill> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
@@ -35,6 +39,12 @@ skillspec source query <draft>/.skillspec/source-map/source-map.json code --view
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>
 skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
+
+For URI imports, `source stage` is the authoritative URI-to-local-source gate.
+Agents should use its `selected_source_path` when there is one candidate, or ask
+the user to choose from `candidates[].source_path`. Web search, raw GitHub
+fetches, and ad hoc sparse-checkout probing are troubleshooting paths only after
+`source stage` fails and the user approves.
 
 Agents should query exact handles with `--view full` when they need the source
 span for a heading, code block, dependency mention, local reference, or modal

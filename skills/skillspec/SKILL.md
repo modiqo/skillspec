@@ -21,7 +21,8 @@ Use `skillspec query` and `skillspec refs` only for handles named by the guide.
 Do not read the full spec unless the guide, a blocker, or the user asks for it.
 
 Before the final response, follow the guide's end anchor: record final-response
-evidence, run compact alignment, and report result, evidence, alignment summary,
+evidence, run the printed `skillspec trace align ... --summary` command as the
+completion summary source, and report result, evidence, alignment summary,
 token usage, selected route, and run directory.
 
 If the CLI guide is unavailable, read `skill.spec.yml` directly and manually

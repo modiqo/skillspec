@@ -122,13 +122,23 @@ Examples:
 
 The `skillspec` prompt skill does the careful path:
 
-1. Stages remote sources locally.
+1. Stages remote sources locally with `skillspec source stage <uri> --json`,
+   then uses the returned `selected_source_path` or selected
+   `candidates[].source_path`.
 2. Reads the skill folder, not just `SKILL.md`.
 3. Runs the deterministic importer.
 4. Promotes imports, resources, code snippets, artifacts, recipes,
    dependencies, rules, and tests into a reviewed `skill.spec.yml`.
 5. Validates and tests the spec.
 6. Optionally compiles and installs a generated harness skill.
+
+For direct CLI use, stage a URI before importing:
+
+```text
+skillspec source stage https://github.com/anthropics/skills/tree/main/skills/pdf --out ./.skillspec/staged/pdf --json
+skillspec source map ./.skillspec/staged/pdf/repo/skills/pdf --out ./draft/.skillspec/source-map
+skillspec import-skill ./.skillspec/staged/pdf/repo/skills/pdf --out ./draft/skill.spec.yml --source-map ./draft/.skillspec/source-map/source-map.json
+```
 
 Router install stays in the selected roots. It applies explicit-only native
 controls across managed roots, writes the routing index, and runs a status check

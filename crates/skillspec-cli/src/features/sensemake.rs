@@ -109,13 +109,13 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap shape gate; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
+            "for source diagnostics, run doctor before import as a cheap shape gate; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
                 .to_owned(),
         );
     }
     if has_source_import(spec) {
         items.push(
-            "for one atomic prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for URI imports, first run source stage and use the returned selected_source_path/candidates; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
@@ -531,6 +531,11 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     }
     if has_source_import(spec) {
         hints.extend([
+            NavigationHint {
+                intent: "stage remote source URI before import",
+                command: "skillspec source stage <github-skill-uri> --out <staging-root> --json"
+                    .to_owned(),
+            },
             NavigationHint {
                 intent: "diagnose source shape and prose reliability debt",
                 command: "skillspec doctor <source-skill-folder-or-repo-uri> --json".to_owned(),

@@ -735,6 +735,10 @@ fn help_lists_trace_align_arguments() {
     assert!(stdout(&top).contains("durable-executor"));
     assert!(stdout(&top).contains("synthesize-from-workspace"));
 
+    let version = Command::new(bin()).arg("--version").output().unwrap();
+    assert_success(&version);
+    assert!(stdout(&version).contains(env!("CARGO_PKG_VERSION")));
+
     let trace = Command::new(bin())
         .arg("trace")
         .arg("--help")
@@ -785,10 +789,24 @@ fn help_lists_trace_align_arguments() {
     assert_success(&source);
     let source_help = stdout(&source);
     assert!(source_help.contains("Map and query source packages"));
+    assert!(source_help.contains("stage"));
     assert!(source_help.contains("map"));
     assert!(source_help.contains("query"));
     assert!(source_help.contains("coverage"));
     assert!(source_help.contains("stale"));
+
+    let source_stage = Command::new(bin())
+        .arg("source")
+        .arg("stage")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&source_stage);
+    let source_stage_help = stdout(&source_stage);
+    assert!(source_stage_help.contains("GitHub"));
+    assert!(source_stage_help.contains("--out"));
+    assert!(source_stage_help.contains("--no-detect-candidates"));
+    assert!(source_stage_help.contains("--json"));
 
     let workspace = Command::new(bin())
         .arg("workspace")
@@ -4569,7 +4587,16 @@ trace:
     assert!(summary.contains("  Decision replay: pass"));
     assert!(summary.contains("  Requirements: 1/2 proven"));
     assert!(summary.contains("  Alignment: partial"));
+    assert!(summary.contains("summary_meaning:"));
+    assert!(summary.contains(
+        "  Decision replay: replays the current spec against the captured input; pass means routing is reproducible."
+    ));
+    assert!(summary.contains(
+        "  Execution proof: checks execution.jsonl for structured evidence; partial or unproven means evidence is missing or incomplete, not that decision replay failed."
+    ));
     assert!(summary.contains("token_usage:"));
+    assert!(summary.contains("  Token consumption: total 1234 tokens"));
+    assert!(summary.contains("  Token savings: 500 tokens saved or cached; 28.5% reduction"));
     assert!(summary.contains("alignment_report:"));
     assert!(!summary.contains("checks:"));
     assert!(!summary.contains("obligations:"));
