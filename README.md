@@ -1,137 +1,155 @@
 <p align="center">
-  <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
+  <img src="https://github.com/modiqo/skillspec/raw/main/assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
 </p>
 
 # Skills that agents can actually follow
 
 [![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
 
-SkillSpec is a CLI plus a structured skill plan.
+You wrote a good `SKILL.md`. But did the agent actually follow it, or skip the
+late safety rule, grab an undeclared tool, and report "done" with no proof?
 
-It keeps your normal `SKILL.md`, but adds a small `skill.spec.yml` beside it so
-an agent knows when to use the skill, what path to follow, what checks must
-pass, and what proof should exist at the end.
+**SkillSpec tells you.** Run one command and get a risk report. Then turn any
+skill into a contract the agent has to follow, with a record you can inspect at
+the end.
 
-No new agent runtime. No orchestration platform. Just a contract that makes a
-skill easier to follow, test, port, route, and review.
+No new agent runtime. No orchestration platform. Just a CLI and a small
+`skill.spec.yml` that lives next to your `SKILL.md`.
 
-## Do Any Of These Sound Familiar?
+<p align="center">
+  <a href="https://github.com/modiqo/skillspec/blob/main/assets/skillspec-layer-stack.svg">
+    <img src="https://raw.githubusercontent.com/modiqo/skillspec/main/assets/skillspec-layer-stack.svg" alt="SkillSpec sits inside the skills layer" width="900">
+  </a>
+</p>
 
-- You wrote a powerful skill, but you still have to wonder: did the agent
-  actually follow it?
-- Your `SKILL.md` has step-by-step instructions, examples, scripts, code blocks,
-  or extra files, and the agent sometimes reads the wrong part or skips the
-  important part.
-- Your skill keeps getting longer because every miss becomes another paragraph
-  of instructions.
-- You need the same skill to behave the same way in Codex, Claude, Agents, or
-  another harness.
-- You need to know whether the agent picked the right route before it started
-  doing work.
-- You need the agent to check dependencies before acting.
-- You need tool boundaries: this skill may run these commands, but not those.
-- You need proof after the run: selected route, completed steps, missing
-  evidence, blocked checks, token economy, and final alignment.
-- You have a repo of skills that reference each other, and it is unclear whether
-  it is one skill, many skills, or a plugin-shaped system.
-- You have too many installed skills and the harness starts shortening
-  descriptions or spending context on the wrong ones.
-- You want to turn a guided expert workflow into a reusable skill without
-  rewriting tacit knowledge from memory.
+## See It In 30 Seconds
 
-If even two of these sound familiar, SkillSpec is probably for you.
+Point Doctor at any skill, a local folder or a public GitHub URL:
+
+```bash
+skillspec doctor ./my-skill
+```
+
+```text
+SkillSpec Doctor
+================
+Target: ./my-skill        Shape: simple_skill
+
+Agent follow-through risk: HIGH (74/100)
+
+Findings
+- description is short and generic -> automatic discovery may be unreliable
+- active skill load is 8,482 tokens -> above the balanced target
+- 14 must/never obligations appear after 60% of the body -> easy to miss
+- tools and commands are used, but dependencies are never declared
+- no tests and no progress/trace surface -> "done" can't be checked
+
+Likely consequence
+An agent may follow the broad task but skip a late safety gate, use an
+undeclared tool, or claim completion without evidence.
+
+Next step
+Ask your agent: /skillspec import ./my-skill, compile it, test it, install it,
+and print the alignment summary.
+```
+
+No install required to try it. Paste a public skill URL into the hosted page:
+
+**<https://modiqo.github.io/skillspec/>**
+
+## Why This Exists
+
+A `SKILL.md` is just text. The harness loads it and hopes the model reads the
+right part. For a throwaway skill, that can be fine. For a skill you rely on,
+"hope" is not a plan:
+
+- **Buried rules get skipped.** The important "never do X" sits at line 400,
+  and models are most reliable at the start and end of context, not the middle.
+- **Every miss grows the prose.** Each failure becomes another paragraph, which
+  makes the next miss more likely.
+- **You only see the final answer.** There is no durable record of which route
+  ran, which steps happened, or what was skipped.
+
+SkillSpec moves the load-bearing parts out of prose and into a small structured
+contract:
+
+- when to use the skill
+- which route to take
+- what is forbidden
+- what dependencies must exist
+- what checks must pass
+- what proof should exist at the end
 
 ## Install
 
-Install the CLI first. For macOS and Linux x86_64, the fastest path is the
-prebuilt binary from the latest GitHub release:
+Install the CLI:
 
-```sh
+```bash
 curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
 skillspec --version
 ```
 
-To pin a release or install somewhere else:
+Or with Cargo:
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \
-  | SKILLSPEC_VERSION=v0.1.0 SKILLSPEC_INSTALL_DIR="$HOME/.local/bin" sh
-```
-
-The installer downloads the matching release archive, verifies the `.sha256`
-file, and writes `skillspec` to `~/.local/bin` by default.
-
-You can also download release assets directly:
-
-```sh
-# macOS
-curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-macos.tar.gz
-curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-macos.tar.gz.sha256
-shasum -a 256 -c skillspec-macos.tar.gz.sha256
-tar -xzf skillspec-macos.tar.gz
-mkdir -p "$HOME/.local/bin"
-install -m 0755 skillspec "$HOME/.local/bin/skillspec"
-
-# Linux x86_64
-curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-linux-x86_64.tar.gz
-curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-linux-x86_64.tar.gz.sha256
-sha256sum -c skillspec-linux-x86_64.tar.gz.sha256
-tar -xzf skillspec-linux-x86_64.tar.gz
-mkdir -p "$HOME/.local/bin"
-install -m 0755 skillspec "$HOME/.local/bin/skillspec"
-```
-
-Windows x86_64 users can download
-`skillspec-windows-x86_64.zip` from the same release page and place
-`skillspec.exe` on `PATH`.
-
-On any machine with Rust installed, use crates.io:
-
-```sh
+```bash
 cargo install skillspec
 skillspec --version
 ```
 
-To install unreleased `main`, use:
-
-```sh
-cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
-skillspec --version
-```
-
-From a local repo checkout, use:
-
-```sh
-cargo install --path crates/skillspec-cli --force
-skillspec --version
-```
-
-Then install the `skillspec` plugin into your harness.
+Then add the plugin to your harness.
 
 Claude Code:
 
-```sh
+```bash
 claude plugin marketplace add modiqo/skillspec --sparse .claude-plugin plugins/skillspec
 claude plugin install skillspec@skillspec
 claude plugin list
 ```
 
-Claude installs the plugin enabled by default in current Claude Code builds. If
-`claude plugin list` shows it disabled, run `claude plugin enable skillspec`.
-
 Codex:
 
-```sh
+```bash
 codex plugin marketplace add modiqo/skillspec --ref main --sparse .agents --sparse plugins/skillspec
 codex plugin add skillspec@skillspec
 ```
 
-Codex does not have a separate plugin enable command; `codex plugin add`
-installs the plugin from the configured marketplace snapshot.
+<details>
+<summary>Other platforms, pinned releases, direct downloads, and local development</summary>
 
-For local development, you can still install the skill folder directly:
+Prebuilt binaries are available on the
+[releases page](https://github.com/modiqo/skillspec/releases):
 
-```sh
+- `skillspec-macos.tar.gz`
+- `skillspec-linux-x86_64.tar.gz`
+- `skillspec-windows-x86_64.zip`
+
+Release artifacts include `.sha256` checksums. The installer verifies the
+checksum and writes to `~/.local/bin` by default.
+
+Pin a version or choose an install directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \
+  | SKILLSPEC_VERSION=v0.1.0 SKILLSPEC_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+Install unreleased `main`:
+
+```bash
+cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
+skillspec --version
+```
+
+Install from a local checkout:
+
+```bash
+cargo install --path crates/skillspec-cli --force
+skillspec --version
+```
+
+Local development can also install the skill folder directly:
+
+```bash
 # Codex
 skillspec install skill skills/skillspec --target codex --retire-existing
 
@@ -142,121 +160,132 @@ skillspec install skill skills/skillspec --target agents --retire-existing
 skillspec install skill skills/skillspec --target claude-local --retire-existing
 ```
 
-After that, stay in chat and ask for outcomes:
+Full install notes:
+[docs/install](https://github.com/modiqo/skillspec/blob/main/docs/README.md)
 
-```text
-/skillspec run doctor on ./my-skill
-/skillspec import ./my-skill, compile it for Codex, install it, and prove it
-```
+</details>
 
-## Skill Vs SkillSpec
+## The Loop: Assess -> Port -> Prove
 
-| A normal skill | A SkillSpec-backed skill |
+Once the plugin is installed, ask your agent for the outcome in chat. SkillSpec
+picks the commands and keeps the run aligned.
+
+**1. Assess** a skill before you touch it.
+
+> `/skillspec run doctor on ./my-skill`
+
+You get a baseline: discovery risk, context load, buried obligations,
+undeclared dependencies, missing proof, and the likely consequence for agent
+follow-through.
+
+**2. Port** it into a contract.
+
+> `/skillspec import ./my-skill, compile it for Codex, install it, and prove it`
+
+SkillSpec generates a `skill.spec.yml` next to your `SKILL.md`: routes, rules,
+forbidden actions, dependencies, checks, tests, and proof expectations. It also
+compiles a thin loader so the active prompt stays small.
+
+**3. Prove** it ran the way it was supposed to.
+
+Every run can leave an alignment summary you can read: selected route,
+completed steps, missing proof, forbidden-action status, token usage, and wall
+clock metrics when available. Not just "done" - a record.
+
+Crowded skill library?
+
+> `/skillspec install router`
+
+Router mode routes to the one skill that matters instead of making the harness
+expose too many skills at once.
+
+## What SkillSpec Is, And Is Not
+
+Four things you can do with it:
+
+- **Import** an existing prose `SKILL.md` into a structured SkillSpec contract.
+- **Run** a SkillSpec-backed skill in your harness, then review the alignment
+  and token report.
+- **Route** many skills through an explicit router when harness listing budgets
+  make discovery unreliable.
+- **Capture** durable execution traces and turn observed CLI/API/MCP work into
+  reusable skills. This path is powered by [Rote](https://www.modiqo.ai).
+
+| It is | It is not |
 | --- | --- |
-| A reusable prompt package. | A reusable prompt package plus a structured plan. |
-| The harness loads text and the model interprets it. | The CLI exposes the current route, phase, checks, and next action. |
-| Long instructions can become load-bearing prose. | The important behavior moves into `skill.spec.yml`: routes, phases, rules, dependencies, tests, and proof. |
-| The agent may follow the skill well, but you mostly inspect the final answer. | SkillSpec records decisions and progress, then prints an alignment report. |
-| Porting across harnesses depends on each harness interpreting the same text similarly. | The same contract shape can compile and run across harnesses, making behavior easier to compare. |
-| Evaluation is usually manual or ad hoc. | Scenario tests, decision replay, dependency checks, trace alignment, and final reports can be used as eval evidence. |
-| Many installed skills can create discovery and context-pressure problems. | Router mode can index skills and route only to the one that matters. |
-| Tacit expert workflows are hard to package. | Durable execution mode can observe a guided agent interaction and turn the trace into an explicit SkillSpec-backed skill. |
+| A contract that sits beside `SKILL.md`. | A replacement for skills. |
+| A CLI that scores, ports, compiles, and records. | A new agent runtime or orchestration platform. |
+| A way to make skills easier to compare across Codex, Claude, and Agents. | A promise that every harness will behave identically. |
+| A run record you can audit after the task. | A security sandbox. |
 
-The point is not to replace skills. The point is to keep skills powerful while
-making the critical parts followable, testable, and provable.
-
-SkillSpec is designed to use less active context without hiding the work. The
-agent gets the current gate and next action from the CLI, records progress as it
-goes, and can resume from trace state after compaction or interruption.
-
-<p align="center">
-  <img src="assets/skillspec-layer-stack.svg" alt="SkillSpec sits inside the skills layer" width="900">
-</p>
-
-## How To Use It From An Agent
-
-Ask the agent for the outcome. The installed `skillspec` skill will choose the
-right CLI commands and keep the run aligned.
-
-| You want to know or do | What to ask in chat | What SkillSpec does |
-| --- | --- | --- |
-| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape and explain agent follow-through risk: how likely the current skill shape is to make an agent skip, reorder, improvise, or finish without proof. This is a baseline of the skill as it exists today, not a grade of domain quality. The default report is formatted for terminals, `--markdown` renders cleanly in GitHub, `--html` creates a shareable review page, and `--json` preserves the full machine report. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
-| Request a hosted public doctor report. | Open a `Doctor report request` issue with a public GitHub skill URL. | GitHub Actions validates that the target is publicly readable, runs `skillspec doctor`, prints a Markdown report in the Actions summary, comments the rendered report, and attaches Markdown/HTML/JSON/text artifacts. Private or unreadable repos get local-run instructions. |
-| Port an existing skill. | `/skillspec import <path-or-url>, compile it for Codex, install it, and prove it` | Stages the source if needed, runs doctor, maps the source, imports the skill, validates it, tests it, compiles it, and prints the report. |
-| Port a repo with many skills or plugin folders. | `/skillspec map this repo and import the packages safely` | Preserves the original shape, processes each atomic `SKILL.md` package separately, detects references, prevents circular dependency mistakes, and converges the workspace before install. |
-| Use the installed skill. | Use it normally, the same way you would use any other skill. | The generated skill loader keeps the prompt small and asks the CLI for route guidance, phase checks, progress recording, and final alignment. |
-| Too many skills are installed, or the harness warns about context. | `/skillspec install router` | Installs router mode so the agent can route to the right skill instead of loading or exposing too many skills at once. See [Skill Router](docs/design/14-skill-router.md). |
-| Create a skill from observed expert work. | `/skillspec install durable-executor from <source>`<br>`/skillspec create from observed durable execution: "<workflow>"` | Uses durable execution mode to capture a guided interaction, preserve evidence, and convert tacit workflow knowledge into an explicit SkillSpec-backed skill. This path requires Rote by Modiqo; install/setup from [modiqo.ai](https://www.modiqo.ai). |
+That last row matters. SkillSpec makes a run **auditable**: you can see what was
+claimed and check it against the contract. Enforcement of tool boundaries is
+still the harness's job.
 
 ## Public Doctor Reports
 
-Want to check a public skill before installing or porting it? Open a
+Want to check a public skill before installing or porting it? Use the hosted
+Doctor page:
+
+**<https://modiqo.github.io/skillspec/>**
+
+You can also open a
 [Doctor report request](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)
-with a public GitHub skill repo or folder URL. GitHub Actions will run
-`skillspec doctor`, render the Markdown report in Actions and the issue, and
-attach Markdown/HTML/JSON/text artifacts.
-
-You can also use the public Doctor page:
-
-[https://modiqo.github.io/skillspec/](https://modiqo.github.io/skillspec/)
-
-It provides a form for public GitHub URLs and lists prior public reports with
-success/error status and rendered report output.
+with a public GitHub skill repo or folder URL. GitHub Actions validates the
+target, runs `skillspec doctor`, comments with a Markdown report, and attaches
+Markdown, HTML, JSON, and text artifacts.
 
 Private repositories are not inspected by public Actions. For private skills,
-install SkillSpec locally and run `skillspec doctor /path/to/local/skill`, or
-`skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md` for a
-GitHub-renderable report.
+install SkillSpec locally:
 
-Doctor is step one. Use it to publish a baseline of the current skill shape,
-then ask the harness to import the skill:
+```bash
+skillspec doctor /path/to/local/skill
+skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md
+skillspec doctor /path/to/local/skill --html > skillspec-doctor.html
+```
+
+Use Doctor as the baseline. Then ask your harness to import the skill:
 
 ```text
 /skillspec import <skill-repo-or-folder>, compile it, verify it, test it, and prove it. Print the alignment summary.
 ```
 
-Read the alignment summary before trusting the port. It should show the selected
-route, required steps, missing proof if any, forbidden-action status, and token
-or wall-clock metrics when available. After install, restart the harness and try
-the SkillSpec-backed skill normally.
+Publish the baseline report, generated `skill.spec.yml`, compiled loader, and
+alignment report with the repo or pull request so reviewers can see both the
+original skill risk and the proof after porting.
 
-## What You Get At The End
+## Why The Scores Are Credible
 
-For an important skill, the output should not just be "done."
+Doctor is not vibes. Every risk condition cites published work or local
+SkillSpec methodology on how agents fail: context-position effects, effective
+context limits, verifiable instruction following, process-level agent
+evaluation, and skill-metadata routing.
 
-SkillSpec gives you artifacts you can inspect:
+The report is explicit about what is measured versus what is a policy
+threshold. Start here:
 
-- the generated `skill.spec.yml`
-- the compiled `SKILL.md` loader
-- validation and scenario-test results
-- dependency and import checks
-- progress records
-- route and phase evidence
-- alignment summary
-- token and wall-clock metrics when available
+- [Doctor Agent Drift Risk](https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md)
+- [Why SkillSpec](https://github.com/modiqo/skillspec/blob/main/docs/01-why-skillspec.md)
+- [Contract Trace Methodology](https://github.com/modiqo/skillspec/blob/main/docs/08-contract-trace-methodology.md)
 
-That makes a skill easier to ship, easier to debug, and easier to trust across
-agents.
+The contract itself is a real spec: a typed Rust model, JSON Schema, reference
+grammar, and
+[conformance suite](https://github.com/modiqo/skillspec/tree/main/conformance).
+
+## Learn More
+
+- [How it works](https://github.com/modiqo/skillspec/blob/main/docs/design/README.md)
+- [Command reference](https://github.com/modiqo/skillspec/blob/main/docs/design/16-command-log.md)
+- [Plugin marketplace install](https://github.com/modiqo/skillspec/blob/main/docs/design/26-plugin-marketplace-install.md)
+- [Request a public Doctor report](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)
+- [Contributing](https://github.com/modiqo/skillspec/blob/main/CONTRIBUTING.md)
 
 ## License
 
-SkillSpec is dual-licensed under either of:
+SkillSpec is dual-licensed under either:
 
 - [MIT](LICENSE-MIT)
 - [Apache License, Version 2.0](LICENSE-APACHE)
 
 You may choose either license. Contributions are accepted under the same dual
 license unless explicitly stated otherwise.
-
-Some imported examples and source fixtures preserve their own upstream license
-files inside the example package. Those fixture-specific license files govern
-that fixture material and do not relicense the rest of this repository.
-
-## Learn More
-
-- [Detailed docs](docs/README.md)
-- [Design docs](docs/design/README.md)
-- [Command log](docs/design/16-command-log.md)
-- [Plugin marketplace install](docs/design/26-plugin-marketplace-install.md)
-- [Guided run loop](docs/design/23-guided-run-loop-from-doctor-dogfood.md)
-- [Progressive agent guidance](docs/design/25-progressive-agent-guidance.md)
