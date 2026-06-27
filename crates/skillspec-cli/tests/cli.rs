@@ -630,6 +630,7 @@ fn help_lists_trace_align_arguments() {
     assert!(align_help.contains("[OPTIONS]"));
     assert!(align_help.contains("--decision-trace <DECISION_TRACE>"));
     assert!(align_help.contains("--execution-trace <EXECUTION_TRACE>"));
+    assert!(align_help.contains("--proof-digest <PROOF_DIGEST>"));
     assert!(align_help.contains("<PATH>"));
     assert!(align_help.contains("--summary"));
     assert!(align_help.contains("--json"));
@@ -4381,6 +4382,38 @@ trace:
     assert!(!summary.contains("checks:"));
     assert!(!summary.contains("obligations:"));
     assert!(!stderr(&align_summary).contains("alignment: wrote"));
+
+    let proof_digest = run_dir.join("proof-digest.json");
+    let align_with_digest = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--summary")
+        .arg("--proof-digest")
+        .arg(&proof_digest)
+        .output()
+        .unwrap();
+    assert_success(&align_with_digest);
+    let digest_summary = stdout(&align_with_digest);
+    assert!(digest_summary.contains("proof_digest:"));
+    assert!(proof_digest.exists());
+    let digest: Value = serde_json::from_str(&fs::read_to_string(&proof_digest).unwrap())
+        .expect("proof digest should be valid JSON");
+    assert_eq!(digest["schema"], "skillspec.align.proof_digest/v0");
+    assert_eq!(digest["alignment"], "partial");
+    assert!(digest["missing_count"].as_u64().unwrap() >= 1);
+    assert!(digest["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|group| group["kind"] == "phase_requirement"));
+    assert!(digest["groups"].as_array().unwrap().iter().any(|group| {
+        group["kind"] == "route_fulfillment" && group["recommended_event"] == "route_fulfilled"
+    }));
 }
 
 #[test]
@@ -4687,7 +4720,9 @@ fn progress_batch_records_multiple_events_with_compact_output() {
     write_file(
         &events,
         r#"{"event":"route-fulfilled","id":"local_skill_port","status":"pass","evidence":{"kind":"directory","ref":"./draft"}}
+{"event":"route-check-completed","id":"qa_gate","status":"pass","evidence":{"kind":"command","ref":"skillspec test"}}
 {"event":"after_success_completed","id":"generate_value_report","status":"pass","evidence":{"kind":"report","ref":"alignment.json"}}
+{"event":"elicitation_answered","id":"approve_scope","status":"pass","evidence":{"kind":"user_approval","ref":"chat"}}
 {"event":"obligation_satisfied","id":"install_from_remote_checkout","status":"pass","message":"remote source was staged only"}
 "#,
     );
@@ -4702,14 +4737,18 @@ fn progress_batch_records_multiple_events_with_compact_output() {
         .unwrap();
     assert_success(&progress_batch);
     let text = stdout(&progress_batch);
-    assert!(text.contains("progress batch: appended 3 events"));
+    assert!(text.contains("progress batch: appended 5 events"));
     assert!(text.contains("- route_fulfilled: 1"));
+    assert!(text.contains("- route_check_completed: 1"));
     assert!(text.contains("- after_success_completed: 1"));
+    assert!(text.contains("- elicitation_answered: 1"));
     assert!(text.contains("- obligation_satisfied: 1"));
 
     let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
     assert!(ledger.contains("\"event\":\"route_fulfilled\""));
+    assert!(ledger.contains("\"event\":\"route_check_completed\""));
     assert!(ledger.contains("\"event\":\"after_success_completed\""));
+    assert!(ledger.contains("\"event\":\"elicitation_answered\""));
     assert!(ledger.contains("\"event\":\"obligation_satisfied\""));
     assert!(ledger.contains("\"run_id\":\"run-progress-batch\""));
 }

@@ -117,7 +117,8 @@ It consumes execution traces supplied through:
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 Execution proof can show:
@@ -235,7 +236,8 @@ Compiled SkillSpec loader files should instruct agents to:
 - preserve the trace run directory;
 - record progress after phase actions;
 - run `progress show` as an internal gate check before phase transitions;
-- run `trace align --summary` at completion;
+- run `trace align --summary --proof-digest` for the first completion audit;
+- batch multiple final proof rows before the final alignment rerun;
 - include alignment summary;
 - include token usage;
 - report missing proof rows;
@@ -252,10 +254,26 @@ A harness should:
 - preserve token stats in structured execution events;
 - preserve query-reduction stats separately from prompt consumption;
 - expose `alignment.json` as a durable artifact;
+- expose `proof-digest.json` when the first completion alignment finds missing
+  proof, so final evidence can be batched instead of chased one row at a time;
 - fail or warn when a final answer omits the required alignment and token
   sections for a SkillSpec-backed run.
 
 The model can render the report, but the harness should provide the data.
+
+## Re-Alignment Control
+
+Completion proof should use a bounded loop:
+
+1. Run `trace align --summary --proof-digest <run-dir>/proof-digest.json`.
+2. If real proof exists for several missing rows, write one
+   `<run-dir>/final-proof.jsonl` file and append it with `progress batch`.
+3. Record `progress final-response` once.
+4. Rerun `trace align --summary` once and report the compact result.
+
+Do not rerun alignment after each individual `progress record`. If the final
+rerun is still partial, report the remaining missing proof rows unless there is
+one obvious additional batch to record from evidence already on disk.
 
 ## Report Examples
 

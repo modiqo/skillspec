@@ -392,7 +392,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         NavigationHint {
             intent: "prove completion",
             command: format!(
-                "skillspec trace align {spec_path} --decision-trace <run_dir> --summary"
+                "skillspec trace align {spec_path} --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json"
             ),
         },
     ];

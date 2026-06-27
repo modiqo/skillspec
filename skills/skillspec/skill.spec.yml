@@ -2189,6 +2189,38 @@ artifacts:
     consumed_by:
       - kind: command
         id: value_report
+  alignment_report:
+    kind: file
+    path: .skillspec/traces/<run-id>/alignment.json
+    description: Full trace alignment report written by trace_align while chat receives only the compact completion summary.
+    produced_by:
+      - kind: command
+        id: trace_align
+    consumed_by:
+      - kind: command
+        id: value_report
+  proof_digest:
+    kind: file
+    path: .skillspec/traces/<run-id>/proof-digest.json
+    description: Grouped missing-proof digest from trace_align, used to plan one final-proof batch instead of a repeated alignment loop.
+    produced_by:
+      - kind: command
+        id: trace_align
+    consumed_by:
+      - kind: command
+        id: progress_batch
+      - kind: command
+        id: value_report
+  final_proof_batch:
+    kind: file
+    path: .skillspec/traces/<run-id>/final-proof.jsonl
+    description: Agent-authored proof events with real evidence refs, derived from proof-digest.json and appended once with progress_batch.
+    produced_by:
+      - kind: recipe
+        id: local_porting_loop
+    consumed_by:
+      - kind: command
+        id: progress_batch
   durable_workspace_report:
     kind: report
     path: .skillspec/reports/durable-workspace-report.md
@@ -2449,7 +2481,7 @@ commands:
       dependencies:
         - skillspec_cli
   progress_batch:
-    description: Append several final route, closure, elicitation, forbid/no-violation, or evidence proof events from one JSONL file so final alignment proof does not become a visible progress parade.
+    description: Append several final route, route-check, closure, elicitation, forbid/no-violation, or evidence proof events from one JSONL file so final alignment proof does not become a visible progress parade.
     template: skillspec progress batch <trace-dir> --events <trace-dir>/final-proof.jsonl
     safety: local_write
     requires:
@@ -2730,8 +2762,8 @@ commands:
       dependencies:
         - skillspec_cli
   trace_align:
-    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json while printing only the compact completion-facing summary.
-    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary
+    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json while printing only the compact completion-facing summary.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary --proof-digest <trace-dir>/proof-digest.json
     safety: read_only
     requires:
       dependencies:
@@ -2952,7 +2984,7 @@ recipes:
       - run_command: act_named_phase
       - run_command: progress_record_requirement
       - run_command: progress_record_phase
-      - note: For final route, closure, elicitation, forbid/no-violation, or evidence proof rows, write <trace-dir>/final-proof.jsonl and run progress_batch once instead of showing one progress command per row.
+      - note: Run trace_align once to create <trace-dir>/proof-digest.json; if multiple missing proof rows remain, write <trace-dir>/final-proof.jsonl from that digest and real evidence, then run progress_batch once instead of showing one progress command per row.
       - run_command: progress_batch
       - run_command: progress_show
       - run_command: decide_demo
@@ -3228,6 +3260,7 @@ snippets:
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
       - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
       - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
+      - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:
     text: |

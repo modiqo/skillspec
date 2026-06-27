@@ -172,6 +172,12 @@ pub fn alignment_written(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn proof_digest_written(path: &Path) -> Result<()> {
+    let mut stderr = io::stderr().lock();
+    writeln!(stderr, "proof_digest: wrote {}", path.display())?;
+    Ok(())
+}
+
 pub fn align(report: &AlignReport) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
     let execution_not_evaluated = matches!(
@@ -399,7 +405,11 @@ pub fn align(report: &AlignReport) -> Result<()> {
     Ok(())
 }
 
-pub fn align_summary(report: &AlignReport, alignment_report: &Path) -> Result<()> {
+pub fn align_summary(
+    report: &AlignReport,
+    alignment_report: &Path,
+    proof_digest: Option<&Path>,
+) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
     writeln!(stdout, "alignment_summary:")?;
     writeln!(
@@ -445,6 +455,9 @@ pub fn align_summary(report: &AlignReport, alignment_report: &Path) -> Result<()
         )?;
     }
     writeln!(stdout, "alignment_report: {}", alignment_report.display())?;
+    if let Some(path) = proof_digest {
+        writeln!(stdout, "proof_digest: {}", path.display())?;
+    }
     Ok(())
 }
 

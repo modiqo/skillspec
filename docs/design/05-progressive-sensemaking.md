@@ -285,17 +285,26 @@ commands, browser work, network work, and file changes.
 After a traced decision, run:
 
 ```sh
-skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --summary
+skillspec trace align ./skill.spec.yml \
+  --decision-trace <run_dir> \
+  --summary \
+  --proof-digest <run_dir>/proof-digest.json
 ```
 
 If structured execution evidence exists, include it:
 
 ```sh
-skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <jsonl> --summary
+skillspec trace align ./skill.spec.yml \
+  --decision-trace <run_dir> \
+  --execution-trace <jsonl> \
+  --summary \
+  --proof-digest <run_dir>/proof-digest.json
 ```
 
 Decision replay can prove deterministic steering behavior. Execution obligations
 may still be unproven if the harness did not provide execution evidence.
+When several proof rows remain, use the digest to build one final-proof JSONL
+file and append it with `progress batch` before one final alignment rerun.
 
 ## Escalation Rules
 

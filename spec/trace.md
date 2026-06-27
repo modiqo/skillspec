@@ -164,7 +164,8 @@ Align a spec with a decision trace:
 ```sh
 skillspec trace align examples/durable-executor/skill.spec.yml \
   --decision-trace .skillspec/traces/run-1781900000000-12345 \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/run-1781900000000-12345/proof-digest.json
 ```
 
 Alignment re-runs the current spec against the captured input and compares the

@@ -701,7 +701,7 @@ skillspec trace <COMMAND>
 Subcommands:
 
 - `compact <run-dir>`
-- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--summary] [--json]`
+- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--summary] [--proof-digest <path>] [--json]`
 
 ### `trace compact`
 
@@ -732,13 +732,20 @@ Options:
   action evidence. Repeat for multiple ledgers.
 - `--summary`: emit only the completion-facing alignment summary, token usage
   block, and `alignment.json` path while still writing the full report to disk.
+- `--proof-digest <PROOF_DIGEST>`: write a grouped missing-proof digest for
+  one-shot final proof batching. Use this with `--summary` during completion
+  audits, then build `<run-dir>/final-proof.jsonl` from the digest and run
+  `skillspec progress batch` once before the final alignment rerun.
 - `--json`: emit JSON instead of a concise human report.
 
 Current alignment compares deterministic decision-trace facts. Default human
 output includes a summary before the detailed check list. `--summary` suppresses
 the detailed checks, proof rows, and obligation list for normal harness
 completion display. The full report is always written to
-`<DECISION_TRACE>/alignment.json`.
+`<DECISION_TRACE>/alignment.json`. `--proof-digest` writes a sidecar JSON file
+that groups missing phase requirements, route fulfillment, route checks,
+forbid/no-violation rows, elicitations, and after-success closures by the event
+shape needed for `progress batch`.
 The full human report includes the selected route, route-selection basis,
 matched rules, pass/fail/unproven counts for deterministic checks, and
 pass/fail/unproven counts for execution obligations.
@@ -758,6 +765,8 @@ alignment_summary:
 token_usage:
   Token consumption: total 1234 tokens
   Token savings: 3729702 tokens saved by query reduction (4439892 cached response tokens reduced to 710190 query-result tokens, 84.0% reduction)
+alignment_report: .skillspec/traces/run-123/alignment.json
+proof_digest: .skillspec/traces/run-123/proof-digest.json
 ```
 
 `Alignment: partial` is the user-facing label for a non-failing `status:
@@ -813,7 +822,8 @@ Arguments:
 - `<RUN>`: trace run directory containing `execution.jsonl`.
 - `<EVENT>`: one of `phase-started`, `requirement-started`,
   `requirement-satisfied`, `requirement-failed`, `stats-collected`,
-  `obligation-satisfied`, `route-fulfilled`, `after-success-completed`,
+  `obligation-satisfied`, `route-fulfilled`, `route-check-completed`,
+  `after-success-completed`, `elicitation-answered`, `elicitation-waived`,
   `evidence-attached`, `handoff-started`, `handoff-completed`,
   `phase-completed`, or `phase-blocked`.
 - `[PHASE]`: phase id for phase or requirement events.
@@ -822,7 +832,8 @@ Arguments:
 Options:
 
 - `--id <ID>`: obligation, route, closure, or elicitation id for
-  `obligation-satisfied`, `route-fulfilled`, `after-success-completed`, and
+  `obligation-satisfied`, `route-fulfilled`, `route-check-completed`,
+  `after-success-completed`, `elicitation-answered`, `elicitation-waived`, and
   related proof events.
 - `--status <STATUS>`: event status, such as `pass`, `fail`, `blocked`, or
   `pending`.
@@ -853,10 +864,10 @@ Options:
 
 `progress batch` records several proof events in one command and prints one
 compact summary by default. Use it for final closure proof that would otherwise
-create a visible progress parade: route fulfillment, after-success closures,
-elicitation approvals, forbid/no-violation proof, and evidence attachments. It
-preserves the same `execution.jsonl` ledger shape as `progress record`; it only
-reduces command chatter.
+create a visible progress parade: route fulfillment, route checks,
+after-success closures, elicitation answers or waivers, forbid/no-violation
+proof, and evidence attachments. It preserves the same `execution.jsonl` ledger
+shape as `progress record`; it only reduces command chatter.
 
 ### `progress stats`
 

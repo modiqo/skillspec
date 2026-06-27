@@ -936,6 +936,9 @@ pub(super) enum TraceCommand {
         /// JSONL execution ledger with sanitized action evidence. Repeat for multiple ledgers.
         #[arg(long)]
         execution_trace: Vec<PathBuf>,
+        /// Write a grouped missing-proof digest for one-shot final proof batching.
+        #[arg(long)]
+        proof_digest: Option<PathBuf>,
         /// Print only the completion-facing alignment and token summary while writing the full report to alignment.json.
         #[arg(long, conflicts_with = "json")]
         summary: bool,
@@ -1411,7 +1414,10 @@ pub(super) enum ProgressEventArg {
     StatsCollected,
     ObligationSatisfied,
     RouteFulfilled,
+    RouteCheckCompleted,
     AfterSuccessCompleted,
+    ElicitationAnswered,
+    ElicitationWaived,
     EvidenceAttached,
     HandoffStarted,
     HandoffCompleted,
@@ -1536,7 +1542,10 @@ impl From<ProgressEventArg> for String {
             ProgressEventArg::StatsCollected => "stats_collected",
             ProgressEventArg::ObligationSatisfied => "obligation_satisfied",
             ProgressEventArg::RouteFulfilled => "route_fulfilled",
+            ProgressEventArg::RouteCheckCompleted => "route_check_completed",
             ProgressEventArg::AfterSuccessCompleted => "after_success_completed",
+            ProgressEventArg::ElicitationAnswered => "elicitation_answered",
+            ProgressEventArg::ElicitationWaived => "elicitation_waived",
             ProgressEventArg::EvidenceAttached => "evidence_attached",
             ProgressEventArg::HandoffStarted => "handoff_started",
             ProgressEventArg::HandoffCompleted => "handoff_completed",

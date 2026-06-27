@@ -14,6 +14,7 @@ pub use types::*;
 use ledger::ExecutionLedger;
 
 const ALIGN_SCHEMA: &str = "skillspec.align/v0";
+const PROOF_DIGEST_SCHEMA: &str = "skillspec.align.proof_digest/v0";
 
 /// Align a loaded spec against a decision trace run directory.
 ///
@@ -216,6 +217,8 @@ fn summary_for(
         has_execution_trace,
     );
     let evidence_gaps = evidence_gaps(checks, obligations);
+    let phase_requirement_gaps =
+        phase_requirement_gaps(decision, execution_ledger, has_execution_trace);
     let completion = completion_summary_for(
         status,
         decision,
@@ -252,9 +255,137 @@ fn summary_for(
         execution_obligations,
         unproven_obligation_kinds,
         evidence_gaps,
+        phase_requirement_gaps,
         completion,
         tokens,
     }
+}
+
+/// Build a grouped missing-proof digest so agents can batch final proof rows
+/// once, then run one final alignment.
+pub fn build_proof_digest(report: &AlignReport, alignment_report: &Path) -> AlignProofDigest {
+    let suggested_batch_file = Path::new(&report.decision_trace)
+        .join("final-proof.jsonl")
+        .display()
+        .to_string();
+    let mut groups = Vec::new();
+
+    if !report.summary.phase_requirement_gaps.is_empty() {
+        let items = report
+            .summary
+            .phase_requirement_gaps
+            .iter()
+            .map(|gap| AlignProofDigestItem {
+                id: gap.requirement.clone(),
+                source: format!("phase `{}` requirement `{}`", gap.phase, gap.requirement),
+                needed: gap.needed.clone(),
+                phase: Some(gap.phase.clone()),
+                requirement: Some(gap.requirement.clone()),
+                obligation_kind: None,
+                recommended_event: Some("requirement_satisfied".to_owned()),
+                required_fields: vec![
+                    "event=requirement_satisfied".to_owned(),
+                    "phase".to_owned(),
+                    "requirement".to_owned(),
+                    "evidence.kind".to_owned(),
+                    "evidence.ref".to_owned(),
+                ],
+                expected_evidence: None,
+                observed_evidence: None,
+                note: match gap.status {
+                    AlignPhaseRequirementGapStatus::Failed => "Fix or re-run the failed requirement, then record real satisfied evidence; do not mark it pass from the failure row.".to_owned(),
+                    AlignPhaseRequirementGapStatus::Missing => "Record this only if real evidence exists that the requirement was satisfied.".to_owned(),
+                    AlignPhaseRequirementGapStatus::NotEvaluated => "Supply an execution ledger first, then record this only if real evidence exists.".to_owned(),
+                },
+            })
+            .collect::<Vec<_>>();
+        groups.push(AlignProofDigestGroup {
+            kind: "phase_requirement".to_owned(),
+            count: items.len(),
+            recommended_event: Some("requirement_satisfied".to_owned()),
+            required_fields: vec![
+                "event".to_owned(),
+                "phase".to_owned(),
+                "requirement".to_owned(),
+                "evidence.kind".to_owned(),
+                "evidence.ref".to_owned(),
+            ],
+            items,
+        });
+    }
+
+    let mut by_group: BTreeMap<String, Vec<AlignProofDigestItem>> = BTreeMap::new();
+    for gap in &report.summary.evidence_gaps {
+        let (group, event, required_fields, note) = proof_digest_group_for(gap);
+        let proof = proof_row_for_gap(report, gap);
+        by_group
+            .entry(group.to_owned())
+            .or_default()
+            .push(AlignProofDigestItem {
+                id: gap.id.clone(),
+                source: gap.source.clone(),
+                needed: gap.needed.clone(),
+                phase: None,
+                requirement: None,
+                obligation_kind: gap.obligation_kind,
+                recommended_event: event.map(str::to_owned),
+                required_fields: required_fields
+                    .iter()
+                    .map(|field| (*field).to_owned())
+                    .collect(),
+                expected_evidence: proof.map(|row| row.expected_evidence.clone()),
+                observed_evidence: proof.map(|row| row.observed_evidence.clone()),
+                note: note.to_owned(),
+            });
+    }
+
+    for (kind, items) in by_group {
+        let recommended_event = items.iter().find_map(|item| item.recommended_event.clone());
+        let required_fields = items
+            .first()
+            .map(|item| item.required_fields.clone())
+            .unwrap_or_default();
+        groups.push(AlignProofDigestGroup {
+            kind,
+            count: items.len(),
+            recommended_event,
+            required_fields,
+            items,
+        });
+    }
+
+    let missing_count = groups.iter().map(|group| group.count).sum();
+    AlignProofDigest {
+        schema: PROOF_DIGEST_SCHEMA.to_owned(),
+        status: report.status,
+        alignment: report.summary.completion.alignment.clone(),
+        alignment_report: alignment_report.display().to_string(),
+        suggested_batch_file,
+        missing_count,
+        recommended_loop: vec![
+            "Run trace align once with --summary --proof-digest.".to_owned(),
+            "Read this digest and create final-proof.jsonl with real evidence for every batchable item.".to_owned(),
+            "Run skillspec progress batch once with that final-proof.jsonl file.".to_owned(),
+            "Run trace align --summary once more and report only the compact final summary.".to_owned(),
+            "Do not rerun alignment after each individual proof row.".to_owned(),
+        ],
+        groups,
+    }
+}
+
+pub fn write_proof_digest_json(path: &Path, digest: &AlignProofDigest) -> Result<PathBuf> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| Error::Write {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    let content = serde_json::to_vec_pretty(digest)?;
+    fs::write(path, content).map_err(|source| Error::Write {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(path.to_path_buf())
 }
 
 fn completion_summary_for(
@@ -342,6 +473,49 @@ fn requirement_completion_summary(
         requirements,
         missing_proof: missing,
     }
+}
+
+fn phase_requirement_gaps(
+    decision: &decision::Decision,
+    ledger: &ExecutionLedger,
+    has_execution_trace: bool,
+) -> Vec<AlignPhaseRequirementGap> {
+    phase_requirements(decision)
+        .into_iter()
+        .filter_map(|(phase, requirement)| {
+            if ledger.has_requirement_satisfied(&phase, &requirement) {
+                return None;
+            }
+            if ledger.has_requirement_failed(&phase, &requirement) {
+                return Some(AlignPhaseRequirementGap {
+                    phase: phase.clone(),
+                    requirement: requirement.clone(),
+                    status: AlignPhaseRequirementGapStatus::Failed,
+                    needed: format!(
+                        "requirement `{requirement}` in phase `{phase}` has a failed progress event"
+                    ),
+                });
+            }
+            let status = if has_execution_trace {
+                AlignPhaseRequirementGapStatus::Missing
+            } else {
+                AlignPhaseRequirementGapStatus::NotEvaluated
+            };
+            let needed = if has_execution_trace {
+                format!("requirement `{requirement}` in phase `{phase}` has no progress event")
+            } else {
+                format!(
+                    "requirement `{requirement}` in phase `{phase}` was not checked; no execution trace supplied"
+                )
+            };
+            Some(AlignPhaseRequirementGap {
+                phase,
+                requirement,
+                status,
+                needed,
+            })
+        })
+        .collect()
 }
 
 fn phase_requirements(decision: &decision::Decision) -> Vec<(String, String)> {
@@ -609,6 +783,96 @@ fn evidence_gaps(checks: &[AlignCheck], obligations: &[AlignObligation]) -> Vec<
         });
     }
     gaps
+}
+
+fn proof_digest_group_for(
+    gap: &AlignEvidenceGap,
+) -> (
+    &'static str,
+    Option<&'static str>,
+    Vec<&'static str>,
+    &'static str,
+) {
+    match (gap.kind, gap.obligation_kind) {
+        (AlignEvidenceGapKind::DecisionTrace, _) => (
+            "decision_trace",
+            None,
+            vec![],
+            "Progress events cannot prove missing deterministic decision facts; recreate or compact the decision trace instead.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::Route)) => (
+            "route_fulfillment",
+            Some("route_fulfilled"),
+            vec!["event=route_fulfilled", "id", "status=pass", "evidence.kind", "evidence.ref"],
+            "Record this only after the selected route actually completed.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::RouteCheck)) => (
+            "route_check",
+            Some("route_check_completed"),
+            vec![
+                "event=route_check_completed",
+                "id",
+                "status=pass",
+                "evidence.kind",
+                "evidence.ref",
+            ],
+            "Record this only after the route check actually passed.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::Forbid)) => (
+            "forbid_no_violation",
+            Some("obligation_satisfied"),
+            vec![
+                "event=obligation_satisfied",
+                "id",
+                "status=pass",
+                "evidence.kind=no_violation",
+                "evidence.ref",
+            ],
+            "Record this only when the execution ledger or reviewed artifacts prove the forbidden action did not happen.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::Elicitation)) => (
+            "elicitation",
+            Some("elicitation_answered or elicitation_waived"),
+            vec![
+                "event=elicitation_answered|elicitation_waived",
+                "id",
+                "status=pass",
+                "evidence.kind",
+                "evidence.ref",
+            ],
+            "Use answered when the user supplied the answer; use waived only when the user or route explicitly allowed a waiver.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::AfterSuccess)) => (
+            "after_success",
+            Some("after_success_completed"),
+            vec![
+                "event=after_success_completed",
+                "id",
+                "status=pass",
+                "evidence.kind",
+                "evidence.ref",
+            ],
+            "Record this only after the closure actually completed.",
+        ),
+        (AlignEvidenceGapKind::ExecutionObligation, Some(AlignObligationKind::UserRequirement))
+        | (AlignEvidenceGapKind::ExecutionObligation, None) => (
+            "execution_obligation",
+            Some("obligation_satisfied"),
+            vec!["event=obligation_satisfied", "id", "status=pass", "evidence.kind", "evidence.ref"],
+            "Record this only when concrete evidence proves the obligation.",
+        ),
+    }
+}
+
+fn proof_row_for_gap<'a>(
+    report: &'a AlignReport,
+    gap: &AlignEvidenceGap,
+) -> Option<&'a AlignProofRow> {
+    let prefix = format!("{} (", gap.id);
+    report
+        .proof_rows
+        .iter()
+        .find(|row| row.obligation.starts_with(&prefix))
 }
 
 fn align_conclusion(

@@ -220,7 +220,8 @@ skillspec progress show skill.spec.yml --run .skillspec/traces/<run-id>
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 `import-skill` preserves source material; it does not pretend to understand the
@@ -520,10 +521,14 @@ drafting the final report sections, run `progress final-response --result
 requirements, then rerun `trace align --summary` so the final alignment proves the
 response included evidence, alignment, and token usage.
 
-When final closure needs several route, elicitation, forbid/no-violation, or
-after-success proof rows, write them to a JSONL proof file and run
-`skillspec progress batch` once. This keeps `execution.jsonl` exact without
-making the user watch a parade of bookkeeping commands.
+At final proof time, use a two-align loop: run one initial
+`trace align --summary --proof-digest <run-dir>/proof-digest.json`, build
+`<run-dir>/final-proof.jsonl` from that digest and real evidence, run
+`skillspec progress batch` once, then run one final `trace align --summary`.
+Do not rerun alignment after each individual proof row. When final closure needs
+several route, route-check, elicitation, forbid/no-violation, or after-success
+proof rows, this keeps `execution.jsonl` exact without making the user watch a
+parade of bookkeeping commands.
 
 The agent remains the executor. SkillSpec supplies the contract and the phase
 tracker so the harness can ask "what is the current phase?" and "what remains?"
@@ -557,7 +562,8 @@ skillspec trace compact .skillspec/traces/<run-id>
 skillspec trace align path/to/skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 `trace align --summary` replays the captured input against the current spec and
@@ -570,9 +576,11 @@ It writes the full alignment report to
 `.skillspec/traces/<run-id>/alignment.json` so the completion summary and token
 usage are durable run artifacts.
 Use `--summary` for normal harness runs; it prints only the completion-facing
-block plus the alignment report path. Omit `--summary` only for debugging,
-failure triage, or explicit user requests for detailed checks. The summary
-block is:
+block plus the alignment report path. Add `--proof-digest` during completion
+audits to write grouped missing-proof rows for one `progress batch` command
+instead of a repeated align-record-align loop. Omit `--summary` only for
+debugging, failure triage, or explicit user requests for detailed checks. The
+summary block is:
 
 ```text
 alignment_summary:
@@ -585,6 +593,8 @@ alignment_summary:
 token_usage:
   Token consumption: total 1234 tokens
   Token savings: 3729702 tokens saved by query reduction (4439892 cached response tokens reduced to 710190 query-result tokens, 84.0% reduction)
+alignment_report: .skillspec/traces/<run-id>/alignment.json
+proof_digest: .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 When token stats are absent, `Token consumption` and `Token savings` are shown

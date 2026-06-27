@@ -90,9 +90,10 @@ stable JSONL stream and summary for later review.
 
 ## Alignment
 
-`skillspec trace align <spec> --decision-trace <run_dir> --summary` compares
-the current spec with a decision trace and prints only the completion-facing
-summary for normal harness use.
+`skillspec trace align <spec> --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json`
+compares the current spec with a decision trace, prints only the
+completion-facing summary for normal harness use, and writes a grouped
+missing-proof digest for batch final proof cleanup.
 
 The aligner:
 
@@ -120,9 +121,12 @@ The report includes:
 - user-facing `proof_rows`.
 
 `skillspec trace align --summary` writes the full report to
-`<run_dir>/alignment.json` while keeping terminal output compact. Omit
-`--summary` only for debugging, failure triage, or explicit user requests for
-detailed checks.
+`<run_dir>/alignment.json` while keeping terminal output compact.
+`--proof-digest` writes `<run_dir>/proof-digest.json`, grouping missing phase
+requirements, route fulfillment, route checks, forbids, elicitations, and
+after-success closures by the event shape needed for one `progress batch`
+append. Omit `--summary` only for debugging, failure triage, or explicit user
+requests for detailed checks.
 
 `ok` is true when no deterministic check failed. A report can have `ok: true`
 and `status: unproven` when decision replay succeeded but execution proof is
@@ -259,7 +263,10 @@ skillspec decide skill.spec.yml --input '<task>' --trace-dir .skillspec/traces
 After execution:
 
 ```sh
-skillspec trace align skill.spec.yml --decision-trace .skillspec/traces/<run-id> --summary
+skillspec trace align skill.spec.yml \
+  --decision-trace .skillspec/traces/<run-id> \
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 When structured execution evidence exists:
@@ -268,7 +275,8 @@ When structured execution evidence exists:
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace execution-ledger.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 The final report should include:

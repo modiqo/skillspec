@@ -471,7 +471,7 @@ Proof is the difference between "the agent probably followed the skill" and
 | Act | `skillspec act ...` | The next phase has a concrete checklist and tool boundary. |
 | Record | `skillspec progress record ...` | The run ledger captures phase, requirement, and evidence events. |
 | Review | `skillspec progress show ...` | The execution ledger has progress events and no observed forbidden actions. Use it as an internal gate check unless details are needed. |
-| Align | `skillspec trace align ... --summary` | The current spec can replay the decision and match execution evidence to obligations while keeping full detail in `alignment.json`. |
+| Align | `skillspec trace align ... --summary --proof-digest ...` | The current spec can replay the decision, match execution evidence to obligations, and group missing proof for one final batch while keeping full detail in `alignment.json`. |
 
 Run a realistic task through the spec:
 
@@ -503,8 +503,15 @@ Align decision and execution proof:
 skillspec trace align ./my-skill/skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
+
+If the summary is partial and several proof rows are genuinely satisfied by
+evidence already on disk, write them to
+`.skillspec/traces/<run-id>/final-proof.jsonl`, run `skillspec progress batch`
+once, then rerun `trace align --summary` once. Do not rerun alignment after
+each individual proof row.
 
 ### What The Report Tells You
 

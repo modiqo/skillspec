@@ -422,6 +422,7 @@ pub(super) fn run(command: Command) -> Result<()> {
                 path,
                 decision_trace,
                 execution_trace,
+                proof_digest,
                 summary,
                 json,
             } => {
@@ -429,13 +430,30 @@ pub(super) fn run(command: Command) -> Result<()> {
                 let report =
                     align::align_decision_trace(&spec, &path, &decision_trace, &execution_trace)?;
                 let alignment_report = align::write_report_json(&decision_trace, &report)?;
+                let proof_digest_path = match proof_digest {
+                    Some(path) => {
+                        let digest = align::build_proof_digest(&report, &alignment_report);
+                        Some(align::write_proof_digest_json(&path, &digest)?)
+                    }
+                    None => None,
+                };
                 if json {
                     report::alignment_written(&alignment_report)?;
+                    if let Some(path) = &proof_digest_path {
+                        report::proof_digest_written(path)?;
+                    }
                     report::json(&report)?;
                 } else if summary {
-                    report::align_summary(&report, &alignment_report)?;
+                    report::align_summary(
+                        &report,
+                        &alignment_report,
+                        proof_digest_path.as_deref(),
+                    )?;
                 } else {
                     report::alignment_written(&alignment_report)?;
+                    if let Some(path) = &proof_digest_path {
+                        report::proof_digest_written(path)?;
+                    }
                     report::align(&report)?;
                 }
                 if report.has_failures() {

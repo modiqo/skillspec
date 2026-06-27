@@ -34,7 +34,8 @@ skillspec progress show <spec> --run .skillspec/traces/<run-id>
 skillspec trace align <spec> \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 `plan`, `act`, and `progress` are not generic workflow execution commands.
@@ -258,7 +259,8 @@ execution ledger:
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
 
 The compact output separates two layers:
@@ -391,8 +393,15 @@ the user-visible transcript unless it is needed for a decision.
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary
+  --summary \
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
 ```
+
+Use the digest to avoid a visible re-alignment loop. If alignment reports
+several missing route, route-check, requirement, elicitation, forbid/no-violation,
+or closure proof rows, create `.skillspec/traces/<run-id>/final-proof.jsonl`,
+append it once with `skillspec progress batch`, then rerun alignment once. Do
+not rerun alignment after each individual proof row.
 
 The final response should include:
 

@@ -64,6 +64,8 @@ pub struct AlignSummary {
     pub unproven_obligation_kinds: Vec<AlignObligationKindCount>,
     /// Missing proof items that explain an `unproven` status.
     pub evidence_gaps: Vec<AlignEvidenceGap>,
+    /// Phase requirements that still need explicit structured proof.
+    pub phase_requirement_gaps: Vec<AlignPhaseRequirementGap>,
     /// Compact completion-facing summary suitable for final agent responses.
     pub completion: AlignCompletionSummary,
     /// Token consumption and savings evidence supplied by the execution ledger.
@@ -142,6 +144,27 @@ pub struct AlignEvidenceGap {
     pub obligation_kind: Option<AlignObligationKind>,
     pub source: String,
     pub needed: String,
+}
+
+/// One missing phase requirement proof item.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignPhaseRequirementGap {
+    pub phase: String,
+    pub requirement: String,
+    pub status: AlignPhaseRequirementGapStatus,
+    pub needed: String,
+}
+
+/// Why a phase requirement remains in the proof digest.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AlignPhaseRequirementGapStatus {
+    /// No execution ledger was supplied, so the requirement could not be checked.
+    NotEvaluated,
+    /// An execution ledger was supplied, but no matching requirement proof row exists.
+    Missing,
+    /// A matching requirement_failed row exists and must be resolved before pass.
+    Failed,
 }
 
 /// Source category for a missing proof item.
@@ -235,6 +258,60 @@ pub struct AlignProofRow {
     pub observed_evidence: String,
     pub status: AlignProofStatus,
     pub explanation: String,
+}
+
+/// Grouped proof-planning digest emitted beside an alignment report.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignProofDigest {
+    /// Schema identifier for the digest payload.
+    pub schema: String,
+    /// Overall alignment status from the source report.
+    pub status: AlignStatus,
+    /// Completion-facing alignment label, such as pass, partial, or fail.
+    pub alignment: String,
+    /// Alignment report this digest summarizes.
+    pub alignment_report: String,
+    /// Suggested batch file path for final proof events.
+    pub suggested_batch_file: String,
+    /// Number of missing proof items across all digest groups.
+    pub missing_count: usize,
+    /// How agents should use this digest without creating a visible progress loop.
+    pub recommended_loop: Vec<String>,
+    /// Missing proof grouped by the event shape needed to close it.
+    pub groups: Vec<AlignProofDigestGroup>,
+}
+
+/// A batchable group of missing proof items.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignProofDigestGroup {
+    pub kind: String,
+    pub count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recommended_event: Option<String>,
+    pub required_fields: Vec<String>,
+    pub items: Vec<AlignProofDigestItem>,
+}
+
+/// One item in a proof digest group.
+#[derive(Clone, Debug, Serialize)]
+pub struct AlignProofDigestItem {
+    pub id: String,
+    pub source: String,
+    pub needed: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requirement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub obligation_kind: Option<AlignObligationKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recommended_event: Option<String>,
+    pub required_fields: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_evidence: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_evidence: Option<String>,
+    pub note: String,
 }
 
 /// A route, guard, elicitation, or closure that execution evidence must prove.
