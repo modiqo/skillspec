@@ -314,8 +314,11 @@ For installing SkillSpec itself into a harness, prefer the official plugin
 marketplace flow:
 
 ```sh
-cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
+cargo install skillspec
 skillspec --version
+
+# unreleased main
+cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
 
 claude plugin marketplace add modiqo/skillspec --sparse .claude-plugin plugins/skillspec
 claude plugin install skillspec@skillspec
@@ -804,11 +807,13 @@ draft generation, install target behavior, full JSON Schema validation against
 examples, conformance fixtures, and golden snapshots for compiler/importer
 output.
 
-CI runs a full Ubuntu quality gate plus native locked build/test jobs on Linux,
-macOS, and Windows.
+CI runs a full Ubuntu quality gate, verifies the crates.io package with
+`cargo publish --locked --dry-run -p skillspec`, and runs native locked
+build/test jobs on Linux, macOS, and Windows.
 
-Tagged releases and manual release runs build native CLI archives for Linux,
-macOS, and Windows with SHA-256 checksums.
+Tagged releases build native CLI archives for Linux, macOS, and Windows with
+SHA-256 checksums and publish the `skillspec` crate to crates.io when the
+`CARGO_REGISTRY_TOKEN` repository secret is configured.
 
 The minimum compliance gate for a SkillSpec-backed skill is:
 

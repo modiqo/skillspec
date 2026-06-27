@@ -5,6 +5,20 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "CLI for validating, testing, and compiling SkillSpec files"
+readme = "README.md"
+homepage = "https://github.com/modiqo/skillspec"
+documentation = "https://github.com/modiqo/skillspec/tree/main/docs"
+keywords = ["skillspec", "agents", "skills", "cli", "alignment"]
+categories = ["command-line-utilities", "development-tools"]
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "README.md",
+    "src/**",
+    "spec/**",
+]
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }

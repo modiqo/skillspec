@@ -3,8 +3,8 @@ use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Write;
 
-const GRAMMAR_MD: &str = include_str!("../../../../spec/grammar.md");
-const SCHEMA_JSON: &str = include_str!("../../../../spec/skill.spec.schema.json");
+const GRAMMAR_MD: &str = include_str!("../../spec/grammar.md");
+const SCHEMA_JSON: &str = include_str!("../../spec/skill.spec.schema.json");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -1,0 +1,28 @@
+# SkillSpec CLI
+
+`skillspec` is the command-line interface for SkillSpec: a structured contract
+format for agent skills.
+
+It validates, tests, imports, compiles, routes, runs guided loops, records
+progress, and prints alignment reports for SkillSpec-backed skills.
+
+Install from crates.io:
+
+```sh
+cargo install skillspec
+skillspec --version
+```
+
+Then install the SkillSpec plugin into your agent harness from the repository
+marketplace. See the project README for Claude and Codex plugin install
+commands:
+
+<https://github.com/modiqo/skillspec>
+
+Local development install:
+
+```sh
+cargo install --path crates/skillspec-cli --force
+```
+
+License: MIT OR Apache-2.0.

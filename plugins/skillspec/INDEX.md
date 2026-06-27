@@ -10,6 +10,6 @@ and alignment guidance.
 The CLI must be installed separately:
 
 ```sh
-cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
+cargo install skillspec
 skillspec --version
 ```

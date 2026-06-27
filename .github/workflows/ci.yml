@@ -43,6 +43,9 @@ jobs:
       - name: Run tests
         run: cargo test --locked --workspace --all-targets
 
+      - name: Verify crates.io package
+        run: cargo publish --locked --dry-run -p skillspec
+
       - name: Build CLI
         shell: bash
         run: |
