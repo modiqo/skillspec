@@ -58,20 +58,18 @@ jobs:
           set -euo pipefail
           mkdir -p doctor-reports
           skillspec doctor skills/skillspec/ | tee doctor-reports/skillspec-doctor.txt
+          skillspec doctor skills/skillspec/ --markdown > doctor-reports/skillspec-doctor.md
           skillspec doctor skills/skillspec/ --json > doctor-reports/skillspec-doctor.json
           skillspec doctor skills/skillspec/ --html > doctor-reports/skillspec-doctor.html
 
           {
-            echo "## SkillSpec Doctor Dogfood"
+            cat doctor-reports/skillspec-doctor.md
             echo
-            echo "Target: \`skills/skillspec/\`"
-            echo
-            echo '```text'
-            cat doctor-reports/skillspec-doctor.txt
-            echo '```'
+            echo "---"
             echo
             echo "Artifacts:"
             echo "- \`skillspec-doctor.txt\`"
+            echo "- \`skillspec-doctor.md\`"
             echo "- \`skillspec-doctor.json\`"
             echo "- \`skillspec-doctor.html\`"
           } >> "${GITHUB_STEP_SUMMARY}"

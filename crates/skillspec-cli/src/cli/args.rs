@@ -157,11 +157,14 @@ pub(super) enum Command {
         /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
         path: String,
         /// Emit machine-readable JSON instead of the formatted human report.
-        #[arg(long, conflicts_with = "html")]
+        #[arg(long, conflicts_with_all = ["html", "markdown"])]
         json: bool,
         /// Emit a self-contained HTML report instead of the formatted human report.
-        #[arg(long, conflicts_with = "json")]
+        #[arg(long, conflicts_with_all = ["json", "markdown"])]
         html: bool,
+        /// Emit GitHub-flavored Markdown instead of the formatted human report.
+        #[arg(long, conflicts_with_all = ["json", "html"])]
+        markdown: bool,
     },
     #[command(
         about = "Show installed SkillSpec lifecycle status, roots, router index state, and skill inventory"

@@ -137,6 +137,7 @@ Current command:
 
 ```sh
 skillspec doctor <target>
+skillspec doctor <target> --markdown
 skillspec doctor <target> --html
 skillspec doctor <target> --json
 ```

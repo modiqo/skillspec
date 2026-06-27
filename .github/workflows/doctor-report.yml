@@ -151,6 +151,7 @@ jobs:
               "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh",
               "git clone <your-private-repo-url>",
               "skillspec doctor /path/to/local/skill",
+              "skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md",
               "skillspec doctor /path/to/local/skill --html > skillspec-doctor.html",
               "skillspec doctor /path/to/local/skill --json > skillspec-doctor.json",
               "````",
@@ -212,6 +213,7 @@ jobs:
           echo "status=${status}" >> "${GITHUB_OUTPUT}"
 
           if [ "${status}" -eq 0 ]; then
+            target/debug/skillspec doctor "${TARGET}" --markdown > doctor-report/doctor-report.md
             target/debug/skillspec doctor "${TARGET}" --html > doctor-report/doctor-report.html
             target/debug/skillspec doctor "${TARGET}" --json > doctor-report/doctor-report.json
           fi
@@ -219,31 +221,22 @@ jobs:
       - name: Add doctor report to run summary
         if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
         shell: bash
-        env:
-          TARGET: ${{ steps.parse.outputs.target }}
         run: |
           set -euo pipefail
           max_report_chars=52000
-          report_bytes=$(wc -c < doctor-report/doctor-report.txt | tr -d ' ')
+          report_bytes=$(wc -c < doctor-report/doctor-report.md | tr -d ' ')
 
           {
-            echo "## SkillSpec Doctor report"
-            echo
-            echo "Target:"
-            echo
-            echo '```text'
-            printf '%s\n' "${TARGET}"
-            echo '```'
-            echo
-            echo '```text'
-            head -c "${max_report_chars}" doctor-report/doctor-report.txt
+            head -c "${max_report_chars}" doctor-report/doctor-report.md
             echo
             if [ "${report_bytes}" -gt "${max_report_chars}" ]; then
-              echo "... report truncated in run summary. Download the artifact for the full report."
+              echo
+              echo "> Report truncated in run summary. Download the artifact for the full report."
             fi
-            echo '```'
             echo
-            echo "Full text, HTML, and JSON reports are attached as workflow artifacts."
+            echo "---"
+            echo
+            echo "Full Markdown, text, HTML, and JSON reports are attached as workflow artifacts."
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Add doctor failure to run summary
@@ -292,38 +285,27 @@ jobs:
         if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
         uses: actions/github-script@v7
         env:
-          TARGET: ${{ steps.parse.outputs.target }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         with:
           script: |
             const fs = require("fs");
             const marker = "<!-- skillspec-doctor-report -->";
-            const report = fs.readFileSync("doctor-report/doctor-report.txt", "utf8");
+            const report = fs.readFileSync("doctor-report/doctor-report.md", "utf8");
             const maxReportChars = 52000;
             const renderedReport = report.length > maxReportChars
-              ? `${report.slice(0, maxReportChars)}\n\n... report truncated in issue comment. Download the artifact for the full report.`
+              ? `${report.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
               : report;
-            const target = process.env.TARGET;
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
-              "### SkillSpec Doctor report",
-              "",
-              "Target:",
-              "",
-              "````text",
-              target,
-              "````",
-              "",
-              "````text",
               renderedReport,
-              "````",
               "",
               `Full artifacts: ${artifactUrl}`,
               "",
               "The artifact contains:",
               "",
               "- `doctor-report.txt`",
+              "- `doctor-report.md`",
               "- `doctor-report.html`",
               "- `doctor-report.json`",
               "- `target.txt`",
@@ -389,6 +371,7 @@ jobs:
               "````sh",
               "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh",
               "skillspec doctor /path/to/local/skill",
+              "skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md",
               "skillspec doctor /path/to/local/skill --html > skillspec-doctor.html",
               "````",
             ].join("\n");

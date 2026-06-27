@@ -202,9 +202,10 @@ Before importing, classify the source shape:
 | Existing reviewed `skill.spec.yml` | revise the spec from grammar/current-spec handles; do not re-import |
 
 Use `skillspec doctor <target>` as the cheap shape gate when the source could
-be a repo URI or parent folder. The default output is a formatted user report;
-use `--html` for a self-contained review page and `--json` when a caller needs
-the full machine report. It reports `simple_skill`,
+be a repo URI or parent folder. The default output is a formatted terminal
+report; use `--markdown` for GitHub summaries or issue comments, `--html` for a
+self-contained review page, and `--json` when a caller needs the full machine
+report. It reports `simple_skill`,
 `entry_skill_with_subskills`, `multi_skill_workspace`, `plugin_workspace`, or
 `non_skill_repository`. `simple_skill` gets full source-map structural scoring
 plus frontmatter discovery and agent drift risk. Multi-skill,

@@ -6015,6 +6015,42 @@ description: Review one file and report risks.
 }
 
 #[test]
+fn doctor_markdown_output_is_renderable_report(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-markdown-report");
+    let root = dir.path().join("review-skill");
+    write_file(
+        &root.join("SKILL.md"),
+        r#"---
+name: review-skill
+description: Review one file and report risks.
+---
+# Review Skill
+
+1. Read the requested file.
+2. Report risks.
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--markdown")
+        .output()?;
+    assert_success(&output);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("# SkillSpec Doctor report"));
+    assert!(stdout.contains("## Assessment"));
+    assert!(stdout.contains("## Surface"));
+    assert!(stdout.contains("## Findings"));
+    assert!(stdout.contains("## Next Actions"));
+    assert!(stdout.contains("## Research Basis"));
+    assert!(stdout.contains("**Recommended next action**"));
+    assert!(!stdout.contains("```text\nSkillSpec Doctor"));
+    Ok(())
+}
+
+#[test]
 fn doctor_reports_non_skill_repository_shape_without_source_mapping(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let dir = TempDir::new("doctor-code-repo");

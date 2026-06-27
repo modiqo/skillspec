@@ -171,6 +171,217 @@ pub fn render(report: &DoctorReport) -> String {
     output
 }
 
+pub fn render_markdown(report: &DoctorReport) -> String {
+    let mut output = String::new();
+
+    output.push_str("# SkillSpec Doctor report\n\n");
+    output.push_str(&format!(
+        "**Target:** {}\n\n",
+        markdown_location(&report.target)
+    ));
+    output.push_str(&format!(
+        "**Shape:** {} - {}\n\n",
+        inline_code(&report.shape.kind),
+        markdown_text(&report.shape.summary)
+    ));
+    output.push_str(&format!(
+        "**Status:** {}\n\n",
+        inline_code(&report.analysis_status)
+    ));
+    if let Some(staged_from) = &report.staged_from {
+        output.push_str(&format!(
+            "**Remote:** {}\n\n",
+            markdown_location(staged_from)
+        ));
+    }
+    if let Some(primary) = &report.shape.primary_skill {
+        output.push_str(&format!("**Primary skill:** {}\n\n", inline_code(primary)));
+    }
+
+    output.push_str("## Assessment\n\n");
+    output.push_str(&format!(
+        "- **Verdict:** {}\n",
+        markdown_text(&report.verdict)
+    ));
+    if report.analysis_status == "shape_only" {
+        output
+            .push_str("- **Structural score:** not evaluated; doctor stopped at shape analysis.\n");
+    } else {
+        output.push_str(&format!(
+            "- **Structural score:** `{}/100`\n",
+            report.structural_score
+        ));
+    }
+    if let Some((label, score, level)) = primary_risk(report) {
+        output.push_str(&format!(
+            "- **Follow-through risk:** **{}** (`{}/100`, {})\n",
+            level.as_str(),
+            score,
+            markdown_text(label)
+        ));
+    }
+    if let Some(frontmatter) = &report.frontmatter_discovery_risk {
+        output.push_str(&format!(
+            "- **Discovery risk:** **{}** (`{}/100`)\n",
+            frontmatter.level.as_str(),
+            frontmatter.score
+        ));
+    }
+    if let Some(mitigation) = &report.contract_mitigation {
+        output.push_str(&format!(
+            "- **Contract mitigation:** **{}**; residual risk is **{}** (`{}/100`)\n",
+            mitigation.level.as_str(),
+            mitigation.residual_risk_level.as_str(),
+            mitigation.residual_risk_score
+        ));
+        output.push_str(&format!(
+            "- **Contract surface:** `{}` route(s), `{}` rule(s), `{}` command(s), `{}` dependency item(s), `{}` test(s)\n",
+            mitigation.routes,
+            mitigation.rules,
+            mitigation.commands,
+            mitigation.dependencies,
+            mitigation.tests
+        ));
+    }
+    if let Some(risk) = &report.raw_activation_risk {
+        output.push_str(&format!(
+            "- **Raw activation risk:** **{}** (`{}/100` before contract mitigation)\n",
+            risk.level.as_str(),
+            risk.score
+        ));
+    }
+
+    output.push_str("\n## Surface\n\n");
+    output.push_str(&format!(
+        "- **Activation body:** `{}` line(s), `{}` byte(s), approximately `{}` token(s)\n",
+        report.surface.activation_lines,
+        report.surface.activation_bytes,
+        report.surface.activation_estimated_tokens
+    ));
+    output.push_str(&format!(
+        "- **Deferred resources:** `{}` file(s), `{}` byte(s)\n",
+        report.surface.deferred_files, report.surface.deferred_bytes
+    ));
+    output.push_str(&format!(
+        "- **Frontmatter:** `{}` line(s), `{}` byte(s)\n",
+        report.surface.frontmatter_lines, report.surface.frontmatter_bytes
+    ));
+    output.push_str(&format!(
+        "- **Activation-loaded surface:** `{}%`\n",
+        report.large_surface_percentage
+    ));
+    output.push_str(&format!(
+        "- **Unmapped package files:** `{}`\n",
+        report.surface.unmapped_files
+    ));
+    output.push_str(&format!(
+        "- **Instruction signals:** `{}` modal obligation(s), `{}` late obligation(s), `{}` numbered step(s), `{}` dependency mention(s)\n",
+        report.counts.modal_obligations,
+        report.counts.late_modal_obligations,
+        report.counts.numbered_steps,
+        report.counts.dependency_mentions
+    ));
+    output.push_str(&format!(
+        "- **Code in active skill:** `{}` block(s), `{}` unlabeled\n",
+        report.counts.code_blocks_in_skill, report.counts.unlabeled_code_blocks_in_skill
+    ));
+
+    if !report.shape.plugin_roots.is_empty()
+        || !report.shape.referenced_skill_paths.is_empty()
+        || !report.shape.negative_signals.is_empty()
+    {
+        output.push_str("\n## Shape Details\n\n");
+        if !report.shape.plugin_roots.is_empty() {
+            output.push_str("### Plugin Roots\n\n");
+            for plugin in &report.shape.plugin_roots {
+                output.push_str(&format!(
+                    "- **{}** at {} with `{}` skill file(s)\n",
+                    markdown_text(&plugin.namespace),
+                    inline_code(&plugin.path),
+                    plugin.skill_files.len()
+                ));
+            }
+            output.push('\n');
+        }
+        if !report.shape.referenced_skill_paths.is_empty() {
+            output.push_str("### Referenced Skills\n\n");
+            for path in &report.shape.referenced_skill_paths {
+                output.push_str(&format!("- {}\n", inline_code(path)));
+            }
+            output.push('\n');
+        }
+        if !report.shape.negative_signals.is_empty() {
+            output.push_str("### Negative Signals\n\n");
+            for signal in &report.shape.negative_signals {
+                output.push_str(&format!("- {}\n", markdown_text(signal)));
+            }
+        }
+    }
+
+    if !report.packages.is_empty() {
+        output.push_str("\n## Packages\n\n");
+        for package in report.packages.iter().take(12) {
+            output.push_str(&render_package_markdown(package));
+        }
+        if report.packages.len() > 12 {
+            output.push_str(&format!(
+                "\n{} more package(s) omitted. Use `--json` for the full list.\n",
+                report.packages.len() - 12
+            ));
+        }
+    }
+
+    output.push_str("\n## Findings\n\n");
+    if report.issues.is_empty() {
+        output.push_str("No static structure issues detected.\n");
+    } else {
+        for (index, issue) in report.issues.iter().take(8).enumerate() {
+            output.push_str(&render_issue_markdown(index + 1, issue));
+        }
+        if report.issues.len() > 8 {
+            output.push_str(&format!(
+                "\n{} more finding(s) omitted. Use `--json` or `--html` for the full report.\n",
+                report.issues.len() - 8
+            ));
+        }
+    }
+
+    output.push_str("\n## Next Actions\n\n");
+    output.push_str("**Recommended next action**\n\n");
+    output.push_str("```text\n");
+    output.push_str(&report.shape.recommended_command);
+    output.push_str("\n```\n\n");
+    for step in &report.suggested_next_steps {
+        output.push_str(&format!("- {}\n", markdown_text_preserve_code(step)));
+    }
+
+    output.push_str("\n## Research Basis\n\n");
+    output.push_str(&format!(
+        "{} cited basis item(s) are attached to this report.\n\n",
+        report.basis.len()
+    ));
+    for basis in report.basis.iter().take(6) {
+        output.push_str(&format!(
+            "- **{}** - {} ([{}]({}))\n",
+            markdown_text(&basis.id),
+            markdown_text(&basis.claim),
+            markdown_text(&basis.citation),
+            markdown_link_url(&basis_href(&basis.source))
+        ));
+    }
+    if report.basis.len() > 6 {
+        output.push_str(&format!(
+            "- {} more basis item(s) omitted. Use `--json` for the full basis registry.\n",
+            report.basis.len() - 6
+        ));
+    }
+    output
+        .push_str("\nUse `--html` for a shareable review page or `--json` for machine evidence.\n");
+
+    trim_trailing_newline(&mut output);
+    output
+}
+
 pub fn render_html(report: &DoctorReport) -> String {
     let mut output = String::new();
     let (risk_label, risk_score, risk_level) = primary_risk(report)
@@ -476,6 +687,112 @@ fn render_issue_html(issue: &DoctorIssue) -> String {
         escape_html(&issue.remediation)
     ));
     output
+}
+
+fn render_package_markdown(package: &DoctorPackageRiskReport) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("### {}\n\n", markdown_text(&package.package_id)));
+    output.push_str(&format!("- **Path:** {}\n", inline_code(&package.path)));
+    output.push_str(&format!(
+        "- **Role:** {}\n",
+        markdown_text(&package.shape_role)
+    ));
+    output.push_str(&format!(
+        "- **Drift risk:** **{}**\n",
+        package.agent_drift_risk.level.as_str()
+    ));
+    output.push_str(&format!(
+        "- **Discovery risk:** **{}**\n\n",
+        package.frontmatter_discovery_risk.level.as_str()
+    ));
+    output
+}
+
+fn render_issue_markdown(index: usize, issue: &DoctorIssue) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "### {}. {}: {}\n\n",
+        index,
+        issue.severity.to_uppercase(),
+        markdown_text(&issue.title)
+    ));
+    if let Some(location) = &issue.location {
+        output.push_str(&format!(
+            "**Location:** {}\n\n",
+            markdown_location(location)
+        ));
+    }
+    output.push_str(&format!(
+        "**Evidence:** {}\n\n",
+        markdown_text(&issue.evidence)
+    ));
+    if !issue.basis.is_empty() {
+        let basis = issue
+            .basis
+            .iter()
+            .map(|id| inline_code(id))
+            .collect::<Vec<_>>()
+            .join(", ");
+        output.push_str(&format!("**Basis:** {basis}\n\n"));
+    }
+    output.push_str(&format!(
+        "**Fix:** {}\n\n",
+        markdown_text(&issue.remediation)
+    ));
+    output
+}
+
+fn markdown_location(value: &str) -> String {
+    if value.starts_with("http://") || value.starts_with("https://") {
+        format!("[{}]({})", markdown_text(value), markdown_link_url(value))
+    } else {
+        inline_code(value)
+    }
+}
+
+fn markdown_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn markdown_text_preserve_code(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut in_code = false;
+    for ch in value.chars() {
+        if ch == '`' {
+            in_code = !in_code;
+            output.push(ch);
+        } else if in_code {
+            output.push(ch);
+        } else {
+            match ch {
+                '&' => output.push_str("&amp;"),
+                '<' => output.push_str("&lt;"),
+                '>' => output.push_str("&gt;"),
+                _ => output.push(ch),
+            }
+        }
+    }
+    output
+}
+
+fn markdown_link_url(value: &str) -> String {
+    value
+        .replace(' ', "%20")
+        .replace(')', "%29")
+        .replace('(', "%28")
+}
+
+fn inline_code(value: &str) -> String {
+    let max_tick_run = value.split(|ch| ch != '`').map(str::len).max().unwrap_or(0);
+    let ticks = "`".repeat(max_tick_run + 1);
+    if max_tick_run == 0 {
+        format!("{ticks}{value}{ticks}")
+    } else {
+        format!("{ticks} {value} {ticks}")
+    }
 }
 
 fn metric_card(label: &str, value: &str, detail: &str, level: &str) -> String {

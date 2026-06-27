@@ -19,12 +19,13 @@ The CI quality job builds the local CLI and then runs:
 
 ```sh
 skillspec doctor skills/skillspec/
+skillspec doctor skills/skillspec/ --markdown
 skillspec doctor skills/skillspec/ --json
 skillspec doctor skills/skillspec/ --html
 ```
 
-The formatted report is printed into the GitHub job summary. The text, JSON, and
-HTML reports are uploaded as the `skillspec-doctor-dogfood` artifact.
+The Markdown report is printed into the GitHub job summary. The text, Markdown,
+JSON, and HTML reports are uploaded as the `skillspec-doctor-dogfood` artifact.
 
 Dogfood is observational first. CI should not fail merely because doctor finds a
 medium or high issue; otherwise the report becomes a noisy gate instead of a
@@ -58,6 +59,7 @@ workflow comments with local-run instructions:
 curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
 git clone <your-private-repo-url>
 skillspec doctor /path/to/local/skill
+skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md
 skillspec doctor /path/to/local/skill --html > skillspec-doctor.html
 skillspec doctor /path/to/local/skill --json > skillspec-doctor.json
 ```
@@ -71,16 +73,18 @@ For accepted public targets, the workflow builds the current repo CLI and runs:
 
 ```sh
 skillspec doctor "$target" > doctor-report.txt
+skillspec doctor "$target" --markdown > doctor-report.md
 skillspec doctor "$target" --html > doctor-report.html
 skillspec doctor "$target" --json > doctor-report.json
 ```
 
-The Actions run summary and issue comment both include the formatted text report
-inside a fenced block, so a public user can read the result directly in GitHub
-without downloading an artifact. Long reports are truncated in GitHub surfaces
-and preserved in full in the artifact. The artifact contains:
+The Actions run summary and issue comment both render the Markdown report
+directly, so a public user can read the result directly in GitHub without
+downloading an artifact. Long reports are truncated in GitHub surfaces and
+preserved in full in the artifact. The artifact contains:
 
 - `doctor-report.txt`
+- `doctor-report.md`
 - `doctor-report.html`
 - `doctor-report.json`
 - `target.txt`

@@ -12,7 +12,7 @@ mod risk;
 mod types;
 mod workspace_report;
 
-pub use renderer::{render, render_html};
+pub use renderer::{render, render_html, render_markdown};
 
 use serde::Serialize;
 use std::collections::BTreeSet;
