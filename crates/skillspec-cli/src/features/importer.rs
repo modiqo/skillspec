@@ -18,7 +18,7 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
 }
 
 fn import_skill_from_source(path: &Path, source: &SkillSource) -> Result<SkillSpec> {
-    let analysis = SkillAnalysis::from_source(&source);
+    let analysis = SkillAnalysis::from_source(source);
     let mut dependencies = dependencies_from_analysis(&analysis);
     dependencies.insert(
         import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),

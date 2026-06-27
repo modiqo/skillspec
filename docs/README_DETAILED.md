@@ -48,7 +48,7 @@ import existing skill -> compile for harness -> install -> run -> prove value
 Inside a harness run:
 
 ```text
-sensemake -> plan -> act -> progress -> align -> value report
+run-loop --guide agent -> current gate -> progress -> resume -> align -> value report
 ```
 
 The user sees concrete proof, not vague confidence:
@@ -88,6 +88,7 @@ skillspec grammar schema --help
 skillspec imports check --help
 skillspec deps check --help
 skillspec sensemake --help
+skillspec run-loop --help
 skillspec query --help
 skillspec refs --help
 skillspec capability --help
@@ -162,9 +163,12 @@ Before importing, classify the source shape:
 Use `skillspec doctor <target> --json` as the cheap shape gate when the source
 could be a repo URI or parent folder. It reports `simple_skill`,
 `entry_skill_with_subskills`, `multi_skill_workspace`, `plugin_workspace`, or
-`non_skill_repository`. Full structural scoring only runs for `simple_skill`;
-workspace/plugin/code-repo shapes stop with `analysis_status: shape_only` and a
-recommended next command.
+`non_skill_repository`. `simple_skill` gets full source-map structural scoring
+plus frontmatter discovery and agent drift risk. Multi-skill,
+entry-with-subskills, and plugin-shaped roots get `analysis_status: workspace`,
+an aggregate workspace risk block, and one package report per `SKILL.md` while
+preserving plugin namespaces. Ordinary code repos still stop with
+`analysis_status: shape_only` and a recommended next command.
 
 Inside the installed `/skillspec` skill, plain prompts such as "what is the
 shape of this skill", "shape of skill", and "run doctor on this repo/url" route
@@ -431,7 +435,21 @@ In a harness session, invoke the generated skill normally:
 ```
 
 The generated `SKILL.md` should tell the agent to use the sibling
-`skill.spec.yml`. The runtime flow is a visible loop:
+`skill.spec.yml`. The preferred runtime loop is guide-first:
+
+```sh
+skillspec run-loop path/to/skill.spec.yml \
+  --input='the user task text' \
+  --trace-dir .skillspec/traces \
+  --guide agent
+skillspec run-loop path/to/skill.spec.yml \
+  --resume .skillspec/traces/<run-id> \
+  --guide agent
+```
+
+The guide prints the selected route, current gate, allowed commands, proof end
+anchor, and resume command. The underlying primitives remain available for
+explicit checks and debugging:
 
 ```sh
 skillspec sensemake path/to/skill.spec.yml --view index
@@ -481,9 +499,16 @@ skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```
 
-`sensemake` is the progressive orientation step. It returns the SkillSpec map,
-section roles, counts, ids, and query handles without dumping the whole YAML.
-Use it when the spec shape is unfamiliar.
+`run-loop --guide agent` is the preferred trampoline entry point. It loads the
+spec once, selects the route, opens or resumes a trace run, prints start/current
+/end anchors, writes `<run-dir>/guide-state.json` and
+`<run-dir>/guide-summary.md`, and tells the agent which command or query to use
+next.
+
+`sensemake` is the progressive orientation step. Index view returns the
+SkillSpec map, section roles, counts, and navigation commands without dumping
+all handles. Use `--view full` only when exact route/rule/command/test handles
+are needed.
 
 For `/skillspec create from observed durable execution: "..."`, the prompt
 multiplexer collects durable workspace evidence and then calls the synthesis CLI

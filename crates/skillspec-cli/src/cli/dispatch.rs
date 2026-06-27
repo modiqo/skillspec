@@ -1,11 +1,11 @@
 use super::args::{
-    CapabilityCommand, Command, DepsCommand, DurableExecutorCommand, GrammarCommand,
+    CapabilityCommand, Command, DepsCommand, DurableExecutorCommand, GrammarCommand, GuideModeArg,
     ImportsCommand, InstallCommand, ProgressCommand, RouterCommand, RouterIndexCommand,
     SkillsCommand, SourceCommand, TraceCommand, VisibilityCommand, WorkspaceCommand,
 };
 use skillspec::{
     act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
-    importer, imports, install, model, parser, port_one_shot, progress, report, router,
+    guide, importer, imports, install, model, parser, port_one_shot, progress, report, router,
     router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility, workspace,
     workspace_synthesizer,
 };
@@ -101,27 +101,57 @@ pub(super) fn run(command: Command) -> Result<()> {
         Command::RunLoop {
             path,
             input,
+            resume,
             view,
             trace_dir,
             phase,
+            guide: guide_mode_arg,
             json,
         } => {
             let started = Instant::now();
             let spec = parser::load_spec(&path)?;
-            ensure_trace_available(&spec, trace_dir.as_ref())?;
-            let run_loop_report = run_loop::build_report(
-                &spec,
-                &path,
-                &input,
-                view.into(),
-                trace_dir.as_deref(),
-                phase.as_deref(),
-            )?;
-            let elapsed = started.elapsed();
-            if json {
-                report::json(&run_loop_report)?;
+            if let Some(guide_mode_arg) = guide_mode_arg {
+                if resume.is_none() {
+                    ensure_trace_available(&spec, trace_dir.as_ref())?;
+                }
+                let guide_report = guide::build_report(guide::BuildOptions {
+                    spec: &spec,
+                    spec_path: &path,
+                    input: input.as_deref(),
+                    resume_run_dir: resume.as_deref(),
+                    trace_dir: trace_dir.as_deref(),
+                    phase_override: phase.as_deref(),
+                    guide_mode: guide_mode(guide_mode_arg),
+                })?;
+                if json {
+                    report::json(&guide_report)?;
+                } else {
+                    report::text(&guide::render_text(&guide_report))?;
+                }
             } else {
-                report::text(&run_loop::render_summary(&run_loop_report, elapsed))?;
+                let input = input.ok_or_else(|| error::Error::InvalidInput {
+                    message: "run-loop requires --input unless --guide --resume is used".to_owned(),
+                })?;
+                if resume.is_some() {
+                    return Err(error::Error::InvalidInput {
+                        message: "run-loop --resume requires --guide".to_owned(),
+                    });
+                }
+                ensure_trace_available(&spec, trace_dir.as_ref())?;
+                let run_loop_report = run_loop::build_report(
+                    &spec,
+                    &path,
+                    &input,
+                    view.into(),
+                    trace_dir.as_deref(),
+                    phase.as_deref(),
+                )?;
+                let elapsed = started.elapsed();
+                if json {
+                    report::json(&run_loop_report)?;
+                } else {
+                    report::text(&run_loop::render_summary(&run_loop_report, elapsed))?;
+                }
             }
         }
         Command::Explain {
@@ -1263,6 +1293,13 @@ fn ensure_trace_available(spec: &model::SkillSpec, trace_dir: Option<&PathBuf>) 
         });
     }
     Ok(())
+}
+
+fn guide_mode(mode: GuideModeArg) -> guide::GuideMode {
+    match mode {
+        GuideModeArg::Agent => guide::GuideMode::Agent,
+        GuideModeArg::Full => guide::GuideMode::Full,
+    }
 }
 
 #[cfg(test)]

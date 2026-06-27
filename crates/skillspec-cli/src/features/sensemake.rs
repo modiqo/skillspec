@@ -203,13 +203,27 @@ pub fn render_sensemake(report: &SensemakeReport) -> String {
     }
     writeln!(output).unwrap();
     writeln!(output, "Query handles:").unwrap();
-    for section in &report.sections {
-        let ids = if section.ids.is_empty() {
-            "<none>".to_owned()
-        } else {
-            section.ids.join(", ")
-        };
-        writeln!(output, "- {}: {}", section.name, ids).unwrap();
+    if report.view == View::Index {
+        for section in &report.sections {
+            output.push_str(&format!(
+                "- {}: {} handle(s) hidden in index view\n",
+                section.name, section.count
+            ));
+        }
+        output.push_str(&format!(
+            "- full handles: `skillspec sensemake {} --view full`",
+            report.spec_path
+        ));
+        output.push('\n');
+    } else {
+        for section in &report.sections {
+            let ids = if section.ids.is_empty() {
+                "<none>".to_owned()
+            } else {
+                section.ids.join(", ")
+            };
+            output.push_str(&format!("- {}: {}\n", section.name, ids));
+        }
     }
     writeln!(output).unwrap();
     writeln!(output, "Navigation:").unwrap();

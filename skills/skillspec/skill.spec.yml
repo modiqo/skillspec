@@ -2084,7 +2084,7 @@ artifacts:
   doctor_report:
     kind: report
     path: .skillspec/reports/doctor.json
-    description: Static doctor report that first classifies source shape, then runs full reliability-debt and context-burden scoring only for one atomic prose source; local folders, public GitHub skill folders, and public GitHub repo URIs may return shape-only reports for multi-skill, entry-with-subskills, plugin-shaped, or non-skill code repo targets.
+    description: Static doctor report that first classifies source shape, then reports frontmatter discovery risk, agent drift risk, token/context pressure, proof gaps, and workspace/package risk; non-skill code repo targets remain shape-only.
     produced_by:
       - kind: command
         id: doctor_source_skill
@@ -2291,7 +2291,7 @@ commands:
       dependencies:
         - rg_cli
   doctor_source_skill:
-    description: Run the static doctor shape gate and, only for a simple atomic SKILL.md package, score reliability debt, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. The target may be a local folder, public GitHub skill folder, or public GitHub repo URI; multi-skill, entry-with-subskills, plugin-shaped, and non-skill code repos return shape-only reports with the recommended next command.
+    description: Run the static doctor shape gate and score frontmatter discovery risk, agent drift risk, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. Multi-skill, entry-with-subskills, and plugin-shaped roots return workspace reports with one package report per SKILL.md; non-skill code repos return shape-only reports.
     template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
     safety: local_write
     requires:
@@ -2510,8 +2510,15 @@ commands:
       dependencies:
         - skillspec_cli
   run_loop:
-    description: Batch sensemake, decide, plan, and the first or requested action checklist in one spec load to reduce repeated CLI invocations during the common planning loop.
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --view index --trace-dir <trace-dir>
+    description: "Start the stateful agent guide in one spec load: select route, write trace, print start/current/end anchors, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_loop_resume:
+    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and printing the current gate.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent
     safety: local_write
     requires:
       dependencies:
@@ -3358,7 +3365,7 @@ closures:
       - workspace_map_source
       - workspace_validate_manifest
   report_source_shape:
-    description: Summarize the doctor shape report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, and whether full structural scoring was run. Do not import, port, compile, install, or choose a remote candidate during shape-only inspection.
+    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not import, port, compile, install, or choose a remote candidate during read-only inspection.
     commands:
       - doctor_source_shape
   produce_mechanical_draft:
@@ -4073,8 +4080,8 @@ metadata:
       status: reviewed
       review_note: Source examples are represented as command templates rather than executable snippets.
     - prose_span: Revising Existing SkillSpecs and Done Definition
-      obligation: For revisions use grammar/current spec handles, plan ordered phases, act on the current phase, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value.
-      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
+      obligation: For revisions start or resume the guided run-loop, use grammar/current spec handles, follow the current gate, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value. Plan and act remain lower-level primitives behind the guide.
+      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.run_loop, commands.run_loop_resume, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
       confidence: high
       status: proven_by_tests
       review_note: Execution alignment can remain unproven if no real execution ledger is available.
