@@ -109,7 +109,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap shape gate; default doctor output is a formatted terminal report, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
+            "for source diagnostics, run doctor before import as a cheap current-skill baseline; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps; after doctor, import the skill, read the alignment summary, optionally publish the proof artifacts, restart, and try the SkillSpec-backed skill normally"
                 .to_owned(),
         );
     }

@@ -37,6 +37,7 @@ pub struct DoctorReport {
     pub staged_from: Option<String>,
     pub shape: DoctorShapeReport,
     pub verdict: String,
+    pub score_model: DoctorScoreModelReport,
     pub structural_score: u8,
     pub large_surface_percentage: u8,
     pub surface: SurfaceReport,
@@ -56,6 +57,23 @@ pub struct DoctorReport {
     pub packages: Vec<DoctorPackageRiskReport>,
     pub basis: Vec<DoctorBasis>,
     pub suggested_next_steps: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DoctorScoreModelReport {
+    pub schema: String,
+    pub primary_score_label: String,
+    pub primary_score_field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_score: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_level: Option<RiskLevel>,
+    pub risk_direction: String,
+    pub readiness_label: String,
+    pub baseline_scope: String,
+    pub plain_language_summary: String,
+    pub not_measuring: Vec<String>,
+    pub basis_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -557,6 +575,19 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         has_structured_dependencies,
         raw_activation_risk.score,
     );
+    let score_model = if let Some(mitigation) = &contract_mitigation {
+        score_model(
+            "contract_mitigation.residual_risk_score",
+            Some(mitigation.residual_risk_score),
+            Some(mitigation.residual_risk_level),
+        )
+    } else {
+        score_model(
+            "agent_drift_risk.score",
+            Some(agent_drift_risk.score),
+            Some(agent_drift_risk.level),
+        )
+    };
 
     Ok(DoctorReport {
         target: source_root.display().to_string(),
@@ -565,6 +596,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         staged_from: None,
         shape,
         verdict,
+        score_model,
         structural_score,
         large_surface_percentage,
         surface,
@@ -763,6 +795,7 @@ fn shape_only_report_from_classification(
         staged_from,
         shape,
         verdict: "shape-only: full single-skill doctor not run".to_owned(),
+        score_model: score_model("not_evaluated", None, None),
         structural_score: 0,
         large_surface_percentage: 0,
         surface: SurfaceReport::default(),
@@ -981,6 +1014,46 @@ fn recommended_shape_command(kind: &str, root: &str, primary_skill: Option<&str>
     }
 }
 
+fn score_model(
+    primary_score_field: &str,
+    primary_score: Option<u8>,
+    primary_level: Option<RiskLevel>,
+) -> DoctorScoreModelReport {
+    DoctorScoreModelReport {
+        schema: "skillspec.doctor.score_model.v0".to_owned(),
+        primary_score_label: "agent_follow_through_risk".to_owned(),
+        primary_score_field: primary_score_field.to_owned(),
+        primary_score,
+        primary_level,
+        risk_direction: "higher_score_means_higher_risk".to_owned(),
+        readiness_label: readiness_label(primary_level).to_owned(),
+        baseline_scope: "current_skill_shape_at_doctor_time".to_owned(),
+        plain_language_summary: "Doctor estimates how likely an agent is to miss, reorder, improvise, use the wrong surface, or finish without proof because of the current skill shape.".to_owned(),
+        not_measuring: vec![
+            "domain expertise".to_owned(),
+            "legal, medical, or factual correctness".to_owned(),
+            "human usefulness".to_owned(),
+            "author effort".to_owned(),
+        ],
+        basis_ids: vec![
+            "reliability_gap_instruction_density".to_owned(),
+            "reliability_gap_metadata_context_pressure".to_owned(),
+            "contract_trace_activation_adherence_enforcement".to_owned(),
+            "contract_trace_unproven_verdict".to_owned(),
+        ],
+    }
+}
+
+fn readiness_label(level: Option<RiskLevel>) -> &'static str {
+    match level {
+        Some(RiskLevel::Low) => "strong",
+        Some(RiskLevel::Medium) => "moderate",
+        Some(RiskLevel::High) => "low",
+        Some(RiskLevel::Critical) => "very_low",
+        None => "not_evaluated",
+    }
+}
+
 fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorIssue> {
     let mut issues = Vec::new();
     match shape.kind.as_str() {
@@ -1071,6 +1144,9 @@ fn shape_next_steps(shape: &DoctorShapeReport) -> Vec<String> {
                 shape.root
             ),
             "From the harness, ask `/skillspec map this repo and import the packages safely` when you want the agent to preserve package shape, plugin namespaces, and dependencies.".to_owned(),
+            "After fanout import, read the converge/alignment reports: decision replay should pass, required package steps should be proven, and missing proof should be explicit.".to_owned(),
+            "Optionally publish the doctor baseline, generated `skill.spec.yml` files, and alignment reports with the source repo so reviewers can see what changed.".to_owned(),
+            "Restart the harness after install, then use the SkillSpec-backed skills normally rather than invoking internal CLI steps by hand.".to_owned(),
             "Do not flatten the repo into one skill; process each discovered SKILL.md as an atomic package and converge dependencies before install.".to_owned(),
         ],
         "non_skill_repository" => vec![
@@ -1765,21 +1841,29 @@ fn next_steps(
         steps.push(format!(
             "Install the SkillSpec-backed skill into the harness you use: `skillspec install skill {source} --target <codex|agents|claude-local> --retire-existing`."
         ));
-        steps.push("Then invoke the skill normally from the harness; for the SkillSpec self skill, ask `/skillspec import <source-skill>, compile it for <target>, install it, and prove it`.".to_owned());
+        steps.push("Restart the harness, then invoke the skill normally; the generated loader should ask the CLI for route guidance instead of loading the full contract into context.".to_owned());
+        steps.push("Read the final alignment summary after important runs: decision replay, requirements proven, missing proof, forbidden actions, and token/wall-clock metrics when available.".to_owned());
         if raw_activation_score <= 24 {
             steps.push("Keep the activated SKILL.md trampoline thin and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
         } else {
             steps.push("Thin the activated SKILL.md trampoline and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
         }
         steps.push("Use `skillspec run-loop <skill.spec.yml> --input '<task>' --trace-dir <dir> --guide agent` instead of loading the full spec or duplicating policy in prose.".to_owned());
+        steps.push("Optionally publish the doctor baseline and alignment report with the skill repo so reviewers can compare current-shape risk with proven execution.".to_owned());
     } else {
+        steps.push(format!(
+            "Capture this baseline before changing the skill: `skillspec doctor {source} --markdown > docs/skillspec-doctor-baseline.md`."
+        ));
         steps.push(
             "Install the `skillspec` skill into your harness if it is not already installed."
                 .to_owned(),
         );
         steps.push(format!(
-            "From the harness, ask `/skillspec import {source}, compile it for <target>, install it, and prove it`."
+            "From the harness, ask `/skillspec import {source}, compile it for <target>, verify it, test it, and prove it. Print the alignment summary.`"
         ));
+        steps.push("Read the alignment summary before trusting the port: decision replay should pass, required steps should be proven, missing proof should be explicit, and forbidden actions should show no violations.".to_owned());
+        steps.push("Optionally publish the baseline doctor report, generated `skill.spec.yml`, compiled loader, and alignment report with the source repo or PR.".to_owned());
+        steps.push("Restart the harness after install, then try the SkillSpec-backed skill normally on a real task.".to_owned());
         steps.push(format!(
             "For a CLI-only port, run `skillspec source map {source} --out <draft-dir>/.skillspec/source-map`, then `skillspec import-skill {source} --out <draft-dir>/skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json`."
         ));
@@ -1840,6 +1924,7 @@ mod tests {
                         .to_owned(),
             },
             verdict: "low reliability debt".to_owned(),
+            score_model: super::score_model("agent_drift_risk.score", Some(0), Some(super::RiskLevel::Low)),
             structural_score: 100,
             large_surface_percentage: 0,
             surface: SurfaceReport::default(),

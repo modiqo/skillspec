@@ -21,23 +21,30 @@ pub fn render(report: &DoctorReport) -> String {
         output.push_str(&format!("Primary skill: {primary}\n"));
     }
 
-    output.push_str("\nAssessment\n");
-    output.push_str("----------\n");
+    output.push_str("\nWhat This Measures\n");
+    output.push_str("------------------\n");
+    output.push_str(&format!("{}\n", report.score_model.plain_language_summary));
+    output.push_str("This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness.\n");
+    output.push_str("Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.\n");
+
+    output.push_str("\nCurrent Skill Baseline\n");
+    output.push_str("----------------------\n");
     output.push_str(&format!("Verdict: {}\n", report.verdict));
-    if report.analysis_status == "shape_only" {
-        output.push_str("Structural score: not evaluated; doctor stopped at shape analysis.\n");
-    } else {
-        output.push_str(&format!(
-            "Structural score: {}/100\n",
-            report.structural_score
-        ));
-    }
+    output.push_str(&format!(
+        "Follow-through readiness: {}\n",
+        humanize_snake(&report.score_model.readiness_label)
+    ));
     if let Some((label, score, level)) = primary_risk(report) {
         output.push_str(&format!(
-            "Follow-through risk: {} ({}/100, {})\n",
+            "Agent follow-through risk: {} ({}/100, {})\n",
             level.as_str(),
             score,
             label
+        ));
+    } else {
+        output.push_str(&format!(
+            "Agent follow-through risk: not evaluated ({})\n",
+            report.analysis_status
         ));
     }
     if let Some(frontmatter) = &report.frontmatter_discovery_risk {
@@ -52,7 +59,7 @@ pub fn render(report: &DoctorReport) -> String {
     }
     if let Some(risk) = &report.raw_activation_risk {
         output.push_str(&format!(
-            "Raw activation risk: {} ({}/100 before contract mitigation)\n",
+            "Raw activation load risk: {} ({}/100 before contract mitigation)\n",
             risk.level.as_str(),
             risk.score
         ));
@@ -198,26 +205,34 @@ pub fn render_markdown(report: &DoctorReport) -> String {
         output.push_str(&format!("**Primary skill:** {}\n\n", inline_code(primary)));
     }
 
-    output.push_str("## Assessment\n\n");
+    output.push_str("## What This Measures\n\n");
+    output.push_str(&format!(
+        "{}\n\n",
+        markdown_text(&report.score_model.plain_language_summary)
+    ));
+    output.push_str("This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness.\n\n");
+    output.push_str("Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.\n\n");
+
+    output.push_str("## Current Skill Baseline\n\n");
     output.push_str(&format!(
         "- **Verdict:** {}\n",
         markdown_text(&report.verdict)
     ));
-    if report.analysis_status == "shape_only" {
-        output
-            .push_str("- **Structural score:** not evaluated; doctor stopped at shape analysis.\n");
-    } else {
-        output.push_str(&format!(
-            "- **Structural score:** `{}/100`\n",
-            report.structural_score
-        ));
-    }
+    output.push_str(&format!(
+        "- **Follow-through readiness:** **{}**\n",
+        markdown_text(&humanize_snake(&report.score_model.readiness_label))
+    ));
     if let Some((label, score, level)) = primary_risk(report) {
         output.push_str(&format!(
-            "- **Follow-through risk:** **{}** (`{}/100`, {})\n",
+            "- **Agent follow-through risk:** **{}** (`{}/100`, {})\n",
             level.as_str(),
             score,
             markdown_text(label)
+        ));
+    } else {
+        output.push_str(&format!(
+            "- **Agent follow-through risk:** not evaluated (`{}`)\n",
+            markdown_text(&report.analysis_status)
         ));
     }
     if let Some(frontmatter) = &report.frontmatter_discovery_risk {
@@ -245,7 +260,7 @@ pub fn render_markdown(report: &DoctorReport) -> String {
     }
     if let Some(risk) = &report.raw_activation_risk {
         output.push_str(&format!(
-            "- **Raw activation risk:** **{}** (`{}/100` before contract mitigation)\n",
+            "- **Raw activation load risk:** **{}** (`{}/100` before contract mitigation)\n",
             risk.level.as_str(),
             risk.score
         ));
@@ -387,11 +402,7 @@ pub fn render_html(report: &DoctorReport) -> String {
     let (risk_label, risk_score, risk_level) = primary_risk(report)
         .map(|(label, score, level)| (label.to_owned(), score, level))
         .unwrap_or_else(|| ("not evaluated".to_owned(), 0, RiskLevel::Low));
-    let score_label = if report.analysis_status == "shape_only" {
-        "Shape only".to_owned()
-    } else {
-        format!("{}/100", report.structural_score)
-    };
+    let readiness_label = humanize_snake(&report.score_model.readiness_label);
 
     output.push_str("<!doctype html>\n<html lang=\"en\">\n<head>\n");
     output.push_str("<meta charset=\"utf-8\">\n");
@@ -429,13 +440,13 @@ pub fn render_html(report: &DoctorReport) -> String {
 
     output.push_str("<section class=\"cards\">\n");
     output.push_str(&metric_card(
-        "Structural score",
-        &score_label,
-        &report.verdict,
+        "Follow-through readiness",
+        &readiness_label,
+        "current skill baseline",
         "neutral",
     ));
     output.push_str(&metric_card(
-        "Follow-through risk",
+        "Agent follow-through risk",
         &format!("{} / 100", risk_score),
         &format!("{} risk, {}", risk_level.as_str(), risk_label),
         risk_level.as_str(),
@@ -457,6 +468,14 @@ pub fn render_html(report: &DoctorReport) -> String {
         ),
         "neutral",
     ));
+    output.push_str("</section>\n");
+
+    output.push_str("<section class=\"panel explainer\"><h2>What This Measures</h2>");
+    output.push_str(&format!(
+        "<p>{}</p>",
+        escape_html(&report.score_model.plain_language_summary)
+    ));
+    output.push_str("<p class=\"muted\">This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness. Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.</p>");
     output.push_str("</section>\n");
 
     output.push_str("<section class=\"panel-grid\">\n");
@@ -793,6 +812,10 @@ fn inline_code(value: &str) -> String {
     } else {
         format!("{ticks} {value} {ticks}")
     }
+}
+
+fn humanize_snake(value: &str) -> String {
+    value.replace('_', " ")
 }
 
 fn metric_card(label: &str, value: &str, detail: &str, level: &str) -> String {

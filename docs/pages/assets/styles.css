@@ -119,6 +119,7 @@ h3 {
 
 .request-panel,
 .private-note,
+.proof-path,
 .reports-section,
 .runs-section,
 .report-viewer {
@@ -210,6 +211,50 @@ button:focus-visible,
   margin-top: 18px;
   padding: 20px 24px;
   background: #fbfcfe;
+}
+
+.proof-path {
+  margin-top: 18px;
+  padding: 24px;
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.proof-grid article {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.proof-grid span {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.proof-grid h3 {
+  margin: 14px 0 8px;
+}
+
+.proof-grid p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.proof-grid pre {
+  margin-top: 12px;
+  font-size: 0.78rem;
 }
 
 pre {
@@ -486,6 +531,10 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .proof-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .reports-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -511,6 +560,7 @@ code {
   }
 
   .input-row,
+  .proof-grid,
   .reports-grid {
     grid-template-columns: 1fr;
   }

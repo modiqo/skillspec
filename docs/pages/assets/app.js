@@ -303,7 +303,9 @@ function parseSummary(markdown) {
   const target = matchLine(markdown, /\*\*Target:\*\*\s+(.*)/);
   const shape = matchLine(markdown, /\*\*Shape:\*\*\s+`?([^`\n-]+)`?/);
   const verdict = matchLine(markdown, /- \*\*Verdict:\*\*\s+(.+)/);
-  const risk = matchLine(markdown, /- \*\*Follow-through risk:\*\*\s+(.+)/);
+  const risk =
+    matchLine(markdown, /- \*\*Agent follow-through risk:\*\*\s+(.+)/) ||
+    matchLine(markdown, /- \*\*Follow-through risk:\*\*\s+(.+)/);
   return {
     target: stripMarkdown(target),
     shape: stripMarkdown(shape),

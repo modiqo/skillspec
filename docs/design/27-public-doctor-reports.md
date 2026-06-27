@@ -12,9 +12,14 @@ SkillSpec supports two public doctor-report paths:
    gallery reads public doctor-report issues and renders their workflow comments.
 
 The goal is to make the static skill-risk report visible before someone installs
-or ports a skill. The workflow is intentionally read-only: it stages public
-source, parses Markdown/YAML, classifies shape, and renders reports. It does not
-execute code from the target repository.
+or ports a skill. Doctor reports the current skill baseline: how likely the
+current shape is to make an agent skip, reorder, improvise, use the wrong
+surface, or finish without proof. The score is not a grade of domain expertise,
+human usefulness, author effort, or legal/medical/factual correctness.
+
+The workflow is intentionally read-only: it stages public source, parses
+Markdown/YAML, classifies shape, and renders reports. It does not execute code
+from the target repository.
 
 ## Dogfood CI
 
@@ -98,6 +103,17 @@ preserved in full in the artifact. The artifact contains:
 - `doctor-report.json`
 - `target.txt`
 - `doctor-stderr.txt` when a run fails
+
+The report's next actions should teach the post-doctor path:
+
+1. Capture and publish the baseline Doctor report in the skill repository or PR.
+2. In the harness, ask `/skillspec import <skill-repo-or-folder>, compile it,
+   verify it, test it, and prove it. Print the alignment summary.`
+3. Review the alignment summary for selected route, requirements proven, missing
+   proof, forbidden-action status, and token/wall-clock metrics when available.
+4. Optionally publish generated `skill.spec.yml`, compiled loader, and alignment
+   report next to the baseline report.
+5. Restart the harness and try the SkillSpec-backed skill normally.
 
 Artifacts are retained for 14 days. The issue comment is updated in place on
 issue edits or reruns using a hidden `skillspec-doctor-report` marker so repeated

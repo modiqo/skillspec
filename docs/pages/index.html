@@ -18,8 +18,8 @@
           <h1 id="page-title">Check a public skill before you install or port it.</h1>
           <p class="lede">
             Submit a public GitHub skill folder or repository. SkillSpec Doctor
-            classifies the shape, measures follow-through risk, and publishes a
-            report that anyone can inspect.
+            classifies the shape, measures the risk that an agent will miss or
+            improvise instructions, and publishes a report that anyone can inspect.
           </p>
         </div>
         <div class="hero-visual" aria-hidden="true">
@@ -76,12 +76,60 @@
           <h2 id="private-title">Private repository?</h2>
           <p>
             Public Actions cannot inspect private source. Install locally and
-            run Doctor from a checkout you control.
+            run Doctor from a checkout you control, then publish the Markdown
+            report in your own repo or pull request if you want reviewers to see it.
           </p>
         </div>
         <pre><code>curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
 skillspec doctor /path/to/local/skill
 skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code></pre>
+      </section>
+
+      <section class="proof-path" aria-labelledby="proof-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">From baseline to proof</p>
+            <h2 id="proof-title">What to do after Doctor</h2>
+          </div>
+        </div>
+        <div class="proof-grid">
+          <article>
+            <span>1</span>
+            <h3>Measure the current skill</h3>
+            <p>
+              Run Doctor first. Treat the report as a baseline for the skill as it
+              exists today, before SkillSpec changes anything.
+            </p>
+            <pre><code>skillspec doctor /path/to/skill --markdown &gt; docs/skillspec-doctor-baseline.md</code></pre>
+          </article>
+          <article>
+            <span>2</span>
+            <h3>Import through the harness</h3>
+            <p>
+              Ask Codex, Claude, or Agents to port the skill. The agent should
+              create the structured plan, compile it, test it, and print alignment.
+            </p>
+            <pre><code>/skillspec import &lt;skill-repo-or-folder&gt;, compile it, verify it, test it, and prove it. Print the alignment summary.</code></pre>
+          </article>
+          <article>
+            <span>3</span>
+            <h3>Read and publish proof</h3>
+            <p>
+              The alignment summary should show the selected route, proven steps,
+              missing proof if any, forbidden-action status, and run metrics when
+              available.
+            </p>
+          </article>
+          <article>
+            <span>4</span>
+            <h3>Try the enabled skill</h3>
+            <p>
+              Restart the harness after install, then use the SkillSpec-backed
+              skill normally on a real task. The loader stays small while the CLI
+              guides route, phase, checks, resume, and proof.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section class="reports-section" aria-labelledby="reports-title">

@@ -785,14 +785,29 @@ The total still caps at 100.
 Text output should be short and operator-readable:
 
 ```text
-skillspec doctor: ./my-skill
-shape: simple_skill
-analysis: full
+SkillSpec Doctor
+================
 
-Agent drift risk: high (74/100)
-Structural score: 26/100
+Target: ./my-skill
+Shape: simple_skill - one atomic SKILL.md package; detailed doctor analysis can run
+Status: full
 
-Why:
+What This Measures
+------------------
+Doctor estimates how likely an agent is to miss, reorder, improvise, use the
+wrong surface, or finish without proof because of the current skill shape.
+This is a baseline of the current skill shape at doctor time. It is not a grade
+of domain knowledge, human usefulness, author effort, or legal/medical
+correctness.
+
+Current Skill Baseline
+----------------------
+Verdict: high reliability debt
+Follow-through readiness: low
+Agent follow-through risk: high (74/100, single-skill drift)
+
+Findings
+--------
 - frontmatter description is short and generic, so automatic discovery may be unreliable
 - active skill load is 8,482 tokens; this is above the balanced policy target
 - 14 required/forbidden obligations appear after 60% of the active body
@@ -813,8 +828,9 @@ Token pressure:
   159,518 tokens
 
 Recommended next step:
-Run `skillspec source map`, then port the skill into a SkillSpec contract before
-installing it for important workflows.
+Capture the baseline, then ask the harness to import the skill, compile it,
+verify it, test it, and prove it. Read the alignment summary before trusting the
+ported skill.
 ```
 
 ## JSON Report Shape

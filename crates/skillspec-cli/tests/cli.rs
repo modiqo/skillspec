@@ -879,7 +879,8 @@ fn help_lists_trace_align_arguments() {
         .unwrap();
     assert_success(&doctor);
     let doctor_help = stdout(&doctor);
-    assert!(doctor_help.contains("structural score"));
+    assert!(doctor_help.contains("agent follow-through risk"));
+    assert!(doctor_help.contains("score_model"));
     assert!(doctor_help.contains("frontmatter discovery risk"));
     assert!(doctor_help.contains("workspace risk"));
     assert!(doctor_help.contains("activation-loaded surface"));
@@ -3205,7 +3206,7 @@ commands:
     let out = stdout(&output);
     assert!(out.contains("diagnose source shape and prose reliability debt"));
     assert!(out.contains("skillspec doctor <source-skill-folder-or-repo-uri>"));
-    assert!(out.contains("cheap shape gate"));
+    assert!(out.contains("cheap current-skill baseline"));
 }
 
 #[test]
@@ -5632,12 +5633,24 @@ from reportlab.pdfgen import canvas
     assert!(issues_text.contains("missing_behavior_contract"));
     assert!(issues_text.contains("missing_trace_proof_surface"));
     assert!(issues_text.contains("missing_referenced_files"));
+    assert_eq!(
+        report["score_model"]["primary_score_label"].as_str(),
+        Some("agent_follow_through_risk")
+    );
+    assert_eq!(
+        report["score_model"]["risk_direction"].as_str(),
+        Some("higher_score_means_higher_risk")
+    );
+    assert!(report["score_model"]["not_measuring"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty()));
 
     let text = Command::new(bin()).arg("doctor").arg(&skill_dir).output()?;
     assert_success(&text);
     let text = stdout(&text);
     assert!(text.contains("Activation-loaded surface:"));
-    assert!(text.contains("Follow-through risk:"));
+    assert!(text.contains("What This Measures"));
+    assert!(text.contains("Agent follow-through risk:"));
     assert!(text.contains("Discovery risk:"));
     assert!(text.contains("docs/00-skills-reliability-gap.md"));
     assert!(text.contains("docs/08-contract-trace-methodology.md"));
@@ -5968,11 +5981,14 @@ description: Review one file and report risks.
     assert_success(&output);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("SkillSpec Doctor"));
-    assert!(stdout.contains("Assessment"));
+    assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Current Skill Baseline"));
+    assert!(stdout.contains("Agent follow-through risk:"));
     assert!(stdout.contains("Surface"));
     assert!(stdout.contains("Findings"));
     assert!(stdout.contains("Next Actions"));
     assert!(stdout.contains("Recommended next action: /skillspec import"));
+    assert!(!stdout.contains("Structural score:"));
     assert!(!stdout.contains("shape_kind:"));
     assert!(!stdout.contains("analysis_status:"));
     assert!(!stdout.contains("Recommended next action: skillspec doctor"));
@@ -6007,6 +6023,8 @@ description: Review one file and report risks.
     assert!(stdout.contains("<!doctype html>"));
     assert!(stdout.contains("<title>SkillSpec Doctor Report</title>"));
     assert!(stdout.contains("class=\"hero\""));
+    assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Agent follow-through risk"));
     assert!(stdout.contains("Next Actions"));
     assert!(stdout.contains("Research Basis"));
     assert!(stdout.contains("https://github.com/modiqo/skillspec/blob/main/docs/"));
@@ -6040,12 +6058,15 @@ description: Review one file and report risks.
     assert_success(&output);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("# SkillSpec Doctor report"));
-    assert!(stdout.contains("## Assessment"));
+    assert!(stdout.contains("## What This Measures"));
+    assert!(stdout.contains("## Current Skill Baseline"));
+    assert!(stdout.contains("**Agent follow-through risk:**"));
     assert!(stdout.contains("## Surface"));
     assert!(stdout.contains("## Findings"));
     assert!(stdout.contains("## Next Actions"));
     assert!(stdout.contains("## Research Basis"));
     assert!(stdout.contains("**Recommended next action**"));
+    assert!(!stdout.contains("**Structural score:**"));
     assert!(!stdout.contains("```text\nSkillSpec Doctor"));
     Ok(())
 }

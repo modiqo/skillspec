@@ -84,6 +84,11 @@ fn report_from_skill_texts(
     let surface = workspace_surface(&package_reports);
     let basis = basis();
     let suggested_next_steps = super::shape_next_steps(&shape);
+    let score_model = super::score_model(
+        "workspace_agent_drift_risk.score",
+        Some(workspace_agent_drift_risk.score),
+        Some(workspace_agent_drift_risk.level),
+    );
 
     DoctorReport {
         target: target.to_owned(),
@@ -95,6 +100,7 @@ fn report_from_skill_texts(
             "workspace risk: {}",
             workspace_agent_drift_risk.level.as_str()
         ),
+        score_model,
         structural_score,
         large_surface_percentage: 0,
         surface,

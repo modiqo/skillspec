@@ -180,7 +180,7 @@ right CLI commands and keep the run aligned.
 
 | You want to know or do | What to ask in chat | What SkillSpec does |
 | --- | --- | --- |
-| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape: simple skill, multi-skill workspace, plugin-shaped workspace, entry skill with subskills, or non-skill repo. The default report is formatted for terminals, `--markdown` renders cleanly in GitHub, `--html` creates a shareable review page, and `--json` preserves the full machine report. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
+| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape and explain agent follow-through risk: how likely the current skill shape is to make an agent skip, reorder, improvise, or finish without proof. This is a baseline of the skill as it exists today, not a grade of domain quality. The default report is formatted for terminals, `--markdown` renders cleanly in GitHub, `--html` creates a shareable review page, and `--json` preserves the full machine report. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
 | Request a hosted public doctor report. | Open a `Doctor report request` issue with a public GitHub skill URL. | GitHub Actions validates that the target is publicly readable, runs `skillspec doctor`, prints a Markdown report in the Actions summary, comments the rendered report, and attaches Markdown/HTML/JSON/text artifacts. Private or unreadable repos get local-run instructions. |
 | Port an existing skill. | `/skillspec import <path-or-url>, compile it for Codex, install it, and prove it` | Stages the source if needed, runs doctor, maps the source, imports the skill, validates it, tests it, compiles it, and prints the report. |
 | Port a repo with many skills or plugin folders. | `/skillspec map this repo and import the packages safely` | Preserves the original shape, processes each atomic `SKILL.md` package separately, detects references, prevents circular dependency mistakes, and converges the workspace before install. |
@@ -207,6 +207,18 @@ Private repositories are not inspected by public Actions. For private skills,
 install SkillSpec locally and run `skillspec doctor /path/to/local/skill`, or
 `skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md` for a
 GitHub-renderable report.
+
+Doctor is step one. Use it to publish a baseline of the current skill shape,
+then ask the harness to import the skill:
+
+```text
+/skillspec import <skill-repo-or-folder>, compile it, verify it, test it, and prove it. Print the alignment summary.
+```
+
+Read the alignment summary before trusting the port. It should show the selected
+route, required steps, missing proof if any, forbidden-action status, and token
+or wall-clock metrics when available. After install, restart the harness and try
+the SkillSpec-backed skill normally.
 
 ## What You Get At The End
 
