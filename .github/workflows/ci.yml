@@ -52,6 +52,38 @@ jobs:
           cargo build --locked --workspace
           echo "${PWD}/target/debug" >> "${GITHUB_PATH}"
 
+      - name: Dogfood doctor on SkillSpec skill
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p doctor-reports
+          skillspec doctor skills/skillspec/ | tee doctor-reports/skillspec-doctor.txt
+          skillspec doctor skills/skillspec/ --json > doctor-reports/skillspec-doctor.json
+          skillspec doctor skills/skillspec/ --html > doctor-reports/skillspec-doctor.html
+
+          {
+            echo "## SkillSpec Doctor Dogfood"
+            echo
+            echo "Target: \`skills/skillspec/\`"
+            echo
+            echo '```text'
+            cat doctor-reports/skillspec-doctor.txt
+            echo '```'
+            echo
+            echo "Artifacts:"
+            echo "- \`skillspec-doctor.txt\`"
+            echo "- \`skillspec-doctor.json\`"
+            echo "- \`skillspec-doctor.html\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload dogfood doctor reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspec-doctor-dogfood
+          path: doctor-reports/
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Validate all examples
         shell: bash
         run: |
