@@ -106,6 +106,7 @@ These are repository automation surfaces, not `skillspec` CLI subcommands.
 | --- | --- | --- |
 | CI dogfood doctor | Push or pull request quality run | Runs `skillspec doctor skills/skillspec/`, prints the Markdown report to the GitHub job summary, and uploads text, Markdown, HTML, and JSON artifacts. |
 | Doctor report request issue | `Doctor report request` issue form, `doctor-report` label, or `Doctor report:` title prefix | Validates a public `https://github.com/...` skill URL from the issue body or title, rejects private or unreadable repositories with local-run instructions, runs `skillspec doctor` for accepted public targets, writes the Markdown report to the Actions run summary, comments the rendered report on the issue, and uploads Markdown/HTML/JSON/text artifacts. |
+| Public doctor Pages site | `https://modiqo.github.io/skillspec/` | Static GitHub Pages app that validates public GitHub skill URLs, opens a prefilled doctor-report issue request, lists prior public report issues, and renders the workflow's Markdown report comments without exposing a browser-side write token. |
 
 ## Durable Executor Lifecycle Commands
 

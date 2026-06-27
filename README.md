@@ -196,6 +196,13 @@ with a public GitHub skill repo or folder URL. GitHub Actions will run
 `skillspec doctor`, render the Markdown report in Actions and the issue, and
 attach Markdown/HTML/JSON/text artifacts.
 
+You can also use the public Doctor page:
+
+[https://modiqo.github.io/skillspec/](https://modiqo.github.io/skillspec/)
+
+It provides a form for public GitHub URLs and lists prior public reports with
+success/error status and rendered report output.
+
 Private repositories are not inspected by public Actions. For private skills,
 install SkillSpec locally and run `skillspec doctor /path/to/local/skill`, or
 `skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md` for a

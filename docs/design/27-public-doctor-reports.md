@@ -7,6 +7,9 @@ SkillSpec supports two public doctor-report paths:
 2. Public users can open a "Doctor report request" issue with a public GitHub
    skill URL. GitHub Actions validates the URL, runs `skillspec doctor`, uploads
    report artifacts, and comments back with the formatted report.
+3. The GitHub Pages site at `https://modiqo.github.io/skillspec/` provides a
+   public form and report gallery. The form opens a prefilled issue request; the
+   gallery reads public doctor-report issues and renders their workflow comments.
 
 The goal is to make the static skill-risk report visible before someone installs
 or ports a skill. The workflow is intentionally read-only: it stages public
@@ -33,6 +36,12 @@ useful signal. A stricter regression gate can be added later once thresholds are
 stable.
 
 ## Public Request Workflow
+
+The browser page is static and intentionally has no secret token. It cannot and
+must not create issues directly on behalf of anonymous users. Instead, the form
+validates the URL client-side and opens a prefilled GitHub issue. The user
+reviews and submits that issue in GitHub, and the existing issue workflow remains
+the trusted queue.
 
 The public issue form asks for one field:
 
@@ -93,6 +102,26 @@ preserved in full in the artifact. The artifact contains:
 Artifacts are retained for 14 days. The issue comment is updated in place on
 issue edits or reruns using a hidden `skillspec-doctor-report` marker so repeated
 runs do not leave a comment trail.
+
+## Public Pages Gallery
+
+The Pages source lives under `docs/pages/` and is deployed by
+`.github/workflows/pages.yml`. It is a static client-side app:
+
+- The request form accepts only public `https://github.com/...` URLs and opens a
+  prefilled `Doctor report request` issue.
+- The report gallery reads public issues through GitHub's public Issues API and
+  keeps entries whose title starts with `Doctor report:` or whose labels include
+  `doctor-report`.
+- It looks for the hidden `skillspec-doctor-report` marker in bot comments,
+  extracts the Markdown report, renders it in the page, and links back to the
+  original issue.
+- Pending requests are shown when no report comment exists yet.
+- Error and private-repository cases remain visible because the issue workflow
+  writes a marker-bearing comment with local-run instructions.
+
+This design avoids public write tokens in the browser while still giving users a
+friendly form, a public status list, and readable prior output.
 
 ## Security Model
 
