@@ -1,0 +1,38 @@
+{
+  "name": "skillspec",
+  "version": "0.1.0",
+  "description": "SkillSpec is a CLI plus a structured skill plan for making agent skills easier to follow, test, route, and prove.",
+  "author": {
+    "name": "Modiqo",
+    "url": "https://www.modiqo.ai"
+  },
+  "homepage": "https://github.com/modiqo/skillspec",
+  "repository": "https://github.com/modiqo/skillspec",
+  "license": "MIT OR Apache-2.0",
+  "keywords": [
+    "agents",
+    "skills",
+    "skillspec",
+    "routing",
+    "alignment",
+    "evals"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SkillSpec",
+    "shortDescription": "Inspect, import, route, run, and prove SkillSpec-backed skills.",
+    "longDescription": "SkillSpec keeps agent skills small at the surface while moving critical behavior into a structured contract. The plugin exposes the SkillSpec guide so agents can run doctor, import skills, follow run-loop guidance, record proof, and print alignment summaries from chat.",
+    "developerName": "Modiqo",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/modiqo/skillspec",
+    "defaultPrompt": [
+      "Run doctor on this skill repo",
+      "Import this SKILL.md into SkillSpec and prove it"
+    ]
+  }
+}

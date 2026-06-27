@@ -1,0 +1,10 @@
+{
+  "name": "skillspec",
+  "version": "0.1.0",
+  "description": "SkillSpec is a CLI plus a structured skill plan for making agent skills easier to follow, test, route, and prove.",
+  "author": {
+    "name": "Modiqo"
+  },
+  "homepage": "https://github.com/modiqo/skillspec",
+  "license": "MIT OR Apache-2.0"
+}

@@ -70,6 +70,21 @@ SkillSpec-backed skills.
 | `skillspec install targets` | none | Lists detected harness skill roots, such as Codex, Agents, or Claude local skill directories. | `skillspec install targets` |
 | `skillspec install skill` | `<folder>`, `--target agents,codex,claude-local`, `--all-detected`, `--dry-run`, `--name <name>`, `--force`, `--retire-existing` | Installs a generated skill folder containing `SKILL.md`, `skill.spec.yml`, and declared package-local files from imports, resources, code sources, and file dependencies into one or more detected harness roots. Use `--dry-run` before writing. When replacing an existing active prose skill, use `--retire-existing`: it backs up the old skill under `SKILLSPEC_HOME/backups/retired-skills` or `~/.skillspec/backups/retired-skills`, removes it from harness discovery, then installs the reviewed replacement at the same name. `--force` and `--retire-existing` are mutually exclusive. | `skillspec install skill examples/pdf --target agents --target codex --dry-run --retire-existing` |
 
+## Harness Plugin Install Commands
+
+These commands are not part of the `skillspec` CLI. They are the official
+harness plugin install path for SkillSpec itself. Use them for public install
+docs; use `skillspec install skill` for local development, generated skills, and
+unreleased package testing.
+
+| Harness | Command | Explanation |
+| --- | --- | --- |
+| Claude Code | `claude plugin marketplace add modiqo/skillspec --sparse .claude-plugin plugins/skillspec` | Adds the SkillSpec marketplace from the public repo. |
+| Claude Code | `claude plugin install skillspec@skillspec` | Installs the `skillspec` plugin from that marketplace. |
+| Claude Code | `claude plugin list`, then `claude plugin enable skillspec` only if disabled | Claude installs the plugin enabled by default in current builds; use `enable` only when list shows the plugin disabled. |
+| Codex | `codex plugin marketplace add modiqo/skillspec --ref main --sparse .agents --sparse plugins/skillspec` | Adds the SkillSpec marketplace from the public repo. |
+| Codex | `codex plugin add skillspec@skillspec` | Installs the `skillspec` plugin from that marketplace. Codex does not have a separate plugin enable command. |
+
 ## Durable Executor Lifecycle Commands
 
 These commands manage the optional SkillSpec-owned durable first-hop skill. They

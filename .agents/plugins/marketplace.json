@@ -1,0 +1,21 @@
+{
+  "name": "skillspec",
+  "interface": {
+    "displayName": "SkillSpec"
+  },
+  "plugins": [
+    {
+      "name": "skillspec",
+      "source": {
+        "source": "local",
+        "path": "./plugins/skillspec"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+        "products": ["CODEX"]
+      },
+      "category": "Productivity"
+    }
+  ]
+}
