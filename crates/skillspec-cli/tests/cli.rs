@@ -186,6 +186,10 @@ fn normalize_newlines(text: &str) -> String {
     text.replace("\r\n", "\n")
 }
 
+fn normalize_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
 fn assert_snapshot_eq(snapshot_path: &Path, actual: &str) {
     let expected = fs::read_to_string(snapshot_path).unwrap_or_else(|error| {
         panic!(
@@ -6037,7 +6041,7 @@ Run `/coding-standards` before the wrapper.
     assert!(map_summary.contains("artifact_tokens_preserved: ~"));
     assert!(map_summary.contains("avoided_tokens: ~"));
     assert!(map_summary.contains("metrics_source: estimated"));
-    assert!(map_summary.contains(&format!("- manifest: {}", manifest.display())));
+    assert!(map_summary.contains(&format!("- manifest: {}", normalize_path(&manifest))));
     assert!(!map_summary.contains("## Packages"));
 
     let validate = Command::new(bin())
