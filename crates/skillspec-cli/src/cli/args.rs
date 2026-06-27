@@ -120,7 +120,7 @@ pub(super) enum Command {
     Query {
         /// Path to a skill.spec.yml file.
         path: PathBuf,
-        /// Query handle, such as routes, rule:<id>, or command:<id>.requires.
+        /// Query handle, such as routes, rule:<id>, command:<id>.requires, or test:<name>.expect.
         handle: String,
         /// Output detail level.
         #[arg(long, value_enum, default_value_t = SenseViewArg::Summary)]
@@ -133,7 +133,7 @@ pub(super) enum Command {
     Refs {
         /// Path to a skill.spec.yml file.
         path: PathBuf,
-        /// Item handle, such as rule:<id>, command:<id>, state:<id>, or recipe:<id>.
+        /// Item handle, such as rule:<id>, command:<id>, state:<id>, recipe:<id>, or test:<name>.
         handle: String,
         /// Output detail level.
         #[arg(long, value_enum, default_value_t = SenseViewArg::Summary)]

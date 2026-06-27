@@ -126,6 +126,7 @@ Supported item handles include:
 - `command:<id>`;
 - `recipe:<id>`;
 - `closure:<id>`;
+- `test:<name>`;
 - `import:<id>`;
 - `resource:<id>`;
 - `code:<id>`;
@@ -139,7 +140,10 @@ Dot-field projection is supported. Examples:
 skillspec query skill.spec.yml rule:cli_invocations_use_rote_exec.forbid
 skillspec query skill.spec.yml command:deps_check.requires
 skillspec query skill.spec.yml route:browser_handoff.handoff
+skillspec query skill.spec.yml test:browse_selects_browser.expect
 ```
+
+Quote the handle when a test name contains spaces.
 
 When a field path is requested, the implementation projects from the full value
 for that target. That lets an agent ask for exactly the field it needs without
@@ -156,7 +160,8 @@ The current implementation supports outgoing refs for:
 - `command:<id>`;
 - `state:<id>`;
 - `recipe:<id>`;
-- `route:<id>`.
+- `route:<id>`;
+- `test:<name>`.
 
 Examples:
 
@@ -164,6 +169,7 @@ Examples:
 skillspec refs skill.spec.yml rule:external_service_tasks_are_adapter_first
 skillspec refs skill.spec.yml command:deps_check
 skillspec refs skill.spec.yml route:shell_then_browser_handoff
+skillspec refs skill.spec.yml test:browse_selects_browser
 ```
 
 Refs are useful because they turn a chosen id into the next ids to inspect:

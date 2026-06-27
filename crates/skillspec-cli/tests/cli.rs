@@ -3314,6 +3314,62 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert!(route_refs_out.contains("execution_plan.route -> route: local"));
     assert!(route_refs_out.contains("execution_plan.jump.to_phase -> phase: browser_handoff"));
 
+    let test = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("test:browse selects browser")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&test);
+    let test_report = json_stdout(&test);
+    assert_eq!(test_report["target"]["kind"], "test");
+    assert_eq!(test_report["target"]["id"], "browse selects browser");
+    assert_eq!(test_report["value"]["route"], "browser");
+    assert!(test_report["value"]["expect_fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|field| field == "plan_phases"));
+    assert!(test_report["query_hints"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|hint| hint.as_str().is_some_and(|text| {
+            text.contains("'test:browse selects browser.expect' --view full")
+        })));
+
+    let test_expect = Command::new(bin())
+        .arg("query")
+        .arg(&spec)
+        .arg("test:browse selects browser.expect")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&test_expect);
+    let test_expect_report = json_stdout(&test_expect);
+    assert_eq!(test_expect_report["target"]["field_path"][0], "expect");
+    assert_eq!(test_expect_report["value"]["route"], "browser");
+    assert_eq!(
+        test_expect_report["value"]["matched_rules_exact"][0],
+        "browse_rule"
+    );
+
+    let test_refs = Command::new(bin())
+        .arg("refs")
+        .arg(&spec)
+        .arg("test:browse selects browser")
+        .output()
+        .unwrap();
+    assert_success(&test_refs);
+    let test_refs_out = stdout(&test_refs);
+    assert!(test_refs_out.contains("expect.route -> route: browser"));
+    assert!(test_refs_out.contains("expect.elicit_exact -> elicitation: mode"));
+    assert!(
+        test_refs_out.contains("expect.after_success_exact -> command_or_recipe_or_state: cleanup")
+    );
+    assert!(test_refs_out.contains("expect.matched_rules_exact -> rule: browse_rule"));
+
     let missing = Command::new(bin())
         .arg("query")
         .arg(&spec)

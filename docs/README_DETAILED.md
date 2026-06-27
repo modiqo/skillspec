@@ -542,7 +542,11 @@ skillspec refs path/to/skill.spec.yml rule:<matched-rule> --view summary
 skillspec query path/to/skill.spec.yml rule:<matched-rule>.forbid --json
 skillspec query path/to/skill.spec.yml command:<command-id>.requires
 skillspec query path/to/skill.spec.yml state:<state-id>.next --json
+skillspec query path/to/skill.spec.yml test:<test-name>.expect --view full
+skillspec refs path/to/skill.spec.yml test:<test-name> --view summary
 ```
+
+Quote the handle when a test name contains spaces.
 
 Query detail is progressive:
 

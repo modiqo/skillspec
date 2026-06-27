@@ -469,6 +469,7 @@ not specific enough, the agent should use precise handles:
 skillspec query ./skill.spec.yml rule:<id> --view summary
 skillspec refs ./skill.spec.yml route:<id> --view summary
 skillspec query ./skill.spec.yml command:<id>.requires
+skillspec query ./skill.spec.yml test:<name>.expect --view full
 ```
 
 This preserves progressive disclosure. The phase checklist tells the agent what

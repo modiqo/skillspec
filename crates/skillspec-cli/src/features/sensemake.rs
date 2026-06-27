@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::model::{CommandRequires, Predicate, RecipeStep, RouteId, SkillSpec};
+use crate::model::{CommandRequires, Expectation, Predicate, RecipeStep, RouteId, SkillSpec};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::fmt::Write;
@@ -390,6 +390,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             command: format!("skillspec query {spec_path} state:<id> --view summary"),
         },
         NavigationHint {
+            intent: "inspect scenario test",
+            command: format!("skillspec query {spec_path} test:<name> --view summary"),
+        },
+        NavigationHint {
             intent: "prove completion",
             command: format!(
                 "skillspec trace align {spec_path} --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json"
@@ -744,10 +748,7 @@ fn select_value(spec: &SkillSpec, parsed: &ParsedHandle, view: View) -> Result<V
         ("closures", None) => map_collection(&spec.closures, base_view)?,
         ("tests", None) => collection(
             spec.tests.iter().map(|test| test.name.as_str()).collect(),
-            spec.tests
-                .iter()
-                .map(|test| json!({"name": test.name, "input": test.input}))
-                .collect(),
+            spec.tests.iter().map(test_summary).collect(),
             &spec.tests,
             base_view,
         )?,
@@ -795,6 +796,15 @@ fn select_value(spec: &SkillSpec, parsed: &ParsedHandle, view: View) -> Result<V
         ("artifact", Some(id)) => map_item(id, &spec.artifacts, base_view, "artifact")?,
         ("snippet", Some(id)) => map_item(id, &spec.snippets, base_view, "snippet")?,
         ("elicitation", Some(id)) => map_item(id, &spec.elicitations, base_view, "elicitation")?,
+        ("test", Some(id)) => item(
+            id,
+            spec.tests
+                .iter()
+                .find(|test| test.name == id)
+                .map(|test| (test_summary(test), test)),
+            base_view,
+            "test",
+        )?,
         _ => {
             return Err(Error::InvalidInput {
                 message: format!("unknown query handle {kind}", kind = parsed.kind),
@@ -990,6 +1000,21 @@ fn command_summary(id: &str, command: &crate::model::CommandTemplate) -> Value {
     })
 }
 
+fn test_summary(test: &crate::model::ScenarioTest) -> Value {
+    json!({
+        "name": test.name,
+        "input": test.input,
+        "expect_fields": non_empty_expectation_fields(&test.expect),
+        "route": route_id(test.expect.route.as_ref()),
+        "matched_rules": rule_ids(&test.expect.matched_rules),
+        "matched_rules_exact": test.expect.matched_rules_exact.as_ref().map(|rules| rule_ids(rules)),
+        "elicit": test.expect.elicit,
+        "elicit_exact": test.expect.elicit_exact,
+        "after_success": test.expect.after_success,
+        "after_success_exact": test.expect.after_success_exact,
+    })
+}
+
 fn predicate_summary(predicate: &Predicate) -> Value {
     json!({
         "user_says_any": predicate.user_says_any,
@@ -1019,6 +1044,10 @@ fn route_ids(routes: &[RouteId]) -> Vec<String> {
     routes.iter().map(|route| route.0.clone()).collect()
 }
 
+fn rule_ids(rules: &[crate::model::RuleId]) -> Vec<String> {
+    rules.iter().map(|rule| rule.0.clone()).collect()
+}
+
 fn non_empty_rule_fields(rule: &crate::model::Rule) -> Vec<&'static str> {
     let mut fields = vec!["when"];
     if rule.prefer.is_some() {
@@ -1041,6 +1070,59 @@ fn non_empty_rule_fields(rule: &crate::model::Rule) -> Vec<&'static str> {
     }
     if rule.reason.is_some() {
         fields.push("reason");
+    }
+    fields
+}
+
+fn non_empty_expectation_fields(expectation: &Expectation) -> Vec<&'static str> {
+    let mut fields = Vec::new();
+    if expectation.route.is_some() {
+        fields.push("route");
+    }
+    if !expectation.route_order.is_empty() {
+        fields.push("route_order");
+    }
+    if !expectation.plan_phases.is_empty() {
+        fields.push("plan_phases");
+    }
+    if !expectation.plan_jumps.is_empty() {
+        fields.push("plan_jumps");
+    }
+    if !expectation.forbid.is_empty() {
+        fields.push("forbid");
+    }
+    if expectation.forbid_exact.is_some() {
+        fields.push("forbid_exact");
+    }
+    if !expectation.not_forbid.is_empty() {
+        fields.push("not_forbid");
+    }
+    if !expectation.elicit.is_empty() {
+        fields.push("elicit");
+    }
+    if expectation.elicit_exact.is_some() {
+        fields.push("elicit_exact");
+    }
+    if !expectation.not_elicit.is_empty() {
+        fields.push("not_elicit");
+    }
+    if !expectation.after_success.is_empty() {
+        fields.push("after_success");
+    }
+    if expectation.after_success_exact.is_some() {
+        fields.push("after_success_exact");
+    }
+    if !expectation.not_after_success.is_empty() {
+        fields.push("not_after_success");
+    }
+    if !expectation.matched_rules.is_empty() {
+        fields.push("matched_rules");
+    }
+    if expectation.matched_rules_exact.is_some() {
+        fields.push("matched_rules_exact");
+    }
+    if !expectation.not_matched_rules.is_empty() {
+        fields.push("not_matched_rules");
     }
     fields
 }
@@ -1223,9 +1305,19 @@ fn outgoing_refs(spec: &SkillSpec, parsed: &ParsedHandle) -> Result<Vec<Referenc
             }
             Ok(edges)
         }
+        "test" => {
+            let test = spec
+                .tests
+                .iter()
+                .find(|test| test.name == id)
+                .ok_or_else(|| Error::InvalidInput {
+                    message: format!("unknown test id {id:?}"),
+                })?;
+            Ok(test_expectation_edges(&test.expect))
+        }
         _ => Err(Error::InvalidInput {
             message: format!(
-                "refs supports route:<id>, rule:<id>, state:<id>, command:<id>, and recipe:<id>; got {kind}",
+                "refs supports route:<id>, rule:<id>, state:<id>, command:<id>, recipe:<id>, and test:<name>; got {kind}",
                 kind = parsed.kind
             ),
         }),
@@ -1237,6 +1329,96 @@ fn edge(field: &str, kind: &str, ids: Vec<String>) -> ReferenceEdge {
         field: field.to_owned(),
         kind: kind.to_owned(),
         ids,
+    }
+}
+
+fn test_expectation_edges(expectation: &Expectation) -> Vec<ReferenceEdge> {
+    let mut edges = Vec::new();
+    if let Some(route) = &expectation.route {
+        edges.push(edge("expect.route", "route", vec![route.0.clone()]));
+    }
+    if !expectation.route_order.is_empty() {
+        edges.push(edge(
+            "expect.route_order",
+            "route",
+            route_ids(&expectation.route_order),
+        ));
+    }
+    push_string_edge(&mut edges, "expect.forbid", "forbid", &expectation.forbid);
+    if let Some(ids) = &expectation.forbid_exact {
+        push_string_edge(&mut edges, "expect.forbid_exact", "forbid", ids);
+    }
+    push_string_edge(
+        &mut edges,
+        "expect.not_forbid",
+        "forbid",
+        &expectation.not_forbid,
+    );
+    push_string_edge(
+        &mut edges,
+        "expect.elicit",
+        "elicitation",
+        &expectation.elicit,
+    );
+    if let Some(ids) = &expectation.elicit_exact {
+        push_string_edge(&mut edges, "expect.elicit_exact", "elicitation", ids);
+    }
+    push_string_edge(
+        &mut edges,
+        "expect.not_elicit",
+        "elicitation",
+        &expectation.not_elicit,
+    );
+    push_string_edge(
+        &mut edges,
+        "expect.after_success",
+        "command_or_recipe_or_state",
+        &expectation.after_success,
+    );
+    if let Some(ids) = &expectation.after_success_exact {
+        push_string_edge(
+            &mut edges,
+            "expect.after_success_exact",
+            "command_or_recipe_or_state",
+            ids,
+        );
+    }
+    push_string_edge(
+        &mut edges,
+        "expect.not_after_success",
+        "command_or_recipe_or_state",
+        &expectation.not_after_success,
+    );
+    if !expectation.matched_rules.is_empty() {
+        edges.push(edge(
+            "expect.matched_rules",
+            "rule",
+            rule_ids(&expectation.matched_rules),
+        ));
+    }
+    if let Some(rules) = &expectation.matched_rules_exact {
+        edges.push(edge("expect.matched_rules_exact", "rule", rule_ids(rules)));
+    }
+    if !expectation.not_matched_rules.is_empty() {
+        edges.push(edge(
+            "expect.not_matched_rules",
+            "rule",
+            rule_ids(&expectation.not_matched_rules),
+        ));
+    }
+    if !expectation.plan_phases.is_empty() {
+        edges.push(edge(
+            "expect.plan_phases",
+            "phase",
+            expectation.plan_phases.clone(),
+        ));
+    }
+    edges
+}
+
+fn push_string_edge(edges: &mut Vec<ReferenceEdge>, field: &str, kind: &str, ids: &[String]) {
+    if !ids.is_empty() {
+        edges.push(edge(field, kind, ids.to_vec()));
     }
 }
 
@@ -1285,27 +1467,59 @@ fn recipe_step_edge(step: &RecipeStep) -> Option<ReferenceEdge> {
 fn query_hints(path: &Path, parsed: &ParsedHandle) -> Vec<String> {
     let path = path.display();
     let Some(id) = parsed.id.as_deref() else {
-        return vec![format!(
-            "skillspec query {path} {} --view summary",
-            parsed.kind
-        )];
+        let handle = shell_arg(&parsed.kind);
+        return vec![format!("skillspec query {path} {handle} --view summary")];
     };
     match parsed.kind.as_str() {
         "rule" => vec![
-            format!("skillspec query {path} rule:{id}.forbid"),
-            format!("skillspec query {path} rule:{id}.after_success"),
-            format!("skillspec refs {path} rule:{id} --view summary"),
+            format!(
+                "skillspec query {path} {}",
+                shell_arg(&format!("rule:{id}.forbid"))
+            ),
+            format!(
+                "skillspec query {path} {}",
+                shell_arg(&format!("rule:{id}.after_success"))
+            ),
+            format!(
+                "skillspec refs {path} {} --view summary",
+                shell_arg(&format!("rule:{id}"))
+            ),
         ],
         "command" => vec![
-            format!("skillspec query {path} command:{id}.requires"),
+            format!(
+                "skillspec query {path} {}",
+                shell_arg(&format!("command:{id}.requires"))
+            ),
             format!("skillspec deps check {path} --command {id}"),
-            format!("skillspec refs {path} command:{id} --view summary"),
+            format!(
+                "skillspec refs {path} {} --view summary",
+                shell_arg(&format!("command:{id}"))
+            ),
         ],
         "state" => vec![
-            format!("skillspec query {path} state:{id}.next"),
-            format!("skillspec refs {path} state:{id} --view summary"),
+            format!(
+                "skillspec query {path} {}",
+                shell_arg(&format!("state:{id}.next"))
+            ),
+            format!(
+                "skillspec refs {path} {} --view summary",
+                shell_arg(&format!("state:{id}"))
+            ),
         ],
-        "route" => vec![format!("skillspec query {path} route:{id}.checks")],
+        "route" => vec![format!(
+            "skillspec query {path} {}",
+            shell_arg(&format!("route:{id}.checks"))
+        )],
+        "test" => vec![
+            format!(
+                "skillspec query {path} {} --view full",
+                shell_arg(&format!("test:{id}.expect"))
+            ),
+            format!(
+                "skillspec refs {path} {} --view summary",
+                shell_arg(&format!("test:{id}"))
+            ),
+        ],
         _ => Vec::new(),
     }
 }
@@ -1344,13 +1558,22 @@ fn refs_hints(path: &Path, parsed: &ParsedHandle, outgoing: &[ReferenceEdge]) ->
     }
     if hints.is_empty() {
         if let Some(id) = parsed.id.as_deref() {
-            hints.push(format!(
-                "skillspec query {path} {}:{id} --view full",
-                parsed.kind
-            ));
+            let handle = shell_arg(&format!("{}:{id}", parsed.kind));
+            hints.push(format!("skillspec query {path} {handle} --view full",));
         }
     }
     hints
+}
+
+fn shell_arg(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '/' | '.' | ':' | '='))
+    {
+        value.to_owned()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
 }
 
 fn render_target_header(output: &mut String, target: &QueryTarget, handle: &str, view: View) {

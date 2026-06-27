@@ -314,7 +314,7 @@ fn grammar_sections() -> Vec<GrammarSection> {
             name: "tests",
             role: "scenario expectations",
             use_for: "routing, matched rules, forbids, elicitations, and closures",
-            query_handle: "tests",
+            query_handle: "tests or test:<name>",
         },
         GrammarSection {
             name: "trace",

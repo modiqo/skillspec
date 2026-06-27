@@ -219,7 +219,8 @@ Arguments:
 
 - `<PATH>`: path to a `skill.spec.yml` file.
 - `<HANDLE>`: collection, item, or field handle, such as `routes`,
-  `rule:<id>`, `command:<id>.requires`, or `state:<id>`.
+  `rule:<id>`, `command:<id>.requires`, `state:<id>`, or
+  `test:<name>.expect`.
 
 Options:
 
@@ -240,7 +241,7 @@ Arguments:
 
 - `<PATH>`: path to a `skill.spec.yml` file.
 - `<HANDLE>`: item handle, such as `rule:<id>`, `command:<id>`,
-  `state:<id>`, or `recipe:<id>`.
+  `state:<id>`, `recipe:<id>`, or `test:<name>`.
 
 Options:
 
@@ -249,7 +250,8 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `refs` reports outgoing references from an item, such as route checks, command
-dependencies, rule preferences, phase requirements, and transition edges.
+dependencies, rule preferences, test expectations, phase requirements, and
+transition edges.
 
 ## `doctor`
 

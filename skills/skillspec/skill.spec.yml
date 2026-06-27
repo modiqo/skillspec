@@ -2517,14 +2517,14 @@ commands:
       dependencies:
         - skillspec_cli
   query_active_handles:
-    description: Inspect a specific route, rule, command, state, or dependency handle instead of reading the whole YAML.
+    description: Inspect a specific route, rule, command, state, dependency, or test expectation handle instead of reading the whole YAML.
     template: skillspec query <skill-folder>/skill.spec.yml <handle> --view summary
     safety: read_only
     requires:
       dependencies:
         - skillspec_cli
   refs_active_handles:
-    description: Inspect references from an active handle during targeted revision.
+    description: Inspect references from an active handle, including test expectation references, during targeted revision.
     template: skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary
     safety: read_only
     requires:
