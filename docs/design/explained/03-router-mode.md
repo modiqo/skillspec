@@ -68,8 +68,8 @@ Review check:
 - Router skill is generated in each configured root.
 - Router config records managed roots and router skill dirs.
 - Visibility is manifest-backed for restore.
-- After harness restart, the router is the primary implicit discovery entry
-  point for managed roots.
+- After harness restart, the router is the implicit first hop for every request
+  in managed roots.
 - Routed skills are explicit-only/manual-only and should be loaded only after
   router selection.
 - `durable-executor` remains implicit only when installed and enabled.
@@ -84,7 +84,9 @@ their skill metadata.
 
 The router is a discovery first-hop, not an execution envelope. It ranks
 candidates from the local index and returns the selected skill path plus
-candidates and confidence.
+candidates and confidence. If the router finds no suitable skill, the agent
+continues with the normal path for the request instead of loading an unrelated
+skill.
 
 ```mermaid
 flowchart LR

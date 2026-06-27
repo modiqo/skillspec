@@ -1396,16 +1396,18 @@ description: Use as the durable execution first-hop for tool-backed requests tha
         .is_file());
     let router_skill = fs::read_to_string(root.join("skill-router/SKILL.md")).unwrap();
     assert!(router_skill.contains("skill.spec.yml"));
-    assert!(router_skill.contains("Primary implicit skill-discovery entry point"));
-    assert!(router_skill.contains("primary implicit discovery entry point"));
+    assert!(router_skill.contains("Use for every user request"));
+    assert!(router_skill.contains("the first hop for every user request"));
+    assert!(router_skill.contains("continue with the normal agent path"));
     assert!(router_skill.contains("explicit-only"));
-    assert!(router_skill.contains("load the selected skill explicitly"));
+    assert!(router_skill.contains("load that selected skill explicitly"));
     assert!(router_skill.contains("durable-executor"));
     assert!(!router_skill.contains("visible discovery surface"));
     let router_spec = fs::read_to_string(root.join("skill-router/skill.spec.yml")).unwrap();
     assert!(router_spec.contains("schema: skillspec/v0"));
-    assert!(router_spec.contains("Primary implicit skill-discovery gateway"));
-    assert!(router_spec.contains("router first-hop"));
+    assert!(router_spec.contains("Use for every user request"));
+    assert!(router_spec.contains("first hop for every request"));
+    assert!(router_spec.contains("no suitable skill is found"));
     assert!(!router_spec.contains("--router-root"));
     let validate_router_spec = Command::new(bin())
         .arg("validate")

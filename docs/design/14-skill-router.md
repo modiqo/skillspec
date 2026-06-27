@@ -65,8 +65,8 @@ directory paths resolve to `skill-index.sqlite`.
 Router mode is the managed state created by `skillspec router install`:
 
 - after install/enable and harness restart, the generated `skill-router` skill
-  is the primary implicit skill-discovery entry point for managed roots and is
-  directly invocable;
+  is the first hop for every user request in managed roots and is directly
+  invocable;
 - when enabled, indexed routed skills are made explicit-only/manual-only unless
   they are already `off`;
 - `durable-executor` is implicit only when it is present in the managed roots
@@ -86,12 +86,15 @@ router install still succeeds and reports that durable first-hop execution is
 unavailable until durable-executor is installed separately.
 
 The router guarantee is visibility-backed, not prose-only. Within configured
-roots, router install/enable writes native metadata so the router remains
-implicit while routed skills stop competing for implicit selection. A harness
-restart is required before active sessions reliably observe those metadata
-changes. Skills outside the managed roots, stale harness sessions, or
-harness-specific selection bugs are outside the guarantee; `skillspec status`
-and `skillspec router index status` are the verification gates.
+roots, router install/enable writes native metadata so the router is the
+implicit first hop for every request while routed skills stop competing for
+implicit selection. The router must query the local index first. If the index
+returns no suitable skill, the agent continues with the normal path for the
+request, including ordinary workspace or web search when those are otherwise
+allowed. A harness restart is required before active sessions reliably observe
+the metadata changes. Skills outside the managed roots, stale harness sessions,
+or harness-specific selection bugs are outside the guarantee; `skillspec
+status` and `skillspec router index status` are the verification gates.
 
 `durable-executor` has its own managed lifecycle. `skillspec durable-executor
 install <source-folder>` first checks that `rote` is available on `PATH`, then
@@ -256,10 +259,10 @@ Normal routing:
 
 ```text
 user task
--> implicit skill-router first-hop after router install/enable and harness restart
+-> implicit skill-router first-hop for every request after router install/enable and harness restart
 -> skillspec route
--> selected domain skill
--> normal execution when direct mode is selected
+-> if selected, load the selected domain skill
+-> if no suitable skill, continue normal agent behavior
 ```
 
 Durable routing:
