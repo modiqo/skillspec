@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Why SkillSpec exists: a research-style explanation of agent skills, attention pressure, Doctor risk analysis, structured contracts, routing, proof, and durable execution."
+    >
+    <title>Why SkillSpec Exists</title>
+    <link rel="stylesheet" href="./assets/styles.css?v=20260627-article">
+  </head>
+  <body>
+    <main class="shell article-shell">
+      <nav class="page-nav" aria-label="Page navigation">
+        <a href="./index.html">SkillSpec Doctor</a>
+        <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
+      </nav>
+
+      <section class="article-hero" aria-labelledby="article-title">
+        <div>
+          <p class="eyebrow">Research note</p>
+          <h1 id="article-title">Why SkillSpec exists</h1>
+          <p class="lede">
+            Skills made agent knowledge portable. SkillSpec makes important
+            skills followable, testable, and provable without forcing the agent
+            to keep the whole operating manual in working memory.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-link" href="#operator-model">See the operating model</a>
+            <a class="secondary-link" href="#sources">Read the source docs</a>
+          </div>
+        </div>
+        <figure class="article-figure">
+          <img
+            src="./assets/skillspec-layer-stack.svg"
+            alt="Concentric diagram showing models, the agent harness, SkillSpec, and skills."
+          >
+          <figcaption>
+            SkillSpec sits inside the skills layer: close enough to travel with
+            the skill, structured enough for the harness and CLI to check.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="article-panel abstract-panel" aria-labelledby="abstract-title">
+        <div>
+          <p class="eyebrow">Abstract</p>
+          <h2 id="abstract-title">The problem is not that skills are weak.</h2>
+        </div>
+        <div class="abstract-copy">
+          <p>
+            The problem is that the most important skills become load-bearing
+            prose. They start as clean instructions, then grow into state machines,
+            dependency notes, tool policies, code snippets, references, and release
+            checks. At the same time, teams install more skills for more products
+            and tools. One axis makes each skill longer. The other makes the skill
+            library wider. Both compete for model attention.
+          </p>
+          <p>
+            SkillSpec is the answer we arrived at after measuring that pressure:
+            keep prose for judgment, but move the parts that must be followed into
+            a small, portable behavior contract. The contract says when the skill
+            applies, which route to choose, what steps to run, what tools are
+            allowed, what checks must pass, and what proof should exist at the end.
+          </p>
+        </div>
+      </section>
+
+      <div class="article-layout">
+        <aside class="article-toc" aria-label="Article sections">
+          <a href="#skills">1. What skills changed</a>
+          <a href="#attention">2. The attention problem</a>
+          <a href="#model">3. Why better models are not enough</a>
+          <a href="#skillspec">4. The SkillSpec move</a>
+          <a href="#operator-model">5. The operating model</a>
+          <a href="#proof">6. Proof instead of vibes</a>
+          <a href="#sources">Sources</a>
+        </aside>
+
+        <article class="article-body">
+          <section id="skills">
+            <p class="section-kicker">1. Skills</p>
+            <h2>Skills are becoming the packaging layer for tacit domain knowledge.</h2>
+            <p>
+              A prompt is usually a one-off instruction. A skill is a reusable
+              package: frontmatter for discovery, a <code>SKILL.md</code> body
+              for instructions, and optional resources such as examples,
+              scripts, reference files, and checklists. That packaging matters
+              because it lets an agent carry specialized ways of working across
+              tasks and harnesses.
+            </p>
+            <p>
+              In practice, skills are becoming the place where teams write down
+              tacit operating knowledge: how to use a product, how to review a
+              legal clause, how to call a CLI safely, how to sequence a release,
+              or how to keep an agent aligned with a desired outcome. The format
+              emerged from prompts, but the intent is larger than prompting. It
+              is a way to ship capability.
+            </p>
+            <p>
+              This became more important as agent harnesses evolved. Early
+              models already knew common internet and programming patterns from
+              training. Modern harnesses then gave agents access to files,
+              shells, browsers, APIs, MCP servers, and local tools. Some of
+              those tools are natural to a model. Others are private, new,
+              domain-specific, or company-specific. Skills became the teaching
+              layer that tells the agent how to use those tools in the right
+              order for a real outcome.
+            </p>
+            <div class="callout-grid">
+              <div class="callout-card">
+                <strong>Prompt</strong>
+                <span>A transient instruction inside one conversation.</span>
+              </div>
+              <div class="callout-card">
+                <strong>Skill</strong>
+                <span>A portable package of instructions, resources, scripts, and examples.</span>
+              </div>
+              <div class="callout-card">
+                <strong>SkillSpec</strong>
+                <span>A checkable contract beside the skill for route, steps, limits, checks, and proof.</span>
+              </div>
+            </div>
+            <p>
+              The original skill architecture was a real advance because it
+              used progressive disclosure: load a small description first, load
+              the full body when relevant, and load references only when needed.
+              That solves the catalog problem better than dumping every prompt
+              into context. But after activation, the skill body is still prose.
+              It can be skipped, reordered, partially followed, or interpreted
+              differently by another model or harness.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/00-skills-reliability-gap.md"
+                target="_blank"
+                rel="noreferrer"
+              >Reliability gap paper</a>
+            </p>
+          </section>
+
+          <section id="attention">
+            <p class="section-kicker">2. Attention</p>
+            <h2>Skill growth creates two kinds of pressure.</h2>
+            <p>
+              Longitudinal pressure is what happens inside one skill over time.
+              The skill starts short. Then it gains a decision tree, safety
+              rules, setup steps, examples, dependency notes, code snippets,
+              references, exceptions, and final reporting requirements. The file
+              is more complete, but the agent now has more instructions to hold
+              and sequence.
+            </p>
+            <p>
+              Lateral pressure is what happens across the skill library. As
+              agents reach deeper into a user's environment, every useful CLI,
+              API, MCP server, browser flow, and domain workflow wants a skill.
+              More skills means more discovery metadata, more routing ambiguity,
+              and more pressure on the harness budget reserved for skills.
+            </p>
+
+            <div class="pressure-diagram" aria-label="Skill attention pressure">
+              <div>
+                <span class="axis-label">Longitudinal</span>
+                <strong>One skill gets deeper</strong>
+                <p>Instructions become plans, state, rules, snippets, references, and proof demands.</p>
+              </div>
+              <div>
+                <span class="axis-label">Lateral</span>
+                <strong>The library gets wider</strong>
+                <p>More tools and domains create more skill descriptions competing for selection.</p>
+              </div>
+              <div class="pressure-result">
+                <strong>Result</strong>
+                <p>The agent must select the right skill, then follow the right slice of it, without losing steps.</p>
+              </div>
+            </div>
+
+            <p>
+              Doctor was built to make this visible. It classifies the shape of
+              a skill or workspace, measures activation-loaded text, dependency
+              and proof surfaces, frontmatter discovery risk, and agent drift
+              risk. The score is not a grade of domain quality. It is a static
+              estimate of follow-through pressure: how likely the current shape
+              is to make an agent skip, distort, over-trigger, under-trigger, or
+              finish without proof.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md"
+                target="_blank"
+                rel="noreferrer"
+              >Doctor risk model</a>
+            </p>
+          </section>
+
+          <section id="model">
+            <p class="section-kicker">3. Model limits</p>
+            <h2>Better models help, but they do not remove the follow-through problem.</h2>
+            <p>
+              A stronger model can read more, reason better, and recover from
+              more ambiguity. That still does not turn prose into a guarantee.
+              If a skill says "never use tool X before approval," that sentence
+              is only as strong as the model's attention to it at the moment of
+              action. If a later phase says "run tests before release," the run
+              still needs evidence that tests actually ran.
+            </p>
+            <p>
+              The design docs make a narrow claim: long context and compaction
+              are not free. Token windows are large, but usable attention is not
+              uniform, and summarized context can drop governance constraints.
+              Doctor treats these as directional risk signals, not exact
+              probabilities. The report cites its basis so the user can see what
+              is measured, what is policy, and what is still a hypothesis.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/20-performance-token-speed.md"
+                target="_blank"
+                rel="noreferrer"
+              >Token economy design</a>
+            </p>
+          </section>
+
+          <section id="skillspec">
+            <p class="section-kicker">4. The move</p>
+            <h2>SkillSpec keeps prose, but stops making prose carry everything.</h2>
+            <p>
+              The goal is not to replace skills. A good skill still needs
+              human-readable explanation, examples, references, and judgment.
+              The move is to place a small contract next to that prose for the
+              parts that matter most.
+            </p>
+            <div class="contract-flow" aria-label="SkillSpec contract flow">
+              <div>
+                <strong>Assess</strong>
+                <span>Doctor measures the current skill before changing it.</span>
+              </div>
+              <div>
+                <strong>Port</strong>
+                <span>Source maps and import scaffolds turn prose into a reviewed contract.</span>
+              </div>
+              <div>
+                <strong>Guide</strong>
+                <span>Run-loop serves the current route and phase instead of the whole spec.</span>
+              </div>
+              <div>
+                <strong>Prove</strong>
+                <span>Trace alignment compares what was planned with what has evidence.</span>
+              </div>
+            </div>
+            <p>
+              This is why SkillSpec is a CLI plus a structured skill plan. The
+              CLI does the mechanical work: map, validate, test, compile, plan,
+              record progress, and align traces. The skill plan carries the
+              intended behavior: routes, phases, tool boundaries, dependencies,
+              checks, tests, and proof obligations. The installed loader stays
+              small so the agent can ask the CLI for the next slice instead of
+              loading the whole operating manual.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/24-guided-trampoline.md"
+                target="_blank"
+                rel="noreferrer"
+              >Guided trampoline design</a>
+            </p>
+            <p>
+              That boundary matters. If follow-through optimizations live only
+              inside one harness, the skill becomes less portable the moment it
+              moves. SkillSpec keeps the optimization beside the skill itself:
+              the prose, the contract, the tests, and the proof model travel
+              together.
+            </p>
+          </section>
+
+          <section id="operator-model">
+            <p class="section-kicker">5. Operating model</p>
+            <h2>What SkillSpec gives an agent operator.</h2>
+            <div class="solution-grid">
+              <article>
+                <span>01</span>
+                <h3>Measure the existing skill</h3>
+                <p>
+                  Run Doctor before porting. It tells you whether the current
+                  shape is a simple skill, multi-skill workspace, plugin-shaped
+                  workspace, or non-skill repository. It also explains where
+                  follow-through risk comes from.
+                </p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Derive a contract from prose</h3>
+                <p>
+                  Import starts with source mapping, not guesswork. The agent
+                  reviews handles, headings, code blocks, dependencies, and
+                  review-required spans before promoting prose into structured
+                  routes, rules, checks, and proof.
+                </p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Run with progressive guidance</h3>
+                <p>
+                  The run loop selects the route, prints the current gate,
+                  records progress, and resumes from a persisted trace after
+                  interruption or compaction.
+                </p>
+              </article>
+              <article>
+                <span>04</span>
+                <h3>Route large skill libraries</h3>
+                <p>
+                  Router mode moves broad discovery into a local index. The
+                  prompt sees the selected candidates, not every installed skill
+                  description.
+                </p>
+              </article>
+              <article>
+                <span>05</span>
+                <h3>Create skills from observed work</h3>
+                <p>
+                  Durable execution, powered by Modiqo Rote when installed,
+                  captures real interaction evidence so tacit workflow knowledge
+                  can become an explicit SkillSpec-backed skill.
+                </p>
+              </article>
+            </div>
+            <p>
+              The implementation details are intentionally split by concern:
+              import and release flow,
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/01-import-to-release.md"
+                target="_blank"
+                rel="noreferrer"
+              >porting</a>
+              router mode for broad catalogs,
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/03-router-mode.md"
+                target="_blank"
+                rel="noreferrer"
+              >routing</a>
+              and durable execution for observed tool-backed work.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/04-durable-executor.md"
+                target="_blank"
+                rel="noreferrer"
+              >durable execution</a>
+            </p>
+          </section>
+
+          <section id="proof">
+            <p class="section-kicker">6. Proof</p>
+            <h2>The final answer should not be the only artifact you trust.</h2>
+            <p>
+              SkillSpec separates decision evidence from execution evidence. A
+              decision trace can prove which route was selected. A progress
+              ledger can prove which requirements were satisfied. Alignment
+              compares those records against the current contract and reports
+              pass, partial, or fail.
+            </p>
+            <div class="proof-table" role="table" aria-label="SkillSpec proof surfaces">
+              <div role="row">
+                <strong role="cell">Decision trace</strong>
+                <span role="cell">What route and rules were selected for the task.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Progress ledger</strong>
+                <span role="cell">What the agent recorded as completed, with evidence references.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Alignment report</strong>
+                <span role="cell">What is proven, missing, forbidden, or contradicted.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Token metrics</strong>
+                <span role="cell">What was measured, estimated, or explicitly not recorded.</span>
+              </div>
+            </div>
+            <p>
+              This is the scientific posture of the project: do not infer
+              success from a polished answer. Ask what route was selected, what
+              checks passed, what proof exists, and what remains unproven.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/12-traces-and-alignment.md"
+                target="_blank"
+                rel="noreferrer"
+              >Traces and alignment</a>
+            </p>
+          </section>
+
+          <section id="sources" class="sources-section">
+            <p class="section-kicker">Sources</p>
+            <h2>Design material behind this article.</h2>
+            <p>
+              These links open the implementation and design notes used to write
+              this page. They are intentionally public so the claims can be
+              checked against the project source.
+            </p>
+            <div class="source-list">
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/00-skills-reliability-gap.md" target="_blank" rel="noreferrer">
+                Reliability gap in agent skills
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md" target="_blank" rel="noreferrer">
+                Doctor agent drift risk model
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/01-import-to-release.md" target="_blank" rel="noreferrer">
+                Import to release explainer
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/24-guided-trampoline.md" target="_blank" rel="noreferrer">
+                Guided trampoline design
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/12-traces-and-alignment.md" target="_blank" rel="noreferrer">
+                Traces and alignment
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/13-completion-alignment-and-token-reporting.md" target="_blank" rel="noreferrer">
+                Completion alignment and token reporting
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/03-router-mode.md" target="_blank" rel="noreferrer">
+                Router mode
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/explained/04-durable-executor.md" target="_blank" rel="noreferrer">
+                Durable executor
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/19-workspace-authoring-graph.md" target="_blank" rel="noreferrer">
+                Workspace authoring graph
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/20-performance-token-speed.md" target="_blank" rel="noreferrer">
+                Performance and token economy
+              </a>
+            </div>
+          </section>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>

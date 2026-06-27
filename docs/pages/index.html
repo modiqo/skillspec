@@ -8,7 +8,7 @@
       content="Run SkillSpec Doctor on public GitHub skill repositories and review prior reports."
     >
     <title>SkillSpec Doctor Reports</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260627-row-layout">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260627-article">
   </head>
   <body>
     <main class="shell">
@@ -21,27 +21,21 @@
             classifies the shape, measures the risk that an agent will miss or
             improvise instructions, and publishes a report that anyone can inspect.
           </p>
+          <div class="hero-actions">
+            <a class="primary-link" href="./why-skillspec.html">Read why SkillSpec exists</a>
+            <a
+              class="secondary-link"
+              href="https://github.com/modiqo/skillspec"
+              target="_blank"
+              rel="noreferrer"
+            >View GitHub repo</a>
+          </div>
         </div>
-        <div class="hero-visual" aria-hidden="true">
-          <svg viewBox="0 0 420 260" role="img">
-            <defs>
-              <linearGradient id="riskLine" x1="0" x2="1">
-                <stop offset="0" stop-color="#2563eb"></stop>
-                <stop offset="0.5" stop-color="#0f9f6e"></stop>
-                <stop offset="1" stop-color="#d97706"></stop>
-              </linearGradient>
-            </defs>
-            <rect x="24" y="28" width="372" height="204" rx="18" fill="#ffffff"></rect>
-            <path d="M70 184 C118 92, 176 205, 224 116 S324 98, 352 62" fill="none" stroke="url(#riskLine)" stroke-width="8" stroke-linecap="round"></path>
-            <circle cx="70" cy="184" r="11" fill="#2563eb"></circle>
-            <circle cx="224" cy="116" r="11" fill="#0f9f6e"></circle>
-            <circle cx="352" cy="62" r="11" fill="#d97706"></circle>
-            <line x1="72" y1="204" x2="350" y2="204" stroke="#cbd5e1" stroke-width="2"></line>
-            <line x1="72" y1="56" x2="72" y2="204" stroke="#cbd5e1" stroke-width="2"></line>
-            <rect x="92" y="146" width="74" height="12" rx="6" fill="#dbeafe"></rect>
-            <rect x="238" y="84" width="86" height="12" rx="6" fill="#dcfce7"></rect>
-            <rect x="278" y="146" width="60" height="12" rx="6" fill="#fef3c7"></rect>
-          </svg>
+        <div class="hero-visual layer-visual">
+          <img
+            src="./assets/skillspec-layer-stack.svg"
+            alt="Concentric diagram showing models inside the agent harness, SkillSpec inside skills, and skills as the outer capability layer."
+          >
         </div>
       </section>
 
