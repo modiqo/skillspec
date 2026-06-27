@@ -7,9 +7,12 @@ use crate::source_map::{
 use crate::{model::SkillSpec, parser};
 mod frontmatter;
 mod metrics;
+mod renderer;
 mod risk;
 mod types;
 mod workspace_report;
+
+pub use renderer::{render, render_html};
 
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -185,6 +188,7 @@ fn inspect_local_target(path: &Path) -> Result<DoctorReport> {
         .unwrap_or_else(|| shape_root(path));
     let mut report = inspect_simple_skill(&package_root)?;
     report.shape = shape;
+    apply_simple_recommended_action(&mut report, &package_root);
     Ok(report)
 }
 
@@ -194,7 +198,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
     let skill = load_skill_body(&map, &source_root)?;
     let skill_sections = frontmatter::split_skill(&format!("{}{}", skill.frontmatter, skill.body));
     let frontmatter_discovery_risk = frontmatter::analyze(&skill.path, &skill_sections);
-    let shape = simple_shape_for_source_root(&source_root)?;
+    let mut shape = simple_shape_for_source_root(&source_root)?;
     let surface = surface_report(&map, &skill);
     let counts = counts(&map, &skill);
     let skill_spec_path = source_root.join("skill.spec.yml");
@@ -233,6 +237,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         || contract_source
             .as_ref()
             .is_some_and(|(_, spec)| !spec.tests.is_empty());
+    shape.recommended_command = recommended_simple_next_action(&source_root, has_valid_skill_spec);
     let mut issues = Vec::new();
     if let Some(issue) = invalid_contract_issue {
         issues.push(issue);
@@ -541,6 +546,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         agent_drift_risk.recommended_mode = "thin_trampoline_and_use_guided_cli".to_owned();
     }
     let suggested_next_steps = next_steps(
+        &source_root,
         has_valid_skill_spec,
         has_deps_toml,
         has_structured_dependencies,
@@ -640,6 +646,7 @@ fn inspect_staged_remote(
     };
     let mut report = inspect_local_target(&scope_path)?;
     report.shape = classification.shape;
+    apply_simple_recommended_action(&mut report, &scope_path);
     Ok(report)
 }
 
@@ -743,6 +750,7 @@ fn shape_only_report_from_classification(
     let counts = classification.counts;
     let issues = shape_issues(&shape, &counts);
     let basis = basis();
+    let suggested_next_steps = shape_next_steps(&shape);
     DoctorReport {
         target: target.to_owned(),
         source_kind: source_kind.to_owned(),
@@ -762,7 +770,7 @@ fn shape_only_report_from_classification(
         workspace_agent_drift_risk: None,
         packages: Vec::new(),
         basis,
-        suggested_next_steps: shape_next_steps(),
+        suggested_next_steps,
     }
 }
 
@@ -805,190 +813,6 @@ fn frontmatter_issue_title(id: &str) -> &str {
 
 fn simple_shape_for_source_root(source_root: &Path) -> Result<DoctorShapeReport> {
     Ok(classify_local(source_root)?.shape)
-}
-
-pub fn render(report: &DoctorReport) -> String {
-    let mut output = String::new();
-    output.push_str(&format!("skillspec doctor: {}\n", report.target));
-    output.push_str(&format!("source_kind: {}\n", report.source_kind));
-    output.push_str(&format!("analysis_status: {}\n", report.analysis_status));
-    if let Some(staged_from) = &report.staged_from {
-        output.push_str(&format!("staged_from: {staged_from}\n"));
-    }
-    output.push_str(&format!("shape_kind: {}\n", report.shape.kind));
-    output.push_str(&format!("shape_summary: {}\n", report.shape.summary));
-    if let Some(primary) = &report.shape.primary_skill {
-        output.push_str(&format!("primary_skill: {primary}\n"));
-    }
-    output.push_str(&format!(
-        "skill_files: {}\n",
-        report.shape.skill_files.len()
-    ));
-    if !report.shape.plugin_roots.is_empty() {
-        output.push_str("plugin_roots:\n");
-        for plugin in &report.shape.plugin_roots {
-            output.push_str(&format!(
-                "- {} path={} skills={}\n",
-                plugin.namespace,
-                plugin.path,
-                plugin.skill_files.len()
-            ));
-        }
-    }
-    if !report.shape.referenced_skill_paths.is_empty() {
-        output.push_str("referenced_skill_paths:\n");
-        for path in &report.shape.referenced_skill_paths {
-            output.push_str(&format!("- {path}\n"));
-        }
-    }
-    if !report.shape.negative_signals.is_empty() {
-        output.push_str("negative_signals:\n");
-        for signal in &report.shape.negative_signals {
-            output.push_str(&format!("- {signal}\n"));
-        }
-    }
-    output.push_str(&format!(
-        "recommended_command: {}\n",
-        report.shape.recommended_command
-    ));
-    output.push_str(&format!("verdict: {}\n", report.verdict));
-    if report.analysis_status == "shape_only" {
-        output.push_str("structural_score: not evaluated (shape-only)\n");
-    } else {
-        output.push_str(&format!(
-            "structural_score: {}/100\n",
-            report.structural_score
-        ));
-    }
-    if let Some(risk) = &report.agent_drift_risk {
-        output.push_str(&format!(
-            "agent_drift_risk: {} ({}/100)\n",
-            risk.level.as_str(),
-            risk.score
-        ));
-    }
-    if let Some(risk) = &report.raw_activation_risk {
-        output.push_str(&format!(
-            "raw_activation_risk: {} ({}/100)\n",
-            risk.level.as_str(),
-            risk.score
-        ));
-    }
-    if let Some(mitigation) = &report.contract_mitigation {
-        output.push_str(&format!(
-            "contract_mitigation: {} (routes={}, rules={}, commands={}, dependencies={}, tests={})\n",
-            mitigation.level.as_str(),
-            mitigation.routes,
-            mitigation.rules,
-            mitigation.commands,
-            mitigation.dependencies,
-            mitigation.tests
-        ));
-        output.push_str(&format!(
-            "residual_agent_drift_risk: {} ({}/100)\n",
-            mitigation.residual_risk_level.as_str(),
-            mitigation.residual_risk_score
-        ));
-    }
-    if let Some(risk) = &report.workspace_agent_drift_risk {
-        output.push_str(&format!(
-            "workspace_risk: {} ({}/100)\n",
-            risk.level.as_str(),
-            risk.score
-        ));
-    }
-    if let Some(frontmatter) = &report.frontmatter_discovery_risk {
-        output.push_str(&format!(
-            "frontmatter_discovery_risk: {} ({}/100)\n",
-            frontmatter.level.as_str(),
-            frontmatter.score
-        ));
-    }
-    if !report.packages.is_empty() {
-        output.push_str(&format!("packages_analyzed: {}\n", report.packages.len()));
-        for package in report.packages.iter().take(8) {
-            output.push_str(&format!(
-                "- {} path={} drift={} discovery={}\n",
-                package.package_id,
-                package.path,
-                package.agent_drift_risk.level.as_str(),
-                package.frontmatter_discovery_risk.level.as_str()
-            ));
-        }
-    }
-    output.push_str(&format!(
-        "large_surface: {}% activation-loaded\n\n",
-        report.large_surface_percentage
-    ));
-    output.push_str("surface:\n");
-    output.push_str(&format!(
-        "- frontmatter: {} line(s), {} byte(s)\n",
-        report.surface.frontmatter_lines, report.surface.frontmatter_bytes
-    ));
-    output.push_str(&format!(
-        "- activation: {} line(s), {} byte(s), ~{} token(s)\n",
-        report.surface.activation_lines,
-        report.surface.activation_bytes,
-        report.surface.activation_estimated_tokens
-    ));
-    output.push_str(&format!(
-        "- deferred: {} file(s), {} byte(s)\n",
-        report.surface.deferred_files, report.surface.deferred_bytes
-    ));
-    output.push_str(&format!(
-        "- unmapped package files: {}\n\n",
-        report.surface.unmapped_files
-    ));
-    output.push_str("counts:\n");
-    output.push_str(&format!(
-        "- modal obligations: {} (late: {})\n",
-        report.counts.modal_obligations, report.counts.late_modal_obligations
-    ));
-    output.push_str(&format!(
-        "- numbered steps: {}\n",
-        report.counts.numbered_steps
-    ));
-    output.push_str(&format!(
-        "- code blocks in SKILL.md: {} (unlabeled: {})\n",
-        report.counts.code_blocks_in_skill, report.counts.unlabeled_code_blocks_in_skill
-    ));
-    output.push_str(&format!(
-        "- dependency mentions: {}\n",
-        report.counts.dependency_mentions
-    ));
-    output.push_str(&format!(
-        "- missing local references: {}\n\n",
-        report.counts.missing_local_references
-    ));
-
-    if report.issues.is_empty() {
-        output.push_str("issues: none detected by static structure\n");
-    } else {
-        output.push_str("issues:\n");
-        for issue in &report.issues {
-            output.push_str(&format!(
-                "- [{}] {}: {}\n",
-                issue.severity, issue.id, issue.title
-            ));
-            output.push_str(&format!("  evidence: {}\n", issue.evidence));
-            output.push_str(&format!("  basis: {}\n", issue.basis.join(", ")));
-            output.push_str(&format!("  remediation: {}\n", issue.remediation));
-        }
-    }
-
-    output.push_str("\nbasis:\n");
-    for basis in &report.basis {
-        output.push_str(&format!(
-            "- {}: {} ({})\n",
-            basis.id, basis.claim, basis.source
-        ));
-    }
-    output.push_str("\nnext:\n");
-    for step in &report.suggested_next_steps {
-        output.push_str(&format!("- {step}\n"));
-    }
-    trim_trailing_newline(&mut output);
-    output
 }
 
 fn collect_inventory_files(root: &Path) -> Result<Vec<PathBuf>> {
@@ -1140,8 +964,8 @@ fn recommended_shape_command(kind: &str, root: &str, primary_skill: Option<&str>
             .and_then(|skill| Path::new(skill).parent())
             .map(path_to_slash)
             .filter(|path| !path.is_empty())
-            .map(|path| format!("skillspec doctor {root}/{path}"))
-            .unwrap_or_else(|| format!("skillspec doctor {root}")),
+            .map(|path| format!("/skillspec import {root}/{path}, compile it for <target>, install it, and prove it"))
+            .unwrap_or_else(|| format!("/skillspec import {root}, compile it for <target>, install it, and prove it")),
         "entry_skill_with_subskills" | "plugin_workspace" | "multi_skill_workspace" => {
             format!("skillspec workspace map {root} --out <build-dir>/skillspec.workspace.yml")
         }
@@ -1219,13 +1043,41 @@ fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorI
     issues
 }
 
-fn shape_next_steps() -> Vec<String> {
-    vec![
-        "For `simple_skill`, rerun doctor on the reported primary skill package if needed."
-            .to_owned(),
-        "For multi-skill or plugin shapes, run `skillspec workspace map <root> --out <build-dir>/skillspec.workspace.yml` before import.".to_owned(),
-        "For `non_skill_repository`, stop; add or select a SKILL.md package before SkillSpec conversion.".to_owned(),
-    ]
+fn recommended_simple_next_action(source_root: &Path, has_valid_skill_spec: bool) -> String {
+    let source = source_root.display();
+    if has_valid_skill_spec {
+        format!("skillspec install skill {source} --target <target> --retire-existing")
+    } else {
+        format!("/skillspec import {source}, compile it for <target>, install it, and prove it")
+    }
+}
+
+fn apply_simple_recommended_action(report: &mut DoctorReport, source_root: &Path) {
+    let has_valid_skill_spec = report.contract_mitigation.is_some();
+    report.shape.recommended_command =
+        recommended_simple_next_action(source_root, has_valid_skill_spec);
+}
+
+fn shape_next_steps(shape: &DoctorShapeReport) -> Vec<String> {
+    match shape.kind.as_str() {
+        "entry_skill_with_subskills" | "plugin_workspace" | "multi_skill_workspace" => vec![
+            format!(
+                "Map the workspace before import: `skillspec workspace map {} --out <build-dir>/skillspec.workspace.yml`.",
+                shape.root
+            ),
+            "From the harness, ask `/skillspec map this repo and import the packages safely` when you want the agent to preserve package shape, plugin namespaces, and dependencies.".to_owned(),
+            "Do not flatten the repo into one skill; process each discovered SKILL.md as an atomic package and converge dependencies before install.".to_owned(),
+        ],
+        "non_skill_repository" => vec![
+            "Stop here: doctor did not find a SKILL.md entrypoint.".to_owned(),
+            "Select a folder that contains SKILL.md, pass a GitHub skill-folder URL, or add a SKILL.md before importing.".to_owned(),
+            "Do not run import or workspace fanout against an ordinary code repository until a skill entrypoint exists.".to_owned(),
+        ],
+        _ => vec![
+            "Use the recommended action above instead of rerunning doctor on the same target."
+                .to_owned(),
+        ],
+    }
 }
 
 fn shape_root(path: &Path) -> PathBuf {
@@ -1400,6 +1252,9 @@ fn rewrite_remote_locations(report: &mut DoctorReport, staged_skill_path: &Path,
     let target = target.trim_end_matches('/');
     rewrite_prefixed_string(&mut report.shape.root, prefix, target);
     rewrite_prefixed_string(&mut report.shape.recommended_command, prefix, target);
+    for step in &mut report.suggested_next_steps {
+        rewrite_prefixed_string(step, prefix, target);
+    }
     for issue in &mut report.issues {
         if let Some(location) = &mut issue.location {
             rewrite_prefixed_string(location, prefix, target);
@@ -1893,13 +1748,19 @@ fn contract_mitigation_level(spec: &SkillSpec) -> ContractMitigationLevel {
 }
 
 fn next_steps(
+    source_root: &Path,
     has_valid_skill_spec: bool,
     has_deps_toml: bool,
     has_structured_dependencies: bool,
     raw_activation_score: u8,
 ) -> Vec<String> {
     let mut steps = Vec::new();
+    let source = source_root.display();
     if has_valid_skill_spec {
+        steps.push(format!(
+            "Install the SkillSpec-backed skill into the harness you use: `skillspec install skill {source} --target <codex|agents|claude-local> --retire-existing`."
+        ));
+        steps.push("Then invoke the skill normally from the harness; for the SkillSpec self skill, ask `/skillspec import <source-skill>, compile it for <target>, install it, and prove it`.".to_owned());
         if raw_activation_score <= 24 {
             steps.push("Keep the activated SKILL.md trampoline thin and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
         } else {
@@ -1907,8 +1768,16 @@ fn next_steps(
         }
         steps.push("Use `skillspec run-loop <skill.spec.yml> --input '<task>' --trace-dir <dir> --guide agent` instead of loading the full spec or duplicating policy in prose.".to_owned());
     } else {
-        steps.push("Run `skillspec source map <skill> --out <dir>` to inspect exact source handles before conversion.".to_owned());
-        steps.push("Run `skillspec import-skill <skill> --out <skill>/skill.spec.yml --source-map <dir>/source-map.json` and review the scaffold.".to_owned());
+        steps.push(
+            "Install the `skillspec` skill into your harness if it is not already installed."
+                .to_owned(),
+        );
+        steps.push(format!(
+            "From the harness, ask `/skillspec import {source}, compile it for <target>, install it, and prove it`."
+        ));
+        steps.push(format!(
+            "For a CLI-only port, run `skillspec source map {source} --out <draft-dir>/.skillspec/source-map`, then `skillspec import-skill {source} --out <draft-dir>/skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json`."
+        ));
     }
     if !has_deps_toml && !has_structured_dependencies {
         steps.push("Create or complete `deps.toml`; preserve dependency authority, local status, install risk, and degraded proof impact.".to_owned());
@@ -1919,12 +1788,6 @@ fn next_steps(
         steps.push("Promote operational prose into routes, rules, forbids, command templates, scenario tests, and trace/progress proof obligations.".to_owned());
     }
     steps
-}
-
-fn trim_trailing_newline(output: &mut String) {
-    while output.ends_with('\n') {
-        output.pop();
-    }
 }
 
 #[cfg(test)]

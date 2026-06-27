@@ -144,7 +144,7 @@ pub fn stage_remote_source(
     let mut next = Vec::new();
     match &selected_source_path {
         Some(path) => {
-            next.push(format!("skillspec doctor {path} --json"));
+            next.push(format!("skillspec doctor {path}"));
             next.push(format!(
                 "skillspec source map {path} --out <draft-dir>/.skillspec/source-map"
             ));

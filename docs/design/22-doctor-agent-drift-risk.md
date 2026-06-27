@@ -136,6 +136,8 @@ that threshold was actually measured and published.
 Current command:
 
 ```sh
+skillspec doctor <target>
+skillspec doctor <target> --html
 skillspec doctor <target> --json
 ```
 
@@ -143,7 +145,6 @@ Designed extensions:
 
 ```sh
 skillspec doctor <target> \
-  --json \
   --tokenizer-profile auto \
   --model claude-sonnet-4-6 \
   --harness-profile claude-code \

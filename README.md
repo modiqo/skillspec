@@ -101,7 +101,7 @@ right CLI commands and keep the run aligned.
 
 | You want to know or do | What to ask in chat | What SkillSpec does |
 | --- | --- | --- |
-| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape: simple skill, multi-skill workspace, plugin-shaped workspace, entry skill with subskills, or non-skill repo. It also reports follow-through risk for agent execution. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
+| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape: simple skill, multi-skill workspace, plugin-shaped workspace, entry skill with subskills, or non-skill repo. The default report is formatted for humans, `--html` creates a shareable review page, and `--json` preserves the full machine report. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
 | Port an existing skill. | `/skillspec import <path-or-url>, compile it for Codex, install it, and prove it` | Stages the source if needed, runs doctor, maps the source, imports the skill, validates it, tests it, compiles it, and prints the report. |
 | Port a repo with many skills or plugin folders. | `/skillspec map this repo and import the packages safely` | Preserves the original shape, processes each atomic `SKILL.md` package separately, detects references, prevents circular dependency mistakes, and converges the workspace before install. |
 | Use the installed skill. | Use it normally, the same way you would use any other skill. | The generated skill loader keeps the prompt small and asks the CLI for route guidance, phase checks, progress recording, and final alignment. |

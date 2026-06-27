@@ -205,10 +205,12 @@ pub(super) fn run(command: Command) -> Result<()> {
                 report::text(&sensemake::render_refs(&report))?;
             }
         }
-        Command::Doctor { path, json } => {
+        Command::Doctor { path, json, html } => {
             let doctor_report = doctor::inspect_target(&path)?;
             if json {
                 report::json(&doctor_report)?;
+            } else if html {
+                report::text(&doctor::render_html(&doctor_report))?;
             } else {
                 report::text(&doctor::render(&doctor_report))?;
             }

@@ -156,9 +156,12 @@ pub(super) enum Command {
     Doctor {
         /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
         path: String,
-        /// Emit JSON instead of a concise human report.
-        #[arg(long)]
+        /// Emit machine-readable JSON instead of the formatted human report.
+        #[arg(long, conflicts_with = "html")]
         json: bool,
+        /// Emit a self-contained HTML report instead of the formatted human report.
+        #[arg(long, conflicts_with = "json")]
+        html: bool,
     },
     #[command(
         about = "Show installed SkillSpec lifecycle status, roots, router index state, and skill inventory"

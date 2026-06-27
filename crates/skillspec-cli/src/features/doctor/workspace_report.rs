@@ -83,6 +83,7 @@ fn report_from_skill_texts(
     let workspace_agent_drift_risk = workspace_agent_drift_risk(&shape, &package_reports, &issues);
     let surface = workspace_surface(&package_reports);
     let basis = basis();
+    let suggested_next_steps = super::shape_next_steps(&shape);
 
     DoctorReport {
         target: target.to_owned(),
@@ -106,7 +107,7 @@ fn report_from_skill_texts(
         workspace_agent_drift_risk: Some(workspace_agent_drift_risk),
         packages: package_reports,
         basis,
-        suggested_next_steps: super::shape_next_steps(),
+        suggested_next_steps,
     }
 }
 

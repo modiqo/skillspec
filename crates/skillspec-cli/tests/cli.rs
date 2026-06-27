@@ -3204,7 +3204,7 @@ commands:
     assert_success(&output);
     let out = stdout(&output);
     assert!(out.contains("diagnose source shape and prose reliability debt"));
-    assert!(out.contains("skillspec doctor <source-skill-folder-or-repo-uri> --json"));
+    assert!(out.contains("skillspec doctor <source-skill-folder-or-repo-uri>"));
     assert!(out.contains("cheap shape gate"));
 }
 
@@ -5636,9 +5636,9 @@ from reportlab.pdfgen import canvas
     let text = Command::new(bin()).arg("doctor").arg(&skill_dir).output()?;
     assert_success(&text);
     let text = stdout(&text);
-    assert!(text.contains("large_surface:"));
-    assert!(text.contains("agent_drift_risk:"));
-    assert!(text.contains("frontmatter_discovery_risk:"));
+    assert!(text.contains("Activation-loaded surface:"));
+    assert!(text.contains("Follow-through risk:"));
+    assert!(text.contains("Discovery risk:"));
     assert!(text.contains("docs/00-skills-reliability-gap.md"));
     assert!(text.contains("docs/08-contract-trace-methodology.md"));
     Ok(())
@@ -5690,8 +5690,10 @@ import pypdf
     let text = Command::new(bin()).arg("doctor").arg(&skill_dir).output()?;
     assert_success(&text);
     let text = stdout(&text);
-    assert!(text.contains("contract_mitigation: strong"));
-    assert!(text.contains("residual_agent_drift_risk:"));
+    assert!(text.contains("Contract mitigation: strong"));
+    assert!(text.contains("Residual risk:"));
+    assert!(text.contains("Recommended next action: skillspec install skill"));
+    assert!(!text.contains("Recommended next action: skillspec doctor"));
     assert!(text.contains("skillspec run-loop --guide agent"));
     Ok(())
 }
@@ -5941,6 +5943,74 @@ fn doctor_detects_plugin_workspace_shape() -> std::result::Result<(), Box<dyn st
         report["packages"][0]["shape_role"].as_str(),
         Some("plugin_skill")
     );
+    Ok(())
+}
+
+#[test]
+fn doctor_default_output_is_formatted_user_report(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-human-report");
+    let root = dir.path().join("review-skill");
+    write_file(
+        &root.join("SKILL.md"),
+        r#"---
+name: review-skill
+description: Review one file and report risks.
+---
+# Review Skill
+
+1. Read the requested file.
+2. Report risks.
+"#,
+    );
+
+    let output = Command::new(bin()).arg("doctor").arg(&root).output()?;
+    assert_success(&output);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("SkillSpec Doctor"));
+    assert!(stdout.contains("Assessment"));
+    assert!(stdout.contains("Surface"));
+    assert!(stdout.contains("Findings"));
+    assert!(stdout.contains("Next Actions"));
+    assert!(stdout.contains("Recommended next action: /skillspec import"));
+    assert!(!stdout.contains("shape_kind:"));
+    assert!(!stdout.contains("analysis_status:"));
+    assert!(!stdout.contains("Recommended next action: skillspec doctor"));
+    Ok(())
+}
+
+#[test]
+fn doctor_html_output_is_self_contained_report(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-html-report");
+    let root = dir.path().join("review-skill");
+    write_file(
+        &root.join("SKILL.md"),
+        r#"---
+name: review-skill
+description: Review one file and report risks.
+---
+# Review Skill
+
+1. Read the requested file.
+2. Report risks.
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--html")
+        .output()?;
+    assert_success(&output);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("<!doctype html>"));
+    assert!(stdout.contains("<title>SkillSpec Doctor Report</title>"));
+    assert!(stdout.contains("class=\"hero\""));
+    assert!(stdout.contains("Next Actions"));
+    assert!(stdout.contains("Research Basis"));
+    assert!(stdout.contains("https://github.com/modiqo/skillspec/blob/main/docs/"));
+    assert!(!stdout.contains("href=\"docs/"));
     Ok(())
 }
 

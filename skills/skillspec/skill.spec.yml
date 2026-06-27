@@ -2301,8 +2301,8 @@ commands:
       dependencies:
         - skillspec_cli
   doctor_source_shape:
-    description: Print a read-only source shape report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command.
-    template: skillspec doctor <source-skill-folder-or-repo-uri> --json
+    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
+    template: skillspec doctor <source-skill-folder-or-repo-uri>
     safety: local_write
     requires:
       dependencies:

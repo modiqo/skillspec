@@ -491,7 +491,7 @@ selected_route: inspect_source_shape
 current_phase: run_shape_doctor
 open_requirements: doctor_source_shape
 do_not: port, import, compile, install
-next command: skillspec doctor <source> --json
+next command: skillspec doctor <source>
 resume: skillspec run-loop <spec> --resume <run_dir> --guide agent
 ```
 

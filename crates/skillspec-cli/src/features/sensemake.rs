@@ -109,7 +109,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap shape gate; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
+            "for source diagnostics, run doctor before import as a cheap shape gate; default doctor output is a formatted user report, --html is for shareable review pages, and --json is for machine extraction; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-only next steps"
                 .to_owned(),
         );
     }
@@ -538,7 +538,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
             NavigationHint {
                 intent: "diagnose source shape and prose reliability debt",
-                command: "skillspec doctor <source-skill-folder-or-repo-uri> --json".to_owned(),
+                command: "skillspec doctor <source-skill-folder-or-repo-uri>".to_owned(),
             },
             NavigationHint {
                 intent: "map import source",

@@ -360,7 +360,7 @@ DO NOT
 
 NEXT COMMANDS
 - skillspec source stage <uri> --out <staging-root> --json
-- skillspec doctor <selected_source_path> --json
+- skillspec doctor <selected_source_path>
 - skillspec progress record <run_dir> requirement-satisfied approve_remote_source approve_remote_source_access --evidence-kind user_approval --evidence-ref <ref>
 
 LOAD MORE ONLY IF NEEDED
@@ -545,7 +545,7 @@ Proposed schema:
       "Do not search the web or fetch raw GitHub files to locate the same URI."
     ],
     "allowed_commands": [
-      "skillspec doctor <source> --json"
+      "skillspec doctor <source>"
     ],
     "recommended_queries": [
       "skillspec query ./skill.spec.yml route:remote_skill_port --view summary"

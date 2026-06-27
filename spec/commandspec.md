@@ -30,7 +30,7 @@ skillspec <COMMAND>
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
-| `doctor <target> [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk. |
+| `doctor <target> [--html] [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk. Defaults to a formatted user report; use `--html` for a self-contained review page and `--json` for machines. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
@@ -273,7 +273,7 @@ transition edges.
 ## `doctor`
 
 ```text
-skillspec doctor <TARGET> [--json]
+skillspec doctor <TARGET> [--html] [--json]
 ```
 
 Arguments:
@@ -283,7 +283,12 @@ Arguments:
 
 Options:
 
-- `--json`: emit JSON instead of a concise human report.
+- default output: emit a formatted human report with assessment, surface,
+  packages, findings, next actions, and basis summary.
+- `--html`: emit a self-contained HTML report suitable for redirecting to a
+  file and sharing in review.
+- `--json`: emit the full machine-readable report. This is mutually exclusive
+  with `--html`.
 
 `doctor` is a static diagnostic. It does not execute scripts, call tools, invoke
 a model, or simulate a task. It first runs a cheap shape gate and reports one of
