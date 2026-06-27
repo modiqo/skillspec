@@ -7484,6 +7484,25 @@ fn schema_records_strict_typed_sections_and_extension_surfaces() {
 }
 
 #[test]
+fn crate_package_artifacts_match_published_root_files() {
+    let root = repo_root();
+    for relative_path in [
+        "LICENSE-APACHE",
+        "LICENSE-MIT",
+        "spec/grammar.md",
+        "spec/skill.spec.schema.json",
+    ] {
+        let published = fs::read_to_string(root.join(relative_path)).unwrap();
+        let crate_copy =
+            fs::read_to_string(root.join("crates/skillspec-cli").join(relative_path)).unwrap();
+        assert_eq!(
+            crate_copy, published,
+            "crate-local {relative_path} must match the root file before release"
+        );
+    }
+}
+
+#[test]
 fn published_json_schema_validates_every_example() {
     let root = repo_root();
     let schema_path = root.join("spec/skill.spec.schema.json");

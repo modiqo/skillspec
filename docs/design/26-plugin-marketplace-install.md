@@ -61,6 +61,13 @@ plugins/skillspec/skills/skillspec/source/SKILL_md.old
 Install the CLI:
 
 ```sh
+cargo install skillspec
+skillspec --version
+```
+
+For unreleased `main`:
+
+```sh
 cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
 skillspec --version
 ```
@@ -154,3 +161,14 @@ The plugin version should track the CLI crate version in
 independently later, the plugin manifest should declare the minimum compatible
 CLI version in its description or a supported metadata field once the harness
 schema exposes one.
+
+The release gate must verify and publish the crate package:
+
+```sh
+cargo package --locked -p skillspec
+cargo publish --locked --dry-run -p skillspec
+cargo publish --locked -p skillspec
+```
+
+CI runs the dry-run package verification. Tagged releases publish to crates.io
+through the `CARGO_REGISTRY_TOKEN` repository secret.

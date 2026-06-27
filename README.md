@@ -46,6 +46,13 @@ If even two of these sound familiar, SkillSpec is probably for you.
 Install the CLI first:
 
 ```sh
+cargo install skillspec
+skillspec --version
+```
+
+To install unreleased `main`, use:
+
+```sh
 cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
 skillspec --version
 ```
