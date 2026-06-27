@@ -120,6 +120,7 @@ h3 {
 .request-panel,
 .private-note,
 .reports-section,
+.runs-section,
 .report-viewer {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -227,7 +228,8 @@ code {
     "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
 }
 
-.reports-section {
+.reports-section,
+.runs-section {
   margin-top: 28px;
   padding: 24px;
 }
@@ -273,6 +275,49 @@ code {
   border-radius: 8px;
   padding: 16px;
   background: #ffffff;
+}
+
+.runs-list {
+  display: grid;
+  gap: 10px;
+}
+
+.run-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.run-row h3 {
+  overflow: hidden;
+  margin: 0 0 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.run-row a {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 11px;
+  color: var(--ink);
+  font-weight: 720;
+  text-decoration: none;
+}
+
+.run-row a:hover {
+  border-color: var(--blue);
+  color: var(--blue);
 }
 
 .card-topline {
@@ -472,5 +517,13 @@ code {
 
   .card-actions {
     flex-direction: column;
+  }
+
+  .run-row {
+    grid-template-columns: 1fr;
+  }
+
+  .run-row h3 {
+    white-space: normal;
   }
 }

@@ -2,18 +2,22 @@ const REPO_OWNER = "modiqo";
 const REPO_NAME = "skillspec";
 const REPORT_LABEL = "doctor-report";
 const REPORT_MARKER = "<!-- skillspec-doctor-report -->";
+const REPORT_WORKFLOW = "doctor-report.yml";
 
 const form = document.querySelector("#doctor-form");
 const targetInput = document.querySelector("#target-url");
 const formMessage = document.querySelector("#form-message");
 const reportsGrid = document.querySelector("#reports-grid");
 const reportsStatus = document.querySelector("#reports-status");
+const runsList = document.querySelector("#runs-list");
+const runsStatus = document.querySelector("#runs-status");
 const refreshButton = document.querySelector("#refresh-reports");
 const reportViewer = document.querySelector("#report-viewer");
 const reportContent = document.querySelector("#report-content");
 const viewerTitle = document.querySelector("#viewer-title");
 const closeViewer = document.querySelector("#close-viewer");
 const cardTemplate = document.querySelector("#report-card-template");
+const runRowTemplate = document.querySelector("#run-row-template");
 
 let reports = [];
 let activeFilter = "all";
@@ -49,6 +53,7 @@ form.addEventListener("submit", (event) => {
 
 refreshButton.addEventListener("click", () => {
   loadReports();
+  loadWorkflowRuns();
 });
 
 document.querySelectorAll(".filter").forEach((button) => {
@@ -135,6 +140,55 @@ async function loadReports() {
   } catch (error) {
     reports = [];
     reportsStatus.textContent = `Could not load public reports: ${error.message}`;
+  }
+}
+
+async function loadWorkflowRuns() {
+  runsStatus.textContent = "Loading workflow runs...";
+  runsList.replaceChildren();
+
+  try {
+    const runsUrl = new URL(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${REPORT_WORKFLOW}/runs`,
+    );
+    runsUrl.searchParams.set("per_page", "50");
+
+    const payload = await fetchJson(runsUrl);
+    const workflowRuns = payload.workflow_runs || [];
+    renderWorkflowRuns(workflowRuns);
+  } catch (error) {
+    runsStatus.textContent = `Could not load workflow runs: ${error.message}`;
+  }
+}
+
+function renderWorkflowRuns(workflowRuns) {
+  runsList.replaceChildren();
+  if (workflowRuns.length === 0) {
+    runsStatus.textContent = "No workflow runs found yet.";
+    return;
+  }
+
+  runsStatus.textContent = `${workflowRuns.length} run${workflowRuns.length === 1 ? "" : "s"} shown.`;
+  for (const run of workflowRuns) {
+    const node = runRowTemplate.content.firstElementChild.cloneNode(true);
+    const status = run.conclusion || run.status || "pending";
+    const statusPill = node.querySelector(".status-pill");
+    const title = node.querySelector("h3");
+    const meta = node.querySelector("p");
+    const link = node.querySelector("a");
+
+    statusPill.textContent = status;
+    statusPill.classList.add(status === "success" ? "success" : status === "failure" ? "error" : "pending");
+    title.textContent = run.display_title || run.name || `Run ${run.id}`;
+    meta.textContent = [
+      `Run #${run.run_number}`,
+      run.run_attempt > 1 ? `attempt ${run.run_attempt}` : null,
+      formatDate(run.created_at),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    link.href = run.html_url;
+    runsList.appendChild(node);
   }
 }
 
@@ -288,6 +342,16 @@ function stripMarkdown(value) {
     .trim();
 }
 
+function formatDate(value) {
+  if (!value) {
+    return "unknown date";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
@@ -402,3 +466,4 @@ function escapeAttribute(value) {
 }
 
 loadReports();
+loadWorkflowRuns();

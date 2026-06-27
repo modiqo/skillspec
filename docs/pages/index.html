@@ -103,6 +103,19 @@ skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code>
         <div id="reports-grid" class="reports-grid"></div>
       </section>
 
+      <section class="runs-section" aria-labelledby="runs-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workflow run history</p>
+            <h2 id="runs-title">Doctor runs</h2>
+          </div>
+        </div>
+        <div id="runs-status" class="reports-status" role="status" aria-live="polite">
+          Loading workflow runs...
+        </div>
+        <div id="runs-list" class="runs-list"></div>
+      </section>
+
       <section id="report-viewer" class="report-viewer" aria-labelledby="viewer-title" hidden>
         <div class="viewer-header">
           <div>
@@ -140,6 +153,17 @@ skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code>
           <button type="button" data-action="view">View report</button>
           <a data-action="issue" target="_blank" rel="noreferrer">GitHub issue</a>
         </div>
+      </article>
+    </template>
+
+    <template id="run-row-template">
+      <article class="run-row">
+        <span class="status-pill"></span>
+        <div>
+          <h3></h3>
+          <p></p>
+        </div>
+        <a target="_blank" rel="noreferrer">View run</a>
       </article>
     </template>
 
