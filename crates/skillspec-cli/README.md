@@ -9,6 +9,15 @@ progress, and prints alignment reports for SkillSpec-backed skills.
 This crate is published so users can install the CLI with Cargo. Its Rust
 modules are implementation details for now, not a stable library API.
 
+Install the prebuilt binary from the latest GitHub release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+skillspec --version
+```
+
+Binary releases are available for macOS, Linux x86_64, and Windows x86_64.
+
 Install from crates.io:
 
 ```sh

@@ -43,7 +43,49 @@ If even two of these sound familiar, SkillSpec is probably for you.
 
 ## Install
 
-Install the CLI first:
+Install the CLI first. For macOS and Linux x86_64, the fastest path is the
+prebuilt binary from the latest GitHub release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+skillspec --version
+```
+
+To pin a release or install somewhere else:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \
+  | SKILLSPEC_VERSION=v0.1.0 SKILLSPEC_INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+The installer downloads the matching release archive, verifies the `.sha256`
+file, and writes `skillspec` to `~/.local/bin` by default.
+
+You can also download release assets directly:
+
+```sh
+# macOS
+curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-macos.tar.gz
+curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-macos.tar.gz.sha256
+shasum -a 256 -c skillspec-macos.tar.gz.sha256
+tar -xzf skillspec-macos.tar.gz
+mkdir -p "$HOME/.local/bin"
+install -m 0755 skillspec "$HOME/.local/bin/skillspec"
+
+# Linux x86_64
+curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-linux-x86_64.tar.gz
+curl -LO https://github.com/modiqo/skillspec/releases/latest/download/skillspec-linux-x86_64.tar.gz.sha256
+sha256sum -c skillspec-linux-x86_64.tar.gz.sha256
+tar -xzf skillspec-linux-x86_64.tar.gz
+mkdir -p "$HOME/.local/bin"
+install -m 0755 skillspec "$HOME/.local/bin/skillspec"
+```
+
+Windows x86_64 users can download
+`skillspec-windows-x86_64.zip` from the same release page and place
+`skillspec.exe` on `PATH`.
+
+On any machine with Rust installed, use crates.io:
 
 ```sh
 cargo install skillspec

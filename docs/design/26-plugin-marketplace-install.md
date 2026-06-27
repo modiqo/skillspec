@@ -58,7 +58,23 @@ plugins/skillspec/skills/skillspec/source/SKILL_md.old
 
 ## Public Install Flow
 
-Install the CLI:
+Install the CLI from the latest prebuilt release binary:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+skillspec --version
+```
+
+The installer supports the published macOS and Linux x86_64 release assets,
+verifies the `.sha256` checksum, and installs to `~/.local/bin` by default.
+Use `SKILLSPEC_VERSION=v0.1.0` to pin a release, or
+`SKILLSPEC_INSTALL_DIR=/path/to/bin` to change the destination.
+
+The release workflow also publishes a Windows x86_64 zip. Windows users can
+download `skillspec-windows-x86_64.zip`, verify the matching `.sha256`, and put
+`skillspec.exe` on `PATH`.
+
+Users with Rust installed can also install from crates.io:
 
 ```sh
 cargo install skillspec

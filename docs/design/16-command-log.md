@@ -85,6 +85,19 @@ unreleased package testing.
 | Codex | `codex plugin marketplace add modiqo/skillspec --ref main --sparse .agents --sparse plugins/skillspec` | Adds the SkillSpec marketplace from the public repo. |
 | Codex | `codex plugin add skillspec@skillspec` | Installs the `skillspec` plugin from that marketplace. Codex does not have a separate plugin enable command. |
 
+## Binary And Crates.io Install Commands
+
+These commands install the `skillspec` CLI itself. They are public
+distribution commands, not SkillSpec runtime commands.
+
+| Method | Command | Explanation |
+| --- | --- | --- |
+| Release binary | `curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \| sh` | Downloads the latest published GitHub release asset for macOS or Linux x86_64, verifies the `.sha256`, and installs `skillspec` to `~/.local/bin` by default. |
+| Pinned release binary | `curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \| SKILLSPEC_VERSION=v0.1.0 sh` | Installs a specific release tag. `SKILLSPEC_INSTALL_DIR=/path/to/bin` changes the destination. |
+| Crates.io | `cargo install skillspec` | Builds and installs the published crate from crates.io. Use when Rust is already installed or a prebuilt asset is unavailable for the platform. |
+| Git main | `cargo install --git https://github.com/modiqo/skillspec --package skillspec --force` | Installs unreleased `main`; use for testing pending changes only. |
+| Local checkout | `cargo install --path crates/skillspec-cli --force` | Installs from the current repo checkout for development and release verification. |
+
 ## Durable Executor Lifecycle Commands
 
 These commands manage the optional SkillSpec-owned durable first-hop skill. They
