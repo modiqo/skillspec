@@ -5220,20 +5220,18 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert!(loader_out.contains(
         "description: \"Universal CLI/API/shell router with trace and alignment benefits."
     ));
-    assert!(loader_out.contains("thin loader"));
-    assert!(loader_out.contains("## SkillSpec CLI Required"));
-    assert!(loader_out.contains("skillspec --version"));
+    assert!(loader_out.contains("Use the directory that contains this loaded `SKILL.md`"));
+    assert!(loader_out.contains("skillspec run-loop <skill_dir>/skill.spec.yml"));
+    assert!(loader_out.contains("--guide agent"));
+    assert!(loader_out.contains("--resume <run_dir>"));
     assert!(loader_out.contains("cargo install skillspec"));
-    assert!(loader_out.contains("## Entry Gate"));
-    assert!(loader_out.contains("skillspec act ./skill.spec.yml --input='<user task>'"));
-    assert!(loader_out.contains("current-route action checklist"));
-    assert!(loader_out.contains("selected route and matched rules in the checklist override"));
-    assert!(loader_out.contains("## Authoring And Revision Contract"));
-    assert!(loader_out.contains("skillspec grammar sensemake --view porting"));
-    assert!(loader_out.contains("skillspec grammar checklist --for import-skill"));
-    assert!(loader_out.contains("## Durable Handoff Contract"));
-    assert!(loader_out.contains("Forbidden before the decision"));
     assert!(loader_out.contains("skill.spec.yml"));
+    assert!(loader_out.lines().count() < 60);
+    assert!(!loader_out.contains("## Runtime Contract"));
+    assert!(!loader_out.contains("## Completion Report"));
+    assert!(!loader_out.contains("## Authoring And Revision Contract"));
+    assert!(!loader_out.contains("## Durable Handoff Contract"));
+    assert!(!loader_out.contains("skillspec act ./skill.spec.yml"));
     assert!(!loader_out.contains("## Rules"));
 
     let markdown = Command::new(bin())
@@ -6594,8 +6592,11 @@ Read `../coding-standards/SKILL.md`.
     assert!(review_loader.is_file());
     let loader = fs::read_to_string(review_loader).unwrap();
     assert!(loader.contains("name: code-review"));
-    assert!(loader.contains("thin loader"));
+    assert!(loader.contains("skillspec run-loop <skill_dir>/skill.spec.yml"));
+    assert!(loader.contains("--guide agent"));
     assert!(loader.contains("skill.spec.yml"));
+    assert!(!loader.contains("## Runtime Contract"));
+    assert!(!loader.contains("## Completion Report"));
 
     let collision_home = dir.path().join("collision-home");
     fs::create_dir_all(collision_home.join(".agents/skills")).unwrap();
