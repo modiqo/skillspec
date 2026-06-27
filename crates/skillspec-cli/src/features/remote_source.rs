@@ -345,7 +345,7 @@ fn materialize_candidates(
                 ),
             });
         }
-        return Ok(find_materialized_candidates(checkout_dir, &scope_path)?);
+        return find_materialized_candidates(checkout_dir, &scope_path);
     }
 
     if !detect_candidates {
