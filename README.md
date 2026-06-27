@@ -126,6 +126,20 @@ SkillSpec gives you artifacts you can inspect:
 That makes a skill easier to ship, easier to debug, and easier to trust across
 agents.
 
+## License
+
+SkillSpec is dual-licensed under either of:
+
+- [MIT](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
+
+You may choose either license. Contributions are accepted under the same dual
+license unless explicitly stated otherwise.
+
+Some imported examples and source fixtures preserve their own upstream license
+files inside the example package. Those fixture-specific license files govern
+that fixture material and do not relicense the rest of this repository.
+
 ## Learn More
 
 - [Detailed docs](docs/README.md)

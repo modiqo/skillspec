@@ -83,3 +83,14 @@ Start with [docs/05-good-first-issues.md](docs/05-good-first-issues.md). The bes
 SkillSpec helps constrain, test, and audit agent behavior. It is not a complete security boundary. Treat dependency installation, credentials, browser attachment, network writes, and destructive commands as explicit permission paths.
 
 Report sensitive security issues privately to the maintainers before opening a public issue.
+
+## License
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in SkillSpec is licensed as `MIT OR Apache-2.0`, matching the
+repository license.
+
+This repository also contains imported examples and source fixtures that may
+carry their own package-local license files. Do not remove or overwrite those
+fixture licenses unless the fixture itself is being replaced with original or
+properly licensed material.
