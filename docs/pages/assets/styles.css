@@ -220,15 +220,19 @@ button:focus-visible,
 
 .proof-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .proof-grid article {
+  display: grid;
+  grid-template-columns: 42px minmax(220px, 0.75fr) minmax(0, 1.25fr);
+  gap: 18px;
+  align-items: start;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 18px;
   background: #ffffff;
 }
 
@@ -244,17 +248,29 @@ button:focus-visible,
 }
 
 .proof-grid h3 {
-  margin: 14px 0 8px;
+  margin: 0 0 8px;
 }
 
-.proof-grid p {
+.proof-grid p,
+.proof-note {
   color: var(--muted);
   line-height: 1.55;
 }
 
+.proof-copy p,
+.proof-note {
+  margin-bottom: 0;
+}
+
 .proof-grid pre {
-  margin-top: 12px;
+  align-self: center;
+  margin-top: 0;
   font-size: 0.78rem;
+}
+
+.proof-note {
+  border-left: 3px solid #bfdbfe;
+  padding-left: 14px;
 }
 
 pre {
@@ -308,14 +324,15 @@ code {
 
 .reports-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .report-card {
-  display: flex;
-  min-height: 264px;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr) minmax(180px, auto);
+  gap: 18px;
+  align-items: stretch;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
@@ -368,9 +385,9 @@ code {
 .card-topline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .status-pill {
@@ -408,21 +425,25 @@ code {
 .report-card h3 {
   display: -webkit-box;
   overflow: hidden;
-  min-height: 3.7em;
+  min-height: 0;
+  margin-bottom: 0;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
 }
 
 .report-card dl {
   display: grid;
-  gap: 8px;
-  margin: 0 0 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
 }
 
 .report-card dl div {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 10px;
+  gap: 6px;
+  align-content: start;
+  border-left: 1px solid var(--line);
+  padding-left: 12px;
 }
 
 .report-card dt {
@@ -438,14 +459,15 @@ code {
 }
 
 .card-actions {
-  display: flex;
+  display: grid;
   gap: 8px;
-  margin-top: auto;
+  align-content: center;
+  margin-top: 0;
 }
 
 .card-actions button,
 .card-actions a {
-  flex: 1;
+  width: 100%;
   padding: 10px 12px;
   text-align: center;
 }
@@ -531,12 +553,27 @@ code {
     grid-template-columns: 1fr;
   }
 
-  .proof-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .proof-grid article {
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
-  .reports-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .proof-grid pre,
+  .proof-note {
+    grid-column: 2;
+  }
+
+  .report-card {
+    grid-template-columns: 1fr;
+  }
+
+  .report-card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .report-card dl div {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 10px 0 0;
   }
 
   .section-heading {
@@ -560,13 +597,8 @@ code {
   }
 
   .input-row,
-  .proof-grid,
   .reports-grid {
     grid-template-columns: 1fr;
-  }
-
-  .card-actions {
-    flex-direction: column;
   }
 
   .run-row {

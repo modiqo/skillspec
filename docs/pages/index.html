@@ -95,38 +95,53 @@ skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code>
         <div class="proof-grid">
           <article>
             <span>1</span>
-            <h3>Measure the current skill</h3>
-            <p>
-              Run Doctor first. Treat the report as a baseline for the skill as it
-              exists today, before SkillSpec changes anything.
-            </p>
+            <div class="proof-copy">
+              <h3>Measure the current skill</h3>
+              <p>
+                Run Doctor first. Treat the report as a baseline for the skill as it
+                exists today, before SkillSpec changes anything.
+              </p>
+            </div>
             <pre><code>skillspec doctor /path/to/skill --markdown &gt; docs/skillspec-doctor-baseline.md</code></pre>
           </article>
           <article>
             <span>2</span>
-            <h3>Import through the harness</h3>
-            <p>
-              Ask Codex, Claude, or Agents to port the skill. The agent should
-              create the structured plan, compile it, test it, and print alignment.
-            </p>
+            <div class="proof-copy">
+              <h3>Import through the harness</h3>
+              <p>
+                Ask Codex, Claude, or Agents to port the skill. The agent should
+                create the structured plan, compile it, test it, and print alignment.
+              </p>
+            </div>
             <pre><code>/skillspec import &lt;skill-repo-or-folder&gt;, compile it, verify it, test it, and prove it. Print the alignment summary.</code></pre>
           </article>
           <article>
             <span>3</span>
-            <h3>Read and publish proof</h3>
-            <p>
-              The alignment summary should show the selected route, proven steps,
-              missing proof if any, forbidden-action status, and run metrics when
-              available.
+            <div class="proof-copy">
+              <h3>Read and publish proof</h3>
+              <p>
+                The alignment summary should show the selected route, proven steps,
+                missing proof if any, forbidden-action status, and run metrics when
+                available.
+              </p>
+            </div>
+            <p class="proof-note">
+              Publish the baseline report, generated <code>skill.spec.yml</code>,
+              compiled loader, and alignment report with the repo or pull request.
             </p>
           </article>
           <article>
             <span>4</span>
-            <h3>Try the enabled skill</h3>
-            <p>
-              Restart the harness after install, then use the SkillSpec-backed
-              skill normally on a real task. The loader stays small while the CLI
-              guides route, phase, checks, resume, and proof.
+            <div class="proof-copy">
+              <h3>Try the enabled skill</h3>
+              <p>
+                Restart the harness after install, then use the SkillSpec-backed
+                skill normally on a real task.
+              </p>
+            </div>
+            <p class="proof-note">
+              The loader stays small while the CLI guides route, phase, checks,
+              resume, and proof.
             </p>
           </article>
         </div>
