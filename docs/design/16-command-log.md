@@ -98,6 +98,15 @@ distribution commands, not SkillSpec runtime commands.
 | Git main | `cargo install --git https://github.com/modiqo/skillspec --package skillspec --force` | Installs unreleased `main`; use for testing pending changes only. |
 | Local checkout | `cargo install --path crates/skillspec-cli --force` | Installs from the current repo checkout for development and release verification. |
 
+## Public Doctor Report Automation
+
+These are repository automation surfaces, not `skillspec` CLI subcommands.
+
+| Surface | Trigger | Explanation |
+| --- | --- | --- |
+| CI dogfood doctor | Push or pull request quality run | Runs `skillspec doctor skills/skillspec/`, prints the formatted report to the GitHub job summary, and uploads text, HTML, and JSON artifacts. |
+| Doctor report request issue | `Doctor report request` issue form with label `doctor-report` | Validates a public `https://github.com/...` skill URL, rejects private or unreadable repositories with local-run instructions, runs `skillspec doctor` for accepted public targets, comments the formatted report, and uploads HTML/JSON/text artifacts. |
+
 ## Durable Executor Lifecycle Commands
 
 These commands manage the optional SkillSpec-owned durable first-hop skill. They

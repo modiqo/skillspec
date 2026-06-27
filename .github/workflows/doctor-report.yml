@@ -1,0 +1,348 @@
+name: Doctor Report Request
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: doctor-report-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  doctor-report:
+    name: Generate doctor report
+    if: contains(github.event.issue.labels.*.name, 'doctor-report')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Parse request
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || "";
+            const match = body.match(/### Public GitHub skill URL\s*\n([\s\S]*?)(?=\n### |\n---|$)/);
+            const raw = match
+              ? match[1]
+                  .split(/\r?\n/)
+                  .map((line) => line.trim())
+                  .filter((line) => line && line !== "_No response_")[0] || ""
+              : "";
+
+            let valid = false;
+            let reason = "The issue form did not include a public GitHub skill URL.";
+            let normalized = "";
+            let owner = "";
+            let repo = "";
+
+            if (raw.length > 400) {
+              reason = "The URL is too long for the public report workflow.";
+            } else if (raw) {
+              try {
+                const url = new URL(raw);
+                if (url.protocol !== "https:") {
+                  reason = "Use an https://github.com/... URL.";
+                } else if (url.hostname.toLowerCase() !== "github.com") {
+                  reason = "Only github.com repository and folder URLs are supported.";
+                } else if (url.username || url.password) {
+                  reason = "Do not include credentials in the URL.";
+                } else if (url.search || url.hash) {
+                  reason = "Remove query strings and fragments from the URL.";
+                } else {
+                  const parts = url.pathname.split("/").filter(Boolean);
+                  if (parts.length < 2) {
+                    reason = "Use a GitHub repository URL such as https://github.com/org/repo.";
+                  } else {
+                    owner = parts[0];
+                    repo = parts[1].replace(/\.git$/, "");
+                    const safeSegment = /^[A-Za-z0-9._-]+$/;
+                    if (!safeSegment.test(owner) || !safeSegment.test(repo)) {
+                      reason = "The owner or repository name contains unsupported characters.";
+                    } else {
+                      const rest = parts.slice(2).join("/");
+                      normalized = `https://github.com/${owner}/${repo}${rest ? `/${rest}` : ""}`;
+                      valid = true;
+                      reason = "";
+                    }
+                  }
+                }
+              } catch (error) {
+                reason = "The submitted value is not a valid URL.";
+              }
+            }
+
+            core.setOutput("valid", String(valid));
+            core.setOutput("reason", reason);
+            core.setOutput("target", normalized || raw);
+            core.setOutput("owner", owner);
+            core.setOutput("repo", repo);
+
+      - name: Check public repository visibility
+        id: visibility
+        if: steps.parse.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        env:
+          TARGET_OWNER: ${{ steps.parse.outputs.owner }}
+          TARGET_REPO: ${{ steps.parse.outputs.repo }}
+        with:
+          script: |
+            const owner = process.env.TARGET_OWNER;
+            const repo = process.env.TARGET_REPO;
+
+            try {
+              const response = await github.rest.repos.get({ owner, repo });
+              if (response.data.private) {
+                core.setOutput("public", "false");
+                core.setOutput("reason", "The repository is private. Public report requests can only inspect public GitHub repositories.");
+              } else {
+                core.setOutput("public", "true");
+                core.setOutput("reason", "");
+              }
+            } catch (error) {
+              core.setOutput("public", "false");
+              if (error.status === 404) {
+                core.setOutput("reason", "The repository could not be read publicly. If it is private, run SkillSpec locally on a local checkout.");
+              } else {
+                core.setOutput("reason", `GitHub API could not verify the repository: ${error.message}`);
+              }
+            }
+
+      - name: Comment with local-run instructions
+        if: steps.parse.outputs.valid != 'true' || steps.visibility.outputs.public != 'true'
+        uses: actions/github-script@v7
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          PARSE_REASON: ${{ steps.parse.outputs.reason }}
+          VISIBILITY_REASON: ${{ steps.visibility.outputs.reason }}
+        with:
+          script: |
+            const marker = "<!-- skillspec-doctor-report -->";
+            const target = process.env.TARGET || "not provided";
+            const reason = process.env.PARSE_REASON || process.env.VISIBILITY_REASON || "The URL could not be read as a public GitHub repository.";
+            const body = [
+              marker,
+              "### SkillSpec Doctor report",
+              "",
+              "I could not run a public report for:",
+              "",
+              "````text",
+              target,
+              "````",
+              "",
+              `Reason: ${reason}`,
+              "",
+              "Public report requests only support publicly readable GitHub repositories or folders. For a private repository, run SkillSpec locally:",
+              "",
+              "````sh",
+              "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh",
+              "git clone <your-private-repo-url>",
+              "skillspec doctor /path/to/local/skill",
+              "skillspec doctor /path/to/local/skill --html > skillspec-doctor.html",
+              "skillspec doctor /path/to/local/skill --json > skillspec-doctor.json",
+              "````",
+            ].join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user.type === "Bot" && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Check out repository
+        if: steps.visibility.outputs.public == 'true'
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        if: steps.visibility.outputs.public == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        if: steps.visibility.outputs.public == 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build SkillSpec CLI
+        if: steps.visibility.outputs.public == 'true'
+        run: cargo build --locked -p skillspec
+
+      - name: Run doctor
+        id: doctor
+        if: steps.visibility.outputs.public == 'true'
+        shell: bash
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p doctor-report
+          printf '%s\n' "${TARGET}" > doctor-report/target.txt
+
+          set +e
+          target/debug/skillspec doctor "${TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
+          status=$?
+          set -e
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${status}" -eq 0 ]; then
+            target/debug/skillspec doctor "${TARGET}" --html > doctor-report/doctor-report.html
+            target/debug/skillspec doctor "${TARGET}" --json > doctor-report/doctor-report.json
+          fi
+
+      - name: Upload doctor report artifacts
+        id: upload
+        if: steps.visibility.outputs.public == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: doctor-report-${{ github.event.issue.number }}
+          path: doctor-report/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Comment with doctor report
+        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
+        uses: actions/github-script@v7
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- skillspec-doctor-report -->";
+            const report = fs.readFileSync("doctor-report/doctor-report.txt", "utf8");
+            const maxReportChars = 52000;
+            const renderedReport = report.length > maxReportChars
+              ? `${report.slice(0, maxReportChars)}\n\n... report truncated in issue comment. Download the artifact for the full report.`
+              : report;
+            const target = process.env.TARGET;
+            const artifactUrl = process.env.ARTIFACT_URL;
+            const body = [
+              marker,
+              "### SkillSpec Doctor report",
+              "",
+              "Target:",
+              "",
+              "````text",
+              target,
+              "````",
+              "",
+              "````text",
+              renderedReport,
+              "````",
+              "",
+              `Full artifacts: ${artifactUrl}`,
+              "",
+              "The artifact contains:",
+              "",
+              "- `doctor-report.txt`",
+              "- `doctor-report.html`",
+              "- `doctor-report.json`",
+              "- `target.txt`",
+            ].join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user.type === "Bot" && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Comment with doctor failure
+        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status != '0'
+        uses: actions/github-script@v7
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- skillspec-doctor-report -->";
+            const stderr = fs.existsSync("doctor-report/doctor-stderr.txt")
+              ? fs.readFileSync("doctor-report/doctor-stderr.txt", "utf8")
+              : "No stderr was captured.";
+            const target = process.env.TARGET;
+            const artifactUrl = process.env.ARTIFACT_URL;
+            const body = [
+              marker,
+              "### SkillSpec Doctor report",
+              "",
+              "SkillSpec could not complete the public report for:",
+              "",
+              "````text",
+              target,
+              "````",
+              "",
+              "Error:",
+              "",
+              "````text",
+              stderr.slice(0, 12000),
+              "````",
+              "",
+              `Artifacts: ${artifactUrl}`,
+              "",
+              "If this is a private repository or requires credentials, run SkillSpec locally on a local checkout:",
+              "",
+              "````sh",
+              "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh",
+              "skillspec doctor /path/to/local/skill",
+              "skillspec doctor /path/to/local/skill --html > skillspec-doctor.html",
+              "````",
+            ].join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user.type === "Bot" && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

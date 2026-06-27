@@ -58,6 +58,7 @@ directory listings.
 | 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
 | 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
 | 26 | [Plugin Marketplace Install](26-plugin-marketplace-install.md) | How the repo is packaged as Claude and Codex plugin marketplaces, how official install differs from local `skillspec install skill`, and how validation should run before release. |
+| 27 | [Public Doctor Reports](27-public-doctor-reports.md) | How CI dogfoods `skillspec doctor` on the SkillSpec self skill, and how public issue-form requests run doctor against public GitHub skill URLs without executing target repo code or touching private repositories. |
 
 ## Visual Explainers
 

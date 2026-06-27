@@ -181,11 +181,23 @@ right CLI commands and keep the run aligned.
 | You want to know or do | What to ask in chat | What SkillSpec does |
 | --- | --- | --- |
 | Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape: simple skill, multi-skill workspace, plugin-shaped workspace, entry skill with subskills, or non-skill repo. The default report is formatted for humans, `--html` creates a shareable review page, and `--json` preserves the full machine report. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
+| Request a hosted public doctor report. | Open a `Doctor report request` issue with a public GitHub skill URL. | GitHub Actions validates that the target is publicly readable, runs `skillspec doctor`, comments the formatted report, and attaches HTML/JSON artifacts. Private or unreadable repos get local-run instructions. |
 | Port an existing skill. | `/skillspec import <path-or-url>, compile it for Codex, install it, and prove it` | Stages the source if needed, runs doctor, maps the source, imports the skill, validates it, tests it, compiles it, and prints the report. |
 | Port a repo with many skills or plugin folders. | `/skillspec map this repo and import the packages safely` | Preserves the original shape, processes each atomic `SKILL.md` package separately, detects references, prevents circular dependency mistakes, and converges the workspace before install. |
 | Use the installed skill. | Use it normally, the same way you would use any other skill. | The generated skill loader keeps the prompt small and asks the CLI for route guidance, phase checks, progress recording, and final alignment. |
 | Too many skills are installed, or the harness warns about context. | `/skillspec install router` | Installs router mode so the agent can route to the right skill instead of loading or exposing too many skills at once. See [Skill Router](docs/design/14-skill-router.md). |
 | Create a skill from observed expert work. | `/skillspec install durable-executor from <source>`<br>`/skillspec create from observed durable execution: "<workflow>"` | Uses durable execution mode to capture a guided interaction, preserve evidence, and convert tacit workflow knowledge into an explicit SkillSpec-backed skill. This path requires Rote by Modiqo; install/setup from [modiqo.ai](https://www.modiqo.ai). |
+
+## Public Doctor Reports
+
+Want to check a public skill before installing or porting it? Open a
+[Doctor report request](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)
+with a public GitHub skill repo or folder URL. GitHub Actions will run
+`skillspec doctor`, comment back with the formatted report, and attach HTML/JSON
+artifacts.
+
+Private repositories are not inspected by public Actions. For private skills,
+install SkillSpec locally and run `skillspec doctor /path/to/local/skill`.
 
 ## What You Get At The End
 

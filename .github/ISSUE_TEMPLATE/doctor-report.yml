@@ -1,0 +1,31 @@
+name: Doctor report request
+description: Run SkillSpec Doctor on a public GitHub skill repository or folder.
+title: "Doctor report: <public GitHub skill URL>"
+labels:
+  - doctor-report
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request a public SkillSpec Doctor report for a skill repository or skill folder.
+
+        Only public GitHub URLs are supported here. Do not paste private URLs, access tokens, or credential-bearing links. For private repositories, install SkillSpec locally and run:
+
+        ```sh
+        curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+        skillspec doctor /path/to/local/skill
+        skillspec doctor /path/to/local/skill --html > skillspec-doctor.html
+        ```
+  - type: input
+    id: skill_repo_url
+    attributes:
+      label: Public GitHub skill URL
+      description: Use a public GitHub repository URL or a public folder URL that contains one or more SKILL.md files.
+      placeholder: https://github.com/org/repo/tree/main/skills/example
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Optional context about what you want the report to inspect.

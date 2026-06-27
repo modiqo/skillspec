@@ -151,11 +151,16 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
         });
     };
     let staged = remote_source::clone_remote_temp(&remote, "skillspec-doctor")?;
+    let rewrite_root = remote
+        .path
+        .as_deref()
+        .map(|path| staged.checkout_dir().join(path))
+        .unwrap_or_else(|| staged.checkout_dir().to_path_buf());
     let mut report = match inspect_staged_remote(target, &remote, staged.checkout_dir()) {
         Ok(report) => report,
-        Err(error) => return Err(rewrite_remote_error(error, staged.checkout_dir(), target)),
+        Err(error) => return Err(rewrite_remote_error(error, &rewrite_root, target)),
     };
-    rewrite_remote_locations(&mut report, staged.checkout_dir(), target);
+    rewrite_remote_locations(&mut report, &rewrite_root, target);
     report.target = target.to_owned();
     report.source_kind = "remote_github".to_owned();
     report.staged_from = Some(remote.repo_url);
@@ -1792,7 +1797,10 @@ fn next_steps(
 
 #[cfg(test)]
 mod tests {
-    use super::rewrite_remote_error;
+    use super::{
+        rewrite_remote_error, rewrite_remote_locations, DoctorCounts, DoctorReport,
+        DoctorShapeReport, SurfaceReport,
+    };
     use crate::error::Error;
     use std::path::Path;
 
@@ -1809,5 +1817,65 @@ mod tests {
         .to_string();
         assert!(error.contains("https://github.com/owner/repo/tree/main/skills"));
         assert!(!error.contains("/tmp/skillspec-doctor"));
+    }
+
+    #[test]
+    fn rewrites_remote_folder_locations_without_duplicating_requested_path() {
+        let mut report = DoctorReport {
+            target: "/tmp/skillspec-doctor/repo/skills/pdf".to_owned(),
+            source_kind: "local".to_owned(),
+            analysis_status: "full".to_owned(),
+            staged_from: None,
+            shape: DoctorShapeReport {
+                kind: "simple_skill".to_owned(),
+                summary: "one atomic SKILL.md package".to_owned(),
+                root: "/tmp/skillspec-doctor/repo/skills/pdf".to_owned(),
+                primary_skill: Some("SKILL.md".to_owned()),
+                skill_files: vec!["SKILL.md".to_owned()],
+                plugin_roots: Vec::new(),
+                referenced_skill_paths: Vec::new(),
+                negative_signals: Vec::new(),
+                recommended_command:
+                    "skillspec install skill /tmp/skillspec-doctor/repo/skills/pdf --target <target> --retire-existing"
+                        .to_owned(),
+            },
+            verdict: "low reliability debt".to_owned(),
+            structural_score: 100,
+            large_surface_percentage: 0,
+            surface: SurfaceReport::default(),
+            counts: DoctorCounts::default(),
+            issues: Vec::new(),
+            frontmatter_discovery_risk: None,
+            agent_drift_risk: None,
+            raw_activation_risk: None,
+            contract_mitigation: None,
+            workspace_agent_drift_risk: None,
+            packages: Vec::new(),
+            basis: Vec::new(),
+            suggested_next_steps: vec![
+                "Install /tmp/skillspec-doctor/repo/skills/pdf into the harness".to_owned(),
+            ],
+        };
+
+        rewrite_remote_locations(
+            &mut report,
+            Path::new("/tmp/skillspec-doctor/repo/skills/pdf"),
+            "https://github.com/owner/repo/tree/main/skills/pdf",
+        );
+
+        assert_eq!(
+            report.shape.root,
+            "https://github.com/owner/repo/tree/main/skills/pdf"
+        );
+        assert!(report
+            .shape
+            .recommended_command
+            .contains("https://github.com/owner/repo/tree/main/skills/pdf"));
+        assert!(!report
+            .shape
+            .recommended_command
+            .contains("skills/pdf/skills/pdf"));
+        assert!(report.suggested_next_steps[0]
+            .contains("https://github.com/owner/repo/tree/main/skills/pdf"));
     }
 }
