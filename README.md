@@ -43,14 +43,44 @@ If even two of these sound familiar, SkillSpec is probably for you.
 
 ## Install
 
-From this repo checkout, install the CLI:
+Install the CLI first:
+
+```sh
+cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
+skillspec --version
+```
+
+From a local repo checkout, use:
 
 ```sh
 cargo install --path crates/skillspec-cli --force
-skillspec --help
+skillspec --version
 ```
 
-Then install the `skillspec` skill into your harness:
+Then install the `skillspec` plugin into your harness.
+
+Claude Code:
+
+```sh
+claude plugin marketplace add modiqo/skillspec --sparse .claude-plugin plugins/skillspec
+claude plugin install skillspec@skillspec
+claude plugin list
+```
+
+Claude installs the plugin enabled by default in current Claude Code builds. If
+`claude plugin list` shows it disabled, run `claude plugin enable skillspec`.
+
+Codex:
+
+```sh
+codex plugin marketplace add modiqo/skillspec --ref main --sparse .agents --sparse plugins/skillspec
+codex plugin add skillspec@skillspec
+```
+
+Codex does not have a separate plugin enable command; `codex plugin add`
+installs the plugin from the configured marketplace snapshot.
+
+For local development, you can still install the skill folder directly:
 
 ```sh
 # Codex
@@ -145,5 +175,6 @@ that fixture material and do not relicense the rest of this repository.
 - [Detailed docs](docs/README.md)
 - [Design docs](docs/design/README.md)
 - [Command log](docs/design/16-command-log.md)
+- [Plugin marketplace install](docs/design/26-plugin-marketplace-install.md)
 - [Guided run loop](docs/design/23-guided-run-loop-from-doctor-dogfood.md)
 - [Progressive agent guidance](docs/design/25-progressive-agent-guidance.md)

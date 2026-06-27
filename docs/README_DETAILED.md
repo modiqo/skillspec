@@ -310,6 +310,27 @@ hard dependency edges. Relative file references remain hard dependencies.
 
 ## Install A SkillSpec-Backed Skill
 
+For installing SkillSpec itself into a harness, prefer the official plugin
+marketplace flow:
+
+```sh
+cargo install --git https://github.com/modiqo/skillspec --package skillspec --force
+skillspec --version
+
+claude plugin marketplace add modiqo/skillspec --sparse .claude-plugin plugins/skillspec
+claude plugin install skillspec@skillspec
+claude plugin list
+
+codex plugin marketplace add modiqo/skillspec --ref main --sparse .agents --sparse plugins/skillspec
+codex plugin add skillspec@skillspec
+```
+
+Use direct `skillspec install skill` only for generated skills, local
+development checkouts, or unreleased package testing. Codex plugin install does
+not have a separate plugin enable step. Claude installs the plugin enabled by
+default in current Claude Code builds; if `claude plugin list` shows it
+disabled, run `claude plugin enable skillspec`.
+
 A generated skill folder should look like this:
 
 ```text

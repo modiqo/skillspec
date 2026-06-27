@@ -1,0 +1,18 @@
+{
+  "name": "skillspec",
+  "owner": {
+    "name": "Modiqo"
+  },
+  "metadata": {
+    "description": "SkillSpec plugin marketplace for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "skillspec",
+      "source": "./plugins/skillspec",
+      "description": "A thin SkillSpec guide that lets agents inspect, import, route, run, and prove SkillSpec-backed skills from chat.",
+      "homepage": "https://github.com/modiqo/skillspec",
+      "license": "MIT OR Apache-2.0"
+    }
+  ]
+}

@@ -57,6 +57,7 @@ directory listings.
 | 23 | [Guided Run Loop From Doctor Dogfood](23-guided-run-loop-from-doctor-dogfood.md) | Why doctor dogfood led to moving trampoline guidance into `run-loop --guide agent`, how the CLI tracks current/next/end actions, how resume uses persistent traces, and how the self trampoline stays optimal. |
 | 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
 | 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
+| 26 | [Plugin Marketplace Install](26-plugin-marketplace-install.md) | How the repo is packaged as Claude and Codex plugin marketplaces, how official install differs from local `skillspec install skill`, and how validation should run before release. |
 
 ## Visual Explainers
 

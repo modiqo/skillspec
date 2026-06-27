@@ -1,0 +1,4104 @@
+schema: skillspec/v0
+id: skillspec
+title: SkillSpec
+description: SkillSpec post-install setup and skill-authoring multiplexer for inspecting skill/repo shape with doctor, mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+activation:
+  summary: >
+    Multiplex SkillSpec post-install setup: inspect skill/repo shape with doctor, map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from
+    local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally
+    install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces,
+    revise SkillSpec YAML, and prove value before install or release.
+  keywords:
+    - skillspec
+    - /skillspec
+    - skillspec setup
+    - post install setup
+    - import SKILL.md
+    - import existing skill
+    - port skill
+    - what is the shape of this skill
+    - what is the shape of skill
+    - shape of skill
+    - skill shape
+    - source shape
+    - classify skill repo
+    - run doctor on this repo
+    - run doctor on this url
+    - port-one-shot
+    - one-shot port
+    - workspace map
+    - workspace validate
+    - workspace import
+    - workspace converge
+    - workspace compile
+    - workspace install
+    - skillspec workspace
+    - skillspec workspace install
+    - skillspec.workspace.yml
+    - multi-skill repo
+    - multi-skill workspace
+    - plugin-shaped repo
+    - plugin-shaped workspace
+    - plugin namespace
+    - plugin namespaces
+    - namespaced skills
+    - namespaced skill packages
+    - .claude-plugin/plugin.json
+    - .mcp.json
+    - plugin slash command
+    - claude plugin skills
+    - many SKILL.md files
+    - parent folder with multiple skills
+    - fanout converge
+    - fanout import
+    - workspace cache
+    - workspace-cache.json
+    - cache hits
+    - run-loop
+    - command batching
+    - chunked source map
+    - parallel strategy
+    - sequential strategy
+    - converge workspace
+    - compile workspace
+    - install workspace
+    - token economy
+    - token savings
+    - compact metrics
+    - agent-visible tokens
+    - workspace proof
+    - workspace install proof
+    - workspace-install.report.md
+    - workspace-install.manifest.json
+    - workspace visibility
+    - workspace visibility policy
+    - visibility-policy
+    - apply visibility
+    - apply-visibility
+    - entry-implicit
+    - manual-only support skill
+    - workspace-visibility.manifest.json
+    - import workspace packages
+    - cross-skill references
+    - skill dependency graph
+    - shared standards package
+    - local folder or uri
+    - dependency ledger
+    - deps.toml
+    - dependency preservation
+    - skillspec status
+    - status report
+    - lifecycle status
+    - installed skills inventory
+    - skillspec-backed skills
+    - legacy prose skills
+    - install router
+    - install skill-router
+    - update router
+    - enable router
+    - disable router
+    - repair skill-router
+    - router mode
+    - install durable-executor
+    - durable executor install
+    - update durable-executor
+    - durable executor update
+    - enable durable-executor
+    - durable executor enable
+    - disable durable-executor
+    - durable executor disable
+    - delete durable-executor
+    - durable executor delete
+    - observe durable executor
+    - observed durable workspace
+    - create spec skill from workspace
+    - rote exec workspace
+    - revise existing SkillSpec
+    - update skill.spec.yml
+    - prose skill to skillspec
+    - skill.spec.yml
+    - skillspec import-skill
+    - skillspec port-one-shot
+    - skillspec doctor
+    - skillspec source map
+    - skillspec source query
+    - source-map.json
+    - skillspec plan
+    - skillspec act
+    - skillspec progress
+    - phase progress
+    - grammar sensemake
+    - grammar checklist
+    - compile skill
+    - install codex agents
+    - retire existing skill
+    - replace old skill
+    - --retire-existing
+    - backup old skill
+    - prove value
+    - value report
+    - schema-safe port
+    - typed shape crib
+  priority: domain
+applies_when:
+  - user_intent:
+      - run SkillSpec post-install setup inside the harness prompt
+      - inspect the shape of a skill, skill folder, repository, or URL without importing it
+      - convert a prose SKILL.md to skill.spec.yml
+      - port a local skill folder into SkillSpec
+      - run one-shot porting for one atomic skill package
+      - map a skills repository that contains multiple SKILL.md packages before import
+      - map a plugin-shaped skills repository without flattening repeated skill names
+      - validate a multi-skill workspace graph before fanout import
+      - fanout-import a validated workspace graph into one generated package draft per atomic skill
+      - converge generated workspace package drafts against the workspace graph before compile or install
+      - compile converged workspace package drafts into harness-ready SKILL.md loaders without installing them
+      - dry-run or install compiled workspace packages into harness roots using install_slug folders and collision proof
+      - detect cross-skill references, shared standards packages, and skill dependency edges
+      - import a public GitHub skill into SkillSpec
+      - import an existing prose skill from a local folder or public URI
+      - diagnose reliability debt and context burden in a prose skill before porting
+      - preserve imported dependency mentions, package authority, install risk, and missing dependency proof gaps
+      - inspect installed SkillSpec status, lifecycle state, roots, router index state, and skill inventory
+      - install skill-router after SkillSpec is installed
+      - install router mode after SkillSpec is installed
+      - update, enable, disable, or repair an installed skill-router mode
+      - install durable-executor as an optional first-hop skill
+      - update, enable, disable, or delete a managed durable-executor install
+      - create a SkillSpec skill by observing a durable-executor rote-exec workspace
+      - revise an existing SkillSpec-backed skill
+      - add phase planning and progress tracking to a SkillSpec-backed skill
+      - compile and optionally install a reviewed SkillSpec-backed skill
+      - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
+      - run proof or value reporting for a ported skill
+entry:
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, answer read-only source-shape questions with doctor, map multi-skill and plugin-shaped workspaces before import, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  decision_required: true
+  forbid_before_decision:
+    - edit_yaml_from_memory
+    - skip_grammar_sensemake
+    - import_without_reading_source_skill
+    - install_before_dependency_surface_approval
+    - claim_unproven_execution_evidence
+    - consult_existing_ports_without_user_request
+    - consult_repo_history_without_user_request
+    - consult_memory_or_prior_examples_without_user_request
+    - drop_imported_dependency_mentions
+    - work_around_missing_dependency_without_waiver
+    - claim_partial_dependency_proof_as_full
+    - leave_old_and_new_skill_discoverable_without_user_choice
+    - parallelize_dependency_bound_or_mutating_phases
+    - load_full_reports_when_summary_suffices
+    - claim_token_savings_without_metrics
+  tool_boundary:
+    default: deny
+    allow:
+      - skillspec_cli
+      - skillspec_grammar_commands
+      - local_skill_files
+      - local_repo_files
+      - git
+      - cargo
+      - rote_workspace
+      - declared_commands_dependencies_imports_resources
+    forbid:
+      - edit_yaml_from_memory
+      - skip_grammar_sensemake
+      - install_before_dependency_surface_approval
+      - claim_unproven_execution_evidence
+      - consult_existing_ports_without_user_request
+      - consult_repo_history_without_user_request
+      - consult_memory_or_prior_examples_without_user_request
+      - parallelize_dependency_bound_or_mutating_phases
+      - load_full_reports_when_summary_suffices
+      - claim_token_savings_without_metrics
+    permission_required_for:
+      - any_unlisted_tool
+      - any_forbidden_action
+      - any_new_data_source
+      - any_new_execution_substrate
+      - any_new_provider_or_adapter
+      - any_external_side_effect
+routes:
+  - id: inspect_source_shape
+    label: Inspect source shape
+    rank: 12
+    description: Use when the user asks what shape a skill, skill folder, repository, or URL has, or asks to run doctor without requesting import, port, compile, install, or proof.
+    execution_plan:
+      mode: ordered
+      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before import or mutation.
+      phases:
+        - id: run_shape_doctor
+          owner_skill: skillspec
+          description: Run skillspec doctor on the supplied local folder, skill folder, or public GitHub repo URI and capture the shape report.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+              - git
+            permission_required_for:
+              - network_access
+              - any_unlisted_tool
+          requires:
+            - doctor_source_shape
+          forbid:
+            - port_one_shot_or_manual_import
+            - import_skill_draft
+            - workspace_import_packages
+            - workspace_converge_build
+            - workspace_compile_build
+            - workspace_install_packages
+            - workspace_install_apply_visibility
+            - install_from_remote_checkout
+            - execute_imported_snippets_during_staging
+        - id: report_shape
+          owner_skill: skillspec
+          description: Explain the detected shape, the recommended next command, and whether full structural scoring ran or stopped as shape_only.
+          requires:
+            - report_source_shape
+          forbid:
+            - port_one_shot_or_manual_import
+            - import_skill_draft
+            - workspace_import_packages
+            - workspace_compile_build
+            - workspace_install_packages
+  - id: local_skill_port
+    label: Port local skill
+    rank: 1
+    description: Use when source-shape recon proves exactly one atomic local prose skill package. If the source has multiple SKILL.md files, plugin markers, cross-skill references, or an existing reviewed skill.spec.yml, route to workspace or revision instead.
+    execution_plan:
+      mode: ordered
+      reason: Local ports need source-shape classification, source preservation, grammar preflight, a mechanical draft, semantic promotion, QA, and a value report. One-shot is allowed only after recon confirms a single atomic prose package.
+      phases:
+        - id: resolve_local_source
+          owner_skill: skillspec
+          description: Resolve the user-supplied local path, classify the source shape, and preserve package-local sibling resources. Use one-shot only for exactly one SKILL.md with no workspace/plugin markers; hand multi-skill, cross-referenced, or plugin-shaped roots to workspace map; hand existing reviewed skill.spec.yml changes to the revision route.
+          requires:
+            - decide_import_mode_from_source_shape
+            - inventory_source_folder
+            - doctor_source_skill
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
+          forbid:
+            - copy_only_skill_md_when_resources_exist
+            - load_large_source_without_source_map
+            - use_port_one_shot_without_shape_recon
+            - use_port_one_shot_for_workspace_root
+            - use_port_one_shot_for_plugin_root
+            - revise_existing_spec_through_import
+        - id: grammar_preflight
+          owner_skill: skillspec
+          description: Run the grammar sensemaking and checklist commands before import or YAML editing.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - skillspec_grammar_commands
+              - local_skill_files
+            permission_required_for:
+              - any_grammar_source_outside_embedded_runtime_artifacts
+          requires:
+            - grammar_sensemake_index
+            - grammar_sensemake_porting
+            - grammar_checklist_import
+          forbid:
+            - infer_grammar_from_memory
+        - id: mechanical_import
+          owner_skill: skillspec
+          description: Generate and inspect the draft spec without treating it as final truth. Run port-one-shot only when source-shape recon has proven one atomic prose package; otherwise stop and switch to workspace or revision flow.
+          requires:
+            - port_one_shot_or_manual_import
+            - import_skill_draft
+            - sensemake_draft
+            - produce_mechanical_draft
+          forbid:
+            - port_one_shot_for_multi_skill_workspace
+            - port_one_shot_for_plugin_workspace
+            - port_one_shot_for_existing_reviewed_spec
+        - id: semantic_promotion
+          owner_skill: skillspec
+          description: Guide the agent through a small source-backed promotion pass instead of auto-filling the scaffold. Fill the coverage matrix from the current source only, split source code into package-local resources/code entries, and promote only evidenced activation, routes, rules, deps, imports, resources, artifacts, commands, recipes, states, closures, tests, and review notes. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Use artifact produced_by/consumed_by only for command, code, or recipe refs; do not attach artifacts directly to routes or rules.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+              - file_edit_tool
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - any_unlisted_tool
+              - any_new_data_source
+              - install_or_release_side_effect
+          requires:
+            - fill_coverage_matrix
+            - promote_only_source_backed_behavior
+            - split_source_code_into_resources
+            - review_and_promote_draft
+            - produce_reviewed_spec
+          forbid:
+            - auto_fill_scaffold_from_inference
+            - guess_routes_rules_or_tests
+            - leave_colon_strings_unquoted
+            - use_route_or_rule_as_artifact_consumer
+            - consult_existing_ports_without_user_request
+            - consult_repo_history_without_user_request
+            - consult_memory_or_prior_examples_without_user_request
+        - id: qa_and_proof
+          owner_skill: skillspec
+          description: Validate, test, check imports and dependencies, run a demo phase plan/action checklist, record progress evidence, and align the trace.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - cargo
+              - local_repo_files
+              - local_trace_files
+            permission_required_for:
+              - install_or_release_side_effect
+              - network_access
+              - any_unlisted_tool
+          requires:
+            - run_structural_qa
+            - plan_phase_order
+            - act_named_phase
+            - progress_show
+            - prove_value
+        - id: report_value
+          owner_skill: skillspec
+          description: Print the value report and contract-quality grades.
+          requires:
+            - generate_value_report
+  - id: remote_skill_port
+    label: Port remote skill
+    rank: 2
+    description: Use when the source is an owner/repo shorthand, GitHub URL, owner/repo/path, or GitHub tree URL.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: approve_remote_source
+          owner_skill: skillspec
+          requires:
+            - approve_remote_source_access
+        - id: stage_remote_source
+          owner_skill: skillspec
+          requires:
+            - stage_remote_folder
+          forbid:
+            - install_from_remote_checkout
+            - execute_imported_snippets_during_staging
+            - web_search_for_remote_source
+            - fetch_raw_github_skill_md_for_import
+        - id: continue_as_local_port
+          owner_skill: skillspec
+          route: local_skill_port
+          requires:
+            - local_porting_loop
+  - id: workspace_skill_authoring
+    label: Map multi-skill workspace
+    rank: 3
+    description: Use when the source root may contain multiple atomic skill packages, plugin-shaped skill folders, shared standards packages, wrapper skills, or cross-skill references that must be mapped before fanout import.
+    execution_plan:
+      mode: ordered
+      reason: Multi-skill and plugin-shaped repositories need structure recon before import so each SKILL.md becomes an atomic package, plugin namespaces are preserved, file dependencies are explicit, and slash-command workflow links do not create false cycles.
+      phases:
+        - id: inventory_workspace_source
+          owner_skill: skillspec
+          description: Inventory the source root and confirm it is a workspace candidate, not one ordinary skill package.
+          requires:
+            - inventory_source_folder
+          forbid:
+            - use_router_index_for_authoring_recon
+            - import_workspace_root_as_single_skill
+        - id: map_workspace_graph
+          owner_skill: skillspec
+          description: Generate skillspec.workspace.yml and a markdown recon report from the source tree, preserving plugin namespaces when plugin-shaped roots are present.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_map_source
+            - produce_workspace_manifest
+          forbid:
+            - use_router_index_for_authoring_recon
+        - id: validate_workspace_graph
+          owner_skill: skillspec
+          description: Validate package boundaries, plugin namespace naming, deterministic install slugs, dependency edges, missing targets, and cycles before fanout import planning.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+          forbid:
+            - proceed_with_circular_skill_dependencies
+            - ignore_install_slug_collision
+        - id: report_workspace_recon
+          owner_skill: skillspec
+          description: Explain plugin namespaces, package map, dependency graph, workflow references, warnings, and the next fanout/converge implementation phase without importing yet.
+          requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
+            - report_workspace_recon
+  - id: workspace_fanout_import
+    label: Fanout import workspace
+    rank: 4
+    description: Use when a validated skillspec.workspace.yml should be imported into one generated package draft per atomic skill under a mirrored build root.
+    execution_plan:
+      mode: ordered
+      reason: Fanout import must preserve the validated workspace graph, process dependencies before dependents, and keep successful package outputs when another package fails.
+      phases:
+        - id: validate_workspace_before_import
+          owner_skill: skillspec
+          description: Validate the workspace graph before writing generated package outputs.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+          forbid:
+            - proceed_with_circular_skill_dependencies
+            - import_workspace_root_as_single_skill
+        - id: import_workspace_packages
+          owner_skill: skillspec
+          description: Run per-package doctor, source map, and import-skill through the workspace import command, preserving built packages and blocking dependents of failed packages.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_skill_files
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_import_packages
+            - produce_workspace_import_report
+          forbid:
+            - use_router_index_for_authoring_recon
+            - compile_or_install_during_workspace_import
+        - id: report_workspace_import
+          owner_skill: skillspec
+          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next converge command.
+          requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
+            - report_workspace_import
+  - id: workspace_converge
+    label: Converge workspace build
+    rank: 5
+    description: Use when generated workspace package drafts should be checked against the validated workspace graph before compile or install.
+    execution_plan:
+      mode: ordered
+      reason: Converge is the graph-level proof gate after fanout import; it must verify generated specs and dependency readiness without compiling or installing.
+      phases:
+        - id: validate_workspace_for_converge
+          owner_skill: skillspec
+          description: Revalidate the workspace manifest before trusting build outputs.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+        - id: converge_workspace_build
+          owner_skill: skillspec
+          description: Verify each package has a ready generated spec or explicit failure evidence, and block dependents whose dependencies are not ready.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_converge_build
+            - produce_workspace_converge_report
+          forbid:
+            - compile_or_install_during_workspace_import
+            - use_router_index_for_authoring_recon
+        - id: report_workspace_converge
+          owner_skill: skillspec
+          description: Report ready, failed, blocked, and missing packages plus review/compile guidance only when every package is ready.
+          requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
+            - report_workspace_converge
+  - id: workspace_compile
+    label: Compile workspace build
+    rank: 6
+    description: Use when converged workspace package drafts should be compiled into harness-ready SKILL.md loaders under the mirrored build root.
+    execution_plan:
+      mode: ordered
+      reason: Workspace compile is the Phase 6 gate after convergence; it writes loaders for ready packages but must not install skills or refresh router indexes.
+      phases:
+        - id: validate_workspace_for_compile
+          owner_skill: skillspec
+          description: Revalidate the workspace manifest and recheck convergence before writing loaders.
+          requires:
+            - workspace_validate_manifest
+            - workspace_converge_build
+            - validate_workspace_graph
+        - id: compile_workspace_build
+          owner_skill: skillspec
+          description: Compile ready package specs into SKILL.md loaders and block dependents whose dependencies did not compile.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_compile_build
+            - produce_workspace_compile_report
+          forbid:
+            - install_during_workspace_compile
+            - refresh_router_during_workspace_compile
+            - use_router_index_for_authoring_recon
+        - id: report_workspace_compile
+          owner_skill: skillspec
+          description: Report compiled, failed, blocked, missing, and skipped packages plus Phase 7 install guidance.
+          requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
+            - report_workspace_compile
+  - id: workspace_install
+    label: Install workspace build
+    rank: 7
+    description: Use when compiled workspace packages should be dry-run planned or installed into harness roots using manifest install_slug folders, with explicit workspace visibility policy planning.
+    execution_plan:
+      mode: ordered
+      reason: Workspace install is the Phase 7 gate after compile; it must prove the full install plan, block collisions before mutation, install dependencies first, report entry/support visibility, and leave router refresh separate.
+      phases:
+        - id: validate_workspace_for_install
+          owner_skill: skillspec
+          description: Revalidate the workspace manifest before trusting install slugs and dependency edges.
+          requires:
+            - workspace_validate_manifest
+            - validate_workspace_graph
+        - id: plan_workspace_install
+          owner_skill: skillspec
+          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - workspace_install_dry_run
+            - produce_workspace_install_report
+            - produce_workspace_visibility_plan
+          forbid:
+            - install_without_workspace_dry_run
+            - refresh_router_during_workspace_install
+        - id: install_workspace_packages
+          owner_skill: skillspec
+          description: Install the compiled packages only after the dry-run report is clean or the user explicitly requested install with reviewed collision and visibility behavior.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - workspace_install_packages
+            - produce_workspace_install_manifest
+            - produce_workspace_visibility_plan
+          forbid:
+            - install_without_workspace_dry_run
+            - refresh_router_during_workspace_install
+        - id: report_workspace_install
+          owner_skill: skillspec
+          description: Report installed, planned, failed, blocked, and missing packages plus install manifest paths, visibility policy, optional visibility manifest, and router-refresh separation.
+          requires:
+            - choose_execution_strategy
+            - preserve_compact_evidence
+            - report_workspace_install
+  - id: install_skill_router
+    label: Install router mode
+    rank: 3
+    description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
+    execution_plan:
+      mode: ordered
+      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, verify the implicit router surface, and verify routed skills are explicit-only.
+      phases:
+        - id: inspect_router_targets
+          owner_skill: skillspec
+          description: Identify the skill roots where router mode should be installed and verify the SkillSpec CLI supports router commands.
+          requires:
+            - list_install_targets
+            - router_help
+          forbid:
+            - infer_router_roots_without_check
+        - id: install_router_surface
+          owner_skill: skillspec
+          description: Install or refresh the router skill inside the selected roots without using a separate router root.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_install
+            - verify_router_install
+          forbid:
+            - use_removed_router_root
+        - id: report_router_mode
+          owner_skill: skillspec
+          description: Report which roots were changed, whether the router is implicit, whether routed skills are explicit-only, and whether durable first-hop is unavailable.
+          requires:
+            - verify_router_installed
+  - id: update_skill_router
+    label: Update router mode
+    rank: 4
+    description: Use when the user wants to update or repair an existing skill-router install, including stale generated text, missing router spec files, or recorded harness roots that need to be rewritten.
+    execution_plan:
+      mode: ordered
+      reason: Router update mutates recorded harness roots, so it must start from the saved router config, create a backup, rewrite every managed router skill, and warn the operator to restart active harness sessions.
+      phases:
+        - id: inspect_router_update
+          owner_skill: skillspec
+          description: Verify the SkillSpec CLI supports router update and that router mode has an existing config to update.
+          requires:
+            - router_help
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: update_router_surface
+          owner_skill: skillspec
+          description: Back up the existing router state, rewrite every recorded router skill, reapply visibility, rebuild the index, and check preparedness.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_update
+          forbid:
+            - update_router_without_backup
+            - mutate_unrecorded_router_roots
+        - id: report_router_update
+          owner_skill: skillspec
+          description: Report the backup path, updated router roots, preparedness status, durable-executor status, and restart warning.
+          requires:
+            - verify_router_updated
+  - id: switch_skill_router_mode
+    label: Enable or disable router mode
+    rank: 5
+    description: Use when the user wants to switch router mode on or off without uninstalling the managed router package.
+    execution_plan:
+      mode: ordered
+      reason: Router enable/disable mutates native Codex and Claude visibility metadata while preserving router files, config, manifest, and index.
+      phases:
+        - id: inspect_router_switch
+          owner_skill: skillspec
+          description: Verify router lifecycle help and that router config exists before switching mode.
+          requires:
+            - router_help
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: switch_router_mode
+          owner_skill: skillspec
+          description: Enable rebuilds the index from current roots and makes routed skills explicit-only; disable makes router explicit-only and restores routed skills to implicit/default visibility.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_enable_or_disable
+          forbid:
+            - mutate_unrecorded_router_roots
+        - id: report_router_switch
+          owner_skill: skillspec
+          description: Report enabled state, visibility change count, index rebuild/preparedness for enable, and restart warning.
+          requires:
+            - verify_router_updated
+  - id: inspect_skillspec_status
+    label: Inspect SkillSpec status
+    rank: 6
+    description: Use when the user wants a read-only report of installed SkillSpec lifecycle state, supported roots, router index status, and SkillSpec-backed versus legacy prose skills.
+    execution_plan:
+      mode: ordered
+      reason: Status inspection must not mutate router, durable-executor, visibility metadata, or indexes.
+      phases:
+        - id: inspect_status_help
+          owner_skill: skillspec
+          description: Verify the CLI exposes the read-only status command before collecting status.
+          requires:
+            - status_help
+          forbid:
+            - install_or_release_side_effect
+            - mutate_unrecorded_router_roots
+        - id: collect_status_report
+          owner_skill: skillspec
+          description: Run the read-only lifecycle and inventory status command and preserve the report.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+          requires:
+            - status_lifecycle_inventory
+          forbid:
+            - install_or_release_side_effect
+            - mutate_unrecorded_router_roots
+            - rebuild_index_for_status
+        - id: report_status_summary
+          owner_skill: skillspec
+          description: Report router and durable enabled/disabled state, supported and scanned roots, last router index state, and SkillSpec-backed versus legacy skill counts and names.
+          requires:
+            - report_skillspec_status
+  - id: install_durable_executor
+    label: Install durable-executor
+    rank: 6
+    description: Use when the user wants the optional durable-executor first-hop skill installed after SkillSpec itself is installed.
+    execution_plan:
+      mode: ordered
+      reason: Durable-executor is optional and must come from an explicit local source, so source and target approval must happen before writing skill roots.
+      phases:
+        - id: resolve_durable_source
+          owner_skill: skillspec
+          description: Determine whether rote is available, whether the user supplied a local durable-executor source folder, and which harness targets should receive it.
+          requires:
+            - durable_help
+            - verify_rote_cli
+            - find_durable_executor
+            - choose_durable_source
+          forbid:
+            - assume_bundled_durable_executor
+        - id: import_or_install_durable
+          owner_skill: skillspec
+          description: Install durable-executor through the managed durable lifecycle command and refresh router state when configured.
+          requires:
+            - durable_install
+            - verify_durable_executor
+          forbid:
+            - install_durable_without_source_or_existing_skill
+            - make_durable_executor_explicit_in_router_mode
+        - id: report_durable_status
+          owner_skill: skillspec
+          description: Report whether durable-executor is installed and whether it is implicit or explicit-only under its lifecycle state.
+          requires:
+            - verify_durable_optional_status
+  - id: update_durable_executor
+    label: Update durable-executor
+    rank: 7
+    description: Use when the user wants to refresh every managed durable-executor install from its recorded source or an explicit replacement source.
+    execution_plan:
+      mode: ordered
+      reason: Durable-executor update mutates recorded harness roots, so it must use durable config, create a backup, refresh router state when configured, and warn the operator to restart active harness sessions.
+      phases:
+        - id: inspect_durable_update
+          owner_skill: skillspec
+          description: Verify the SkillSpec CLI exposes durable-executor update and that durable config exists.
+          requires:
+            - durable_help
+          forbid:
+            - mutate_unrecorded_durable_roots
+        - id: update_durable_surface
+          owner_skill: skillspec
+          description: Back up durable config and every recorded durable-executor install, rewrite those installs, and refresh router state when configured.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - durable_update
+          forbid:
+            - update_durable_without_backup
+            - mutate_unrecorded_durable_roots
+        - id: report_durable_update
+          owner_skill: skillspec
+          description: Report the backup path, updated durable installs, router refresh status, and restart warning.
+          requires:
+            - verify_durable_optional_status
+  - id: switch_durable_executor_mode
+    label: Enable or disable durable-executor
+    rank: 8
+    description: Use when the user wants to switch durable-executor implicit invocation on or off without uninstalling the managed durable package.
+    execution_plan:
+      mode: ordered
+      reason: Durable enable/disable mutates native Codex and Claude visibility metadata while preserving durable files, managed markers, and config.
+      phases:
+        - id: inspect_durable_switch
+          owner_skill: skillspec
+          description: Verify durable-executor lifecycle help and the saved durable config before switching mode.
+          requires:
+            - durable_help
+          forbid:
+            - mutate_unrecorded_durable_roots
+        - id: switch_durable_mode
+          owner_skill: skillspec
+          description: Enable makes recorded durable installs implicit; disable makes recorded durable installs explicit-only and refreshes router state when configured and enabled.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - durable_enable_or_disable
+          forbid:
+            - mutate_unrecorded_durable_roots
+        - id: report_durable_switch
+          owner_skill: skillspec
+          description: Report enabled state, visibility change count, router refresh status if present, and restart warning.
+          requires:
+            - verify_durable_optional_status
+  - id: delete_durable_executor
+    label: Delete durable-executor
+    rank: 9
+    description: Use when the user wants to remove every managed durable-executor install and refresh router state when configured.
+    execution_plan:
+      mode: ordered
+      reason: Durable-executor delete must remove only recorded, marked durable installs so ordinary user skills are not deleted.
+      phases:
+        - id: inspect_durable_delete
+          owner_skill: skillspec
+          description: Verify durable-executor lifecycle help and the saved durable config before deleting anything.
+          requires:
+            - durable_help
+          forbid:
+            - delete_unmarked_durable_executor
+            - mutate_unrecorded_durable_roots
+        - id: delete_durable_surface
+          owner_skill: skillspec
+          description: Delete only marker-protected durable-executor folders recorded in durable config, remove config, and refresh router state when configured.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - durable_delete
+          forbid:
+            - delete_unmarked_durable_executor
+            - mutate_unrecorded_durable_roots
+        - id: report_durable_delete
+          owner_skill: skillspec
+          description: Report removed managed durable installs, removed config, router refresh status, and restart warning.
+          requires:
+            - verify_durable_optional_status
+  - id: observed_durable_workspace_to_skill
+    label: Create skill from observed durable workspace
+    rank: 8
+    description: Use when the user wants to ask for a real task, let durable-executor run it through rote-exec evidence, inspect the workspace, and synthesize a reviewed SkillSpec-backed skill from the observed workflow.
+    execution_plan:
+      mode: ordered
+      reason: Observed-workflow creation depends on evidence from a named durable workspace rather than a pre-existing prose SKILL.md.
+      phases:
+        - id: elicit_observation_task
+          owner_skill: skillspec
+          description: Ask for the task to run or identify the existing durable workspace to observe; when the prompt already includes the task, carry it forward without inventing a workspace.
+          requires:
+            - choose_observation_workspace
+            - capture_observation_task
+          forbid:
+            - observe_anonymous_workspace
+          jumps:
+            - when: existing_named_workspace_supplied
+              to_phase: observe_durable_workspace
+              reason: Existing durable workspaces can be observed directly without running another task.
+        - id: run_observation_task
+          owner_skill: durable-executor
+          description: Run the quoted observation task through durable-executor first, preserving the selected substrate, capability evidence, workspace name, artifacts, and return packet for synthesis.
+          tool_boundary:
+            allow:
+              - durable-executor
+              - skillspec_cli
+              - rote_exec
+              - local_trace_files
+            permission_required_for:
+              - any_unlisted_tool
+              - external_network_or_browser_action
+              - credentialed_or_private_data_access
+          requires:
+            - verify_durable_executor
+            - handoff_observation_task_to_durable_executor
+            - capture_observation_workspace
+            - record_capability_selection_ledger
+          forbid:
+            - direct_cli_without_rote_exec
+            - direct_shell_command_without_rote_exec
+            - direct_api_call_without_rote_adapter_or_rote_exec
+            - observe_anonymous_workspace
+          handoff:
+            to_skill: durable-executor
+            boundary: resume_after_handoff
+            pass_context:
+              - user_intent
+              - observation_task
+              - workspace
+              - trace_dir
+              - return_to
+              - execution_policy
+              - evidence_context
+            forbid:
+              - direct_cli_without_rote_exec
+              - direct_shell_command_without_rote_exec
+              - direct_api_call_without_rote_adapter_or_rote_exec
+              - generated_skill_install_without_review
+            reason: The observed workflow must be created by durable execution evidence first; skillspec resumes only after a named workspace exists to inspect.
+        - id: observe_durable_workspace
+          owner_skill: skillspec
+          description: Inspect rote workspace stats, command log, metadata, and artifacts without replaying unsafe actions.
+          tool_boundary:
+            allow:
+              - rote_workspace
+              - rote_exec
+              - local_trace_files
+              - local_repo_files
+              - skillspec_cli
+            permission_required_for:
+              - replay_or_mutating_action
+              - any_unlisted_tool
+          requires:
+            - observe_workspace_stats
+            - observe_workspace_log
+            - observe_workspace_meta
+          forbid:
+            - replay_workspace_actions_without_approval
+            - claim_workspace_tokens_without_stats
+        - id: synthesize_observed_spec
+          owner_skill: skillspec
+          description: Show the observed result and evidence summary for approval, then build a reviewed skill.spec.yml from observed commands, dependencies, inputs, outputs, rules, elicitations, tests, and proof gaps.
+          requires:
+            - approve_observed_result_for_synthesis
+            - synthesize_from_workspace
+            - synthesize_observed_skill_spec
+            - fill_coverage_matrix
+            - produce_observed_workspace_spec
+          forbid:
+            - synthesize_without_observation_approval
+        - id: qa_observed_spec
+          owner_skill: skillspec
+          description: Validate, test, decide, align, and value-report the observed-workflow spec before optional install.
+          requires:
+            - run_structural_qa
+            - prove_value
+  - id: revise_existing_skillspec
+    label: Revise existing SkillSpec
+    rank: 9
+    description: Use when a skill already has skill.spec.yml and the user wants to revise, improve, or update it.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: grammar_and_current_map
+          owner_skill: skillspec
+          description: Learn the current grammar and summarize the existing SkillSpec before editing it.
+          requires:
+            - grammar_sensemake_index
+            - grammar_sensemake_porting
+            - sensemake_current_spec
+            - grammar_checklist_import
+          forbid:
+            - patch_yaml_from_memory
+        - id: inspect_active_handles
+          owner_skill: skillspec
+          description: Use query/refs plus the phase plan to inspect only active handles and execution order.
+          requires:
+            - plan_phase_order
+            - act_named_phase
+            - query_active_handles
+            - refs_active_handles
+        - id: revise_reviewed_spec
+          owner_skill: skillspec
+          description: Patch only the reviewed SkillSpec constructs required by the requested change.
+          requires:
+            - fill_coverage_matrix
+            - produce_reviewed_spec
+        - id: rerun_qa
+          owner_skill: skillspec
+          description: Re-run structural QA, phase progress, proof, compile, and value reporting after revision.
+          requires:
+            - run_structural_qa
+            - progress_show
+            - prove_value
+  - id: compile_and_install_reviewed_skill
+    label: Compile and install reviewed skill
+    rank: 10
+    description: Use only after a reviewed spec validates and the user explicitly approves dependency surface, install targets, and whether any existing active skill should be retired before replacement.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: dependency_surface
+          owner_skill: skillspec
+          requires:
+            - deps_check_all
+            - show_dependency_surface
+            - approve_dependency_surface
+        - id: compile_targets
+          owner_skill: skillspec
+          requires:
+            - compile_codex_skill
+            - compile_claude_skill
+        - id: dry_run_install
+          owner_skill: skillspec
+          requires:
+            - list_install_targets
+            - install_dry_run
+            - approve_install_targets
+            - approve_retire_existing_skill
+        - id: install
+          owner_skill: skillspec
+          requires:
+            - install_skill
+  - id: prove_skill_value
+    label: Prove skill value
+    rank: 11
+    description: Use when the user asks to prove, demo, align, or value-report a ported SkillSpec skill.
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: run_demo_decision
+          owner_skill: skillspec
+          requires:
+            - plan_phase_order
+            - act_named_phase
+            - decide_demo
+            - produce_decision_trace
+        - id: align_trace
+          owner_skill: skillspec
+          requires:
+            - progress_show
+            - trace_align
+            - report_alignment_status
+        - id: print_value
+          owner_skill: skillspec
+          requires:
+            - value_report
+rules:
+  - id: single_atomic_source_uses_one_shot
+    when:
+      user_says_any:
+        - single atomic skill
+        - one SKILL.md
+        - one-shot port
+        - port-one-shot
+        - single skill folder
+        - atomic skill package
+    prefer: local_skill_port
+    forbid:
+      - use_port_one_shot_without_shape_recon
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+    reason: One-shot is the fast path only after source-shape recon proves there is exactly one atomic prose skill package.
+  - id: route_multi_skill_repos_to_workspace_recon
+    when:
+      user_says_any:
+        - workspace map
+        - workspace validate
+        - skillspec workspace
+        - skillspec.workspace.yml
+        - multiple SKILL.md
+        - many SKILL.md
+        - multi-skill repo
+        - multi-skill workspace
+        - plugin-shaped repo
+        - plugin-shaped workspace
+        - claude plugin
+        - claude plugin skills
+        - plugin namespace
+        - namespaced skills
+        - repeated skill names
+        - parent folder with multiple skills
+        - fanout converge
+        - shared standards package
+        - cross-skill references
+        - cross references another skill
+        - references another skill
+        - coding-standards/SKILL.md
+        - skill dependency graph
+        - skill depends on another skill
+        - plugin.json
+        - .claude-plugin
+        - CLAUDE.md plugin
+        - MCP plugin
+        - same skill name collision
+    prefer: workspace_skill_authoring
+    forbid:
+      - use_router_index_for_authoring_recon
+      - import_workspace_root_as_single_skill
+      - proceed_with_circular_skill_dependencies
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
+    after_success:
+      - report_workspace_recon
+    reason: A folder containing multiple SKILL.md packages or plugin-shaped skill roots must be mapped as a workspace before any single-skill import or fanout/converge plan.
+  - id: route_workspace_import_to_fanout
+    when:
+      user_says_any:
+        - workspace import
+        - skillspec workspace import
+        - fanout import
+        - import workspace packages
+        - import skillspec.workspace.yml
+        - generate workspace package drafts
+        - run fanout import
+    prefer: workspace_fanout_import
+    forbid:
+      - use_router_index_for_authoring_recon
+      - import_workspace_root_as_single_skill
+      - compile_or_install_during_workspace_import
+    after_success:
+      - report_workspace_import
+    reason: Fanout import starts from a validated workspace manifest and writes one generated package draft per atomic skill; it must not compile, install, or refresh router indexes.
+  - id: route_workspace_converge_to_proof
+    when:
+      user_says_any:
+        - workspace converge
+        - skillspec workspace converge
+        - converge workspace
+        - workspace proof
+        - verify workspace build
+        - check workspace package drafts
+        - workspace-converge.report.md
+    prefer: workspace_converge
+    forbid:
+      - use_router_index_for_authoring_recon
+      - compile_or_install_during_workspace_import
+    after_success:
+      - report_workspace_converge
+    reason: Converge verifies generated package drafts and dependency readiness after fanout import and before compile or install.
+  - id: route_workspace_compile_to_phase6
+    when:
+      user_says_any:
+        - workspace compile
+        - skillspec workspace compile
+        - compile workspace
+        - compile workspace build
+        - compile workspace package drafts
+        - workspace-compile.report.md
+    prefer: workspace_compile
+    forbid:
+      - install_during_workspace_compile
+      - refresh_router_during_workspace_compile
+      - use_router_index_for_authoring_recon
+    after_success:
+      - report_workspace_compile
+    reason: Workspace compile runs after convergence, writes generated loaders in the build tree, and must stop before install or router refresh.
+  - id: route_workspace_install_to_phase7
+    when:
+      user_says_any:
+        - workspace install
+        - skillspec workspace install
+        - install workspace
+        - install compiled workspace
+        - workspace install dry-run
+        - workspace-install.report.md
+        - workspace-install.manifest.json
+        - workspace visibility
+        - workspace visibility policy
+        - apply visibility
+        - --apply-visibility
+        - entry-implicit
+        - manual-only support skills
+        - workspace-visibility.manifest.json
+    prefer: workspace_install
+    forbid:
+      - install_without_workspace_dry_run
+      - refresh_router_during_workspace_install
+      - use_router_index_for_authoring_recon
+    after_success:
+      - report_workspace_install
+    reason: Workspace install runs after compile, plans every harness write and visibility target first, uses install_slug folders, blocks collisions, optionally applies native visibility metadata, and keeps router refresh separate.
+  - id: route_local_sources_to_local_port
+    when:
+      user_says_any:
+        - SKILL.md
+        - local skill
+        - local folder
+        - /skills/
+        - ~/.codex/skills
+        - ~/.agents/skills
+    route_order:
+      - local_skill_port
+      - remote_skill_port
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+    reason: Local SKILL.md and skill folders can be staged directly with resources intact.
+  - id: route_remote_sources_to_remote_port
+    when:
+      user_says_any:
+        - github.com
+        - owner/repo
+        - tree/main
+        - public repo
+        - remote skill
+      user_says_all_groups:
+        - - import
+          - port
+          - convert
+          - compile
+          - install
+          - prove
+          - stage
+          - as a SkillSpec
+    prefer: remote_skill_port
+    elicit:
+      - approve_remote_source_access
+      - choose_candidate_skill
+    forbid:
+      - install_from_remote_checkout
+      - execute_imported_snippets_during_staging
+      - web_search_for_remote_source
+      - fetch_raw_github_skill_md_for_import
+    reason: Remote inputs must be staged locally before import and install.
+  - id: route_source_shape_questions_to_doctor
+    when:
+      user_says_any:
+        - what is the shape of this skill
+        - what is the shape of skill
+        - shape of skill
+        - skill shape
+        - source shape
+        - classify this skill repo
+        - classify skill repo
+        - run doctor
+        - run doctor on this repo
+        - run doctor on this url
+        - doctor on this repo
+        - doctor on this url
+        - diagnose source shape
+    prefer: inspect_source_shape
+    forbid:
+      - port_one_shot_or_manual_import
+      - import_skill_draft
+      - workspace_import_packages
+      - workspace_converge_build
+      - workspace_compile_build
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+      - install_from_remote_checkout
+      - execute_imported_snippets_during_staging
+    after_success:
+      - report_source_shape
+    reason: Shape questions should run the static doctor shape gate and stop; they should not import, port, compile, install, or choose a remote candidate.
+  - id: post_install_setup_routes_to_multiplexer
+    when:
+      user_says_any:
+        - post install
+        - post-install
+        - setup after install
+        - skillspec setup
+        - /skillspec
+        - installed skillspec
+    route_order:
+      - workspace_skill_authoring
+      - workspace_fanout_import
+      - workspace_converge
+      - workspace_compile
+      - workspace_install
+      - install_skill_router
+      - update_skill_router
+      - install_durable_executor
+      - update_durable_executor
+      - delete_durable_executor
+      - observed_durable_workspace_to_skill
+      - local_skill_port
+      - remote_skill_port
+      - revise_existing_skillspec
+    reason: Once SkillSpec is installed, the prompt skill should be the single setup entry point for router, durable, import, observe, revise, and proof workflows.
+  - id: route_prompt_import_to_skill_port
+    when:
+      user_says_any:
+        - /skillspec import
+        - import existing skill
+        - import local skill
+        - import remote skill
+    route_order:
+      - local_skill_port
+      - remote_skill_port
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+    reason: The post-install prompt uses import language, but it should still enter the reviewed local or remote porting path.
+  - id: route_router_install_to_router_setup
+    when:
+      user_says_any:
+        - install router
+        - install skill-router
+        - router mode
+        - setup router
+        - skill-router explicit
+    prefer: install_skill_router
+    forbid:
+      - use_removed_router_root
+    after_success:
+      - verify_router_installed
+    reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_router_switch_to_lifecycle
+    when:
+      user_says_any:
+        - enable router
+        - router enable
+        - disable router
+        - router disable
+        - switch off router
+        - switch on router
+        - turn off router mode
+        - turn on router mode
+    prefer: switch_skill_router_mode
+    forbid:
+      - mutate_unrecorded_router_roots
+    after_success:
+      - verify_router_updated
+    reason: Router enable/disable is a reversible lifecycle switch, not uninstall; enable must rebuild the index from current roots.
+  - id: route_status_to_read_only_inventory
+    when:
+      user_says_any:
+        - skillspec status
+        - status report
+        - installed status
+        - lifecycle status
+        - router status
+        - durable status
+        - skill inventory
+        - legacy skills
+        - skillspec-backed skills
+    prefer: inspect_skillspec_status
+    forbid:
+      - install_or_release_side_effect
+      - rebuild_index_for_status
+      - mutate_unrecorded_router_roots
+    after_success:
+      - report_skillspec_status
+    reason: Status is a read-only inspection path for lifecycle state, roots, router index freshness, and SkillSpec-backed versus legacy skill inventory.
+  - id: route_router_update_to_router_maintenance
+    when:
+      user_says_any:
+        - update router
+        - router update
+        - update skill-router
+        - repair router
+        - repair skill-router
+        - stale router
+        - missing router spec
+        - restart harness
+    prefer: update_skill_router
+    forbid:
+      - update_router_without_backup
+      - mutate_unrecorded_router_roots
+    after_success:
+      - verify_router_updated
+    reason: Router update is backup-first maintenance for already-recorded harness roots, not a fresh install or index-only refresh.
+  - id: route_durable_install_to_optional_durable
+    when:
+      user_says_any:
+        - install durable-executor
+        - install durable executor
+        - durable first-hop
+        - durable first hop
+        - optional durable
+        - durable-executor setup
+    prefer: install_durable_executor
+    elicit:
+      - choose_durable_source
+      - approve_install_targets
+    forbid:
+      - assume_bundled_durable_executor
+      - install_durable_without_source_or_existing_skill
+      - make_durable_executor_explicit_in_router_mode
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable-executor is optional; install it only from an existing local skill or approved source, and keep it implicit when router mode is active.
+  - id: route_durable_update_to_lifecycle
+    when:
+      user_says_any:
+        - update durable-executor
+        - update durable executor
+        - durable-executor update
+        - durable executor update
+        - repair durable-executor
+        - refresh durable-executor
+    prefer: update_durable_executor
+    forbid:
+      - update_durable_without_backup
+      - mutate_unrecorded_durable_roots
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable-executor update is backup-first maintenance for managed installs recorded by durable config.
+  - id: route_durable_switch_to_lifecycle
+    when:
+      user_says_any:
+        - enable durable-executor
+        - enable durable executor
+        - durable-executor enable
+        - durable executor enable
+        - disable durable-executor
+        - disable durable executor
+        - durable-executor disable
+        - durable executor disable
+        - switch off durable-executor
+        - switch on durable-executor
+    prefer: switch_durable_executor_mode
+    forbid:
+      - mutate_unrecorded_durable_roots
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable enable/disable is a reversible visibility switch, not uninstall; it preserves durable files and config.
+  - id: route_durable_delete_to_lifecycle
+    when:
+      user_says_any:
+        - delete durable-executor
+        - delete durable executor
+        - durable-executor delete
+        - durable executor delete
+        - uninstall durable-executor
+        - uninstall durable executor
+        - remove durable-executor
+    prefer: delete_durable_executor
+    forbid:
+      - delete_unmarked_durable_executor
+      - mutate_unrecorded_durable_roots
+    after_success:
+      - verify_durable_optional_status
+    reason: Durable-executor delete must remove only recorded, marker-protected installs and refresh router state when configured.
+  - id: route_observed_workspace_to_spec
+    when:
+      user_says_any:
+        - observe durable workspace
+        - create spec from durable
+        - create specskill
+        - create spec skill
+        - rote-exec workspace
+        - durable execution workspace
+        - observe workspace and create skill
+        - create from observed durable execution
+        - create skill from observed durable execution
+        - turn observed durable execution into a skill
+        - create skill by observing durable execution
+        - run task first and create skill
+        - observe durable execution and create skill
+    prefer: observed_durable_workspace_to_skill
+    elicit:
+      - choose_observation_workspace
+    forbid:
+      - observe_anonymous_workspace
+      - replay_workspace_actions_without_approval
+      - claim_workspace_tokens_without_stats
+    after_success:
+      - produce_observed_workspace_spec
+      - generate_value_report
+    reason: Observed-workflow skill creation starts from durable evidence, not prose source, so the workspace must be named and inspected before synthesis.
+  - id: grammar_preflight_is_mandatory
+    when:
+      user_says_any:
+        - port
+        - import
+        - convert
+        - revise
+        - improve
+        - create skill.spec.yml
+    route_order:
+      - local_skill_port
+      - remote_skill_port
+      - revise_existing_skillspec
+    forbid:
+      - skip_grammar_sensemake
+      - infer_grammar_from_memory
+      - patch_yaml_from_memory
+    after_success:
+      - run_grammar_preflight
+    reason: The harness must learn the runtime grammar artifact before fitting prose into SkillSpec.
+  - id: mechanical_import_is_draft_only
+    when:
+      user_says_any:
+        - import-skill
+        - mechanical draft
+        - deterministic extractor
+    prefer: local_skill_port
+    forbid:
+      - treat_mechanical_draft_as_final
+      - install_unreviewed_draft
+      - claim_generated_tests_reviewed
+    after_success:
+      - sensemake_draft
+      - fill_coverage_matrix
+    reason: The source prose states the deterministic import command is first-pass scaffolding, not a finished contract.
+  - id: field_import_uses_only_current_source
+    when:
+      user_says_any:
+        - port
+        - import
+        - convert
+        - semantic promotion
+        - coverage matrix
+    forbid:
+      - consult_existing_ports_without_user_request
+      - consult_repo_history_without_user_request
+      - consult_memory_or_prior_examples_without_user_request
+      - infer_from_example_skill_specs
+    after_success:
+      - fill_coverage_matrix
+    reason: Field imports must derive semantics from the staged source, embedded grammar, draft sensemake, and user-approved references only.
+  - id: source_code_becomes_resources_and_code
+    when:
+      user_says_any:
+        - source code
+        - fenced code
+        - code blocks
+        - scripts
+        - source/
+    forbid:
+      - leave_source_code_unreferenced
+      - flatten_source_code_into_prompt_blob
+      - execute_imported_snippets_during_staging
+    after_success:
+      - split_source_code_into_resources
+    reason: Source code found in source material must be preserved as package-local resource files and referenced through resources/code instead of loose prompt prose.
+  - id: imports_resources_must_be_connected
+    when:
+      user_says_any:
+        - references
+        - resources
+        - imports
+        - scripts
+        - assets
+        - source material
+    forbid:
+      - leave_orphaned_imports
+      - leave_orphaned_resources
+      - flatten_referenced_files_into_prompt_blob
+    after_success:
+      - imports_check
+    reason: Runtime guidance and provenance must be package-local and connected to routes, rules, commands, recipes, artifacts, or review notes.
+  - id: dependency_surface_requires_review
+    when:
+      user_says_any:
+        - install it
+        - install the result
+        - install generated skill
+        - install reviewed skill
+        - release
+        - compile
+        - deps
+        - dependency
+        - dependencies
+        - missing package
+    route_order:
+      - compile_and_install_reviewed_skill
+    elicit:
+      - approve_dependency_surface
+    forbid:
+      - install_before_dependency_surface_approval
+      - silently_install_missing_tools
+      - claim_missing_dependency_present
+    after_success:
+      - deps_check_all
+      - show_dependency_surface
+      - report_dependency_waiver
+    reason: Old prose dependency assumptions must become explicit checks and provision choices before side effects.
+  - id: import_preserves_dependency_ledger
+    when:
+      user_says_any:
+        - import
+        - port
+        - remote skill
+        - public repo
+        - SKILL.md
+        - dependency
+        - dependencies
+        - package
+        - missing package
+        - deps.toml
+    elicit:
+      - approve_dependency_surface
+    forbid:
+      - drop_imported_dependency_mentions
+      - mutate_dependency_set_to_pass_qa
+      - work_around_missing_dependency_without_waiver
+      - claim_partial_dependency_proof_as_full
+    after_success:
+      - preserve_dependency_ledger
+      - show_dependency_surface
+      - report_dependency_waiver
+    reason: Imported skills must preserve source, reference, script, code, command, and package-manifest dependency mentions as package evidence before install or proof.
+  - id: install_requires_validated_reviewed_spec
+    when:
+      user_says_any:
+        - install codex
+        - install agents
+        - install it
+        - install the result
+        - install generated skill
+        - install reviewed skill
+        - codex and agents
+        - --install
+        - install target
+    route_order:
+      - compile_and_install_reviewed_skill
+    elicit:
+      - approve_install_targets
+      - approve_retire_existing_skill
+    forbid:
+      - install_unreviewed_draft
+      - install_before_validate_test_imports_deps
+      - install_from_remote_checkout
+      - leave_old_and_new_skill_discoverable_without_user_choice
+    after_success:
+      - install_skill
+      - retire_existing_skill_when_approved
+      - generate_value_report
+    reason: Installing writes into harness roots, so it requires reviewed QA, explicit target approval, and an explicit choice to retire any old active skill instead of leaving duplicate discoverable skills.
+  - id: prove_requests_route_to_value
+    when:
+      user_says_any:
+        - prove
+        - value
+        - demo decision
+        - alignment
+        - trace align
+        - value report
+        - skillspec plan
+        - skillspec act
+        - skillspec progress
+        - progress report
+    route_order:
+      - prove_skill_value
+    after_success:
+      - decide_demo
+      - trace_align
+      - value_report
+    forbid:
+      - claim_unproven_execution_evidence
+    reason: The product is the visible value report backed by decision and alignment evidence.
+  - id: revision_starts_with_grammar_and_current_spec
+    when:
+      user_says_any:
+        - revise existing SkillSpec
+        - existing SkillSpec
+        - existing SkillSpec-backed
+        - existing skillspec yaml
+        - skillspec yaml
+        - update this skillspec spec
+        - route coverage
+        - improve this spec
+        - update skill.spec.yml
+        - already has skill.spec.yml
+        - existing skill.spec.yml
+        - revise skill.spec.yml instead of import
+        - do not reimport existing spec
+        - update the spec
+        - update existing spec
+        - patch the YAML
+        - plan act progress
+        - phase progress
+        - progress ledger
+    prefer: revise_existing_skillspec
+    forbid:
+      - patch_yaml_from_memory
+      - skip_current_spec_sensemake
+    after_success:
+      - run_structural_qa
+    reason: Existing SkillSpecs, including skillspec itself, must be revised from the current grammar, active handles, phase plan, and progress contract, not broad YAML edits or prose import.
+  - id: durable_tool_work_uses_durable_substrate
+    when:
+      user_says_any:
+        - run command
+        - call API
+        - execute
+        - trace
+        - evidence
+        - future recall
+    forbid:
+      - direct_cli_without_durable_wrapper
+      - untracked_stdout_as_evidence
+    after_success:
+      - produce_return_packet
+    reason: Porting and proof work that executes tools must preserve evidence and route through the durable execution substrate.
+  - id: degraded_draft_blocks_install
+    when:
+      user_says_any:
+        - missing imports check
+        - missing deps check
+        - no imports check
+        - no deps check
+        - unavailable CLI
+        - degraded draft
+        - release
+    forbid:
+      - install_degraded_draft
+      - release_degraded_draft
+      - claim_dependency_presence_without_check
+    after_success:
+      - report_degraded_status
+    reason: Missing grammar/import/dependency capability must be visible and cannot produce a release-ready skill.
+elicitations:
+  choose_candidate_skill:
+    question: Which discovered SKILL.md should be ported?
+    required_when:
+      - route: remote_skill_port
+    choices:
+      - id: first_candidate
+        label: First candidate
+        description: Port the highest-ranked discovered skill folder.
+      - id: named_path
+        label: Named path
+        description: Use the exact path supplied by the user.
+      - id: stop_and_list
+        label: List only
+        description: Stop after listing candidates for explicit selection.
+    default: stop_and_list
+  approve_remote_source_access:
+    question: May I stage the public remote source locally for read-only import?
+    required_when:
+      - route: remote_skill_port
+    choices:
+      - id: approve_read_only
+        label: Approve read-only staging
+        description: Clone or download the source into a temporary local folder without executing it.
+      - id: local_source_only
+        label: Use local source only
+        description: Do not access the remote; wait for a local path.
+    default: approve_read_only
+  choose_durable_source:
+    question: Which durable-executor source should be used?
+    required_when:
+      - route: install_durable_executor
+    choices:
+      - id: existing_installed
+        label: Existing installed
+        description: Use the durable-executor already present in a selected skill root.
+      - id: supplied_source
+        label: Supplied source
+        description: Use the local durable-executor source folder supplied in the prompt.
+      - id: skip_durable
+        label: Skip durable
+        description: Leave durable first-hop unavailable and report that router mode can still install.
+    default: existing_installed
+  choose_observation_workspace:
+    question: Which durable execution evidence should be used?
+    required_when:
+      - route: observed_durable_workspace_to_skill
+    choices:
+      - id: run_task_first
+        label: Run task first
+        description: Use the concrete task in the prompt, run it through durable-executor, then observe the resulting workspace.
+      - id: current_workspace
+        label: Current workspace
+        description: Observe the named rote workspace already active in this session.
+      - id: named_workspace
+        label: Named workspace
+        description: Use the workspace name provided by the user.
+    default: run_task_first
+  approve_observed_result_for_synthesis:
+    question: Here is the observed result and evidence summary. Is this satisfactory enough to synthesize a reusable SkillSpec, or should the observation be rerun/refined first?
+    required_when:
+      - route: observed_durable_workspace_to_skill
+    choices:
+      - id: satisfactory_for_skill_synthesis
+        label: Satisfactory for synthesis
+        description: Proceed only after the observed output, workspace stats, command log, metadata, dependency evidence, artifacts, and proof gaps have been shown and accepted.
+      - id: rerun_or_refine_observation
+        label: Rerun or refine
+        description: Do not synthesize yet; rerun the durable observation or collect better evidence first.
+    default: rerun_or_refine_observation
+  approve_dependency_surface:
+    question: Do you approve the imported dependency ledger and any missing dependency decisions for validation, proof, compile, or install?
+    required_when:
+      - route: compile_and_install_reviewed_skill
+    choices:
+      - id: approve_checked_only
+        label: Checked dependencies only
+        description: Continue only when required dependencies are present or explicitly deferred in deps.toml with proof impact recorded.
+      - id: draft_only
+        label: Keep draft-only
+        description: Do not install or release until missing dependencies are resolved.
+      - id: defer_missing_with_waiver
+        label: Defer missing
+        description: Continue with partial proof only after missing dependencies, authority, install risk, and degraded workflows are recorded.
+      - id: choose_provision
+        label: Provision missing
+        description: Ask before running any provision command for a missing tool.
+    default: draft_only
+  approve_install_targets:
+    question: Which harness targets should receive the generated SkillSpec-backed skill?
+    required_when:
+      - route: compile_and_install_reviewed_skill
+    choices:
+      - id: codex_and_agents
+        label: Codex and Agents
+        description: Install into both detected personal skill roots after dry-run.
+      - id: codex_only
+        label: Codex only
+        description: Install only into the Codex skill root after dry-run.
+      - id: agents_only
+        label: Agents only
+        description: Install only into the Agents skill root after dry-run.
+    default: codex_and_agents
+  approve_retire_existing_skill:
+    question: If the target skill already exists in a harness root, should SkillSpec back up and remove the old active skill before installing the reviewed replacement?
+    required_when:
+      - route: compile_and_install_reviewed_skill
+    choices:
+      - id: retire_existing
+        label: Retire existing
+        description: Back up the current active skill under SKILLSPEC_HOME/backups/retired-skills, remove it from harness discovery, then install the reviewed SkillSpec-backed replacement at the same name.
+      - id: install_new_name
+        label: Install new name
+        description: Keep the old skill discoverable only when the user intentionally chooses a different installed name for side-by-side testing.
+      - id: stop_before_install
+        label: Stop before install
+        description: Do not write harness roots until the retirement or side-by-side choice is explicit.
+    default: retire_existing
+dependencies:
+  skillspec_cli:
+    kind: cli
+    description: SkillSpec CLI with grammar, import, validate, imports, deps, test, compile, plan, act, progress, decide, and trace commands.
+    command: skillspec
+    check:
+      command: skillspec
+    permission:
+      required: false
+      reason: Read-only checks and local compilation are safe, but install commands need explicit target approval.
+      safety: local_read
+    provision:
+      elicit: approve_dependency_surface
+      options:
+        - id: install_from_repo
+          label: Build from repo
+          description: Build the checked-out workspace binary when developing SkillSpec itself.
+          command: cargo build
+          safety: local_write
+  git_cli:
+    kind: cli
+    description: Required only for staging public GitHub repositories or tree URLs.
+    command: git
+    check:
+      command: git
+    permission:
+      required: true
+      reason: Remote staging performs network reads and writes a temporary local checkout.
+      safety: network_read
+  rg_cli:
+    kind: cli
+    description: Fast local inventory and candidate discovery for staged skill folders.
+    command: rg
+    check:
+      command: rg
+    permission:
+      required: false
+      safety: local_read
+  cargo_cli:
+    kind: cli
+    description: Optional development fallback for building the checked-out SkillSpec binary when the installed CLI is stale.
+    command: cargo
+    check:
+      command: cargo
+    permission:
+      required: true
+      reason: Building from source writes local target artifacts.
+      safety: local_write
+  rote_cli:
+    kind: cli
+    description: Required when installing/updating durable-executor or creating a SkillSpec from observed durable execution evidence in a named rote workspace.
+    command: rote
+    check:
+      command: rote
+    permission:
+      required: true
+      reason: Observing a workspace reads local command logs, metadata, stats, and artifact references that may include sensitive user workflow evidence.
+      safety: local_read
+resources:
+  source_skill_md:
+    path: source/SKILL_md.old
+    role: source_material
+    description: Preserved full prose source for the skillspec skill before compilation replaces the visible loader; stored as SKILL_md.old so harnesses do not list it as another skill or Markdown source.
+    used_by:
+      - kind: route
+        id: local_skill_port
+      - kind: route
+        id: revise_existing_skillspec
+      - kind: recipe
+        id: local_porting_loop
+      - kind: artifact
+        id: preserved_source
+artifacts:
+  preserved_source:
+    kind: file
+    path: source/SKILL_md.old
+    description: Full prose source retained for provenance and future review under the non-discoverable SKILL_md.old filename.
+    produced_by:
+      - kind: command
+        id: preserve_source_skill
+    consumed_by:
+      - kind: recipe
+        id: local_porting_loop
+  source_map:
+    kind: file
+    path: .skillspec/source-map/source-map.json
+    description: Markdown AST-backed map of staged source files, byte ranges, line ranges, references, code blocks, dependency mentions, and review-required spans.
+    produced_by:
+      - kind: command
+        id: source_map_create
+    consumed_by:
+      - kind: command
+        id: source_map_coverage
+      - kind: command
+        id: source_map_nodes
+      - kind: command
+        id: source_map_dependencies
+      - kind: command
+        id: source_map_code
+      - kind: command
+        id: source_map_stale
+      - kind: command
+        id: import_skill_draft
+      - kind: recipe
+        id: local_porting_loop
+  workspace_manifest:
+    kind: file
+    path: .skillspec/workspace/skillspec.workspace.yml
+    description: Authoring-side package graph for a multi-skill source root, including atomic package ids, plugin namespaces, skill-safe public names, deterministic install slugs, package kinds, cross-skill references, and inferred hard dependencies.
+    produced_by:
+      - kind: command
+        id: workspace_map_source
+    consumed_by:
+      - kind: command
+        id: workspace_validate_manifest
+      - kind: recipe
+        id: workspace_recon_loop
+  workspace_map_report:
+    kind: report
+    path: .skillspec/workspace/skillspec.workspace.yml.report.md
+    description: Human-readable structure recon report for the multi-skill workspace graph, plugin namespaces, duplicate-name warnings, unresolved references, dependency edges, workflow references, and next validation command.
+    produced_by:
+      - kind: command
+        id: workspace_map_source
+    consumed_by:
+      - kind: recipe
+        id: workspace_recon_loop
+  workspace_import_report:
+    kind: report
+    path: workspace-build/workspace-import.report.md
+    description: Fanout import report naming built, failed, skipped, and blocked packages, per-package evidence paths, and the next converge command.
+    produced_by:
+      - kind: command
+        id: workspace_import_packages
+    consumed_by:
+      - kind: recipe
+        id: workspace_import_loop
+  workspace_package_drafts:
+    kind: file
+    path: workspace-build/<package>/skill.spec.yml
+    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import.
+    produced_by:
+      - kind: command
+        id: workspace_import_packages
+    consumed_by:
+      - kind: recipe
+        id: workspace_import_loop
+      - kind: command
+        id: workspace_converge_build
+      - kind: command
+        id: workspace_compile_build
+  workspace_converge_report:
+    kind: report
+    path: workspace-build/workspace-converge.report.md
+    description: Workspace-level proof report naming ready, failed, blocked, and missing package drafts plus dependency-readiness status.
+    produced_by:
+      - kind: command
+        id: workspace_converge_build
+    consumed_by:
+      - kind: recipe
+        id: workspace_converge_loop
+      - kind: command
+        id: workspace_compile_build
+  workspace_compiled_loaders:
+    kind: file
+    path: workspace-build/<package>/SKILL.md
+    description: Harness-ready SKILL.md loaders generated from each ready workspace package spec under the mirrored build root.
+    produced_by:
+      - kind: command
+        id: workspace_compile_build
+    consumed_by:
+      - kind: recipe
+        id: workspace_compile_loop
+      - kind: command
+        id: workspace_install_dry_run
+      - kind: command
+        id: workspace_install_packages
+  workspace_compile_report:
+    kind: report
+    path: workspace-build/workspace-compile.report.md
+    description: Workspace-level compile report naming compiled, failed, blocked, missing, and skipped packages plus loader paths and Phase 7 install guidance.
+    produced_by:
+      - kind: command
+        id: workspace_compile_build
+    consumed_by:
+      - kind: recipe
+        id: workspace_compile_loop
+      - kind: recipe
+        id: workspace_install_loop
+  workspace_install_report:
+    kind: report
+    path: workspace-build/workspace-install.report.md
+    description: Workspace-level install report naming installed, planned, failed, blocked, and missing packages plus target paths, collision blockers, visibility policy, optional native visibility changes, and router-refresh separation.
+    produced_by:
+      - kind: command
+        id: workspace_install_dry_run
+      - kind: command
+        id: workspace_install_packages
+    consumed_by:
+      - kind: recipe
+        id: workspace_install_loop
+  workspace_install_manifest:
+    kind: file
+    path: workspace-build/workspace-install.manifest.json
+    description: Installed workspace manifest with package ids, public names, install slugs, dependencies, target paths, and retired-install backup paths when applicable.
+    produced_by:
+      - kind: command
+        id: workspace_install_packages
+      - kind: command
+        id: workspace_install_apply_visibility
+    consumed_by:
+      - kind: recipe
+        id: workspace_install_loop
+  workspace_visibility_manifest:
+    kind: file
+    path: workspace-build/workspace-visibility.manifest.json
+    description: Reversible native visibility manifest written when workspace install is run with --apply-visibility; by default entry packages stay implicit and shared/helper/wrapper packages become manual-only.
+    produced_by:
+      - kind: command
+        id: workspace_install_apply_visibility
+    consumed_by:
+      - kind: recipe
+        id: workspace_install_loop
+  doctor_report:
+    kind: report
+    path: .skillspec/reports/doctor.json
+    description: Static doctor report that first classifies source shape, then reports frontmatter discovery risk, agent drift risk, token/context pressure, proof gaps, and workspace/package risk; non-skill code repo targets remain shape-only.
+    produced_by:
+      - kind: command
+        id: doctor_source_skill
+    consumed_by:
+      - kind: recipe
+        id: local_porting_loop
+      - kind: recipe
+        id: coverage_review_loop
+  mechanical_draft:
+    kind: file
+    path: .skillspec/drafts/skill.spec.yml
+    description: Deterministic import-skill output used as review scaffolding, never as the final contract.
+    produced_by:
+      - kind: command
+        id: import_skill_draft
+    consumed_by:
+      - kind: recipe
+        id: local_porting_loop
+  reviewed_spec:
+    kind: file
+    path: skill.spec.yml
+    description: Human-reviewed SkillSpec contract with semantic routes, rules, dependencies, tests, and review notes.
+    produced_by:
+      - kind: recipe
+        id: local_porting_loop
+    consumed_by:
+      - kind: command
+        id: validate_spec
+      - kind: command
+        id: compile_codex_skill
+  compiled_codex_skill:
+    kind: file
+    path: SKILL.md
+    description: Minimal generated loader that points agents at the colocated skill.spec.yml.
+    produced_by:
+      - kind: command
+        id: compile_codex_skill
+  compiled_claude_skill:
+    kind: file
+    path: .generated/claude/SKILL.md
+    description: Optional Claude-target compiled skill output.
+    produced_by:
+      - kind: command
+        id: compile_claude_skill
+  coverage_matrix:
+    kind: report
+    path: .skillspec/reports/coverage-matrix.yml
+    description: Prose-span to SkillSpec-construct mapping with confidence and review status.
+    produced_by:
+      - kind: recipe
+        id: coverage_review_loop
+  dependency_ledger:
+    kind: file
+    path: deps.toml
+    description: Package-local dependency ledger preserving source authority, package risk, local status, install candidates, required workflows, and degraded proof decisions for every imported dependency mention.
+    produced_by:
+      - kind: recipe
+        id: dependency_preservation_loop
+    consumed_by:
+      - kind: command
+        id: inspect_dependency_ledger
+  value_report:
+    kind: report
+    path: .skillspec/reports/value-report.md
+    description: User-facing summary synthesized from sensemake, test, dependency, decision, progress, and alignment outputs; no native `skillspec skill value` command exists yet.
+    produced_by:
+      - kind: command
+        id: value_report
+  decision_trace:
+    kind: directory
+    path: .skillspec/traces/run-*
+    description: Decision trace captured during the realistic demo route.
+    produced_by:
+      - kind: command
+        id: decide_demo
+    consumed_by:
+      - kind: command
+        id: trace_align
+  execution_ledger:
+    kind: file
+    path: .skillspec/traces/<run-id>/execution.jsonl
+    description: Structured progress and action evidence ledger for phase completion, requirement proof, handoffs, and evidence references.
+    produced_by:
+      - kind: command
+        id: progress_record_phase
+      - kind: command
+        id: progress_record_requirement
+      - kind: command
+        id: progress_batch
+    consumed_by:
+      - kind: command
+        id: progress_show
+      - kind: command
+        id: trace_align
+  progress_report:
+    kind: file
+    path: .skillspec/traces/<run-id>/progress.json
+    description: Derived view of completed, current, blocked, and remaining phases for the selected route.
+    produced_by:
+      - kind: command
+        id: progress_show
+    consumed_by:
+      - kind: command
+        id: value_report
+  alignment_report:
+    kind: file
+    path: .skillspec/traces/<run-id>/alignment.json
+    description: Full trace alignment report written by trace_align while chat receives only the compact completion summary.
+    produced_by:
+      - kind: command
+        id: trace_align
+    consumed_by:
+      - kind: command
+        id: value_report
+  proof_digest:
+    kind: file
+    path: .skillspec/traces/<run-id>/proof-digest.json
+    description: Grouped missing-proof digest from trace_align, used to plan one final-proof batch instead of a repeated alignment loop.
+    produced_by:
+      - kind: command
+        id: trace_align
+    consumed_by:
+      - kind: command
+        id: progress_batch
+      - kind: command
+        id: value_report
+  final_proof_batch:
+    kind: file
+    path: .skillspec/traces/<run-id>/final-proof.jsonl
+    description: Agent-authored proof events with real evidence refs, derived from proof-digest.json and appended once with progress_batch.
+    produced_by:
+      - kind: recipe
+        id: local_porting_loop
+    consumed_by:
+      - kind: command
+        id: progress_batch
+  durable_workspace_report:
+    kind: report
+    path: .skillspec/reports/durable-workspace-report.md
+    description: Summary of the observed rote workspace commands, dependencies, inputs, outputs, stats, artifacts, and proof gaps.
+    produced_by:
+      - kind: command
+        id: observe_workspace_stats
+      - kind: command
+        id: observe_workspace_log
+      - kind: command
+        id: observe_workspace_meta
+    consumed_by:
+      - kind: code
+        id: synthesize_observed_skill_spec
+  observed_skill_spec:
+    kind: file
+    path: skill.spec.yml
+    description: Reviewed SkillSpec synthesized from a durable workspace observation rather than from a prose SKILL.md source.
+    produced_by:
+      - kind: code
+        id: synthesize_observed_skill_spec
+    consumed_by:
+      - kind: command
+        id: validate_spec
+      - kind: command
+        id: test_spec
+commands:
+  grammar_sensemake_index:
+    description: Learn the available grammar affordances without reading compiler source.
+    template: skillspec grammar sensemake --view index
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  grammar_sensemake_porting:
+    description: Load prose-to-SkillSpec mapping guidance and the import coverage checklist.
+    template: skillspec grammar sensemake --view porting
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  grammar_checklist_import:
+    description: Load the explicit checklist that gates semantic promotion and install readiness.
+    template: skillspec grammar checklist --for import-skill
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  grammar_schema_json:
+    description: Inspect the runtime JSON schema when a field shape is unclear.
+    template: skillspec grammar schema
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  inventory_source_folder:
+    description: Inventory source files before import so resources, scripts, examples, and sibling references are not dropped.
+    template: rg --files <source-skill-folder>
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  decide_import_mode_from_source_shape:
+    description: Decide whether the source path is a single atomic prose skill, a multi-skill workspace, a plugin-shaped workspace, or an existing SkillSpec revision before choosing one-shot versus workspace/revision.
+    template: "rg --files <source-root> | rg '(^|/)SKILL\\.md$|(^|/)skill\\.spec\\.yml$|(^|/)(\\.claude-plugin/plugin\\.json|\\.mcp\\.json|CLAUDE\\.md)$'"
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  doctor_source_skill:
+    description: Run the static doctor shape gate and score frontmatter discovery risk, agent drift risk, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. Multi-skill, entry-with-subskills, and plugin-shaped roots return workspace reports with one package report per SKILL.md; non-skill code repos return shape-only reports.
+    template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  doctor_source_shape:
+    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
+    template: skillspec doctor <source-skill-folder-or-repo-uri>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_create:
+    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span.
+    template: skillspec source map <source-skill-folder> --out <draft-dir>/.skillspec/source-map
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_coverage:
+    description: Summarize mapped nodes, review-required classifications, and stale counts before semantic promotion.
+    template: skillspec source coverage <draft-dir>/.skillspec/source-map/source-map.json
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_nodes:
+    description: Inspect structural source handles before opening detailed spans.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_dependencies:
+    description: Inspect dependency mentions and imported package signals from the mapped source before proof or install.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json dependencies --view summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_code:
+    description: Inspect mapped code block handles before deciding which snippets become resources, code, commands, recipes, or examples.
+    template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json code --view summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  source_map_stale:
+    description: Verify the source map still matches the staged source before import, proof, compile, or install.
+    template: skillspec source stale <draft-dir>/.skillspec/source-map/source-map.json --root <source-skill-folder>
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_map_source:
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
+    template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_validate_manifest:
+    description: Validate workspace package boundaries, plugin namespace names, deterministic install slugs, hard dependency edges, cross-skill references, and cycles before fanout import planning. Use summary mode to report wall-clock and estimated token metrics.
+    template: skillspec workspace validate <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_import_packages:
+    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
+    template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root> --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_converge_build:
+    description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install. Use summary mode to report compact readiness counts plus metrics.
+    template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_compile_build:
+    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Use summary mode to report compact compile counts plus metrics.
+    template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_install_dry_run:
+    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_install_packages:
+    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Use summary mode to report compact install counts plus metrics.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_install_apply_visibility:
+    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Use summary mode to report compact install counts plus metrics while preserving full install proof.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  read_source_skill:
+    description: Fallback for small sources only; prefer source-map handles and exact --view full queries for large or resource-heavy imports.
+    template: sed -n '1,240p' <source-skill-folder>/SKILL.md
+    safety: local_read
+  preserve_source_skill:
+    description: Preserve the full prose source before compiling over the visible SKILL.md loader.
+    template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
+    safety: local_write
+  stage_remote_folder:
+    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser; use the returned selected_source_path or candidates.source_path for doctor, source map, import-skill, workspace map, or port-one-shot. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
+    template: skillspec source stage <github-skill-uri> --out <staging-root> --json
+    safety: network_read
+    requires:
+      dependencies:
+        - skillspec_cli
+        - git_cli
+  find_skill_candidates:
+    description: Fallback only when source stage was run with candidate detection disabled or a staged local checkout already exists; otherwise use candidates returned by skillspec source stage.
+    template: rg --files <staged-repo> | rg '/SKILL\\.md$'
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  import_skill_draft:
+    description: Generate a deterministic draft from a local skill folder after verifying the staged source map is fresh.
+    template: skillspec import-skill <source-skill-folder> --out <draft-dir>/skill.spec.yml --source-map <draft-dir>/.skillspec/source-map/source-map.json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  port_one_shot:
+    description: Bundle grammar preflight, source map, doctor, typed mechanical import, schema-derived shape crib, validate, imports check, deps check, tests, compile, compact report, and optional estimated direct-run stats for one atomic local skill package.
+    template: skillspec port-one-shot <source-skill-folder> --out <draft-dir> --target codex-skill --prove --run-dir <trace-dir> --phase mechanical_import --requirement estimated_token_metrics
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  sensemake_draft:
+    description: Summarize the mechanical draft's actual routes, rules, deps, commands, imports, tests, and query handles.
+    template: skillspec sensemake <draft-dir>/skill.spec.yml --view index
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  sensemake_current_spec:
+    description: Summarize the current reviewed spec before revising it.
+    template: skillspec sensemake <skill-folder>/skill.spec.yml --view index
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  plan_phase_order:
+    description: List the selected route and ordered phase names before acting so the harness knows the task order.
+    template: skillspec plan <skill-folder>/skill.spec.yml --input '<task>' --trace-dir <skill-folder>/.skillspec/traces
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  act_named_phase:
+    description: Expand one named phase into the active OODA checklist, allowed actions, forbids, handoffs, dependencies, and evidence expectations.
+    template: skillspec act <skill-folder>/skill.spec.yml --input '<task>' --run <trace-dir> --phase <phase-id>
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_record_phase:
+    description: Append structured evidence that a phase started, completed, or blocked.
+    template: skillspec progress record <trace-dir> phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_record_requirement:
+    description: Append structured evidence that a phase requirement was satisfied or failed.
+    template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_batch:
+    description: Append several final route, route-check, closure, elicitation, forbid/no-violation, or evidence proof events from one JSONL file so final alignment proof does not become a visible progress parade.
+    template: skillspec progress batch <trace-dir> --events <trace-dir>/final-proof.jsonl
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_stats_durable_workspace:
+    description: Append measured durable-executor workspace token stats to execution.jsonl so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
+    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  progress_stats_summary_metrics:
+    description: Append direct-run summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
+    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  progress_show:
+    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
+    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_loop:
+    description: "Start the stateful agent guide in one spec load: select route, write trace, print start/current/end anchors, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_loop_resume:
+    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and printing the current gate.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  query_active_handles:
+    description: Inspect a specific route, rule, command, state, dependency, or test expectation handle instead of reading the whole YAML.
+    template: skillspec query <skill-folder>/skill.spec.yml <handle> --view summary
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  refs_active_handles:
+    description: Inspect references from an active handle, including test expectation references, during targeted revision.
+    template: skillspec refs <skill-folder>/skill.spec.yml <handle> --view summary
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  validate_spec:
+    description: Validate the reviewed spec schema and cross-references.
+    template: skillspec validate <skill-folder>/skill.spec.yml
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  imports_check:
+    description: Verify package-local imports and resource load relationships.
+    template: skillspec imports check <skill-folder>/skill.spec.yml
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  deps_check_all:
+    description: Check every declared dependency and surface permission/provision status.
+    template: skillspec deps check <skill-folder>/skill.spec.yml
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  deps_check_command:
+    description: Check only the dependencies for one command template.
+    template: skillspec deps check <skill-folder>/skill.spec.yml --command <command-id>
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  inspect_dependency_ledger:
+    description: Inspect the imported skill's package-local dependency ledger; failure means dependency preservation is incomplete.
+    template: sed -n '1,240p' <skill-folder>/deps.toml
+    safety: local_read
+  test_spec:
+    description: Run scenario tests for route, rule, forbid, elicitation, and closure expectations.
+    template: skillspec test <skill-folder>/skill.spec.yml
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  compile_codex_skill:
+    description: Compile the reviewed spec into a minimal Codex-style SKILL.md loader.
+    template: skillspec compile <skill-folder>/skill.spec.yml --target codex-skill
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  compile_claude_skill:
+    description: Compile the reviewed spec into a Claude-compatible skill loader when requested.
+    template: skillspec compile <skill-folder>/skill.spec.yml --target claude-skill
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  list_install_targets:
+    description: Show detected harness roots before writing generated files.
+    template: skillspec install targets
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_help:
+    description: Verify that the installed CLI exposes the router command surface.
+    template: skillspec router --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  durable_help:
+    description: Verify that the installed CLI exposes the durable-executor lifecycle command surface.
+    template: skillspec durable-executor --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  verify_rote_cli:
+    description: Verify that rote is on PATH before durable-executor install/update makes rote-exec the runtime substrate.
+    template: rote --help
+    safety: read_only
+    requires:
+      dependencies:
+        - rote_cli
+  router_install:
+    description: Install or refresh router mode in the selected skill roots, making router implicit and routed skills explicit-only.
+    template: skillspec router install --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_enable_or_disable:
+    description: Switch installed router mode on or off without uninstalling router files; enable rebuilds the index from current roots.
+    template: skillspec router enable|disable --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  status_help:
+    description: Show the read-only SkillSpec status command help.
+    template: skillspec status --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  status_lifecycle_inventory:
+    description: Report installed router and durable-executor state, enabled/disabled mode, supported roots, router index status, and SkillSpec-backed versus legacy skill inventory.
+    template: skillspec status --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_update:
+    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, then report the harness restart warning.
+    template: skillspec router update --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  verify_router_install:
+    description: Verify the generated skill-router files and visibility metadata under the selected roots.
+    template: skillspec router index status --roots <skill-roots> --index <router-index>
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_index_refresh:
+    description: Refresh an installed router index through the router lifecycle; prefer this over direct skillspec index because refresh also reapplies router-managed visibility and checks preparedness.
+    template: skillspec router index refresh --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  find_durable_executor:
+    description: Check whether durable-executor is already present in the selected skill roots or source path.
+    template: rg --files <skill-roots-or-source> | rg '(^|/)durable-executor/(SKILL.md|skill.spec.yml)$'
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  durable_install:
+    description: Install durable-executor from an explicit local source folder through the managed lifecycle after the rote preflight passes.
+    template: skillspec durable-executor install <durable-source-folder> --target <target> --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  durable_update:
+    description: Back up and update every recorded durable-executor install from durable config or an explicit replacement source after the rote preflight passes.
+    template: skillspec durable-executor update --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  durable_enable_or_disable:
+    description: Switch durable-executor implicit invocation on or off without uninstalling durable files. The enable path checks `rote` on PATH before making durable-executor implicit; the disable path only writes visibility metadata and config.
+    template: skillspec durable-executor enable|disable --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  durable_delete:
+    description: Delete only recorded, marker-protected durable-executor installs and refresh router state when configured.
+    template: skillspec durable-executor delete --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  verify_durable_executor:
+    description: Verify durable-executor exists after install, carries the managed marker when lifecycle-installed, and remains available as the router-managed implicit first hop.
+    template: rg --files <skill-roots> | rg '(^|/)durable-executor/(SKILL.md|skill.spec.yml|\\.skillspec-durable-executor-managed|agents/openai.yaml)$'
+    safety: local_read
+    requires:
+      dependencies:
+        - rg_cli
+  observe_workspace_stats:
+    description: Collect rote workspace stats for token and evidence accounting before synthesizing a SkillSpec.
+    template: rote workspace stats <workspace>
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
+  observe_workspace_log:
+    description: Inspect the rote workspace command log to recover observed commands, dependencies, files, and errors.
+    template: rote workspace inspect log --last <count>
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
+  observe_workspace_meta:
+    description: Inspect rote workspace metadata and variables that explain the observed workflow context.
+    template: rote workspace inspect meta
+    safety: local_read
+    requires:
+      dependencies:
+        - rote_cli
+  synthesize_from_workspace:
+    description: Rote-specific synthesis command that creates a draft SkillSpec skill from a named durable rote workspace after observed output has been shown and approved, and stats, command log, and metadata evidence are available. If live workspace resolution fails, first capture --workspace-stats-report, --workspace-log, and --workspace-meta files from inside the workspace and pass them explicitly.
+    template: skillspec synthesize-from-workspace <workspace> --task '<observed-task>' --out <skill-folder> --observation-approved
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+  install_dry_run:
+    description: Preview install writes for the selected target, including any backup path for retiring an existing active skill, without modifying harness roots.
+    template: skillspec install skill <skill-folder> --target <target> --dry-run --retire-existing
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  install_skill:
+    description: Install the compiled SKILL.md and reviewed skill.spec.yml into an explicitly approved harness target, backing up and removing any existing active skill at that name first.
+    template: skillspec install skill <skill-folder> --target <target> --retire-existing
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  install_skill_new_name:
+    description: Install the reviewed replacement under a different explicit name only when the user intentionally keeps the old active skill for side-by-side testing.
+    template: skillspec install skill <skill-folder> --target <target> --name <new-skill-name>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  decide_demo:
+    description: Run a realistic demo decision against the reviewed spec and capture a trace.
+    template: skillspec decide <skill-folder>/skill.spec.yml --input '<task>' --trace-dir <skill-folder>/.skillspec/traces
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  trace_align:
+    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json while printing only the compact completion-facing summary.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary --proof-digest <trace-dir>/proof-digest.json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  value_report:
+    description: Print the structured SkillSpec map used as one input to the harness-synthesized value report; the final value report is assembled from existing command outputs and explicit proof gaps.
+    template: skillspec sensemake <skill-folder>/skill.spec.yml --view index
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+recipes:
+  run_grammar_preflight:
+    description: Required grammar-first setup before import or revision.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: grammar_sensemake_index
+      - run_command: grammar_sensemake_porting
+      - run_command: grammar_checklist_import
+      - note: Use the returned grammar map as the active contract. Do not infer grammar from memory or old examples.
+  coverage_review_loop:
+    description: Anti-bullshit review loop that maps prose obligations to concrete SkillSpec constructs.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - source_map
+        - doctor_report
+        - coverage_matrix
+    steps:
+      - run_command: source_map_nodes
+      - run_command: source_map_code
+      - run_command: doctor_source_skill
+      - note: Query exact source-map handles with --view full as needed; load the full source file only for bounded small sources.
+      - note: Use the doctor report to prioritize large activation surface, primacy-bias exposure, mixed code/instructions, ambiguous code fences, implicit dependency contracts, and missing proof surfaces.
+      - note: Fill prose_span, obligation, skillspec_construct, confidence, status, and review_note for every mapped source section.
+      - note: Use only the current source folder, embedded grammar, draft sensemake, and user-approved references; do not consult existing ports, repo history, memory, or examples unless the user explicitly asks.
+      - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
+      - produce_artifact: coverage_matrix
+  dependency_preservation_loop:
+    description: Preserve imported dependency mentions as deps.toml package evidence before QA, proof, compile, or install.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - source_map
+        - dependency_ledger
+    steps:
+      - run_command: source_map_dependencies
+      - note: Extract dependencies from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests; include source authority, package risk, local status, install candidate, required workflows, and degraded proof impact.
+      - produce_artifact: dependency_ledger
+      - run_command: inspect_dependency_ledger
+      - ask: approve_dependency_surface
+      - note: Do not delete or soften dependency records to pass QA. Missing required dependencies must be present in deps.toml as missing, provisionable, deferred, or required_but_unproven with explicit proof impact.
+  workspace_recon_loop:
+    description: "Phase 1-3 multi-skill workspace processing: inventory a source root, map atomic skill packages and plugin namespaces, validate the package graph, and report the next fanout/converge plan without importing yet."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rg_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_map_report
+    steps:
+      - run_command: inventory_source_folder
+      - run_command: workspace_map_source
+      - produce_artifact: workspace_manifest
+      - produce_artifact: workspace_map_report
+      - run_command: workspace_validate_manifest
+      - note: Treat every folder containing SKILL.md as one atomic skill package. Do not import the parent root as a single skill.
+      - note: Preserve plugin-shaped roots as namespaces when a folder has skills/ plus .claude-plugin/plugin.json, .mcp.json, or CLAUDE.md; use skill-safe public names to avoid collisions instead of flattening repeated local names.
+      - note: Treat relative file references as hard dependencies. Treat plugin slash-command references as workflow links unless the manifest records a hard file dependency.
+      - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
+      - note: Run recon as a sequential graph gate from compact command summaries; preserve the full workspace map and validation reports on disk instead of loading them into chat unless a blocker needs exact detail.
+      - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
+      - note: Report plugin namespaces, package map, hard dependency graph, workflow references, warnings, and next fanout/converge phase from the validated workspace manifest.
+  workspace_import_loop:
+    description: "Phase 4 workspace fanout import: validate the workspace manifest, run per-package doctor/source-map/import-skill, preserve successful package outputs, and report failed or blocked packages."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_import_report
+        - workspace_package_drafts
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_import_packages
+      - produce_artifact: workspace_import_report
+      - produce_artifact: workspace_package_drafts
+      - note: Do not compile loaders, install skills, or refresh router indexes during workspace import.
+      - note: Fanout is valid only for independent package import units with isolated output folders, source-map evidence, and package-scoped failures; keep dependency blockers and the phase boundary sequential.
+      - note: Treat cached package imports as ready only when the workspace cache reports unchanged source hashes and required proof artifacts still exist.
+      - note: Prefer the compact import summary in chat. Open per-package reports, source maps, or full generated specs only for failed packages, review, or exact proof.
+      - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
+      - note: Report built, cached, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
+  workspace_converge_loop:
+    description: "Phase 5 workspace converge: verify generated package drafts and dependency readiness against the workspace graph before compile or install."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_package_drafts
+        - workspace_converge_report
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_converge_build
+      - produce_artifact: workspace_converge_report
+      - note: Treat ready packages as compile candidates only after their dependencies are also ready.
+      - note: Keep convergence sequential at the graph level even when checks are computed internally in parallel; do not let a ready independent package erase blocked or failed dependency evidence.
+      - note: Prefer the compact convergence summary in chat and use report paths for the detailed proof.
+      - note: Do not compile loaders, install skills, or refresh router indexes during convergence.
+      - note: Report ready, failed, blocked, and missing packages, then stop if any package is not ready.
+  workspace_compile_loop:
+    description: "Phase 6 workspace compile: recheck convergence, compile ready package specs into SKILL.md loaders, and report compile readiness before install."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_package_drafts
+        - workspace_converge_report
+        - workspace_compiled_loaders
+        - workspace_compile_report
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_converge_build
+      - run_command: workspace_compile_build
+      - produce_artifact: workspace_compiled_loaders
+      - produce_artifact: workspace_compile_report
+      - note: Compile only packages that converged as ready and whose dependencies compiled successfully.
+      - note: Compile may batch independent ready packages only when outputs are package-local; dependency ordering, missing-package blockers, and compile failure propagation stay sequential.
+      - note: Prefer the compact compile summary in chat and keep generated loaders and detailed compile reports as artifact paths unless exact review is needed.
+      - note: Do not install skills, retire existing skills, mutate harness roots, refresh router indexes, or change visibility during workspace compile.
+      - note: Report compiled, failed, blocked, missing, and skipped packages, then stop before Phase 7 install planning.
+  workspace_install_loop:
+    description: "Phase 7 workspace install: dry-run the compiled workspace install, block collisions before mutation, install packages in dependency order, report entry/support visibility, and keep router refresh separate."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_compiled_loaders
+        - workspace_compile_report
+        - workspace_install_report
+        - workspace_install_manifest
+    steps:
+      - run_command: workspace_validate_manifest
+      - run_command: workspace_install_dry_run
+      - produce_artifact: workspace_install_report
+      - note: Review the dry-run report before actual install; missing loaders, folder collisions, public-name collisions, blocked dependencies, or surprising visibility targets must stop the install.
+      - run_command: workspace_install_packages
+      - produce_artifact: workspace_install_manifest
+      - produce_artifact: workspace_install_report
+      - note: Use workspace_install_apply_visibility instead of the plain install command when the user wants native visibility metadata written; the reversible manifest is workspace-visibility.manifest.json by default.
+      - note: Install packages using manifest install_slug folders and dependency order only.
+      - note: Keep install, visibility mutation, collision handling, and router-refresh advice sequential; do not parallelize writes to harness roots.
+      - note: Prefer compact install counts and metrics in chat while preserving install manifests and visibility manifests on disk.
+      - note: Do not refresh router indexes or silently overwrite existing skills during workspace install; router refresh remains a separate runtime command after install.
+  local_porting_loop:
+    description: End-to-end local conversion from prose folder to reviewed SkillSpec and value report.
+    ordered: true
+    requires:
+      resources:
+        - source_skill_md
+      dependencies:
+        - skillspec_cli
+        - rg_cli
+      artifacts:
+        - preserved_source
+        - doctor_report
+        - source_map
+        - mechanical_draft
+        - dependency_ledger
+        - reviewed_spec
+        - value_report
+    steps:
+      - run_command: inventory_source_folder
+      - run_command: doctor_source_skill
+      - run_command: source_map_create
+      - run_command: source_map_coverage
+      - run_command: source_map_nodes
+      - run_command: source_map_dependencies
+      - run_command: source_map_code
+      - run_command: source_map_stale
+      - note: Use source-map handles and --view full for exact spans instead of loading large source files wholesale.
+      - run_command: preserve_source_skill
+      - run_command: grammar_sensemake_index
+      - run_command: grammar_sensemake_porting
+      - run_command: import_skill_draft
+      - run_command: sensemake_draft
+      - run_command: grammar_checklist_import
+      - load_resource: source_skill_md
+      - note: Before semantic promotion, inspect and complete the scaffolded deps.toml generated by import-skill. Preserve all dependency mentions from source prose, references, helper scripts, code imports, command examples, and package manifests. Record authority values such as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - produce_artifact: dependency_ledger
+      - run_command: inspect_dependency_ledger
+      - ask: approve_dependency_surface
+      - run_code: review_and_promote_draft
+      - note: If source code was found in source prose or sibling files, split durable snippets into resource files and declare matching resources/code entries before QA.
+      - produce_artifact: reviewed_spec
+      - run_command: validate_spec
+      - run_command: imports_check
+      - run_command: deps_check_all
+      - run_command: test_spec
+      - run_command: compile_codex_skill
+      - run_command: plan_phase_order
+      - run_command: act_named_phase
+      - run_command: progress_record_requirement
+      - run_command: progress_record_phase
+      - note: Run trace_align once to create <trace-dir>/proof-digest.json; if multiple missing proof rows remain, write <trace-dir>/final-proof.jsonl from that digest and real evidence, then run progress_batch once instead of showing one progress command per row.
+      - run_command: progress_batch
+      - run_command: progress_show
+      - run_command: decide_demo
+      - run_command: trace_align
+      - run_command: value_report
+  remote_porting_loop:
+    description: Stage a public remote source and continue through the local porting loop.
+    ordered: true
+    requires:
+      dependencies:
+        - git_cli
+        - rg_cli
+        - skillspec_cli
+    steps:
+      - ask: approve_remote_source_access
+      - run_command: stage_remote_folder
+      - note: If source stage returns selected_source_path, use that local folder as the source and do not run additional remote discovery. If it returns multiple candidates, ask choose_candidate_skill using candidates.source_path. If it returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
+      - ask: choose_candidate_skill
+      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the authoritative URI-to-local-source gate.
+      - branch:
+          if: candidate selected or exactly one candidate exists
+          then: local_porting_loop
+          otherwise: find_skill_candidates
+  install_reviewed_skill_loop:
+    description: Compile and install only after QA and explicit approvals.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - reviewed_spec
+        - compiled_codex_skill
+    steps:
+      - run_command: validate_spec
+      - run_command: imports_check
+      - run_command: deps_check_all
+      - run_command: plan_phase_order
+      - run_command: act_named_phase
+      - run_command: progress_show
+      - ask: approve_dependency_surface
+      - run_command: compile_codex_skill
+      - run_command: list_install_targets
+      - run_command: install_dry_run
+      - ask: approve_install_targets
+      - ask: approve_retire_existing_skill
+      - note: If the user chooses `install_new_name`, use `install_skill_new_name` with an explicit non-conflicting name instead of `install_skill`.
+      - run_command: install_skill
+  router_install_loop:
+    description: Post-install router setup through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: list_install_targets
+      - note: Choose roots explicitly; do not use or ask for a separate router root.
+      - run_command: router_install
+      - run_command: verify_router_install
+      - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
+      - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
+  router_update_loop:
+    description: Backup-first router maintenance through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: router_update
+      - note: Report the backup path, every updated router root, preparedness status, durable-executor status, and the harness restart warning.
+      - note: For index-only repair of an installed router, prefer skillspec router index refresh over direct skillspec index.
+  router_switch_loop:
+    description: Reversible router mode switch through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_help
+      - run_command: router_enable_or_disable
+      - run_command: verify_router_install
+      - note: For enable, report index rebuild and preparedness. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
+      - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
+  status_inspection_loop:
+    description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: status_help
+      - run_command: status_lifecycle_inventory
+      - note: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index updated/stale data, and SkillSpec-backed versus legacy skill names and counts.
+  durable_executor_install_loop:
+    description: Optional durable-executor setup through an explicit local source folder and the managed lifecycle command.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rg_cli
+        - rote_cli
+    steps:
+      - run_command: durable_help
+      - run_command: verify_rote_cli
+      - run_command: find_durable_executor
+      - ask: choose_durable_source
+      - ask: approve_install_targets
+      - run_command: durable_install
+      - run_command: verify_durable_executor
+      - note: Report the managed config path, every installed durable-executor folder, router refresh status if present, and the harness restart warning.
+  durable_executor_update_loop:
+    description: Backup-first durable-executor maintenance through the managed lifecycle command.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+    steps:
+      - run_command: durable_help
+      - run_command: verify_rote_cli
+      - run_command: durable_update
+      - run_command: verify_durable_executor
+      - note: Report the backup path, every updated durable-executor folder, router refresh status if present, and the harness restart warning.
+  durable_executor_switch_loop:
+    description: Reversible durable-executor implicit-invocation switch through the prompt skill.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: durable_help
+      - run_command: durable_enable_or_disable
+      - run_command: verify_durable_executor
+      - note: For enable, report the rote preflight and that durable-executor is implicit. For disable, report that durable-executor is explicit-only, files remain installed, and active harnesses should restart.
+  durable_executor_delete_loop:
+    description: Marker-guarded durable-executor removal through the managed lifecycle command.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: durable_help
+      - run_command: durable_delete
+      - note: Report removed managed durable-executor folders, removed config, router refresh status if present, and the harness restart warning.
+  observed_workspace_to_spec_loop:
+    description: Create a reviewed SkillSpec-backed skill from observed durable execution evidence.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+      artifacts:
+        - durable_workspace_report
+        - observed_skill_spec
+    steps:
+      - ask: choose_observation_workspace
+      - note: If the prompt contains a concrete task and no existing workspace, hand it to durable-executor first and resume with the returned workspace.
+      - run_command: observe_workspace_stats
+      - run_command: observe_workspace_log
+      - run_command: observe_workspace_meta
+      - ask: approve_observed_result_for_synthesis
+      - run_command: synthesize_from_workspace
+      - produce_artifact: observed_skill_spec
+      - run_command: validate_spec
+      - run_command: deps_check_all
+      - run_command: test_spec
+      - run_command: decide_demo
+      - run_command: trace_align
+      - run_command: value_report
+code:
+  review_and_promote_draft:
+    language: text
+    kind: validator
+    source:
+      inline: "Guide the promotion pass; do not auto-fill the scaffold. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep the pass short and deliberate: choose real activation/routes, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Artifact produced_by/consumed_by entries are executable refs only: command, code, or recipe; never route or rule. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
+    provenance:
+      resource: source_skill_md
+      heading: Creation Procedure
+    purpose: Semantic review checklist that turns prose obligations into typed SkillSpec constructs.
+    requires:
+      resources:
+        - source_skill_md
+      artifacts:
+        - mechanical_draft
+        - coverage_matrix
+    inputs:
+      - mechanical_draft
+      - preserved_source
+    outputs:
+      - reviewed_spec
+    safety:
+      mutates_input: false
+      writes_files: true
+      network: false
+      notes:
+        - Produces a reviewed spec but does not install or run imported snippets.
+  synthesize_observed_skill_spec:
+    language: text
+    kind: transform
+    source:
+      inline: "Read the durable workspace report, map observed user intent, capability-selection evidence, commands, dependencies, files, prompts, errors, outputs, and proof gaps into a reviewed skill.spec.yml. Preserve why a substrate such as a Parallel CLI, rote adapter, browser handoff, or CLI fallback was selected, and record alternatives rejected by policy or readiness. Use observed facts as evidence, mark inferred behavior in the coverage matrix, do not turn a transcript into a brittle command list, and do not replay mutating workspace actions without approval."
+    provenance:
+      resource: source_skill_md
+      heading: Post-install multiplexer
+    purpose: Convert a named durable rote workspace into a SkillSpec-backed skill contract; this path is rote-specific and depends on rote workspace evidence.
+    requires:
+      dependencies:
+        - skillspec_cli
+        - rote_cli
+      artifacts:
+        - durable_workspace_report
+        - coverage_matrix
+    inputs:
+      - durable_workspace_report
+    outputs:
+      - observed_skill_spec
+    safety:
+      mutates_input: false
+      writes_files: true
+      network: false
+      notes:
+        - Observes local rote workspace evidence and synthesizes a draft; it does not replay commands or install the result.
+states:
+  start:
+    do:
+      - run_grammar_preflight
+    next: resolve_source
+  resolve_source:
+    do:
+      - inventory_source_folder
+      - source_map_create
+      - source_map_coverage
+      - source_map_nodes
+      - source_map_dependencies
+      - source_map_code
+      - source_map_stale
+    next: import_draft
+  import_draft:
+    do:
+      - import_skill_draft
+      - sensemake_draft
+    next: review
+  review:
+    do:
+      - coverage_review_loop
+      - review_and_promote_draft
+    next: qa
+  qa:
+    do:
+      - run_structural_qa
+    next: prove
+  prove:
+    do:
+      - prove_value
+    next: done
+  done:
+    do:
+      - generate_value_report
+snippets:
+  execution_strategy_shape:
+    text: |
+      Execution strategy SOP:
+      - Treat selected route phases as sequential gates unless the route or command explicitly permits isolated package fanout.
+      - Parallelize only independent read/build/proof units with package-scoped output directories, trace labels, and evidence paths.
+      - Keep dependency ordering, convergence gates, installs, visibility writes, router lifecycle, destructive actions, and user approvals sequential.
+      - In chat, report the strategy chosen and the reason when the source has many packages, plugins, cross-skill references, or expensive proof work.
+  compact_evidence_shape:
+    text: |
+      Token economy SOP:
+      - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
+      - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
+      - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
+      - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
+      - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
+      - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
+      - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
+  dependency_surface_shape:
+    text: |
+      Imported dependency preservation SOP:
+      - import-skill creates deps.toml beside skill.spec.yml and declares it as a file dependency/artifact.
+      - Complete the scaffolded ledger for every imported/shareable skill.
+      - If review finds no dependencies, keep the scaffold with dependency_count = 0. Do not replace it with a byte-empty deps.toml.
+      - Extract dependency mentions from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests.
+      - Record authority as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - Record local_status as present, missing, unknown, provisionable, deferred, or required_but_unproven.
+      - Record package risk, install candidate, required workflows, degraded_without, proof substitution, and user approval or waiver.
+      - Do not mutate the dependency set to make QA pass. Missing required dependencies make proof partial unless installed or explicitly deferred.
+
+      Example:
+      [[dependency]]
+      id = "pypdf"
+      ecosystem = "python"
+      authority = "source_required"
+      source = "SKILL.md:30"
+      reason = "Used for PDF read/write, merge, split, rotate, watermark, and encryption workflows."
+      local_status = "missing"
+      required_for = ["pdf_operations"]
+      degraded_without = true
+      risk = "Third-party Python package; install only with user approval."
+      install = "pip install pypdf"
+closures:
+  choose_execution_strategy:
+    description: State whether the active work stays sequential or uses package-scoped fanout, and preserve the reason when many packages, plugins, cross-skill references, or expensive proof work are involved.
+  preserve_compact_evidence:
+    description: Keep large proof artifacts on disk, report compact summaries plus paths in chat, and load full detail only for exact review, blockers, or proof gaps.
+  fill_coverage_matrix:
+    description: Record prose_span, obligation, skillspec_construct, confidence, status, and review_note before semantic edits or install.
+  split_source_code_into_resources:
+    description: When source material contains scripts or code blocks, preserve each durable code surface as a package-local resource file, declare matching resources/code entries with provenance, and reference them from commands, recipes, tests, artifacts, or review notes.
+  preserve_dependency_ledger:
+    description: Keep the scaffolded deps.toml beside skill.spec.yml for imported/shareable skills, preserving every dependency mention with authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver.
+  produce_workspace_manifest:
+    description: Write skillspec.workspace.yml with every atomic skill package, plugin namespace, skill-safe public name, deterministic install slug, package kind, cross-skill reference, and inferred hard depends_on edge found during structure recon.
+    commands:
+      - workspace_map_source
+  validate_workspace_graph:
+    description: Check that the workspace graph has valid package paths, one SKILL.md per package, unique install slugs, no self-dependencies, no cycles, and no uncovered hard cross-package references; plugin slash-command workflow references may cross packages without depends_on edges.
+    commands:
+      - workspace_validate_manifest
+  produce_workspace_import_report:
+    description: Run workspace fanout import and write a report that names built, failed, skipped, and blocked packages plus per-package evidence paths.
+    commands:
+      - workspace_import_packages
+  produce_workspace_converge_report:
+    description: Run workspace converge and write a graph-level proof report that names ready, failed, blocked, and missing package drafts, dependency-readiness status, validation warnings, and cross-package reference counts.
+    commands:
+      - workspace_converge_build
+  produce_workspace_compile_report:
+    description: Run workspace compile and write a report that names compiled, failed, blocked, missing, and skipped packages plus loader paths and Phase 7 install guidance.
+    commands:
+      - workspace_compile_build
+  produce_workspace_install_report:
+    description: Run workspace install dry-run or install and write a report that names installed, planned, failed, blocked, and missing packages plus target paths, collision blockers, visibility policy, and router-refresh advice.
+    commands:
+      - workspace_install_dry_run
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+  produce_workspace_install_manifest:
+    description: Install compiled workspace packages and write workspace-install.manifest.json with package ids, install slugs, public names, dependencies, target paths, and intended visibility.
+    commands:
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+  produce_workspace_visibility_plan:
+    description: "Report the workspace visibility policy before router refresh: entry packages implicit by default, shared/helper/wrapper packages manual-only when --apply-visibility is used, and policy none/all-* when explicitly selected."
+    commands:
+      - workspace_install_dry_run
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+  report_workspace_import:
+    description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
+    commands:
+      - workspace_import_packages
+  report_workspace_converge:
+    description: Summarize the workspace converge result, generated spec readiness, dependency blockers, missing package drafts, validation warnings, and Phase 6 or per-package compile next steps without compiling or installing anything.
+    commands:
+      - workspace_converge_build
+  report_workspace_compile:
+    description: Summarize the workspace compile result, generated loader paths, dependency compile blockers, missing package drafts, validation warnings, and Phase 7 install next steps without installing or refreshing router state.
+    commands:
+      - workspace_compile_build
+  report_workspace_install:
+    description: Summarize the workspace install dry-run or install result, installed target paths, blockers, install manifest, visibility policy or manifest, and the fact that router refresh is separate.
+    commands:
+      - workspace_install_dry_run
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+  report_workspace_recon:
+    description: Summarize plugin namespaces, workspace package map, hard dependency graph, workflow references, unresolved references, duplicate public-name warnings, and the next fanout/converge phase without importing packages yet.
+    commands:
+      - workspace_map_source
+      - workspace_validate_manifest
+  report_source_shape:
+    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not import, port, compile, install, or choose a remote candidate during read-only inspection.
+    commands:
+      - doctor_source_shape
+  produce_mechanical_draft:
+    description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
+  produce_reviewed_spec:
+    description: Write a reviewed skill.spec.yml that connects source obligations to typed constructs.
+  run_structural_qa:
+    description: Run validate, imports check, deps check, command-level deps check, scenario tests, phase plan, and current-phase action checklist.
+    commands:
+      - validate_spec
+      - imports_check
+      - deps_check_all
+      - deps_check_command
+      - test_spec
+      - plan_phase_order
+      - act_named_phase
+  prove_value:
+    description: Run a realistic phase plan, action checklist, progress ledger update, decision, align the trace, and grade unproven execution evidence honestly.
+    commands:
+      - plan_phase_order
+      - act_named_phase
+      - progress_record_requirement
+      - progress_record_phase
+      - progress_stats_durable_workspace
+      - progress_stats_summary_metrics
+      - progress_show
+      - decide_demo
+      - trace_align
+  generate_value_report:
+    description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
+  retire_existing_skill_when_approved:
+    description: When replacing an existing active skill, install with --retire-existing after approval, report the backup path, and avoid leaving duplicate old/new skills discoverable in harness roots. If the user chooses side-by-side testing, require a distinct --name instead.
+  show_dependency_surface:
+    description: Show dependency ids, source authority, local status, permission sensitivity, install risk, provision choices, missing required dependencies, optional/example dependencies, and degraded proof impact before compile/install/proof approval.
+  report_dependency_waiver:
+    description: If any required dependency is missing, report the missing package, source authority, affected workflows, proof substitution, user approval or waiver, and why final alignment is partial or blocked.
+  verify_router_installed:
+    description: Report the router install/index status, selected roots, router skill location, and whether a separate router root was avoided.
+    commands:
+      - router_install
+      - verify_router_install
+  verify_router_updated:
+    description: Report the router update backup path, updated recorded roots, preparedness state, durable-executor status, and harness restart warning.
+    commands:
+      - router_update
+  report_skillspec_status:
+    description: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index exists/stale/updated data, and SkillSpec-backed versus legacy skill counts and names.
+    commands:
+      - status_lifecycle_inventory
+  verify_durable_optional_status:
+    description: Report whether durable-executor is installed, skipped, or unavailable, and whether durable lifecycle currently leaves it implicit or explicit-only.
+    commands:
+      - find_durable_executor
+      - verify_durable_executor
+  produce_observed_workspace_spec:
+    description: Produce a reviewed SkillSpec from durable workspace evidence, including observed commands, dependencies, artifacts, tests, token stats, and explicit proof gaps.
+    commands:
+      - observe_workspace_stats
+      - observe_workspace_log
+      - observe_workspace_meta
+      - synthesize_from_workspace
+      - validate_spec
+      - test_spec
+  capture_observation_task:
+    description: Preserve the quoted or otherwise supplied real task that durable-executor should run before synthesis, without replacing it with a vague workspace placeholder.
+  handoff_observation_task_to_durable_executor:
+    description: Hand the observation task to durable-executor with return_to=skillspec so the task is executed once through durable workspace evidence before SkillSpec synthesis resumes.
+  capture_observation_workspace:
+    description: Record the durable workspace name, trace directory, artifacts, and return packet produced by durable-executor before inspecting logs or stats.
+  record_capability_selection_ledger:
+    description: Preserve why the execution substrate was chosen, including detected tools such as Parallel CLI, accepted or rejected adapter/browser options, readiness checks, and policy gates.
+  report_alignment_status:
+    description: Report trace alignment with Decision replay, Phase order, Requirements, Missing proof, Forbidden actions, and Alignment pass/partial/fail instead of a bare unproven label.
+  report_degraded_status:
+    description: Mark the generated skill draft-only when grammar, imports, deps, validate, test, or compile capability is missing.
+  produce_decision_trace:
+    description: Preserve the trace directory from the demo decision, including trace.jsonl, execution.jsonl, and progress.json when present.
+  produce_return_packet:
+    description: Return status, selected route, artifacts, evidence handles, blockers, and trace paths to durable-executor when invoked through a durable handoff.
+trace:
+  mode: event_log
+  required: true
+  record:
+    - input_received
+    - spec_loaded
+    - rule_evaluated
+    - rule_matched
+    - route_selected
+    - route_order_set
+    - forbid_added
+    - elicitation_requested
+    - after_success_scheduled
+    - outcome_recorded
+proof:
+  metrics:
+    - grammar commands run before import or revision
+    - multi-skill and plugin-shaped source roots are mapped with skillspec.workspace.yml, preserving plugin namespaces and validating before fanout import planning
+    - workspace fanout import writes one generated package draft per atomic skill and reports built, failed, skipped, and blocked packages
+    - workspace converge validates generated package drafts against the workspace graph and reports ready, failed, blocked, missing, validation warnings, and dependency-readiness proof before compile or install
+    - workspace compile rechecks convergence, writes SKILL.md loaders only for ready packages whose dependencies compiled, and reports compiled, failed, blocked, missing, and skipped packages before install
+    - workspace install dry-runs compiled package installs, blocks collisions before mutation, writes install and visibility proof, optionally applies native visibility metadata, and keeps router refresh separate
+    - "execution strategy is explicit: sequential at phase, dependency, install, visibility, router, and approval gates; package fanout only for independent units with isolated artifacts"
+    - "compact evidence mode is used by default: summaries, handles, alignment rows, and report paths are shown in chat while full proof remains on disk"
+    - "wall-clock and token metrics are reported with their source: durable-executor workspace stats are measured, direct CLI summary blocks are estimated output economy, and missing metrics are stated as not recorded"
+    - source package mapped with source-map.json before import and exact spans queried as needed
+    - post-install router setup avoids a separate router root and verifies the router index
+    - durable-executor install is optional and source-aware
+    - observed durable workspace synthesis uses named rote workspace stats and logs
+    - field imports do not consult existing ports, repo history, memory, or examples unless the user explicitly asks
+    - mechanical draft sensemade before semantic edits
+    - coverage matrix completed before install
+    - source code in source material is preserved as package-local resources/code with provenance
+    - validate/imports/deps/test pass
+    - phase plan and current-phase action checklist produced
+    - progress ledger and progress report generated when proving value
+    - demo decision trace captured
+    - trace alignment summary reported as pass, partial, or fail with missing proof rows
+tests:
+  - name: local prose skill ports through grammar-first loop
+    input: Port /tmp/my-skill/SKILL.md into SkillSpec
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - route_local_sources_to_local_port
+        - grammar_preflight_is_mandatory
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+      forbid:
+        - skip_grammar_sensemake
+        - infer_grammar_from_memory
+  - name: local folder preserves sibling resources
+    input: Convert ~/.agents/skills/rote-browse to skill.spec.yml
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - route_local_sources_to_local_port
+      after_success:
+        - local_porting_loop
+  - name: single atomic source uses one-shot decision gate
+    input: Port one atomic skill package with one SKILL.md using port-one-shot
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - single_atomic_source_uses_one_shot
+        - route_local_sources_to_local_port
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+      forbid:
+        - use_port_one_shot_without_shape_recon
+        - use_port_one_shot_for_workspace_root
+        - use_port_one_shot_for_plugin_root
+  - name: shape question runs doctor instead of remote port
+    input: what is the shape of this skill https://github.com/org/repo
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - port_one_shot_or_manual_import
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_compile_build
+        - workspace_install_packages
+        - install_from_remote_checkout
+  - name: run doctor on repo url stays read only
+    input: run doctor on this repo/url https://github.com/org/repo/tree/main
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_install_packages
+        - execute_imported_snippets_during_staging
+  - name: shape of local skill runs doctor
+    input: shape of skill /Users/me/tulving/skills
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      after_success:
+        - report_source_shape
+      forbid:
+        - port_one_shot_or_manual_import
+        - import_skill_draft
+        - workspace_import_packages
+  - name: multi-skill repo maps before fanout import
+    input: /skillspec map /Users/me/tulving/skills with many SKILL.md files, shared standards package, and cross-skill references
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_workspace_root
+  - name: cross referenced skill repo uses workspace map instead of single import
+    input: /skillspec import this folder with multiple SKILL.md files where one skill references ../coding-standards/SKILL.md
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_workspace_root
+        - use_port_one_shot_for_plugin_root
+  - name: plugin-shaped repo maps with namespaces
+    input: /skillspec map /Users/me/tulving/claude-for-legal plugin namespace repo with repeated skill names and plugin slash commands
+    expect:
+      route: workspace_skill_authoring
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+      after_success:
+        - report_workspace_recon
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_plugin_root
+  - name: workspace manifest fanout imports package drafts
+    input: /skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build
+    expect:
+      route: workspace_fanout_import
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_import_to_fanout
+      after_success:
+        - report_workspace_import
+      forbid:
+        - use_router_index_for_authoring_recon
+        - import_workspace_root_as_single_skill
+        - compile_or_install_during_workspace_import
+  - name: workspace package drafts converge before compile
+    input: /skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
+    expect:
+      route: workspace_converge
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_converge_to_proof
+      after_success:
+        - report_workspace_converge
+      forbid:
+        - use_router_index_for_authoring_recon
+        - compile_or_install_during_workspace_import
+  - name: workspace package drafts compile after converge
+    input: /skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill
+    expect:
+      route: workspace_compile
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_compile_to_phase6
+      after_success:
+        - report_workspace_compile
+      forbid:
+        - use_router_index_for_authoring_recon
+        - install_during_workspace_compile
+        - refresh_router_during_workspace_compile
+  - name: compiled workspace installs after dry-run proof
+    input: /skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run
+    expect:
+      route: workspace_install
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_install_to_phase7
+      after_success:
+        - report_workspace_install
+      forbid:
+        - use_router_index_for_authoring_recon
+        - install_without_workspace_dry_run
+        - refresh_router_during_workspace_install
+  - name: workspace install can apply entry support visibility
+    input: /skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility with entry-implicit visibility
+    expect:
+      route: workspace_install
+      matched_rules:
+        - route_multi_skill_repos_to_workspace_recon
+        - route_workspace_install_to_phase7
+      after_success:
+        - report_workspace_install
+      forbid:
+        - use_router_index_for_authoring_recon
+        - install_without_workspace_dry_run
+        - refresh_router_during_workspace_install
+  - name: public github source stages before import
+    input: Import https://github.com/org/repo/tree/main/skills/pdf as a SkillSpec skill
+    expect:
+      route: remote_skill_port
+      matched_rules:
+        - route_remote_sources_to_remote_port
+        - grammar_preflight_is_mandatory
+      elicit:
+        - approve_remote_source_access
+        - choose_candidate_skill
+      forbid:
+        - install_from_remote_checkout
+        - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
+  - name: prompt skill is named skillspec
+    input: /skillspec import /Users/me/.agents/skills/durable-executor
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_prompt_import_to_skill_port
+        - grammar_preflight_is_mandatory
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+  - name: router install routes to post install router setup
+    input: /skillspec install router mode into my skill roots
+    expect:
+      route: install_skill_router
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_install_to_router_setup
+      after_success:
+        - verify_router_installed
+      forbid:
+        - use_removed_router_root
+  - name: router disable routes to reversible router switch
+    input: /skillspec disable router
+    expect:
+      route: switch_skill_router_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_switch_to_lifecycle
+      after_success:
+        - verify_router_updated
+      forbid:
+        - mutate_unrecorded_router_roots
+  - name: router enable routes to reversible router switch
+    input: /skillspec enable router and rebuild the index
+    expect:
+      route: switch_skill_router_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_switch_to_lifecycle
+      after_success:
+        - verify_router_updated
+      forbid:
+        - mutate_unrecorded_router_roots
+  - name: status routes to read-only lifecycle inventory
+    input: /skillspec status
+    expect:
+      route: inspect_skillspec_status
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_status_to_read_only_inventory
+      after_success:
+        - report_skillspec_status
+      forbid:
+        - install_or_release_side_effect
+        - rebuild_index_for_status
+        - mutate_unrecorded_router_roots
+  - name: router update routes to backup-first router maintenance
+    input: /skillspec update router and repair stale skill-router files
+    expect:
+      route: update_skill_router
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_router_update_to_router_maintenance
+      after_success:
+        - verify_router_updated
+      forbid:
+        - update_router_without_backup
+        - mutate_unrecorded_router_roots
+  - name: durable executor install is optional and source aware
+    input: /skillspec install durable-executor from /Users/me/.agents/skills/durable-executor
+    expect:
+      route: install_durable_executor
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_install_to_optional_durable
+      elicit:
+        - choose_durable_source
+        - approve_install_targets
+      forbid:
+        - assume_bundled_durable_executor
+        - install_durable_without_source_or_existing_skill
+        - make_durable_executor_explicit_in_router_mode
+  - name: durable executor update uses managed lifecycle
+    input: /skillspec update durable-executor
+    expect:
+      route: update_durable_executor
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_update_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
+        - update_durable_without_backup
+        - mutate_unrecorded_durable_roots
+  - name: durable executor disable uses managed switch
+    input: /skillspec disable durable-executor
+    expect:
+      route: switch_durable_executor_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_switch_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
+        - mutate_unrecorded_durable_roots
+  - name: durable executor enable uses managed switch
+    input: /skillspec enable durable-executor
+    expect:
+      route: switch_durable_executor_mode
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_switch_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
+        - mutate_unrecorded_durable_roots
+  - name: durable executor delete uses managed lifecycle
+    input: /skillspec delete durable-executor
+    expect:
+      route: delete_durable_executor
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_durable_delete_to_lifecycle
+      after_success:
+        - verify_durable_optional_status
+      forbid:
+        - delete_unmarked_durable_executor
+        - mutate_unrecorded_durable_roots
+  - name: observed durable workspace creates spec skill
+    input: /skillspec observe durable workspace skillspec-demo and create a spec skill
+    expect:
+      route: observed_durable_workspace_to_skill
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_observed_workspace_to_spec
+      elicit:
+        - choose_observation_workspace
+      after_success:
+        - produce_observed_workspace_spec
+        - generate_value_report
+      forbid:
+        - observe_anonymous_workspace
+        - replay_workspace_actions_without_approval
+        - claim_workspace_tokens_without_stats
+  - name: observed durable execution task runs before skill synthesis
+    input: '/skillspec create from observed durable execution: "use parallel web to enrich this profile"'
+    expect:
+      route: observed_durable_workspace_to_skill
+      matched_rules:
+        - post_install_setup_routes_to_multiplexer
+        - route_observed_workspace_to_spec
+      elicit:
+        - choose_observation_workspace
+      after_success:
+        - produce_observed_workspace_spec
+        - generate_value_report
+      forbid:
+        - observe_anonymous_workspace
+        - replay_workspace_actions_without_approval
+        - claim_workspace_tokens_without_stats
+  - name: mechanical draft cannot be installed directly
+    input: Run skillspec import-skill and install the result
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - mechanical_import_is_draft_only
+        - install_requires_validated_reviewed_spec
+      forbid:
+        - treat_mechanical_draft_as_final
+        - install_unreviewed_draft
+        - consult_existing_ports_without_user_request
+  - name: compound remote import install proof starts with remote port
+    input: /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf, compile it for Codex, install it, and prove it
+    expect:
+      route: remote_skill_port
+      matched_rules:
+        - route_remote_sources_to_remote_port
+        - route_prompt_import_to_skill_port
+        - grammar_preflight_is_mandatory
+        - import_preserves_dependency_ledger
+        - dependency_surface_requires_review
+        - install_requires_validated_reviewed_spec
+        - prove_requests_route_to_value
+      elicit:
+        - approve_remote_source_access
+        - choose_candidate_skill
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      forbid:
+        - install_from_remote_checkout
+        - execute_imported_snippets_during_staging
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
+        - consult_existing_ports_without_user_request
+        - drop_imported_dependency_mentions
+        - work_around_missing_dependency_without_waiver
+        - claim_partial_dependency_proof_as_full
+  - name: remote import preserves dependency ledger before proof
+    input: /skillspec import a remote SKILL.md with Python package dependencies, do not install missing packages, and prove it
+    expect:
+      route: remote_skill_port
+      matched_rules:
+        - route_remote_sources_to_remote_port
+        - route_prompt_import_to_skill_port
+        - import_preserves_dependency_ledger
+        - dependency_surface_requires_review
+        - prove_requests_route_to_value
+      elicit:
+        - approve_remote_source_access
+        - approve_dependency_surface
+      after_success:
+        - preserve_dependency_ledger
+        - show_dependency_surface
+        - report_dependency_waiver
+      forbid:
+        - web_search_for_remote_source
+        - fetch_raw_github_skill_md_for_import
+        - drop_imported_dependency_mentions
+        - mutate_dependency_set_to_pass_qa
+        - work_around_missing_dependency_without_waiver
+        - claim_partial_dependency_proof_as_full
+  - name: dependency approval required for install
+    input: Port a skill and install it into codex and agents
+    expect:
+      route: compile_and_install_reviewed_skill
+      matched_rules:
+        - dependency_surface_requires_review
+        - install_requires_validated_reviewed_spec
+      elicit:
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      forbid:
+        - install_before_dependency_surface_approval
+        - install_before_validate_test_imports_deps
+        - leave_old_and_new_skill_discoverable_without_user_choice
+  - name: prove value routes to trace and report
+    input: Prove value for the ported rote-browse skill with a demo decision
+    expect:
+      route: prove_skill_value
+      matched_rules:
+        - prove_requests_route_to_value
+      after_success:
+        - decide_demo
+        - trace_align
+        - value_report
+      forbid:
+        - claim_unproven_execution_evidence
+  - name: revise existing spec starts with grammar and handles
+    input: Improve this skill.spec.yml route coverage
+    expect:
+      route: revise_existing_skillspec
+      matched_rules:
+        - revision_starts_with_grammar_and_current_spec
+        - grammar_preflight_is_mandatory
+      forbid:
+        - patch_yaml_from_memory
+        - skip_current_spec_sensemake
+  - name: update existing skillspec routes to revision
+    input: Update skillspec existing skillspec yaml with plan act progress command goodness
+    expect:
+      route: revise_existing_skillspec
+      matched_rules:
+        - revision_starts_with_grammar_and_current_spec
+      forbid:
+        - patch_yaml_from_memory
+        - skip_current_spec_sensemake
+  - name: existing skill spec revises instead of reimporting
+    input: This folder already has skill.spec.yml; revise skill.spec.yml instead of import
+    expect:
+      route: revise_existing_skillspec
+      matched_rules:
+        - revision_starts_with_grammar_and_current_spec
+      forbid:
+        - patch_yaml_from_memory
+        - skip_current_spec_sensemake
+  - name: phase progress commands route to value proof
+    input: Prove the ported skill with skillspec plan, skillspec act, skillspec progress, and value report
+    expect:
+      route: prove_skill_value
+      matched_rules:
+        - prove_requests_route_to_value
+      after_success:
+        - decide_demo
+        - trace_align
+        - value_report
+      forbid:
+        - claim_unproven_execution_evidence
+  - name: imports and resources stay connected
+    input: This skill has references, resources, scripts, and assets to extract
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - imports_resources_must_be_connected
+        - source_code_becomes_resources_and_code
+      forbid:
+        - leave_orphaned_imports
+        - leave_orphaned_resources
+        - flatten_referenced_files_into_prompt_blob
+        - leave_source_code_unreferenced
+  - name: field import does not consult history or examples
+    input: Import a prose SKILL.md into SkillSpec from this staged source
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - field_import_uses_only_current_source
+        - grammar_preflight_is_mandatory
+      forbid:
+        - consult_existing_ports_without_user_request
+        - consult_repo_history_without_user_request
+        - consult_memory_or_prior_examples_without_user_request
+  - name: degraded draft blocks release
+    input: The CLI has no deps check, but go ahead and release it
+    expect:
+      route: compile_and_install_reviewed_skill
+      matched_rules:
+        - dependency_surface_requires_review
+        - degraded_draft_blocks_install
+      forbid:
+        - install_degraded_draft
+        - release_degraded_draft
+        - claim_dependency_presence_without_check
+  - name: durable execution routes preserve evidence
+    input: Run the porting command with trace evidence and future recall
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - durable_tool_work_uses_durable_substrate
+      after_success:
+        - produce_return_packet
+      forbid:
+        - direct_cli_without_durable_wrapper
+        - untracked_stdout_as_evidence
+review_required:
+  - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
+  - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
+  - Remote import/port requests must use `skillspec source stage <uri> --json` before doctor, source map, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after the staging command fails and the user approves.
+  - durable-executor is optional and not assumed to be bundled with router mode; install requires an explicit local durable-executor source folder, and remote sources must be staged before lifecycle install.
+  - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
+  - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
+  - Mechanical import now generates a scaffolded deps.toml and declares it as a file dependency/artifact; the prompt import loop must inspect, complete, and review deps.toml before proof, compile, install, or release.
+  - The optional Claude compile/install path should be verified in a Claude-compatible harness before release claims.
+metadata:
+  source:
+    preserved_prose: source/SKILL_md.old
+    source_lines: 756
+    imported_from: skills/skillspec/SKILL.md
+  mechanical_import_observation:
+    routes: 0
+    rules: 0
+    states: 0
+    dependencies: 6
+    commands: 30
+    recipes: 0
+    tests: 0
+    review_notes: 5
+    note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
+  extracted_value_targets:
+    activation_triggers: 12
+    routes: 12
+    rules: 23
+    dependency_checks: 5
+    command_templates: 55
+    recipes: 13
+    closures: 23
+    tests: 24
+    references_moved_out_of_prompt_path: 1
+    estimated_context_reduction: 85%
+  contract_quality:
+    activation: strong
+    dependencies: good
+    route_coverage: strong
+    execution_evidence: unproven_until_real_harness_run
+    tests: reviewed_behavior_tests
+    hallucination_risk: low_medium
+  coverage_matrix:
+    - prose_span: Source Contract
+      obligation: Accept local file/folder and public GitHub source forms, stage remotes locally, and never install directly from remote checkout.
+      skillspec_construct: routes.remote_skill_port, route.local_skill_port, rules.route_remote_sources_to_remote_port, commands.stage_remote_folder, elicitation.approve_remote_source_access
+      confidence: high
+      status: proven_by_tests
+      review_note: Private repo auth is intentionally review_required.
+    - prose_span: Creation Procedure 1-8
+      obligation: Run grammar sensemake/checklist before import/edit, then run mechanical import and sensemake the draft.
+      skillspec_construct: recipe.run_grammar_preflight, commands.grammar_sensemake_index, commands.grammar_sensemake_porting, commands.import_skill_draft, commands.sensemake_draft
+      confidence: high
+      status: proven_by_tests
+      review_note: Runtime grammar artifact is the authoritative teacher.
+    - prose_span: Creation Procedure 9-20
+      obligation: Extract routes, rules, elicitations, imports, resources, code, artifacts, commands, and dependencies with checks and approvals.
+      skillspec_construct: rules.imports_resources_must_be_connected, rules.dependency_surface_requires_review, rules.import_preserves_dependency_ledger, artifacts.dependency_ledger, recipes.dependency_preservation_loop, dependencies, commands, artifacts, code.review_and_promote_draft
+      confidence: high
+      status: reviewed
+      review_note: Imported dependencies must be preserved in deps.toml with authority and risk; missing required packages make proof partial unless provisioned or explicitly deferred.
+    - prose_span: Harness Install Targets, Retirement, and Dependency Approval
+      obligation: Do not install by default; show dependency surface, dry-run, ask for install targets, and ask whether any existing active skill should be retired before replacement.
+      skillspec_construct: route.compile_and_install_reviewed_skill, elicitations.approve_dependency_surface, elicitations.approve_install_targets, elicitations.approve_retire_existing_skill, commands.install_dry_run, commands.install_skill, commands.install_skill_new_name
+      confidence: high
+      status: proven_by_tests
+      review_note: The default install command uses --retire-existing; side-by-side testing requires an explicit non-conflicting --name choice.
+    - prose_span: Code-Heavy Skill Porting, Semantic Promotion, Rule Extraction
+      obligation: Preserve provenance, classify snippets, create recipes/artifacts, write testable rules, and add review notes for uncertainty.
+      skillspec_construct: recipe.coverage_review_loop, code.review_and_promote_draft, rules.mechanical_import_is_draft_only, review_required
+      confidence: medium_high
+      status: reviewed
+      review_note: Source examples are represented as command templates rather than executable snippets.
+    - prose_span: Revising Existing SkillSpecs and Done Definition
+      obligation: For revisions start or resume the guided run-loop, use grammar/current spec handles, follow the current gate, record progress, then validate, imports check, deps check, test, decide, align, compile, and report value. Plan and act remain lower-level primitives behind the guide.
+      skillspec_construct: route.revise_existing_skillspec, route.prove_skill_value, commands.run_loop, commands.run_loop_resume, commands.plan_phase_order, commands.act_named_phase, commands.progress_record_phase, commands.progress_show, commands.validate_spec, commands.imports_check, commands.deps_check_all, commands.test_spec, commands.decide_demo, commands.trace_align
+      confidence: high
+      status: proven_by_tests
+      review_note: Execution alignment can remain unproven if no real execution ledger is available.
+    - prose_span: Post-install setup multiplexer
+      obligation: Provide one prompt entry point named skillspec that imports existing skills, reports read-only lifecycle and skill inventory status, manages router mode, manages durable-executor install/update/enable/disable/delete, and creates SkillSpec-backed skills from observed durable rote workspaces.
+      skillspec_construct: routes.install_skill_router, routes.update_skill_router, routes.switch_skill_router_mode, routes.inspect_skillspec_status, routes.install_durable_executor, routes.update_durable_executor, routes.switch_durable_executor_mode, routes.delete_durable_executor, routes.observed_durable_workspace_to_skill, rules.post_install_setup_routes_to_multiplexer, rules.route_router_install_to_router_setup, rules.route_router_update_to_router_maintenance, rules.route_router_switch_to_lifecycle, rules.route_status_to_read_only_inventory, rules.route_durable_install_to_optional_durable, rules.route_durable_update_to_lifecycle, rules.route_durable_switch_to_lifecycle, rules.route_durable_delete_to_lifecycle, rules.route_observed_workspace_to_spec, recipes.router_install_loop, recipes.router_update_loop, recipes.router_switch_loop, recipes.status_inspection_loop, recipes.durable_executor_install_loop, recipes.durable_executor_update_loop, recipes.durable_executor_switch_loop, recipes.durable_executor_delete_loop, recipes.observed_workspace_to_spec_loop
+      confidence: high
+      status: reviewed
+      review_note: Status is read-only and must not repair visibility or rebuild indexes; router setup uses roots plus index and forbids a separate router root; router and durable-executor switches preserve installed files while changing native visibility; durable-executor remains optional, source-aware, and marker-guarded for update/delete.
