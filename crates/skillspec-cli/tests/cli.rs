@@ -3337,9 +3337,13 @@ fn sensemake_and_query_teach_progressive_navigation() {
     assert!(out.contains("- routes: strategy choices (2)"));
     assert!(out.contains("- rules: steering logic (2)"));
     assert!(out.contains("- states: lifecycle phases (0)"));
+    assert!(out.contains("skillspec run-loop"));
+    assert!(out.contains("--guide agent"));
+    assert!(out.contains("--resume <run-dir>"));
     assert!(out.contains("skillspec decide"));
     assert!(out.contains("skillspec query"));
     assert!(out.contains("skillspec refs"));
+    assert!(out.contains("prefer run-loop --guide agent"));
     assert!(out.contains("escalate index -> summary -> full only when needed"));
 
     let sensemake_json = Command::new(bin())

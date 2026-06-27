@@ -90,6 +90,7 @@ pub fn sensemake(spec: &SkillSpec, path: &Path, view: View) -> SensemakeReport {
 fn escalation(spec: &SkillSpec) -> Vec<String> {
     let mut items = vec![
         "start with sensemake --view index only when unfamiliar".to_owned(),
+        "for active task execution, prefer run-loop --guide agent so the CLI prints start/current/end anchors and persists resume state".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
         "escalate index -> summary -> full only when needed".to_owned(),
@@ -374,6 +375,16 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         NavigationHint {
             intent: "orient",
             command: format!("skillspec sensemake {spec_path} --view index"),
+        },
+        NavigationHint {
+            intent: "start guided task execution",
+            command: format!(
+                "skillspec run-loop {spec_path} --input '<task>' --trace-dir .skillspec/traces --guide agent"
+            ),
+        },
+        NavigationHint {
+            intent: "resume guided task execution",
+            command: format!("skillspec run-loop {spec_path} --resume <run-dir> --guide agent"),
         },
         NavigationHint {
             intent: "task routing",
