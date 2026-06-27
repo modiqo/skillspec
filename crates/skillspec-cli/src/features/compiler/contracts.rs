@@ -1,15 +1,3 @@
-pub(super) fn write_durable_handoff_contract(output: &mut String) {
-    output.push_str("## Durable Handoff Contract\n\n");
-    output.push_str("This skill participates in agent-mediated durable execution. There is no runtime handoff engine: the agent reads the active SkillSpec contracts, carries the handoff packet in context, and preserves the declared evidence.\n\n");
-    output.push_str("- If a durable handoff packet is present, preserve its `workspace`, `trace_dir`, `return_to`, `branch_id`, and `execution_policy` fields.\n");
-    output.push_str("- If no durable handoff packet is present and the task asks for remembered evidence, future recall, reuse, trace, alignment, or durable execution, route through `durable-executor` first unless the user explicitly requests direct execution.\n");
-    output.push_str("- If `durable_context.active` is true, do not route the whole task back to `durable-executor`; use `durable-executor` only as the execution substrate and then return to `return_to`.\n");
-    output.push_str("- This skill owns its domain interpretation and validation. `durable-executor` owns workspace, trace, evidence, command substrate, final alignment, token-savings, and recall/crystallization closure when it initiated the handoff.\n");
-    output.push_str("- Any CLI, shell command, local process, package command, API fallback, or provider command must use the configured durable execution substrate unless the active spec or user explicitly allows direct execution.\n");
-    output.push_str("- On completion, emit a return packet with status, selected route, skill metadata, artifacts, evidence handles, blockers, and trace paths, then hand back to `return_to` for final closure.\n");
-    output.push_str("- For parallel work, keep one top-level workspace but use branch-scoped `branch_id`, trace paths, evidence labels, and artifact directories.\n\n");
-}
-
 pub(super) fn write_authoring_contract(output: &mut String) {
     output.push_str(
         "## Authoring And Revision Contract
