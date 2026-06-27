@@ -2,106 +2,46 @@
   <img src="assets/skillspec-wordmark.svg" alt="SkillSpec" width="520">
 </p>
 
-# Stop guessing whether your agent followed the skill.
+# Skills that agents can actually follow
 
 [![CI](https://github.com/modiqo/skillspec/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/modiqo/skillspec/actions/workflows/ci.yml)
 
-Do any of these sound familiar?
+SkillSpec is a CLI plus a structured skill plan.
 
-- You are building a skill for a CLI, API, MCP server, or product workflow.
-- Your skill has step-by-step instructions, scripts, code blocks, or extra
-  reference files.
-- You have too many skills and need the agent to pick the right one.
-- You need to know whether the agent skipped a step.
-- You need to control which tools the agent can use.
-- You need dependency checks before the agent acts.
-- You need proof of what happened after the run.
+It keeps your normal `SKILL.md`, but adds a small `skill.spec.yml` beside it so
+an agent knows when to use the skill, what path to follow, what checks must
+pass, and what proof should exist at the end.
 
-If even two of these sound familiar, SkillSpec matters.
+No new agent runtime. No orchestration platform. Just a contract that makes a
+skill easier to follow, test, port, route, and review.
 
-It keeps your normal `SKILL.md`: instructions, examples, scripts, and
-references still work.
+## Do Any Of These Sound Familiar?
 
-SkillSpec adds a small contract beside it so the agent can plan the work, follow
-the right steps, stay inside tool boundaries, check dependencies, record
-progress, and show proof at the end.
+- You wrote a powerful skill, but you still have to wonder: did the agent
+  actually follow it?
+- Your `SKILL.md` has step-by-step instructions, examples, scripts, code blocks,
+  or extra files, and the agent sometimes reads the wrong part or skips the
+  important part.
+- Your skill keeps getting longer because every miss becomes another paragraph
+  of instructions.
+- You need the same skill to behave the same way in Codex, Claude, Agents, or
+  another harness.
+- You need to know whether the agent picked the right route before it started
+  doing work.
+- You need the agent to check dependencies before acting.
+- You need tool boundaries: this skill may run these commands, but not those.
+- You need proof after the run: selected route, completed steps, missing
+  evidence, blocked checks, token economy, and final alignment.
+- You have a repo of skills that reference each other, and it is unclear whether
+  it is one skill, many skills, or a plugin-shaped system.
+- You have too many installed skills and the harness starts shortening
+  descriptions or spending context on the wrong ones.
+- You want to turn a guided expert workflow into a reusable skill without
+  rewriting tacit knowledge from memory.
 
-No new agent runtime. No orchestration platform. Just a `skill.spec.yml`, a
-small generated `SKILL.md` loader, and a CLI that validates, plans, records, and
-reports.
+If even two of these sound familiar, SkillSpec is probably for you.
 
-<p align="center">
-  <img src="assets/skillspec-layer-stack.svg" alt="Where SkillSpec fits in the agent stack" width="900">
-</p>
-
-## What SkillSpec Adds
-
-A regular skill tells the agent what to do. SkillSpec makes the important parts
-checkable.
-
-It adds structure for:
-
-- when the skill should be used
-- which route the agent should take
-- which phases must run in order
-- which tools are allowed or blocked
-- which dependencies must be checked
-- which progress events should be recorded
-- which proof should exist after the run
-
-It does not compete with skills. It makes important skills easier to operate,
-review, and trust.
-
-## Why It Exists
-
-A normal `SKILL.md` is still prompt text. It can be loaded late, skipped,
-misread, reordered, or followed only halfway.
-
-SkillSpec moves the load-bearing parts out of long instruction text and into a
-contract:
-
-```text
-Skill:     "Load these instructions."
-MCP:       "These tools are available."
-SkillSpec: "Choose this route, follow these phases, prove these checks."
-```
-
-The honest guarantee:
-
-SkillSpec does not make a model obey. It makes the contract checkable,
-non-compliance detectable, and the gateable parts enforceable by a harness.
-
-## How SkillSpec Works
-
-SkillSpec gives you two pieces:
-
-- a CLI that does the structured work
-- a `skillspec` skill you install into your agent environment
-
-Together, they help create planned skills: a normal `SKILL.md` plus a
-`skill.spec.yml`.
-
-The `skill.spec.yml` spells out:
-
-- when to use the skill
-- what steps to follow
-- what to check
-- what proof to show
-
-The CLI can:
-
-- create or update `skill.spec.yml`
-- validate and test the contract
-- compile a small `SKILL.md` loader
-- install the skill into a harness
-- plan a run
-- record progress
-- produce proof
-
-The installed `skillspec` skill is the chat entry point. It lets you use the
-CLI from inside Codex, Claude, or Agents without thinking about every command.
-You stay in the harness, ask for the outcome, and let the skill use its own
-contract to choose the route and run the right steps.
+## Install
 
 From this repo checkout, install the CLI:
 
@@ -123,439 +63,73 @@ skillspec install skill skills/skillspec --target agents --retire-existing
 skillspec install skill skills/skillspec --target claude-local --retire-existing
 ```
 
-After that, you can stay in chat:
+After that, stay in chat and ask for outcomes:
 
 ```text
+/skillspec run doctor on ./my-skill
 /skillspec import ./my-skill, compile it for Codex, install it, and prove it
 ```
 
-That one request stages the source, turns the existing instructions into a
-SkillSpec contract, preserves package resources, validates and tests the spec,
-compiles the generated skill, installs it, and reports proof.
+## Skill Vs SkillSpec
 
-The important loop is:
-
-```text
-problem or skill folder
-  -> /skillspec request in chat
-  -> SkillSpec CLI commands behind the scenes
-  -> reviewed skill files, checks, progress, and proof
-```
-
-The prompt surface is powered by SkillSpec too:
-
-```text
-/skillspec chat request
-  -> skills/skillspec/skill.spec.yml
-  -> selected route and phase checklist
-  -> commands, checks, progress, and alignment proof
-```
-
-The `/skillspec` multiplexer is not a hand-written exception. It is powered by
-[`skills/skillspec/skill.spec.yml`](skills/skillspec/skill.spec.yml), the same
-kind of contract it helps create for other skills.
-
-## Common Operator Flows
-
-SkillSpec is most useful when a skill, tool, or workflow has become too
-important to leave as instructions alone.
-
-| User problem | What you ask for | What SkillSpec does |
-| --- | --- | --- |
-| "My skill is over 1000+ lines and the agent is not following instructions." | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` | Turns a long skill into a smaller, followable contract: routes, rules, dependencies, tests, installed harness files, and an alignment report that shows what the agent actually followed. |
-| "I switched from Codex to Claude and need proof at the end of execution." | `/skillspec complete the task and print an alignment report` | Runs the task through the same contract shape across harnesses, then prints selected route, required steps, missing evidence if any, and final alignment status. |
-| "I designed a CLI, API, or MCP and want skills that use it correctly." | `/skillspec install durable-executor from /path/or/uri`<br>`/skillspec create from observed durable execution: "use function [A], [B], [C] of my CLI [name-cli]"` | Uses the optional durable-executor trace substrate, captures a real execution as evidence, converts the observed workflow into a reusable SkillSpec-backed skill, and preserves command and dependency proof. |
-| "I have too many skills and my agent environment shortened descriptions to fit context." | `/skillspec install router` | Installs the SkillSpec router, builds an index, routes to the right skill on demand, and frees context for the skill that actually matters. |
-| "I need to prove a skill before release." | `/skillspec prove this installed skill` | Runs decision, test, dependency, progress, and alignment checks so release claims are backed by evidence. |
-| "I need a read-only view of installed SkillSpec state." | `/skillspec status` | Reports router and [durable-executor](#rote-prerequisite-for-agent-traces) installed/enabled state, supported roots, last router index state, and SkillSpec-backed versus legacy text-only skills. |
-
-## Start Here
-
-Once the CLI and `skillspec` skill are installed, ask for the outcome you want in
-chat.
-
-| You want to... | Say this in chat |
+| A normal skill | A SkillSpec-backed skill |
 | --- | --- |
-| Port and prove a skill | `/skillspec import ./my-skill, compile it for Codex, install it, and prove it` |
-| See installed lifecycle state | `/skillspec status` |
-| Route a large skill library | `/skillspec install router` |
-| Temporarily turn router mode off | `/skillspec disable router` |
-| Turn router mode back on | `/skillspec enable router` |
-| Capture a tool-backed workflow | `/skillspec install durable-executor from /path/or/public-uri`<br>Requires the durable-executor prerequisite for agent traces. |
-| Synthesize a skill from observed work | `/skillspec create from observed durable execution: "use parallel web to enrich this profile"` |
-| Turn durable first-hop off | `/skillspec disable durable-executor`<br>Keeps the [durable-executor](#rote-prerequisite-for-agent-traces) files installed but stops automatic routing. |
+| A reusable prompt package. | A reusable prompt package plus a structured plan. |
+| The harness loads text and the model interprets it. | The CLI exposes the current route, phase, checks, and next action. |
+| Long instructions can become load-bearing prose. | The important behavior moves into `skill.spec.yml`: routes, phases, rules, dependencies, tests, and proof. |
+| The agent may follow the skill well, but you mostly inspect the final answer. | SkillSpec records decisions and progress, then prints an alignment report. |
+| Porting across harnesses depends on each harness interpreting the same text similarly. | The same contract shape can compile and run across harnesses, making behavior easier to compare. |
+| Evaluation is usually manual or ad hoc. | Scenario tests, decision replay, dependency checks, trace alignment, and final reports can be used as eval evidence. |
+| Many installed skills can create discovery and context-pressure problems. | Router mode can index skills and route only to the one that matters. |
+| Tacit expert workflows are hard to package. | Durable execution mode can observe a guided agent interaction and turn the trace into an explicit SkillSpec-backed skill. |
 
-The intended user experience is simple: describe the problem, let SkillSpec run
-the structured steps, then inspect the proof report.
+The point is not to replace skills. The point is to keep skills powerful while
+making the critical parts followable, testable, and provable.
 
-### Lifecycle Commands
+SkillSpec is designed to use less active context without hiding the work. The
+agent gets the current gate and next action from the CLI, records progress as it
+goes, and can resume from trace state after compaction or interruption.
 
-Once SkillSpec is installed, these commands manage the local skill environment.
+<p align="center">
+  <img src="assets/skillspec-layer-stack.svg" alt="SkillSpec sits inside the skills layer" width="900">
+</p>
 
-| Command | What changes |
-| --- | --- |
-| `/skillspec status` | Read-only inventory of router state, [durable-executor](#rote-prerequisite-for-agent-traces) state, supported roots, router index freshness, and SkillSpec-backed versus legacy text-only skills. |
-| `/skillspec install router` | Installs the router, makes the router implicit, makes routed skills explicit-only, builds the routing index, and runs a clean status check. |
-| `/skillspec disable router` | Keeps router files installed but makes the router explicit-only and restores routed skills to implicit/default discovery. |
-| `/skillspec enable router` | Turns router mode back on and rebuilds the index from current roots. |
-| `/skillspec update router` | Backs up config, manifest, index, and generated router skills, rewrites recorded harness roots, preserves enabled/disabled state, and warns you to restart active sessions. |
-| `/skillspec install durable-executor from /path/or/public-uri` | Installs the optional [durable-executor](#rote-prerequisite-for-agent-traces) first-hop after checking its trace substrate is on `PATH`, so tool-backed work can preserve traces, evidence, alignment, and token stats. |
-| `/skillspec disable durable-executor` | Keeps [durable-executor](#rote-prerequisite-for-agent-traces) installed but makes it explicit-only. |
-| `/skillspec enable durable-executor` | Checks the trace substrate on `PATH` before making [durable-executor](#rote-prerequisite-for-agent-traces) implicit again. |
+## How To Use It From An Agent
 
-If a skill is later added outside SkillSpec, `skillspec router index status`
-detects text-only versus SkillSpec-backed additions and
-`skillspec router index refresh` reapplies explicit invocation controls and
-rebuilds the index. Observed-workspace synthesis refuses to write until the
-observed result and evidence summary are approved; if live durable workspace
-lookup is unreliable, pass pre-captured stats, log, and metadata files
-explicitly.
+Ask the agent for the outcome. The installed `skillspec` skill will choose the
+right CLI commands and keep the run aligned.
 
-The lower-level `skillspec index` command is router-specific. It only builds the
-SQLite catalog used by `skillspec route` and the optional skill-router; it is not
-source analysis or workspace recon. If router mode is disabled, direct
-`skillspec index` warns that the catalog will not affect implicit skill
-selection until `skillspec router enable` is run.
-
-### Rote Prerequisite For Agent Traces
-
-The [durable-executor](#rote-prerequisite-for-agent-traces) path is optional,
-but it depends on [Rote by Modiqo](https://www.modiqo.ai). Rote is the trace
-substrate SkillSpec uses to run tool-backed work, preserve command logs,
-capture agent evidence, and report token stats outside the prompt.
-
-Install Rote before enabling or installing the
-[durable-executor](#rote-prerequisite-for-agent-traces):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/rote-releases/main/install.sh | bash
-```
-
-After `rote` is on `PATH`, SkillSpec can safely use the
-[durable-executor](#rote-prerequisite-for-agent-traces) first-hop for workflows
-that need durable traces, evidence handles, replayable command history, and
-alignment proof.
-
-## Install From Source
-
-Install the CLI:
-
-```sh
-cargo install --git https://github.com/modiqo/skillspec --package skillspec --locked
-```
-
-During local development, install from this repo:
-
-```sh
-cargo install --path crates/skillspec-cli --force
-```
-
-Then check the CLI:
-
-```sh
-skillspec --help
-```
-
-## Port A Skill
-
-Start with an ordinary skill folder:
-
-```text
-my-skill/
-  SKILL.md
-  scripts/
-  references/
-```
-
-In chat, the whole journey can be one request:
-
-```text
-/skillspec import ./my-skill, compile it for Codex, install it, and prove it
-```
-
-Under the hood, SkillSpec runs the same staged pipeline every time.
-
-### 1. Understand The Source
-
-These commands answer: "What is in this skill, and what risk does the current
-instruction shape carry?"
-
-```sh
-skillspec grammar sensemake --view porting
-skillspec doctor ./my-skill
-```
-
-`skillspec doctor` can also qualify a public GitHub single skill folder before
-import:
-
-```sh
-skillspec doctor https://github.com/anthropics/skills/tree/main/skills/pdf
-```
-
-It stages the requested folder temporarily and rejects parent folders that
-contain multiple `SKILL.md` files.
-
-For an actual URI import, stage the remote source persistently first and import
-from the returned local path:
-
-```sh
-skillspec source stage https://github.com/anthropics/skills/tree/main/skills/pdf --out ./.skillspec/staged/pdf --json
-skillspec doctor ./.skillspec/staged/pdf/repo/skills/pdf
-```
-
-If the source is a whole skills repo with many `SKILL.md` files, map the
-workspace first. This is authoring-side structure recon, not router indexing:
-
-```sh
-skillspec workspace map ./skills --out ./build/skillspec.workspace.yml --summary
-skillspec workspace validate ./build/skillspec.workspace.yml --summary
-skillspec workspace import ./build/skillspec.workspace.yml --out ./workspace-build --summary
-skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build --summary
-skillspec workspace compile ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex-skill --summary
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --dry-run --summary
-skillspec workspace install ./build/skillspec.workspace.yml --build-root ./workspace-build --target codex --apply-visibility --summary
-```
-
-The workspace manifest names each atomic skill package, records deterministic
-install slugs, and captures cross-skill references such as shared standards
-packages before fanout import. The import step writes one generated package per
-atomic skill under the build root. Dependency-ready packages can import in
-parallel, and unchanged packages are reused from
-`<build-root>/.skillspec/workspace-cache.json` when their source hash and proof
-artifacts still match. Import does not compile, install, or refresh the router.
-The converge step verifies those generated package drafts against the workspace
-graph. The compile step writes harness-ready `SKILL.md` loaders for ready
-packages only. The install step plans every harness write first, uses the
-manifest `install_slug` folders, blocks collisions, and writes install proof. It
-also reports workspace visibility using the default `entry-implicit` policy:
-entry skills stay visible, while shared/helper/wrapper packages become
-manual-only support skills when `--apply-visibility` is used. Router index
-refresh is still separate runtime work.
-
-`--summary` keeps the agent-facing output compact and prints wall-clock plus
-estimated token metrics, including cache hits and misses for workspace import.
-Full reports and package proof remain on disk at the paths shown in the summary.
-Use `--json` when a caller needs the full machine report on stdout.
-
-These summary metrics estimate output economy from what the agent sees versus
-the proof artifacts preserved on disk. Durable-executor runs can additionally
-add measured workspace token stats when exact consumption is available.
-
-To include direct-run summary metrics in `trace align --summary`, record the printed
-metrics into the run ledger before alignment:
-
-```bash
-skillspec progress stats .skillspec/traces/<run-id> \
-  --agent-visible-tokens 190 \
-  --artifact-tokens-preserved 96190 \
-  --avoided-tokens 96000 \
-  --metrics-source estimated
-```
-
-Plugin-shaped repos are preserved instead of flattened. If a folder has
-`skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`,
-`workspace map` treats that folder as a plugin namespace. Repeated skill names
-are made skill-safe by prefixing the plugin name, so
-`commercial-legal/skills/cold-start-interview` becomes
-`commercial-legal-cold-start-interview` and does not collide with
-`privacy-legal-cold-start-interview`. Inside a plugin, `/cold-start-interview`
-resolves to that plugin's skill; `/privacy-legal:use-case-triage` resolves
-across plugins. Those slash-command links are recorded as workflow references.
-Relative file links such as `../coding-standards/SKILL.md` remain hard
-dependencies.
-
-### 2. Map And Import
-
-Choose the path before running an import command:
-
-| Source shape | Use this path | Why |
+| You want to know or do | What to ask in chat | What SkillSpec does |
 | --- | --- | --- |
-| One folder with exactly one `SKILL.md` | `skillspec port-one-shot` | Fast single-skill port with grammar proof, source map, QA, compile, and compact metrics. |
-| Parent folder with many `SKILL.md` files | `skillspec workspace map`, then `workspace import` | Preserves each atomic skill separately and records dependency edges. |
-| Plugin-shaped repo | `skillspec workspace map`, then workspace flow | Preserves plugin namespaces so repeated skill names do not collide. |
-| Existing reviewed `skill.spec.yml` | revision flow | Keeps the current contract and changes it with grammar/current-spec sensemaking instead of re-importing. |
+| Assess a skill before touching it. | `/skillspec run doctor on <path-or-github-url>` | Runs `skillspec doctor` to classify the shape: simple skill, multi-skill workspace, plugin-shaped workspace, entry skill with subskills, or non-skill repo. It also reports follow-through risk for agent execution. See [Doctor Agent Drift Risk](docs/design/22-doctor-agent-drift-risk.md). |
+| Port an existing skill. | `/skillspec import <path-or-url>, compile it for Codex, install it, and prove it` | Stages the source if needed, runs doctor, maps the source, imports the skill, validates it, tests it, compiles it, and prints the report. |
+| Port a repo with many skills or plugin folders. | `/skillspec map this repo and import the packages safely` | Preserves the original shape, processes each atomic `SKILL.md` package separately, detects references, prevents circular dependency mistakes, and converges the workspace before install. |
+| Use the installed skill. | Use it normally, the same way you would use any other skill. | The generated skill loader keeps the prompt small and asks the CLI for route guidance, phase checks, progress recording, and final alignment. |
+| Too many skills are installed, or the harness warns about context. | `/skillspec install router` | Installs router mode so the agent can route to the right skill instead of loading or exposing too many skills at once. See [Skill Router](docs/design/14-skill-router.md). |
+| Create a skill from observed expert work. | `/skillspec install durable-executor from <source>`<br>`/skillspec create from observed durable execution: "<workflow>"` | Uses durable execution mode to capture a guided interaction, preserve evidence, and convert tacit workflow knowledge into an explicit SkillSpec-backed skill. This path requires Rote by Modiqo; install/setup from [modiqo.ai](https://www.modiqo.ai). |
 
-For one atomic skill package, use the bundled porting command. It runs grammar
-preflight, source map, doctor, mechanical import, validation, imports check,
-deps check, tests, compile, and a compact proof report in one path.
+## What You Get At The End
 
-```sh
-skillspec port-one-shot ./my-skill \
-  --out ./my-skill \
-  --target codex-skill \
-  --prove
-```
+For an important skill, the output should not just be "done."
 
-The generated `skill.spec.yml` is still a scaffold until reviewed. Do not
-auto-fill it. Use the source map and shape crib for one guided promotion pass:
-promote only source-backed activation, routes, rules, dependencies, recipes, and
-tests; leave weak areas as `review_required`; then run the QA ladder once. When
-editing YAML directly, quote strings that contain `: `, especially elicitation
-questions, and keep artifact `produced_by` / `consumed_by` refs limited to
-`command`, `code`, or `recipe`.
+SkillSpec gives you artifacts you can inspect:
 
-If you need manual control, run the lower-level steps directly:
+- the generated `skill.spec.yml`
+- the compiled `SKILL.md` loader
+- validation and scenario-test results
+- dependency and import checks
+- progress records
+- route and phase evidence
+- alignment summary
+- token and wall-clock metrics when available
 
-```sh
-skillspec source map ./my-skill --out ./my-skill/.skillspec/source-map
+That makes a skill easier to ship, easier to debug, and easier to trust across
+agents.
 
-skillspec import-skill ./my-skill \
-  --out ./my-skill/skill.spec.yml \
-  --source-map ./my-skill/.skillspec/source-map/source-map.json
-```
+## Learn More
 
-The import is deliberately mechanical. Review it before install.
-
-### 3. Review Gates
-
-These checks keep the port honest before it becomes an active skill.
-
-| Gate | Command | Value |
-| --- | --- | --- |
-| Structure | `skillspec validate ./my-skill/skill.spec.yml` | Confirms the contract parses and references connect. |
-| Imports | `skillspec imports check ./my-skill/skill.spec.yml` | Confirms package-local guidance and resources load correctly. |
-| Dependencies | `skillspec deps check ./my-skill/skill.spec.yml` | Shows tools, files, env vars, and services that must exist or be approved. |
-| Behavior | `skillspec test ./my-skill/skill.spec.yml` | Runs scenario expectations for routes, rules, forbids, elicitations, and closures. |
-
-For a release-quality port, fill the coverage matrix:
-
-```text
-prose_span | obligation | skillspec_construct | confidence | status | review_note
-```
-
-### 4. Compile For A Harness
-
-Compilation turns the reviewed contract into the small `SKILL.md` loader the
-agent environment loads. Choose the target you are installing into:
-
-```sh
-# Codex
-skillspec compile --target codex-skill ./my-skill/skill.spec.yml > ./my-skill/SKILL.md
-
-# Claude
-skillspec compile --target claude-skill ./my-skill/skill.spec.yml > ./my-skill/SKILL.md
-
-# Portable Markdown preview
-skillspec compile --target markdown ./my-skill/skill.spec.yml > ./my-skill/compiled.md
-```
-
-### 5. Install With A Dry Run First
-
-Preview writes before changing harness discovery roots:
-
-```sh
-skillspec install targets
-skillspec install skill ./my-skill --target codex --dry-run --retire-existing
-skillspec install skill ./my-skill --target codex --retire-existing
-```
-
-Use `--retire-existing` when replacing an active text-only skill with the reviewed
-SkillSpec-backed port. It backs up the old active skill outside harness
-discovery before installing the replacement. Use `--name <new-name>` only when
-you intentionally want side-by-side testing.
-
-### What You Get
-
-```text
-my-skill/
-  SKILL.md          # small loader for the agent environment
-  skill.spec.yml    # routes, rules, phases, checks, proof contract
-  deps.toml         # reviewed dependency ledger
-  resources/        # examples, scripts, references, and source evidence
-  source/
-    SKILL_md.old    # preserved original instructions; not SKILL.md and not .md
-```
-
-## Prove It Worked
-
-Proof is the difference between "the agent probably followed the skill" and
-"the run produced evidence."
-
-### Proof Flow
-
-| Step | Command | What it proves |
-| --- | --- | --- |
-| Plan | `skillspec plan ...` | The input selects the expected route and phase order. |
-| Act | `skillspec act ...` | The next phase has a concrete checklist and tool boundary. |
-| Record | `skillspec progress record ...` | The run ledger captures phase, requirement, and evidence events. |
-| Review | `skillspec progress show ...` | The execution ledger has progress events and no observed forbidden actions. Use it as an internal gate check unless details are needed. |
-| Align | `skillspec trace align ... --summary --proof-digest ...` | The current spec can replay the decision, match execution evidence to obligations, and group missing proof for one final batch while keeping full detail in `alignment.json`. |
-
-Run a realistic task through the spec:
-
-```sh
-skillspec plan ./my-skill/skill.spec.yml \
-  --input "do the real task" \
-  --trace-dir .skillspec/traces
-```
-
-Execute the current phase checklist:
-
-```sh
-skillspec act ./my-skill/skill.spec.yml \
-  --input "do the real task" \
-  --run .skillspec/traces/<run-id> \
-  --phase <phase-id>
-```
-
-Inspect progress:
-
-```sh
-skillspec progress show ./my-skill/skill.spec.yml \
-  --run .skillspec/traces/<run-id>
-```
-
-Align decision and execution proof:
-
-```sh
-skillspec trace align ./my-skill/skill.spec.yml \
-  --decision-trace .skillspec/traces/<run-id> \
-  --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
-```
-
-If the summary is partial and several proof rows are genuinely satisfied by
-evidence already on disk, write them to
-`.skillspec/traces/<run-id>/final-proof.jsonl`, run `skillspec progress batch`
-once, then rerun `trace align --summary` once. Do not rerun alignment after
-each individual proof row.
-
-### What The Report Tells You
-
-| Field | Meaning |
-| --- | --- |
-| Ported / installed targets | Which skill was converted and where it was installed. |
-| Extracted value | Activation triggers, routes, rules, dependencies, command templates, tests, and moved resources. |
-| Decision trace | The saved route decision and matched rules for the task. |
-| Execution trace | The saved progress events and evidence handles. |
-| Alignment | `pass`, `partial`, or `fail`, with missing proof rows when evidence is incomplete. |
-
-## Harness Support
-
-SkillSpec is portable at the contract layer. Any harness can use it if it can
-load a small instruction file and run local CLI commands.
-
-Current install targets:
-
-| Target | Install path |
-| --- | --- |
-| `codex` | `~/.codex/skills/<name>` |
-| `agents` | `~/.agents/skills/<name>` |
-| `claude-local` | `.claude/skills/<name>` |
-
-For other harnesses, compile to Markdown today and add a native install target
-when the harness discovery path is known.
-
-## Deeper Docs
-
-This README is the fast path.
-
-- [Detailed README](docs/README_DETAILED.md)
-- [Docs index and reader paths](docs/README.md)
-- [The Reliability Gap In Agent Skills](docs/00-skills-reliability-gap.md)
-- [Contract And Trace Methodology](docs/08-contract-trace-methodology.md)
+- [Detailed docs](docs/README.md)
 - [Design docs](docs/design/README.md)
-- [Why SkillSpec](docs/01-why-skillspec.md)
-- [Grammar](spec/grammar.md)
-- [Schema](spec/skill.spec.schema.json)
+- [Command log](docs/design/16-command-log.md)
+- [Guided run loop](docs/design/23-guided-run-loop-from-doctor-dogfood.md)
+- [Progressive agent guidance](docs/design/25-progressive-agent-guidance.md)
