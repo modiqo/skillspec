@@ -1,6 +1,6 @@
 name: Doctor report request
 description: Run SkillSpec Doctor on a public GitHub skill repository or folder.
-title: "Doctor report: <public GitHub skill URL>"
+title: "Doctor report: request"
 labels:
   - doctor-report
 body:

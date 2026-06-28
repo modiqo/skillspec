@@ -46,6 +46,7 @@ jobs:
             let valid = false;
             let reason = "The issue form did not include a public GitHub skill URL.";
             let normalized = "";
+            let displayTarget = "";
             let owner = "";
             let repo = "";
 
@@ -75,6 +76,7 @@ jobs:
                     } else {
                       const rest = parts.slice(2).join("/");
                       normalized = `https://github.com/${owner}/${repo}${rest ? `/${rest}` : ""}`;
+                      displayTarget = displayForTarget(normalized);
                       valid = true;
                       reason = "";
                     }
@@ -88,8 +90,30 @@ jobs:
             core.setOutput("valid", String(valid));
             core.setOutput("reason", reason);
             core.setOutput("target", normalized || raw);
+            core.setOutput("display_target", displayTarget || displayForTarget(normalized || raw));
             core.setOutput("owner", owner);
             core.setOutput("repo", repo);
+
+            function displayForTarget(value) {
+              try {
+                const url = new URL(value);
+                if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com") {
+                  return "[submitted target]";
+                }
+                const parts = url.pathname.split("/").filter(Boolean);
+                if (parts.length < 2) {
+                  return "github.com/[repository]";
+                }
+                const ownerRepo = `${parts[0]}/${parts[1].replace(/\.git$/, "")}`;
+                let rest = parts.slice(2);
+                if (/^(tree|blob)$/i.test(rest[0] || "") && rest.length >= 3) {
+                  rest = rest.slice(2);
+                }
+                return rest.length === 0 ? `github.com/${ownerRepo}` : `github.com/${ownerRepo}/.../${rest.at(-1)}`;
+              } catch (error) {
+                return "[submitted target]";
+              }
+            }
 
       - name: Check public repository visibility
         id: visibility
@@ -125,13 +149,13 @@ jobs:
         if: steps.parse.outputs.valid != 'true' || steps.visibility.outputs.public != 'true'
         uses: actions/github-script@v7
         env:
-          TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
           PARSE_REASON: ${{ steps.parse.outputs.reason }}
           VISIBILITY_REASON: ${{ steps.visibility.outputs.reason }}
         with:
           script: |
             const marker = "<!-- skillspec-doctor-report -->";
-            const target = process.env.TARGET || "not provided";
+            const target = process.env.DISPLAY_TARGET || "not provided";
             const reason = process.env.PARSE_REASON || process.env.VISIBILITY_REASON || "The URL could not be read as a public GitHub repository.";
             const body = [
               marker,
@@ -201,10 +225,10 @@ jobs:
         shell: bash
         env:
           TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
         run: |
           set -euo pipefail
           mkdir -p doctor-report
-          printf '%s\n' "${TARGET}" > doctor-report/target.txt
 
           set +e
           target/debug/skillspec doctor "${TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
@@ -218,16 +242,24 @@ jobs:
             target/debug/skillspec doctor "${TARGET}" --json > doctor-report/doctor-report.json
           fi
 
+      - name: Prepare public doctor artifacts
+        if: steps.visibility.outputs.public == 'true'
+        shell: bash
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
+        run: node .github/scripts/sanitize-doctor-report.mjs
+
       - name: Add doctor report to run summary
         if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
         shell: bash
         run: |
           set -euo pipefail
           max_report_chars=52000
-          report_bytes=$(wc -c < doctor-report/doctor-report.md | tr -d ' ')
+          report_bytes=$(wc -c < doctor-report-public/doctor-report.md | tr -d ' ')
 
           {
-            head -c "${max_report_chars}" doctor-report/doctor-report.md
+            head -c "${max_report_chars}" doctor-report-public/doctor-report.md
             echo
             if [ "${report_bytes}" -gt "${max_report_chars}" ]; then
               echo
@@ -243,7 +275,7 @@ jobs:
         if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status != '0'
         shell: bash
         env:
-          TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
         run: |
           set -euo pipefail
           max_error_chars=12000
@@ -254,14 +286,14 @@ jobs:
             echo "Target:"
             echo
             echo '```text'
-            printf '%s\n' "${TARGET}"
+            printf '%s\n' "${DISPLAY_TARGET}"
             echo '```'
             echo
             echo "Error:"
             echo
             echo '```text'
-            if [ -f doctor-report/doctor-stderr.txt ]; then
-              head -c "${max_error_chars}" doctor-report/doctor-stderr.txt
+            if [ -f doctor-report-public/doctor-stderr.txt ]; then
+              head -c "${max_error_chars}" doctor-report-public/doctor-stderr.txt
             else
               echo "No stderr was captured."
             fi
@@ -277,7 +309,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: doctor-report-${{ github.event.issue.number }}
-          path: doctor-report/
+          path: doctor-report-public/
           retention-days: 14
           if-no-files-found: error
 
@@ -290,7 +322,7 @@ jobs:
           script: |
             const fs = require("fs");
             const marker = "<!-- skillspec-doctor-report -->";
-            const report = fs.readFileSync("doctor-report/doctor-report.md", "utf8");
+            const report = fs.readFileSync("doctor-report-public/doctor-report.md", "utf8");
             const maxReportChars = 52000;
             const renderedReport = report.length > maxReportChars
               ? `${report.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
@@ -337,16 +369,16 @@ jobs:
         if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status != '0'
         uses: actions/github-script@v7
         env:
-          TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         with:
           script: |
             const fs = require("fs");
             const marker = "<!-- skillspec-doctor-report -->";
-            const stderr = fs.existsSync("doctor-report/doctor-stderr.txt")
-              ? fs.readFileSync("doctor-report/doctor-stderr.txt", "utf8")
+            const stderr = fs.existsSync("doctor-report-public/doctor-stderr.txt")
+              ? fs.readFileSync("doctor-report-public/doctor-stderr.txt", "utf8")
               : "No stderr was captured.";
-            const target = process.env.TARGET;
+            const target = process.env.DISPLAY_TARGET || "[submitted target]";
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,

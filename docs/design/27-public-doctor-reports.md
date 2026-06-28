@@ -55,10 +55,13 @@ Public GitHub skill URL
 ```
 
 Requests are recognized by either the `doctor-report` label or a title that
-starts with `Doctor report:`. The label is still attached by the issue template
-when the repository label exists, but the workflow also accepts the title prefix
-so first-time setup mistakes do not silently skip public requests. The parser
-prefers the issue-form body and falls back to a GitHub URL in the title.
+starts with `Doctor report:`. The public page and issue template use the generic
+title `Doctor report: request` so submitted URLs do not appear in issue lists,
+workflow run titles, or report-history headings. The label is still attached by
+the issue template when the repository label exists, but the workflow also
+accepts the title prefix so first-time setup mistakes and label-prefill limits
+do not silently skip public requests. The parser prefers the issue-form body and
+falls back to a GitHub URL in the title only for older manual requests.
 
 The workflow accepts only normalized `https://github.com/<owner>/<repo>` URLs
 and public GitHub folder URLs under them. Canonical GitHub folder URLs use
@@ -95,16 +98,20 @@ skillspec doctor "$target" --html > doctor-report.html
 skillspec doctor "$target" --json > doctor-report.json
 ```
 
-The Actions run summary and issue comment both render the Markdown report
-directly, so a public user can read the result directly in GitHub without
+The Actions run summary and issue comment both render a public-safe Markdown
+report directly, so a public user can read the result directly in GitHub without
 downloading an artifact. Long reports are truncated in GitHub surfaces and
-preserved in full in the artifact. The artifact contains:
+preserved in full in the artifact. Public artifacts are generated from sanitized
+copies, not the raw doctor work directory. Sanitization replaces the exact
+submitted target with a compact `github.com/<owner>/<repo>/.../<leaf>` label and
+redacts runner, temp, and local absolute paths from stdout, stderr, Markdown,
+HTML, and JSON files. The artifact contains:
 
 - `doctor-report.txt`
 - `doctor-report.md`
 - `doctor-report.html`
 - `doctor-report.json`
-- `target.txt`
+- `target.txt` with the compact public target label
 - `doctor-stderr.txt` when a run fails
 
 The report's next actions should teach the post-doctor path:
@@ -128,7 +135,7 @@ The Pages source lives under `docs/pages/` and is deployed by
 `.github/workflows/pages.yml`. It is a static client-side app:
 
 - The request form accepts only public `https://github.com/...` URLs and opens a
-  prefilled `Doctor report request` issue.
+  prefilled `Doctor report: request` issue with a generic title.
 - The report gallery reads public issues through GitHub's public Issues API and
   keeps entries whose title starts with `Doctor report:` or whose labels include
   `doctor-report`.
@@ -138,6 +145,8 @@ The Pages source lives under `docs/pages/` and is deployed by
 - Pending requests are shown when no report comment exists yet.
 - Error and private-repository cases remain visible because the issue workflow
   writes a marker-bearing comment with local-run instructions.
+  Invalid values are not echoed back verbatim; valid GitHub targets are shown as
+  compact public labels.
 
 This design avoids public write tokens in the browser while still giving users a
 friendly form, a public status list, and readable prior output.
@@ -150,6 +159,12 @@ The workflow treats issue input as untrusted.
 - The target URL is passed as an environment variable and quoted.
 - Only public GitHub repositories are allowed.
 - Repository visibility is checked before checkout/staging.
+- Public comments, run summaries, and uploaded artifacts are sanitized copies;
+  the raw target URL and raw doctor work directory are not uploaded.
+- Future issue titles and workflow run titles use generic wording so full GitHub
+  folder paths are not exposed in list views. The public issue body is still a
+  public GitHub surface, so users are told not to submit private repository
+  URLs, tokens, credential-bearing URLs, or sensitive paths.
 - The job has `contents: read` and `issues: write`; it does not request broad
   repository write permissions.
 - The job has a 15 minute timeout.
