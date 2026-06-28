@@ -39,6 +39,7 @@ skillspec router install --roots <skill-root>... --index <index-file-or-router-d
 skillspec router enable
 skillspec router disable
 skillspec router update [--backup-dir <backup-dir>]
+skillspec router guard [--config <router-config>] [--hook] [--json]
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall # alias: delete
@@ -56,6 +57,7 @@ skillspec durable-executor delete # alias: uninstall
   `--roots` path;
 - a SQLite index;
 - a visibility manifest;
+- managed Codex/Claude prompt guard hook entries where supported;
 - a router config under `SKILLSPEC_HOME/router/config.json`, or
   `~/.skillspec/router/config.json` when `SKILLSPEC_HOME` is not set.
 
@@ -64,19 +66,23 @@ directory paths resolve to `skill-index.sqlite`.
 
 Router mode is the managed state created by `skillspec router install`:
 
-- after install/enable and harness restart, the generated `skill-router` skill
-  is the first hop for every user request in managed roots and is directly
-  invocable;
+- after install/enable and when managed hooks are loaded by the active harness,
+  the generated `skill-router` skill is the first hop for every user request in
+  managed roots and is directly invocable;
 - when enabled, indexed routed skills are made explicit-only/manual-only unless
   they are already `off`;
 - `durable-executor` is implicit only when it is present in the managed roots
   and its own lifecycle state is enabled;
-- when disabled, the generated `skill-router` skill is explicit-only and routed
-  skills are restored to implicit/default native visibility;
+- when disabled, managed router guard hook entries are removed, the generated
+  `skill-router` skill is explicit-only, and routed skills are restored to
+  implicit/default native visibility;
 - the index remains searchable by `skillspec route`;
 - install and install-hook refreshes run an immediate status check after
   indexing; preparedness requires a present, non-stale index whose indexed
   skill count matches the discovered skill count;
+- `skillspec router guard` can be run by users or prompt hooks to verify
+  `first_hop_ready`; when enabled and index/visibility drift is detected it
+  reapplies router-managed visibility and rebuilds the index before reporting;
 - the manifest is the only rollback authority.
 
 Router install does not install or copy `durable-executor`. If
@@ -86,15 +92,16 @@ router install still succeeds and reports that durable first-hop execution is
 unavailable until durable-executor is installed separately.
 
 The router guarantee is visibility-backed, not prose-only. Within configured
-roots, router install/enable writes native metadata so the router is the
-implicit first hop for every request while routed skills stop competing for
-implicit selection. The router must query the local index first. If the index
-returns no suitable skill, the agent continues with the normal path for the
-request, including ordinary workspace or web search when those are otherwise
-allowed. A harness restart is required before active sessions reliably observe
-the metadata changes. Skills outside the managed roots, stale harness sessions,
-or harness-specific selection bugs are outside the guarantee; `skillspec
-status` and `skillspec router index status` are the verification gates.
+roots, router install/enable writes native metadata and managed prompt guard
+hooks so the router is the first hop for every request while routed skills stop
+competing for implicit selection. The router must query the local index first.
+If the index returns no suitable skill, the agent continues with the normal path
+for the request, including ordinary workspace or web search when those are
+otherwise allowed. A harness restart is required before active sessions
+reliably observe the metadata and hook changes. Skills outside the managed
+roots, stale harness sessions, disabled hooks, or harness-specific selection
+bugs are outside the guarantee; `skillspec status`, `skillspec router guard`,
+and `skillspec router index status` are the verification gates.
 
 `durable-executor` has its own managed lifecycle. `skillspec durable-executor
 install <source-folder>` first checks that `rote` is available on `PATH`, then
@@ -117,9 +124,10 @@ this durable lifecycle state so a later router update does not silently undo a
 durable disable.
 
 `skillspec router disable` is a switch, not an uninstall: it keeps config,
-manifest, index, and router skill files, but makes the router explicit-only and
-restores routed skills to implicit/default visibility. `skillspec router enable`
-switches router mode back on, refreshes router skill files, reapplies
+manifest, index, and router skill files, removes managed router guard hook
+entries, makes the router explicit-only, and restores routed skills to
+implicit/default visibility. `skillspec router enable` switches router mode back
+on, refreshes router skill files, reinstalls managed guard hooks, reapplies
 explicit-only routed-skill controls, rebuilds the index from current roots, and
 checks preparedness.
 
@@ -142,13 +150,14 @@ refresh, and restart warnings stay consistent.
 starts from `SKILLSPEC_HOME/router/config.json`, backs up the config, manifest,
 index, and every managed router skill directory, rewrites the generated
 SkillSpec-backed router package in each recorded root, reapplies visibility,
-preserves the current enabled/disabled mode, rebuilds the index only when
-enabled, and reports preparedness when enabled. Because Codex, Claude, Agents,
-and vendor harnesses load skill metadata at session start, the command warns the
-operator to restart active harness sessions after a successful update. This is
-the right repair path for stale generated router text, missing router
-`skill.spec.yml` files, or symlinked `.agents`/`.codex` roots that need every
-logical install path refreshed.
+refreshes managed guard hooks to match enabled state, preserves the current
+enabled/disabled mode, rebuilds the index only when enabled, and reports
+preparedness when enabled. Because Codex, Claude, Agents, and vendor harnesses
+load skill metadata and hooks at session start, the command warns the operator
+to restart active harness sessions after a successful update. This is the right
+repair path for stale generated router text, missing router `skill.spec.yml`
+files, stale managed hook commands, or symlinked `.agents`/`.codex` roots that
+need every logical install path refreshed.
 
 If a skill is added outside `skillspec install skill`, the router cannot observe
 that filesystem change until a router command runs. `skillspec router index

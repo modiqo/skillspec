@@ -45,6 +45,29 @@ fn write_file(path: &Path, content: &str) {
     fs::write(path, content).unwrap();
 }
 
+fn hook_commands(path: &Path) -> Vec<String> {
+    let text = fs::read_to_string(path).unwrap();
+    let value: Value = serde_json::from_str(&text).unwrap();
+    value
+        .get("hooks")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|hooks| hooks.values())
+        .filter_map(Value::as_array)
+        .flatten()
+        .filter_map(|group| group.get("hooks").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|hook| hook.get("command").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect()
+}
+
+fn has_hook_command(path: &Path, needle: &str) -> bool {
+    hook_commands(path)
+        .iter()
+        .any(|command| command.contains(needle))
+}
+
 fn invalid_json_shape(message: &'static str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message)
 }
@@ -1369,6 +1392,17 @@ fn router_install_hooks_install_skill_and_uninstall_restores_visibility() {
     let index = skillspec_home.join("router/skill-index.sqlite");
     let manifest = skillspec_home.join("router/visibility-manifest.json");
     let source = dir.path().join("note-source");
+    let codex_hooks = home.join(".codex/hooks.json");
+    let claude_settings = home.join(".claude/settings.json");
+
+    write_file(
+        &codex_hooks,
+        r#"{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"echo keep-codex"}]}]}}"#,
+    );
+    write_file(
+        &claude_settings,
+        r#"{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"echo keep-claude"}]}]}}"#,
+    );
 
     write_file(
         &root.join("pdf/SKILL.md"),
@@ -1407,6 +1441,28 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     let install_report = json_stdout(&install_router);
     assert_eq!(install_report["router_skill_status"], "installed");
     assert_eq!(install_report["durable_executor"]["present"], true);
+    assert_eq!(install_report["harness_hooks"].as_array().unwrap().len(), 2);
+    assert!(has_hook_command(&codex_hooks, "skillspec router guard"));
+    assert!(has_hook_command(&codex_hooks, "echo keep-codex"));
+    assert!(has_hook_command(&claude_settings, "skillspec router guard"));
+    assert!(has_hook_command(&claude_settings, "echo keep-claude"));
+
+    let lifecycle_status = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("status")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&lifecycle_status);
+    let lifecycle_report = json_stdout(&lifecycle_status);
+    let status_hooks = lifecycle_report["router"]["harness_hooks"]
+        .as_array()
+        .unwrap();
+    assert_eq!(status_hooks.len(), 2);
+    assert!(status_hooks
+        .iter()
+        .all(|hook| hook["status"] == "installed"));
     assert_eq!(
         install_report["visibility"]["changes"]
             .as_array()
@@ -1569,6 +1625,13 @@ routes:
     assert!(!root.join("pdf/agents/openai.yaml").exists());
     assert!(!root.join("durable-executor/agents/openai.yaml").exists());
     assert!(!root.join("notes/agents/openai.yaml").exists());
+    assert!(!has_hook_command(&codex_hooks, "skillspec router guard"));
+    assert!(has_hook_command(&codex_hooks, "echo keep-codex"));
+    assert!(!has_hook_command(
+        &claude_settings,
+        "skillspec router guard"
+    ));
+    assert!(has_hook_command(&claude_settings, "echo keep-claude"));
     assert!(!fs::read_to_string(root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
@@ -2066,6 +2129,145 @@ routes:
 }
 
 #[test]
+fn router_guard_repairs_out_of_band_skills_and_emits_hook_output() {
+    let dir = TempDir::new("router-guard");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".codex/skills");
+    let index = skillspec_home.join("router/skill-index.sqlite");
+    let config = skillspec_home.join("router/config.json");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text.
+---
+# PDF
+"#,
+    );
+
+    let missing_hook = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("guard")
+        .arg("--config")
+        .arg(&config)
+        .arg("--hook")
+        .output()
+        .unwrap();
+    assert_success(&missing_hook);
+    let missing_hook_report = json_stdout(&missing_hook);
+    assert_eq!(missing_hook_report["decision"], "block");
+    assert!(missing_hook_report["reason"]
+        .as_str()
+        .unwrap()
+        .contains("router config is missing"));
+    assert!(missing_hook_report["reason"]
+        .as_str()
+        .unwrap()
+        .contains("router install"));
+
+    let install_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install_router);
+
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Use when taking structured notes.
+---
+# Notes
+"#,
+    );
+    assert!(!root.join("notes/agents/openai.yaml").exists());
+
+    let guard = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("guard")
+        .arg("--config")
+        .arg(&config)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&guard);
+    let guard_report = json_stdout(&guard);
+    assert_eq!(guard_report["installed"], true);
+    assert_eq!(guard_report["enabled"], true);
+    assert_eq!(guard_report["repaired"], true);
+    assert_eq!(guard_report["first_hop_ready"], true);
+    assert_eq!(guard_report["status_before"]["stale"], true);
+    assert_eq!(guard_report["status_after"]["stale"], false);
+    assert_eq!(guard_report["index_report"]["skills_indexed"], 3);
+    assert!(fs::read_to_string(root.join("notes/agents/openai.yaml"))
+        .unwrap()
+        .contains("allow_implicit_invocation: false"));
+
+    let hook = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("guard")
+        .arg("--config")
+        .arg(&config)
+        .arg("--hook")
+        .output()
+        .unwrap();
+    assert_success(&hook);
+    let hook_report = json_stdout(&hook);
+    assert!(hook_report["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap()
+        .contains("first_hop_ready=true"));
+
+    let disable_router = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("disable")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&disable_router);
+
+    let disabled_hook = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("guard")
+        .arg("--config")
+        .arg(&config)
+        .arg("--hook")
+        .output()
+        .unwrap();
+    assert_success(&disabled_hook);
+    let disabled_hook_report = json_stdout(&disabled_hook);
+    assert_eq!(disabled_hook_report["decision"], "block");
+    assert!(disabled_hook_report["reason"]
+        .as_str()
+        .unwrap()
+        .contains("router config is installed but disabled"));
+    assert!(disabled_hook_report["reason"]
+        .as_str()
+        .unwrap()
+        .contains("router enable"));
+}
+
+#[test]
 fn router_install_reports_missing_optional_durable_executor() {
     let dir = TempDir::new("router-missing-durable");
     let home = dir.path().join("home");
@@ -2125,6 +2327,7 @@ fn router_disable_and_enable_toggle_visibility_and_reindex_all_roots() {
     let skillspec_home = dir.path().join("skillspec-home");
     let agents_root = home.join(".agents/skills");
     let codex_root = home.join(".codex/skills");
+    let codex_hooks = home.join(".codex/hooks.json");
     let index = skillspec_home.join("router/skill-index.sqlite");
 
     write_file(
@@ -2160,6 +2363,7 @@ description: Use when working with CSV files.
         .output()
         .unwrap();
     assert_success(&install_router);
+    assert!(has_hook_command(&codex_hooks, "skillspec router guard"));
     assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
@@ -2186,6 +2390,7 @@ description: Use when working with CSV files.
     let disable_report = json_stdout(&disable_router);
     assert_eq!(disable_report["enabled"], false);
     assert!(disable_report["index_report"].is_null());
+    assert!(!has_hook_command(&codex_hooks, "skillspec router guard"));
     assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: false"));
@@ -2233,6 +2438,7 @@ description: Use when editing markdown.
     assert_eq!(enable_report["enabled"], true);
     assert_eq!(enable_report["preparedness"]["ready"], true);
     assert_eq!(enable_report["index_report"]["skills_indexed"], 5);
+    assert!(has_hook_command(&codex_hooks, "skillspec router guard"));
     assert!(fs::read_to_string(agents_root.join("pdf/SKILL.md"))
         .unwrap()
         .contains("disable-model-invocation: true"));
@@ -3320,6 +3526,10 @@ commands:
     description: Enable router mode.
     template: skillspec router enable --json
     safety: local_write
+  router_guard:
+    description: Verify router guard readiness.
+    template: skillspec router guard --json
+    safety: local_write
   status_lifecycle_inventory:
     description: Inspect lifecycle status.
     template: skillspec status --json
@@ -3339,6 +3549,8 @@ commands:
     assert!(
         out.contains("skillspec router index refresh --roots <skill-roots> --index <router-index>")
     );
+    assert!(out.contains("skillspec router guard --json"));
+    assert!(out.contains("skillspec status --json"));
 }
 
 #[test]

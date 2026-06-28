@@ -1001,6 +1001,17 @@ pub(super) fn run(command: Command) -> Result<()> {
                     report::text(&router_lifecycle::render_mode(&report))?;
                 }
             }
+            RouterCommand::Guard { config, hook, json } => {
+                let report =
+                    router_lifecycle::guard(router_lifecycle::RouterGuardOptions { config, hook })?;
+                if hook {
+                    report::text(&router_lifecycle::render_guard_hook_json(&report)?)?;
+                } else if json {
+                    report::json(&report)?;
+                } else {
+                    report::text(&router_lifecycle::render_guard(&report))?;
+                }
+            }
             RouterCommand::Index { command } => match command {
                 RouterIndexCommand::Refresh {
                     roots,

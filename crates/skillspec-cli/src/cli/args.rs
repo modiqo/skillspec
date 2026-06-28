@@ -814,6 +814,18 @@ pub(super) enum RouterCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(about = "Verify router-first readiness, repair drift, and emit native hook output")]
+    Guard {
+        /// Router config path. Defaults to the installed router config.
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Emit harness hook JSON for UserPromptSubmit.
+        #[arg(long)]
+        hook: bool,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(about = "Detect, repair, or inspect router index drift")]
     Index {
         #[command(subcommand)]

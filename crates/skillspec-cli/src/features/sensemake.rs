@@ -501,6 +501,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 command: "skillspec router disable --json".to_owned(),
             },
             NavigationHint {
+                intent: "verify router guard readiness and repair drift",
+                command: "skillspec router guard --json".to_owned(),
+            },
+            NavigationHint {
                 intent: "refresh installed router index",
                 command:
                     "skillspec router index refresh --roots <skill-roots> --index <router-index>"
@@ -676,8 +680,10 @@ fn has_router_lifecycle(spec: &SkillSpec) -> bool {
         || spec.commands.contains_key("status_lifecycle_inventory")
         || spec.commands.contains_key("router_enable")
         || spec.commands.contains_key("router_disable")
+        || spec.commands.contains_key("router_guard")
         || spec.commands.values().any(|command| {
             command.template.contains("router enable")
+                || command.template.contains("router guard")
                 || command.template.contains("skillspec status")
         })
 }

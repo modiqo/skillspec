@@ -78,7 +78,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, refresh, or uninstall router
     rank: 20
-    description: Install the explicit-only router skill into the first managed root, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
+    description: Install the explicit-only router skill, manage prompt guard hooks, apply visibility, build and verify the index, refresh out-of-band additions, verify guard readiness, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -89,12 +89,12 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: skill-router
-          description: Run router install, uninstall, index refresh, or index status commands. Install prepares the router; refresh repairs router-managed visibility and indexes out-of-band prose or SkillSpec-backed additions.
+          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks; disable removes managed guard hooks.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
           owner_skill: skill-router
-          description: Verify router skill files, manifest, config, preparedness.ready, and index status after the lifecycle change.
+          description: Verify router skill files, manifest, config, harness_hooks, first_hop_ready, preparedness.ready, and index status after the lifecycle change.
           requires:
             - verify_router_lifecycle_result
 
@@ -191,8 +191,8 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use index refresh to apply explicit invocation controls and rebuild the index after out-of-band skill changes.
-    template: "skillspec router install|uninstall|index refresh|index status"
+    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use disable to remove managed guard hooks.
+    template: "skillspec router install|enable|disable|update|uninstall|guard|index refresh|index status"
     safety: local_write
 
   run_visibility_plan:

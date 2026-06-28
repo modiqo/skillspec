@@ -617,7 +617,7 @@ routes:
     description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility, so it must inventory roots, run the router install command, verify the implicit router surface, and verify routed skills are explicit-only.
+      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain normal fallback when the index finds no suitable skill.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -629,7 +629,7 @@ routes:
             - infer_router_roots_without_check
         - id: install_router_surface
           owner_skill: skillspec
-          description: Install or refresh the router skill inside the selected roots without using a separate router root.
+          description: Install or refresh the router skill and managed Codex/Claude guard hooks inside the selected roots without using a separate router root.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -641,11 +641,12 @@ routes:
           requires:
             - router_install
             - verify_router_install
+            - router_guard
           forbid:
             - use_removed_router_root
         - id: report_router_mode
           owner_skill: skillspec
-          description: Report which roots were changed, whether the router is implicit, whether routed skills are explicit-only, and whether durable first-hop is unavailable.
+          description: Report which roots and harness hook files were changed, whether router guard reports first_hop_ready, whether routed skills are explicit-only, whether no-match fallback returns to normal agent behavior, and whether durable first-hop is unavailable.
           requires:
             - verify_router_installed
   - id: update_skill_router
@@ -690,7 +691,7 @@ routes:
     description: Use when the user wants to switch router mode on or off without uninstalling the managed router package.
     execution_plan:
       mode: ordered
-      reason: Router enable/disable mutates native Codex and Claude visibility metadata while preserving router files, config, manifest, and index.
+      reason: Router enable/disable mutates native Codex and Claude visibility metadata and managed prompt guard hooks while preserving router files, config, manifest, and index.
       phases:
         - id: inspect_router_switch
           owner_skill: skillspec
@@ -701,7 +702,7 @@ routes:
             - mutate_unrecorded_router_roots
         - id: switch_router_mode
           owner_skill: skillspec
-          description: Enable rebuilds the index from current roots and makes routed skills explicit-only; disable makes router explicit-only and restores routed skills to implicit/default visibility.
+          description: Enable rebuilds the index from current roots, installs managed guard hooks, makes the router the first hop when hooks are loaded, and makes routed skills explicit-only; disable removes managed guard hooks, makes router explicit-only, and restores routed skills to implicit/default visibility.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -716,7 +717,7 @@ routes:
             - mutate_unrecorded_router_roots
         - id: report_router_switch
           owner_skill: skillspec
-          description: Report enabled state, visibility change count, index rebuild/preparedness for enable, and restart warning.
+          description: Report enabled state, harness_hooks installed/removed status, visibility change count, index rebuild/preparedness for enable, and restart warning.
           requires:
             - verify_router_updated
   - id: inspect_skillspec_status
@@ -2623,14 +2624,14 @@ commands:
       dependencies:
         - rote_cli
   router_install:
-    description: Install or refresh router mode in the selected skill roots, making router implicit and routed skills explicit-only.
+    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks, make routed skills explicit-only, and preserve no-match fallback to normal agent behavior.
     template: skillspec router install --roots <skill-roots> --index <router-index>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   router_enable_or_disable:
-    description: Switch installed router mode on or off without uninstalling router files; enable rebuilds the index from current roots.
+    description: Switch installed router mode on or off without uninstalling router files; enable rebuilds the index from current roots and installs managed prompt guard hooks, while disable removes the managed hooks.
     template: skillspec router enable|disable --json
     safety: local_write
     requires:
@@ -2651,16 +2652,23 @@ commands:
       dependencies:
         - skillspec_cli
   router_update:
-    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, then report the harness restart warning.
+    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, refresh managed guard hooks, then report the harness restart warning.
     template: skillspec router update --json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   verify_router_install:
-    description: Verify the generated skill-router files and visibility metadata under the selected roots.
+    description: Verify the generated skill-router files, visibility metadata, and index status under the selected roots.
     template: skillspec router index status --roots <skill-roots> --index <router-index>
     safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_guard:
+    description: Verify router-first readiness through the managed guard, repairing stale visibility/index drift and reporting first_hop_ready.
+    template: skillspec router guard --json
+    safety: local_write
     requires:
       dependencies:
         - skillspec_cli
@@ -3055,7 +3063,10 @@ recipes:
       - note: Choose roots explicitly; do not use or ask for a separate router root.
       - run_command: router_install
       - run_command: verify_router_install
+      - run_command: router_guard
       - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
+      - note: Report guard hook paths from harness_hooks and whether router guard returned first_hop_ready. Router-first is guaranteed only when managed hooks are loaded by the active harness.
+      - note: Report that every request should route through skill-router first, and if the index returns no suitable selected skill the agent should continue with normal behavior instead of forcing an unrelated skill.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.
@@ -3078,7 +3089,7 @@ recipes:
       - run_command: router_help
       - run_command: router_enable_or_disable
       - run_command: verify_router_install
-      - note: For enable, report index rebuild and preparedness. For disable, report that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
+      - note: For enable, report index rebuild, preparedness, harness_hooks installed status, and that the router becomes the first hop when managed hooks are loaded. For disable, report harness_hooks removed/missing status, that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
       - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
   status_inspection_loop:
     description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.

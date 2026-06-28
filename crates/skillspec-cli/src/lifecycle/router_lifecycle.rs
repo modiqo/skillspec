@@ -48,6 +48,12 @@ pub struct RouterRefreshOptions {
     pub visibility_manifest: Option<PathBuf>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RouterGuardOptions {
+    pub config: Option<PathBuf>,
+    pub hook: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct RouterInstallReport {
     pub router_name: String,
@@ -63,6 +69,7 @@ pub struct RouterInstallReport {
     pub visibility: VisibilityApplyReport,
     pub index_report: Option<IndexReport>,
     pub preparedness: RouterPreparednessReport,
+    pub harness_hooks: Vec<RouterHarnessHookReport>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -79,6 +86,7 @@ pub struct RouterUninstallReport {
     pub index_removed: bool,
     pub config_removed: bool,
     pub restore: VisibilityRestoreReport,
+    pub harness_hooks: Vec<RouterHarnessHookReport>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -95,6 +103,7 @@ pub struct RouterUpdateReport {
     pub visibility: VisibilityApplyReport,
     pub index_report: Option<IndexReport>,
     pub preparedness: Option<RouterPreparednessReport>,
+    pub harness_hooks: Vec<RouterHarnessHookReport>,
     pub restart_warning: String,
 }
 
@@ -112,6 +121,7 @@ pub struct RouterModeReport {
     pub visibility: VisibilityApplyReport,
     pub index_report: Option<IndexReport>,
     pub preparedness: Option<RouterPreparednessReport>,
+    pub harness_hooks: Vec<RouterHarnessHookReport>,
     pub restart_warning: String,
 }
 
@@ -127,6 +137,7 @@ pub struct RouterStatusReport {
     pub index: Option<PathBuf>,
     pub manifest: Option<PathBuf>,
     pub index_status: Option<IndexStatusReport>,
+    pub harness_hooks: Vec<RouterHarnessHookReport>,
     pub warnings: Vec<String>,
 }
 
@@ -167,12 +178,55 @@ pub struct RouterRefreshReport {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct RouterGuardReport {
+    pub config: PathBuf,
+    pub installed: bool,
+    pub enabled: bool,
+    pub repaired: bool,
+    pub first_hop_ready: bool,
+    pub router_skill_dirs: Vec<RouterSkillInstallStatus>,
+    pub status_before: Option<IndexStatusReport>,
+    pub status_after: Option<IndexStatusReport>,
+    pub visibility: Option<VisibilityApplyReport>,
+    pub index_report: Option<IndexReport>,
+    pub preparedness: Option<RouterPreparednessReport>,
+    pub repair_command: String,
+    pub message: String,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct RouterHookReport {
     pub config: PathBuf,
     pub router_skill_reports: Vec<RouterSkillReport>,
     pub visibility: VisibilityApplyReport,
     pub index_report: IndexReport,
     pub preparedness: RouterPreparednessReport,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouterHarnessHookReport {
+    pub harness: RouterHarness,
+    pub path: PathBuf,
+    pub status: RouterHarnessHookStatus,
+    pub command: String,
+    pub message: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RouterHarness {
+    Codex,
+    Claude,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouterHarnessHookStatus {
+    Planned,
+    Installed,
+    Removed,
+    Missing,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -297,7 +351,15 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         manifest.clone(),
         options.dry_run,
     )?;
-    let (index_report, preparedness) = if options.dry_run {
+    let (index_report, preparedness, harness_hooks) = if options.dry_run {
+        let planned_config = build_config(
+            &options.roots,
+            &router_skill_dirs,
+            &index,
+            &manifest,
+            &router_name,
+            true,
+        );
         (
             None,
             RouterPreparednessReport {
@@ -313,6 +375,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
                     "dry run did not write files, build the index, or check status".to_owned(),
                 ],
             },
+            hooks::apply_harness_hooks_for_config(&config, &planned_config, true, true)?,
         )
     } else {
         let report = router::index(router::IndexOptions {
@@ -331,7 +394,16 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
             &router_name,
             true,
         )?;
-        (Some(report), preparedness)
+        let saved_config =
+            read_config_optional_at(&config)?.ok_or_else(|| Error::InvalidInput {
+                message: format!(
+                    "router install wrote no readable config at {}",
+                    config.display()
+                ),
+            })?;
+        let harness_hooks =
+            hooks::apply_harness_hooks_for_config(&config, &saved_config, true, false)?;
+        (Some(report), preparedness, harness_hooks)
     };
 
     Ok(RouterInstallReport {
@@ -352,6 +424,7 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
         visibility,
         index_report,
         preparedness,
+        harness_hooks,
     })
 }
 
@@ -392,6 +465,14 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
         manifest: manifest.clone(),
         dry_run: options.dry_run,
     })?;
+    let harness_hooks = hooks::apply_harness_hooks_for_config(
+        &config_path,
+        config
+            .as_ref()
+            .expect("router config was required before uninstall"),
+        false,
+        options.dry_run,
+    )?;
 
     let router_skill_reports = remove_router_skills(&router_skill_dirs, options.dry_run)?;
     let router_skill_status = aggregate_router_file_status(&router_skill_reports);
@@ -433,6 +514,7 @@ pub fn uninstall(options: RouterUninstallOptions) -> Result<RouterUninstallRepor
         index_removed,
         config_removed,
         restore,
+        harness_hooks,
     })
 }
 
@@ -499,6 +581,12 @@ pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
         )?;
         (Some(report), Some(preparedness))
     };
+    let harness_hooks = hooks::apply_harness_hooks_for_config(
+        &config_path,
+        &config,
+        config.enabled,
+        options.dry_run,
+    )?;
 
     Ok(RouterUpdateReport {
         router_name: config.router_name,
@@ -513,6 +601,7 @@ pub fn update(options: RouterUpdateOptions) -> Result<RouterUpdateReport> {
         visibility,
         index_report,
         preparedness,
+        harness_hooks,
         restart_warning: restart_warning(),
     })
 }
@@ -539,6 +628,7 @@ pub fn status() -> Result<RouterStatusReport> {
             index: None,
             manifest: None,
             index_status: None,
+            harness_hooks: Vec::new(),
             warnings: Vec::new(),
         });
     };
@@ -559,6 +649,7 @@ pub fn status() -> Result<RouterStatusReport> {
         visibility_manifest: Some(config.manifest.clone()),
     })?;
     let warnings = index_status.warnings.clone();
+    let harness_hooks = hooks::inspect_harness_hooks_for_config(&config_path, &config);
 
     Ok(RouterStatusReport {
         installed: true,
@@ -571,6 +662,7 @@ pub fn status() -> Result<RouterStatusReport> {
         index: Some(config.index),
         manifest: Some(config.manifest),
         index_status: Some(index_status),
+        harness_hooks,
         warnings,
     })
 }
@@ -691,6 +783,10 @@ pub fn refresh(options: RouterRefreshOptions) -> Result<RouterRefreshReport> {
     })
 }
 
+pub fn guard(options: RouterGuardOptions) -> Result<RouterGuardReport> {
+    hooks::guard(options)
+}
+
 fn check_preparedness(
     roots: &[PathBuf],
     index: &Path,
@@ -749,10 +845,14 @@ fn preparedness_from_status(
     }
 }
 
+mod hooks;
 mod render;
 mod template;
 
-pub use render::{render_install, render_mode, render_refresh, render_uninstall, render_update};
+pub use render::{
+    render_guard, render_guard_hook_json, render_install, render_mode, render_refresh,
+    render_uninstall, render_update,
+};
 
 fn router_skill_dirs_for_roots(roots: &[PathBuf], router_name: &str) -> Vec<PathBuf> {
     roots.iter().map(|root| root.join(router_name)).collect()
@@ -867,7 +967,7 @@ fn default_update_backup_dir(config_path: &Path) -> PathBuf {
 }
 
 fn restart_warning() -> String {
-    "Restart active Codex, Claude, Agents, or vendor harness sessions so they reload updated router skill files and native visibility metadata.".to_owned()
+    "Restart active Codex, Claude, Agents, or vendor harness sessions so they reload updated router skill files, guard hooks, and native visibility metadata.".to_owned()
 }
 
 fn backup_file_if_present(
@@ -1163,6 +1263,8 @@ fn set_enabled(enabled: bool, options: RouterModeOptions) -> Result<RouterModeRe
             config.enabled,
         )?;
     }
+    let harness_hooks =
+        hooks::apply_harness_hooks_for_config(&config_path, &config, enabled, options.dry_run)?;
     Ok(RouterModeReport {
         router_name: config.router_name,
         router_skill_dirs,
@@ -1176,6 +1278,7 @@ fn set_enabled(enabled: bool, options: RouterModeOptions) -> Result<RouterModeRe
         visibility,
         index_report,
         preparedness,
+        harness_hooks,
         restart_warning: restart_warning(),
     })
 }
@@ -1223,7 +1326,27 @@ fn write_config(
     router_name: &str,
     enabled: bool,
 ) -> Result<()> {
-    let config = RouterConfig {
+    let config = build_config(
+        roots,
+        router_skill_dirs,
+        index,
+        manifest,
+        router_name,
+        enabled,
+    );
+    let json = serde_json::to_string_pretty(&config).map_err(Error::RenderJson)?;
+    write_file(path, &format!("{json}\n"))
+}
+
+fn build_config(
+    roots: &[PathBuf],
+    router_skill_dirs: &[PathBuf],
+    index: &Path,
+    manifest: &Path,
+    router_name: &str,
+    enabled: bool,
+) -> RouterConfig {
+    RouterConfig {
         schema: CONFIG_SCHEMA.to_owned(),
         created_at_unix: now_unix(),
         enabled,
@@ -1233,9 +1356,7 @@ fn write_config(
         manifest: manifest.to_path_buf(),
         legacy_router_root: None,
         router_name: router_name.to_owned(),
-    };
-    let json = serde_json::to_string_pretty(&config).map_err(Error::RenderJson)?;
-    write_file(path, &format!("{json}\n"))
+    }
 }
 
 fn default_enabled() -> bool {
@@ -1244,15 +1365,19 @@ fn default_enabled() -> bool {
 
 fn read_config_optional() -> Result<Option<RouterConfig>> {
     let path = config_path()?;
+    read_config_optional_at(&path)
+}
+
+fn read_config_optional_at(path: &Path) -> Result<Option<RouterConfig>> {
     if !path.is_file() {
         return Ok(None);
     }
-    let text = fs::read_to_string(&path).map_err(|source| Error::Read {
-        path: path.clone(),
+    let text = fs::read_to_string(path).map_err(|source| Error::Read {
+        path: path.to_path_buf(),
         source,
     })?;
     let config: RouterConfig = serde_json::from_str(&text).map_err(|source| Error::ParseJson {
-        path: path.clone(),
+        path: path.to_path_buf(),
         source,
     })?;
     if config.schema != CONFIG_SCHEMA {

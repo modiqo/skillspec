@@ -114,7 +114,7 @@ routes:
   - id: manage_router_lifecycle
     label: Install, update, refresh, or uninstall router
     rank: 20
-    description: Install the router skill into every managed root, enable or disable router mode, back up and update recorded router installs, apply visibility, build and verify the index, refresh out-of-band additions, or uninstall and restore visibility from the manifest.
+    description: Install the router skill into every managed root, manage guard hooks, enable or disable router mode, back up and update recorded router installs, apply visibility, build and verify the index, refresh out-of-band additions, verify guard readiness, or uninstall and restore visibility from the manifest.
     execution_plan:
       mode: ordered
       phases:
@@ -125,12 +125,12 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, enable, disable, update, uninstall, index refresh, or index status commands. Enable makes the router the first hop for every request after harness restart, makes routed skills explicit-only, rebuilds the index, and checks preparedness. Disable makes the router explicit-only and restores routed skills to implicit/default without deleting router files.
+          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
           owner_skill: {router_skill}
-          description: Verify router skill files, manifest, config, preparedness.ready, and index status after the lifecycle change.
+          description: Verify router skill files, manifest, config, harness_hooks, first_hop_ready, preparedness.ready, and index status after the lifecycle change.
           requires:
             - verify_router_lifecycle_result
 
@@ -228,8 +228,8 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use enable to reapply explicit invocation controls and rebuild the index after router mode was disabled.
-    template: 'skillspec router install|enable|disable|update|uninstall|index refresh|index status'
+    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
+    template: 'skillspec router install|enable|disable|update|uninstall|guard|index refresh|index status'
     safety: local_write
 
   run_visibility_plan:

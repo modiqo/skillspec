@@ -167,13 +167,15 @@ skillspec status --json
 skillspec router disable --json
 skillspec router enable --json
 skillspec router update --json
+skillspec router guard --json
 skillspec router delete --json
 ```
 
 Review check:
 
-- Disable does not uninstall; it makes router explicit-only and routed skills implicit/default.
-- Enable rebuilds the index from current roots and checks preparedness.
+- Disable does not uninstall; it removes managed guard hooks, makes router explicit-only, and makes routed skills implicit/default.
+- Enable reinstalls managed guard hooks, rebuilds the index from current roots, and checks preparedness.
+- Guard verifies `first_hop_ready` and repairs stale visibility/index drift before a prompt hook allows the turn.
 - Status is read-only; it reports lifecycle state, supported/scanned roots, router index freshness, and SkillSpec-backed versus legacy skill inventory without repairing visibility or rebuilding the index.
 - Update starts from saved router config.
 - Delete removes only generated router skills with the managed marker.
