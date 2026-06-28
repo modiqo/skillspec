@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260627-mobile-polish">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-contract-contrast">
   </head>
   <body>
     <header class="site-header">
@@ -54,6 +54,72 @@
             <a class="primary-link" href="#request-title">Check a skill</a>
             <a class="secondary-link" href="./why-skillspec.html">Read the research note</a>
           </div>
+        </div>
+      </section>
+
+      <section class="contract-contrast" aria-labelledby="contrast-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">What changes</p>
+            <h2 id="contrast-title">The same skill, with a contract that survives the run.</h2>
+          </div>
+        </div>
+        <div class="contrast-grid" aria-label="Direct skills compared with SkillSpec-backed skills">
+          <article class="contrast-lane contrast-lane-risk">
+            <div class="lane-heading">
+              <span class="lane-index">A</span>
+              <div>
+                <h3>Existing skill, used directly</h3>
+                <p>The agent reads prose and decides how much of it to follow.</p>
+              </div>
+            </div>
+            <div class="flow-row">
+              <div class="flow-node">SKILL.md</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node">Agent run</div>
+              <div class="flow-arrow broken" aria-hidden="true"></div>
+              <div class="flow-node muted-node">Different harness</div>
+            </div>
+            <div class="lane-result">
+              <strong>Contract breaks</strong>
+              <span>Steps can be skipped, reordered, or interpreted differently across runs and agent harnesses.</span>
+            </div>
+            <ul class="contrast-points" aria-label="Direct skill failure modes">
+              <li>Follow-through depends on prose interpretation.</li>
+              <li>Harness behavior can change the outcome.</li>
+              <li>Proof is whatever the final answer remembers to say.</li>
+            </ul>
+          </article>
+
+          <article class="contrast-lane contrast-lane-proof">
+            <div class="lane-heading">
+              <span class="lane-index">B</span>
+              <div>
+                <h3>SkillSpec-backed skill</h3>
+                <p>The visible skill stays thin while the CLI moderates the agent through the contract.</p>
+              </div>
+            </div>
+            <div class="flow-row">
+              <div class="flow-node">SKILL trampoline</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node">skill.spec.yml</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node">SkillSpec CLI</div>
+              <div class="flow-arrow" aria-hidden="true"></div>
+              <div class="flow-node proof-node">Proof report</div>
+            </div>
+            <div class="lane-result">
+              <strong>Contract holds</strong>
+              <span>Routes, phase order, tool boundaries, checks, and proof stay portable across runs and harnesses.</span>
+            </div>
+            <ul class="contract-tags" aria-label="SkillSpec contract parts">
+              <li>routes</li>
+              <li>plan</li>
+              <li>tool limits</li>
+              <li>checks</li>
+              <li>alignment proof</li>
+            </ul>
+          </article>
         </div>
       </section>
 
