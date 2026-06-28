@@ -843,6 +843,28 @@ fn help_lists_trace_align_arguments() {
     assert!(workspace_help.contains("install"));
     assert!(workspace_help.contains("plugin-shaped"));
 
+    let workspace_map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&workspace_map);
+    let workspace_map_help = stdout(&workspace_map);
+    assert!(workspace_map_help.contains("--install-slug-policy"));
+    assert!(workspace_map_help.contains("local-name"));
+
+    let workspace_install = Command::new(bin())
+        .arg("workspace")
+        .arg("install")
+        .arg("--help")
+        .output()
+        .unwrap();
+    assert_success(&workspace_install);
+    let workspace_install_help = stdout(&workspace_install);
+    assert!(workspace_install_help.contains("--install-slug-policy"));
+    assert!(workspace_install_help.contains("local-name"));
+
     let run_loop = Command::new(bin())
         .arg("run-loop")
         .arg("--help")
@@ -6244,6 +6266,7 @@ Run `/coding-standards` before the wrapper.
     assert!(PathBuf::from(format!("{}.report.md", manifest.display())).is_file());
 
     let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("install_slug_policy: workspace-path"));
     assert!(manifest_yaml.contains("install_slug: skills--code-review"));
     assert!(manifest_yaml.contains("install_slug: skills--review-wrapper"));
     assert!(manifest_yaml.contains("depends_on:\n    - coding-standards"));
@@ -6266,6 +6289,7 @@ Run `/coding-standards` before the wrapper.
     assert!(map_summary.contains("artifact_tokens_preserved: ~"));
     assert!(map_summary.contains("avoided_tokens: ~"));
     assert!(map_summary.contains("metrics_source: estimated"));
+    assert!(map_summary.contains("- install_slug_policy: workspace-path"));
     assert!(map_summary.contains(&format!("- manifest: {}", normalize_path(&manifest))));
     assert!(!map_summary.contains("## Packages"));
 
@@ -6292,6 +6316,42 @@ Run `/coding-standards` before the wrapper.
     assert!(validate_summary.contains("Workspace validate summary"));
     assert!(validate_summary.contains("metrics:"));
     assert!(validate_summary.contains("agent_visible_tokens: ~"));
+}
+
+#[test]
+fn workspace_map_local_name_policy_handles_root_level_simple_skill() {
+    let dir = TempDir::new("workspace-simple-local-name");
+    let root = dir.path().join("source-skill");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    write_file(
+        &root.join("SKILL.md"),
+        r#"---
+name: root-skill
+description: Root package.
+---
+# Root Skill
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--install-slug-policy")
+        .arg("local-name")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["install_slug_policy"], "local-name");
+
+    let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("install_slug_policy: local-name"));
+    assert!(manifest_yaml.contains("install_slug: root-skill"));
+    assert!(!manifest_yaml.contains("install_slug: source-skill--skill"));
 }
 
 #[test]
@@ -6495,6 +6555,70 @@ description: Privacy use-case triage.
 }
 
 #[test]
+fn workspace_map_local_name_policy_reports_plugin_slug_collisions() {
+    let dir = TempDir::new("workspace-plugin-local-name-collision");
+    let root = dir.path().join("plugin-workspace");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+
+    write_file(
+        &root
+            .join("alpha")
+            .join(".claude-plugin")
+            .join("plugin.json"),
+        r#"{"name":"alpha","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root.join("beta").join(".claude-plugin").join("plugin.json"),
+        r#"{"name":"beta","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root
+            .join("alpha")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+        "---\nname: review\ndescription: Alpha review.\n---\n# Review\n",
+    );
+    write_file(
+        &root
+            .join("beta")
+            .join("skills")
+            .join("review")
+            .join("SKILL.md"),
+        "---\nname: review\ndescription: Beta review.\n---\n# Review\n",
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--install-slug-policy")
+        .arg("local-name")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["install_slug_policy"], "local-name");
+    assert!(map_report["duplicate_install_slugs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|duplicate| duplicate["value"] == "review"));
+
+    let validate = Command::new(bin())
+        .arg("workspace")
+        .arg("validate")
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert_failure(&validate);
+    assert!(stdout(&validate).contains("duplicate install_slug \"review\""));
+}
+
+#[test]
 fn workspace_import_fans_out_packages_under_build_root() {
     let dir = TempDir::new("workspace-import");
     let root = dir.path().join("skills");
@@ -6650,6 +6774,52 @@ Read `../coding-standards/SKILL.md`.
     assert!(loader.contains("skill.spec.yml"));
     assert!(!loader.contains("## Runtime Contract"));
     assert!(!loader.contains("## Completion Report"));
+
+    let replacement_home = dir.path().join("replacement-home");
+    fs::create_dir_all(replacement_home.join(".agents/skills")).unwrap();
+    write_file(
+        &replacement_home
+            .join(".agents/skills")
+            .join("code-review")
+            .join("SKILL.md"),
+        "---\nname: code-review\ndescription: Old prose skill.\n---\n# Old\n",
+    );
+    let replacement_plan = Command::new(bin())
+        .env("HOME", &replacement_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--install-slug-policy")
+        .arg("local-name")
+        .arg("--retire-existing")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&replacement_plan);
+    let replacement_plan = json_stdout(&replacement_plan);
+    assert_eq!(replacement_plan["install_slug_policy"], "local-name");
+    let review_package = replacement_plan["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "code-review")
+        .unwrap();
+    assert_eq!(review_package["install_slug"], "code-review");
+    let review_target = &review_package["targets"][0];
+    assert!(review_target["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/.agents/skills/code-review"));
+    assert_eq!(review_target["existed"], true);
+    assert_eq!(review_target["retired_existing"], true);
+    assert!(!replacement_home
+        .join(".agents/skills/skills--code-review/SKILL.md")
+        .exists());
 
     let collision_home = dir.path().join("collision-home");
     fs::create_dir_all(collision_home.join(".agents/skills")).unwrap();

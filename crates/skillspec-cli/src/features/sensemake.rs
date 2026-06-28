@@ -580,6 +580,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                         .to_owned(),
             },
             NavigationHint {
+                intent: "map replacement workspace with canonical install slugs",
+                command:
+                    "skillspec workspace map <source-root> --out <build>/skillspec.workspace.yml --install-slug-policy local-name --summary"
+                        .to_owned(),
+            },
+            NavigationHint {
                 intent: "validate workspace graph",
                 command: "skillspec workspace validate <build>/skillspec.workspace.yml --summary"
                     .to_owned(),
@@ -606,6 +612,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 intent: "dry-run workspace install",
                 command:
                     "skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --dry-run --summary"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "dry-run replacement workspace install",
+                command:
+                    "skillspec workspace install <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex --install-slug-policy local-name --retire-existing --dry-run --summary"
                         .to_owned(),
             },
         ]);

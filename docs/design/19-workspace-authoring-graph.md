@@ -219,10 +219,35 @@ to contain colons.
 
 5. Assign install identity.
 
-   Every package receives a deterministic `install_slug` based on the workspace
-   slug plus the package path. Install identity is path-based, not just
-   display-name-based, so two packages with similar names do not overwrite each
-   other during grouped workspace install.
+   Every package receives a deterministic `install_slug`. The default policy is
+   `workspace-path`: workspace slug plus relative package path. This keeps
+   side-by-side workspace installs and plugin-shaped packages from flattening
+   into the same harness folder.
+
+   Replacement/upgrade flows can choose `local-name`:
+
+   ```bash
+   skillspec workspace map <source-root> \
+     --out <build>/skillspec.workspace.yml \
+     --install-slug-policy local-name
+   ```
+
+   or override an existing manifest during install:
+
+   ```bash
+   skillspec workspace install <build>/skillspec.workspace.yml \
+     --build-root <workspace-build> \
+     --target codex \
+     --install-slug-policy local-name \
+     --retire-existing \
+     --dry-run
+   ```
+
+   Use `local-name` only when the intent is to replace canonical installed
+   skills, for example retiring `rote-setup` with a generated `rote-setup`
+   package. Validation rejects duplicate `install_slug` values before install,
+   so plugin workspaces with repeated local names must keep `workspace-path` or
+   manually choose unique manifest slugs.
 
 6. Build the skill invocation index.
 
@@ -304,7 +329,9 @@ For a plugin-shaped workspace:
 4. explicit namespace invocations can cross plugin boundaries;
 5. plugin workflow links are preserved as references for reports and alignment
    without turning the whole plugin library into one cyclic dependency graph;
-6. install uses namespaced public names plus path-based install slugs.
+6. install uses namespaced public names plus `workspace-path` install slugs by
+   default; replacement installs may opt into `local-name` only when duplicate
+   install slugs are not present.
 
 Workspace install can optionally apply visibility. With the default
 `entry-implicit` policy, entry packages stay implicitly visible and shared,

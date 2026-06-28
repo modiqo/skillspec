@@ -573,7 +573,7 @@ routes:
             - validate_workspace_graph
         - id: plan_workspace_install
           owner_skill: skillspec
-          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation.
+          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation. Use workspace-path slugs for side-by-side or plugin-safe installs; use local-name with --retire-existing only when replacing canonical existing skill folders.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -2350,8 +2350,15 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_map_source:
-    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Default install slugs use workspace-path namespacing for side-by-side and plugin-safe installs. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
     template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_map_replacement_source:
+    description: Build the workspace package graph with canonical local-name install slugs for replacement or upgrade installs that must retire existing skill folders such as rote-setup instead of installing namespaced generated folders. Do not use this for plugin-shaped workspaces with repeated local skill names unless validation proves install_slug uniqueness.
+    template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --install-slug-policy local-name --summary
     safety: local_write
     requires:
       dependencies:
@@ -2387,6 +2394,13 @@ commands:
   workspace_install_dry_run:
     description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  workspace_install_replacement_dry_run:
+    description: Preflight a replacement workspace install using canonical local-name install slugs and --retire-existing, so old prose folders with the same canonical names are backed up and replaced instead of leaving duplicate generated folders discoverable.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --install-slug-policy local-name --retire-existing --dry-run --summary
     safety: local_read
     requires:
       dependencies:
@@ -2937,6 +2951,8 @@ recipes:
       - run_command: workspace_install_dry_run
       - produce_artifact: workspace_install_report
       - note: Review the dry-run report before actual install; missing loaders, folder collisions, public-name collisions, blocked dependencies, or surprising visibility targets must stop the install.
+      - note: If this is a replacement/upgrade install, use --install-slug-policy local-name with --retire-existing during the dry-run so canonical folders such as rote-setup are the planned targets.
+      - note: Keep workspace-path slugs for side-by-side or plugin-shaped installs unless local-name validation proves every install_slug is unique.
       - run_command: workspace_install_packages
       - produce_artifact: workspace_install_manifest
       - produce_artifact: workspace_install_report

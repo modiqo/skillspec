@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use skillspec::{
     compiler, grammar, install::HarnessTarget, router, router_lifecycle, sensemake, source_map,
-    visibility,
+    visibility, workspace,
 };
 use std::path::PathBuf;
 
@@ -477,7 +477,7 @@ pub(super) enum SourceCommand {
 pub(super) enum WorkspaceCommand {
     #[command(
         about = "Create a skillspec.workspace.yml graph from a folder with SKILL.md packages or plugin-shaped roots",
-        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
+        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. The default workspace-path install slug policy is side-by-side and plugin safe; use local-name for replacement installs that must retire canonical existing skill folders. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
     )]
     Map {
         /// Local source root containing one or more skill packages.
@@ -485,6 +485,9 @@ pub(super) enum WorkspaceCommand {
         /// Output path for skillspec.workspace.yml.
         #[arg(long)]
         out: PathBuf,
+        /// Install folder slug policy to write into the manifest.
+        #[arg(long, value_enum, default_value_t = WorkspaceInstallSlugPolicyArg::WorkspacePath)]
+        install_slug_policy: WorkspaceInstallSlugPolicyArg,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
@@ -562,7 +565,7 @@ pub(super) enum WorkspaceCommand {
     },
     #[command(
         about = "Install compiled workspace packages into harness roots",
-        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names, blocks folder and public-name collisions unless explicitly retired where supported, installs dependencies before dependents, reports workspace visibility policy, optionally applies native visibility metadata, writes workspace-install.report.md, and does not refresh router indexes."
+        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names or an explicit install slug policy override, blocks folder and public-name collisions unless explicitly retired where supported, installs dependencies before dependents, reports workspace visibility policy, optionally applies native visibility metadata, writes workspace-install.report.md, and does not refresh router indexes."
     )]
     Install {
         /// Path to skillspec.workspace.yml.
@@ -582,6 +585,9 @@ pub(super) enum WorkspaceCommand {
         /// Back up and remove an existing active install folder before installing this workspace package.
         #[arg(long)]
         retire_existing: bool,
+        /// Override manifest install slugs for this install plan without editing the manifest.
+        #[arg(long, value_enum)]
+        install_slug_policy: Option<WorkspaceInstallSlugPolicyArg>,
         /// Visibility policy recorded for installed packages.
         #[arg(long, value_enum, default_value_t = WorkspaceVisibilityPolicyArg::EntryImplicit)]
         visibility_policy: WorkspaceVisibilityPolicyArg,
@@ -1421,6 +1427,12 @@ pub(super) enum InstallTargetArg {
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
+pub(super) enum WorkspaceInstallSlugPolicyArg {
+    WorkspacePath,
+    LocalName,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
 pub(super) enum SenseViewArg {
     Index,
     Summary,
@@ -1479,6 +1491,15 @@ impl From<InstallTargetArg> for HarnessTarget {
             InstallTargetArg::Agents => Self::Agents,
             InstallTargetArg::Codex => Self::Codex,
             InstallTargetArg::ClaudeLocal => Self::ClaudeLocal,
+        }
+    }
+}
+
+impl From<WorkspaceInstallSlugPolicyArg> for workspace::WorkspaceInstallSlugPolicy {
+    fn from(value: WorkspaceInstallSlugPolicyArg) -> Self {
+        match value {
+            WorkspaceInstallSlugPolicyArg::WorkspacePath => Self::WorkspacePath,
+            WorkspaceInstallSlugPolicyArg::LocalName => Self::LocalName,
         }
     }
 }

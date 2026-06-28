@@ -29,10 +29,29 @@ pub struct WorkspaceManifest {
     pub schema: String,
     pub source_root: String,
     pub workspace_slug: String,
+    #[serde(default)]
+    pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub output_root: String,
     pub packages: BTreeMap<String, WorkspacePackage>,
     #[serde(default)]
     pub references: Vec<WorkspaceReference>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WorkspaceInstallSlugPolicy {
+    #[default]
+    WorkspacePath,
+    LocalName,
+}
+
+impl WorkspaceInstallSlugPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::WorkspacePath => "workspace-path",
+            Self::LocalName => "local-name",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -109,6 +128,7 @@ pub struct WorkspaceMapReport {
     pub report_path: String,
     pub source_root: String,
     pub workspace_slug: String,
+    pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub plugin_namespaces: Vec<WorkspacePluginNamespaceReport>,
     pub package_count: usize,
     pub dependency_edges: Vec<WorkspaceDependencyEdge>,
@@ -183,7 +203,11 @@ pub fn guard_single_skill_source(path: &Path, command_name: &str) -> Result<()> 
     })
 }
 
-pub fn map_workspace(source_root: &Path, manifest_path: &Path) -> Result<WorkspaceMapReport> {
+pub fn map_workspace(
+    source_root: &Path,
+    manifest_path: &Path,
+    install_slug_policy: WorkspaceInstallSlugPolicy,
+) -> Result<WorkspaceMapReport> {
     let source_root = normalize_source_root(source_root)?;
     let packages = discover_packages(&source_root)?;
     if packages.is_empty() {
@@ -199,7 +223,7 @@ pub fn map_workspace(source_root: &Path, manifest_path: &Path) -> Result<Workspa
     let output_root = default_output_root(&source_root);
     let mut package_map = BTreeMap::new();
     for package in packages {
-        let install_slug = format!("{workspace_slug}--{}", path_slug(&package.path));
+        let install_slug = install_slug_for_policy(&workspace_slug, &package, install_slug_policy);
         let kind = infer_package_kind(&package);
         package_map.insert(
             package.package_id.clone(),
@@ -221,6 +245,7 @@ pub fn map_workspace(source_root: &Path, manifest_path: &Path) -> Result<Workspa
         schema: WORKSPACE_SCHEMA.to_owned(),
         source_root: path_to_string(&source_root),
         workspace_slug,
+        install_slug_policy,
         output_root: path_to_string(&output_root),
         packages: package_map,
         references: Vec::new(),
@@ -257,6 +282,10 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
     output.push_str("Workspace map\n\n");
     output.push_str(&format!("- source_root: {}\n", report.source_root));
     output.push_str(&format!("- workspace_slug: {}\n", report.workspace_slug));
+    output.push_str(&format!(
+        "- install_slug_policy: {}\n",
+        report.install_slug_policy.as_str()
+    ));
     output.push_str(&format!("- packages: {}\n", report.package_count));
     output.push_str(&format!("- manifest: {}\n", report.manifest_path));
     output.push_str(&format!("- report: {}\n", report.report_path));
@@ -419,6 +448,10 @@ pub fn render_map_summary(report: &WorkspaceMapReport, elapsed: Duration) -> Str
         output.push_str(&format!("- status: {}\n", status_text(true)));
         output.push_str(&format!("- source_root: {}\n", report.source_root));
         output.push_str(&format!("- workspace_slug: {}\n", report.workspace_slug));
+        output.push_str(&format!(
+            "- install_slug_policy: {}\n",
+            report.install_slug_policy.as_str()
+        ));
         output.push_str(&format!("- packages: {}\n", report.package_count));
         output.push_str(&format!(
             "- plugin_namespaces: {}\n",
@@ -619,6 +652,10 @@ pub fn render_install_summary(report: &WorkspaceInstallReport, elapsed: Duration
         output.push_str(&format!("- build_root: {}\n", report.build_root));
         output.push_str(&format!("- targets: {}\n", report.targets.join(", ")));
         output.push_str(&format!("- packages: {}\n", report.package_count));
+        output.push_str(&format!(
+            "- install_slug_policy: {}\n",
+            report.install_slug_policy.as_str()
+        ));
         output.push_str(&format!("- installed: {}\n", report.installed.len()));
         output.push_str(&format!("- planned: {}\n", report.planned.len()));
         output.push_str(&format!("- failed: {}\n", report.failed.len()));
@@ -764,7 +801,10 @@ fn push_next_summary(output: &mut String, next: &[String]) {
     }
 }
 
-fn validate_manifest(path: &Path, manifest: &WorkspaceManifest) -> WorkspaceValidationReport {
+pub(super) fn validate_manifest(
+    path: &Path,
+    manifest: &WorkspaceManifest,
+) -> WorkspaceValidationReport {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
@@ -1314,6 +1354,7 @@ fn map_report(
         report_path: path_to_string(report_path),
         source_root: manifest.source_root.clone(),
         workspace_slug: manifest.workspace_slug.clone(),
+        install_slug_policy: manifest.install_slug_policy,
         plugin_namespaces: plugin_namespace_reports(manifest),
         package_count: manifest.packages.len(),
         dependency_edges: dependency_edges(manifest),
@@ -1810,6 +1851,17 @@ fn infer_package_kind(package: &SkillPackageSource) -> WorkspacePackageKind {
     WorkspacePackageKind::Helper
 }
 
+pub(super) fn apply_install_slug_policy(
+    manifest: &mut WorkspaceManifest,
+    policy: WorkspaceInstallSlugPolicy,
+) {
+    manifest.install_slug_policy = policy;
+    for package in manifest.packages.values_mut() {
+        package.install_slug =
+            install_slug_for_manifest_package(&manifest.workspace_slug, package, policy);
+    }
+}
+
 fn package_id_from_path(path: &Path) -> String {
     let id = path
         .components()
@@ -1842,6 +1894,62 @@ fn path_slug(path: &Path) -> String {
     } else {
         slug
     }
+}
+
+fn install_slug_for_policy(
+    workspace_slug: &str,
+    package: &SkillPackageSource,
+    policy: WorkspaceInstallSlugPolicy,
+) -> String {
+    match policy {
+        WorkspaceInstallSlugPolicy::WorkspacePath => {
+            format!("{workspace_slug}--{}", path_slug(&package.path))
+        }
+        WorkspaceInstallSlugPolicy::LocalName => canonical_package_slug(
+            package.local_name.as_deref(),
+            &package.path,
+            &package.public_name,
+        ),
+    }
+}
+
+fn install_slug_for_manifest_package(
+    workspace_slug: &str,
+    package: &WorkspacePackage,
+    policy: WorkspaceInstallSlugPolicy,
+) -> String {
+    match policy {
+        WorkspaceInstallSlugPolicy::WorkspacePath => {
+            format!("{workspace_slug}--{}", path_slug(Path::new(&package.path)))
+        }
+        WorkspaceInstallSlugPolicy::LocalName => canonical_package_slug(
+            package.local_name.as_deref(),
+            Path::new(&package.path),
+            &package.public_name,
+        ),
+    }
+}
+
+fn canonical_package_slug(
+    local_name: Option<&str>,
+    package_path: &Path,
+    public_name: &str,
+) -> String {
+    local_name
+        .map(slugify)
+        .filter(|slug| !slug.is_empty())
+        .or_else(|| {
+            package_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(slugify)
+                .filter(|slug| !slug.is_empty())
+        })
+        .or_else(|| {
+            let slug = slugify(public_name);
+            (!slug.is_empty()).then_some(slug)
+        })
+        .unwrap_or_else(|| path_slug(package_path))
 }
 
 fn workspace_slug(source_root: &Path) -> String {

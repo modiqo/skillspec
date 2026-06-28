@@ -714,6 +714,7 @@ mod tests {
             schema: super::super::WORKSPACE_SCHEMA.to_owned(),
             source_root: "/tmp/skills".to_owned(),
             workspace_slug: "skills".to_owned(),
+            install_slug_policy: super::super::WorkspaceInstallSlugPolicy::WorkspacePath,
             output_root: "/tmp/skills/.skillspec/workspace-build".to_owned(),
             packages: BTreeMap::from([
                 ("app".to_owned(), package("app", &["shared"])),

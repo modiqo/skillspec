@@ -327,6 +327,16 @@ contracts, compiled loaders, dependency ledgers, workspace reports, and proof
 artifacts after restarting the harness and interacting with the installed
 SkillSpec-backed skills through the agent.
 
+Install folder names are explicit. The default `--install-slug-policy
+workspace-path` is side-by-side safe for plugin-shaped and published workspace
+installs because it keeps package paths namespaced. Use `--install-slug-policy
+local-name` when the intent is to replace existing canonical skills and retire
+folders such as `rote-setup` instead of installing generated names such as
+`normalized-source--skills--rote-setup`. You can set the policy during
+`workspace map`, or override it during `workspace install` for an existing
+manifest. Validation blocks duplicate install slugs before any harness folder is
+retired.
+
 Use `--summary` for harness-friendly output with wall-clock and estimated token
 metrics, including cache hits and misses where applicable. The detailed reports,
 source maps, package evidence, loaders, and install manifests remain on disk at

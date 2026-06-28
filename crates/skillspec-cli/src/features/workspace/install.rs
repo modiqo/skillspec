@@ -1,6 +1,7 @@
 use super::{
-    dependency_edges, load_manifest, output_package_dir, path_to_string, topological_package_order,
-    validate_workspace, write_text, WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
+    apply_install_slug_policy, dependency_edges, load_manifest, output_package_dir, path_to_string,
+    topological_package_order, validate_manifest, write_text, WorkspaceDependencyEdge,
+    WorkspaceInstallSlugPolicy, WorkspaceManifest, WorkspacePackage,
 };
 use crate::error::{Error, Result};
 use crate::git_context;
@@ -24,6 +25,7 @@ pub struct WorkspaceInstallReport {
     pub install_manifest_path: String,
     pub package_count: usize,
     pub targets: Vec<String>,
+    pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub installed: Vec<String>,
     pub planned: Vec<String>,
     pub failed: Vec<String>,
@@ -159,6 +161,7 @@ struct WorkspaceInstalledManifest {
     schema: &'static str,
     manifest_path: String,
     build_root: String,
+    install_slug_policy: WorkspaceInstallSlugPolicy,
     targets: Vec<String>,
     packages: Vec<WorkspaceInstalledPackage>,
 }
@@ -192,6 +195,7 @@ pub struct WorkspaceInstallRequest<'a> {
     pub all_detected: bool,
     pub dry_run: bool,
     pub retire_existing: bool,
+    pub install_slug_policy: Option<WorkspaceInstallSlugPolicy>,
     pub visibility_policy: WorkspaceVisibilityPolicy,
     pub apply_visibility: bool,
     pub visibility_manifest: Option<&'a Path>,
@@ -219,7 +223,12 @@ struct InstallReportContext<'a> {
 }
 
 pub fn install_workspace(request: WorkspaceInstallRequest<'_>) -> Result<WorkspaceInstallReport> {
-    let validation = validate_workspace(request.manifest_path)?;
+    let mut manifest = load_manifest(request.manifest_path)?;
+    if let Some(policy) = request.install_slug_policy {
+        apply_install_slug_policy(&mut manifest, policy);
+    }
+
+    let validation = validate_manifest(request.manifest_path, &manifest);
     if !validation.ok {
         return Err(Error::InvalidInput {
             message: format!(
@@ -245,7 +254,6 @@ pub fn install_workspace(request: WorkspaceInstallRequest<'_>) -> Result<Workspa
         });
     }
 
-    let manifest = load_manifest(request.manifest_path)?;
     let duplicate_public_names = duplicate_public_names(&manifest);
     let preflight_context = PreflightContext {
         build_root: request.build_root,
@@ -314,6 +322,10 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
     ));
     output.push_str(&format!("- targets: {}\n", report.targets.join(", ")));
     output.push_str(&format!("- packages: {}\n", report.package_count));
+    output.push_str(&format!(
+        "- install_slug_policy: {}\n",
+        report.install_slug_policy.as_str()
+    ));
     output.push_str(&format!(
         "- visibility_policy: {}\n",
         report.visibility_policy.as_str()
@@ -733,6 +745,7 @@ fn install_report(
             .iter()
             .map(|root| root.id.to_owned())
             .collect(),
+        install_slug_policy: context.manifest.install_slug_policy,
         installed,
         planned,
         failed,
@@ -807,6 +820,7 @@ fn write_install_manifest(
         schema: INSTALL_MANIFEST_SCHEMA,
         manifest_path: report.manifest_path.clone(),
         build_root: report.build_root.clone(),
+        install_slug_policy: report.install_slug_policy,
         targets: report.targets.clone(),
         packages: report
             .packages

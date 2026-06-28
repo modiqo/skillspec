@@ -294,11 +294,13 @@ pub(super) fn run(command: Command) -> Result<()> {
             WorkspaceCommand::Map {
                 source_root,
                 out,
+                install_slug_policy,
                 json,
                 summary,
             } => {
                 let started = Instant::now();
-                let workspace_report = workspace::map_workspace(&source_root, &out)?;
+                let workspace_report =
+                    workspace::map_workspace(&source_root, &out, install_slug_policy.into())?;
                 let elapsed = started.elapsed();
                 if json {
                     report::json(&workspace_report)?;
@@ -407,6 +409,7 @@ pub(super) fn run(command: Command) -> Result<()> {
                 all_detected,
                 dry_run,
                 retire_existing,
+                install_slug_policy,
                 visibility_policy,
                 apply_visibility,
                 visibility_manifest,
@@ -426,6 +429,7 @@ pub(super) fn run(command: Command) -> Result<()> {
                         all_detected,
                         dry_run,
                         retire_existing,
+                        install_slug_policy: install_slug_policy.map(Into::into),
                         visibility_policy: visibility_policy.into(),
                         apply_visibility,
                         visibility_manifest: visibility_manifest.as_deref(),

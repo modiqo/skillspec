@@ -420,7 +420,7 @@ workspace stats remain the separate measured token-accounting path.
 ### `workspace map`
 
 ```text
-skillspec workspace map <SOURCE_ROOT> --out <OUT> [--summary]
+skillspec workspace map <SOURCE_ROOT> --out <OUT> [--install-slug-policy <POLICY>] [--summary]
 ```
 
 Arguments:
@@ -430,6 +430,9 @@ Arguments:
 Options:
 
 - `--out <OUT>`: output path for `skillspec.workspace.yml`.
+- `--install-slug-policy <POLICY>`: installed folder naming policy written to
+  the manifest. Values are `workspace-path` and `local-name`. Defaults to
+  `workspace-path`.
 - `--summary`: emit a compact human summary with wall-clock time, estimated
   agent-visible tokens, preserved artifact tokens, avoided tokens, and report
   paths. Full proof artifacts are still written to disk.
@@ -439,6 +442,13 @@ Options:
 and invocation visibility, assigns package ids, assigns deterministic install
 slugs, scans Markdown for cross-package references, and writes a markdown report
 beside the manifest.
+
+The default `workspace-path` policy prefixes install folders with the workspace
+slug and relative package path. This is safest for side-by-side publication and
+plugin-shaped workspaces because it avoids flattening packages with repeated
+local names. Use `local-name` for replacement/upgrade flows where the generated
+package must retire an existing canonical folder such as `rote-setup`.
+Validation rejects duplicate `install_slug` values before install.
 
 When the source has plugin-shaped folders, the mapper preserves those boundaries
 as namespaces instead of flattening names. A folder with `skills/` plus
@@ -583,7 +593,7 @@ It does not install skills or refresh router indexes.
 ### `workspace install`
 
 ```text
-skillspec workspace install <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET> [--summary]
+skillspec workspace install <MANIFEST> --build-root <BUILD_ROOT> --target <TARGET> [--install-slug-policy <POLICY>] [--summary]
 ```
 
 Arguments:
@@ -600,6 +610,9 @@ Options:
 - `--dry-run`: show the full install plan without writing harness files.
 - `--retire-existing`: back up and remove an existing active install folder
   before installing the package with the same `install_slug`.
+- `--install-slug-policy <POLICY>`: override manifest install slugs for this
+  install plan without editing the manifest. Values are `workspace-path` and
+  `local-name`.
 - `--visibility-policy <POLICY>`: workspace visibility policy to report and,
   when requested, apply. Values are `entry-implicit`, `all-implicit`,
   `all-manual`, and `none`. Defaults to `entry-implicit`.
