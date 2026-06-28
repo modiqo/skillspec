@@ -7,7 +7,7 @@ SkillSpec supports two public doctor-report paths:
 2. Public users can open a "Doctor report request" issue with a public GitHub
    skill URL. GitHub Actions validates the URL, runs `skillspec doctor`, uploads
    report artifacts, and comments back with the formatted report.
-3. The GitHub Pages site at `https://modiqo.github.io/skillspec/` provides a
+3. The GitHub Pages site at `https://skillspec.sh/` provides a
    public form and report gallery. The form opens a prefilled issue request; the
    gallery reads public doctor-report issues and renders their workflow comments.
 
@@ -73,7 +73,7 @@ After syntax validation, the workflow calls the GitHub repository API for
 workflow comments with local-run instructions:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 git clone <your-private-repo-url>
 skillspec doctor /path/to/local/skill
 skillspec doctor /path/to/local/skill --markdown > skillspec-doctor.md

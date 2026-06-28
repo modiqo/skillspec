@@ -67,7 +67,7 @@ Alignment: partial
 For public installs on macOS and Linux x86_64, use the prebuilt release binary:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 skillspec --version
 ```
 
@@ -84,7 +84,7 @@ Published binary assets:
 To pin a release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \
+curl -fsSL https://skillspec.sh/install.sh \
   | SKILLSPEC_VERSION=v0.1.0 sh
 ```
 
@@ -362,7 +362,7 @@ For installing SkillSpec itself into a harness, prefer the official plugin
 marketplace flow:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 # or:
 cargo install skillspec
 skillspec --version

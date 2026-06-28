@@ -61,7 +61,7 @@ plugins/skillspec/skills/skillspec/source/SKILL_md.old
 Install the CLI from the latest prebuilt release binary:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 skillspec --version
 ```
 

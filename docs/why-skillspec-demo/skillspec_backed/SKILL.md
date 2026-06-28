@@ -27,7 +27,7 @@ Before the final response, follow the guide's end anchor: record final-response 
 If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 # or, with Rust installed:
 cargo install skillspec
 ```
