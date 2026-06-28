@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 320" role="img" aria-labelledby="title desc">
   <title id="title">SkillSpec monochrome wordmark</title>
   <desc id="desc">A mirrored S glyph paired with a restrained SkillSpec wordmark.</desc>
-  <rect width="1040" height="320" fill="#fff"/>
   <g transform="translate(42 34)">
     <rect width="252" height="252" rx="42" fill="#000"/>
     <g fill="none" stroke="#fff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">

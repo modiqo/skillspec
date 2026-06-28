@@ -1075,7 +1075,6 @@ body {
 
 .site-brand {
   display: inline-flex;
-  gap: 12px;
   align-items: center;
   color: var(--ink);
   font-family: var(--font-display);
@@ -1084,19 +1083,9 @@ body {
 }
 
 .site-brand img {
-  width: min(190px, 38vw);
+  width: min(210px, 42vw);
   height: auto;
   display: block;
-}
-
-.site-brand span {
-  border-left: 1px solid var(--line-soft);
-  padding-left: 12px;
-  color: var(--muted);
-  font-family: var(--font-ui);
-  font-size: 0.88rem;
-  font-weight: 720;
-  letter-spacing: 0;
 }
 
 .site-nav {
@@ -1266,15 +1255,16 @@ h3 {
 }
 
 .hero {
-  grid-template-columns: minmax(0, 1.18fr) minmax(500px, 0.82fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: end;
   margin-bottom: 36px;
-  padding: 70px 0 28px;
+  padding: 70px 0 36px;
 }
 
 .hero-copy {
-  padding-right: 12px;
+  max-width: 1120px;
+  padding-right: 0;
 }
 
 .lede {
@@ -1322,28 +1312,6 @@ h3 {
 .layer-visual img {
   min-height: 100%;
   object-fit: contain;
-}
-
-.chalk-visual {
-  overflow: hidden;
-  background: #26302c;
-}
-
-.chalk-visual img {
-  display: block;
-  width: 100%;
-  min-height: 100%;
-  object-fit: cover;
-}
-
-.chalk-visual figcaption {
-  border-top: 2px solid var(--paper-soft);
-  padding: 18px 22px;
-  background: #26302c;
-  color: #f2efe4;
-  font-family: var(--font-display);
-  font-size: 1.08rem;
-  line-height: 1.42;
 }
 
 .hero-actions {
@@ -1808,7 +1776,7 @@ pre {
 
 .modiqo-credit {
   display: inline-flex;
-  gap: 14px;
+  gap: 10px;
   align-items: center;
   color: var(--paper-soft);
   font-size: 0.98rem;
@@ -1818,14 +1786,6 @@ pre {
 
 .modiqo-credit span {
   color: rgba(251, 248, 240, 0.72);
-}
-
-.modiqo-credit img {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(251, 248, 240, 0.22);
-  border-radius: 999px;
-  object-fit: contain;
 }
 
 .modiqo-credit strong {
@@ -1887,10 +1847,6 @@ pre {
     width: min(165px, 58vw);
   }
 
-  .site-brand span {
-    display: none;
-  }
-
   .header-search input[type="search"] {
     min-height: 44px;
   }
@@ -1927,10 +1883,6 @@ pre {
 
   .hero-body {
     padding-top: 20px;
-  }
-
-  .chalk-visual figcaption {
-    font-size: 0.98rem;
   }
 
   .hero-actions,
