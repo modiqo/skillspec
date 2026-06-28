@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Run SkillSpec Doctor on public GitHub skill repositories and review prior reports."
+      content="SkillSpec is an open-source verifier and executor for agent skills. Try Doctor, install the CLI, then create and run skills with routes, checks, and proof."
     >
-    <title>SkillSpec Doctor Reports</title>
+    <title>SkillSpec - Verifiable Agent Skills</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-follow-through-top">
+    <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-verifier-executor">
   </head>
   <body>
     <header class="site-header">
@@ -30,7 +30,9 @@
         <input id="site-search" name="q" type="search" placeholder="Search">
       </form>
       <nav class="site-nav" aria-label="Primary navigation">
-        <a href="#request-title">Run Doctor</a>
+        <a href="#request-title">Try Doctor</a>
+        <a href="#install-title">Install</a>
+        <a href="#personas-title">Who it is for</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
         <a
           class="github-link star-link"
@@ -40,7 +42,7 @@
           aria-label="Star SkillSpec on GitHub"
         >
           <span>GitHub</span>
-          <span class="star-badge" aria-hidden="true">★ <span data-github-stars>Star</span></span>
+          <span class="star-badge" aria-hidden="true">&#9733; <span data-github-stars>Star</span></span>
         </a>
         <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
       </nav>
@@ -48,25 +50,30 @@
     <main class="shell">
       <section class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
-          <p class="eyebrow">Now checking · Agent skill reliability</p>
-          <h1 id="page-title">Skills agents can actually follow.</h1>
+          <p class="eyebrow">Agent skill verifier and executor</p>
+          <h1 id="page-title">Make agent skills reliable.</h1>
           <p class="lede">
-            Run Doctor on a public skill. See the shape, the
-            <span class="follow-through-wrap">
-              <span class="follow-through-mark">follow-through</span>
-              <span class="follow-through-note">The gap between “sure, I’ll follow the steps” and actually following the steps.</span>
-            </span>
-            risk,
-            and the evidence before you ask an agent to rely on it.
+            Start with Doctor. Install SkillSpec. Make it your default way to
+            create and run skills that agents can actually follow.
           </p>
           <p class="hero-body">
-            SkillSpec turns important skill prose into a routeable, testable
-            contract: when to use the skill, what path to follow, what tools are
-            allowed, what checks must pass, and what proof should exist at the end.
+            SkillSpec is an open-source CLI and contract format for
+            <code>SKILL.md</code> packages. It checks a skill, turns it into a
+            routeable workflow, guides execution through phases, tools, and
+            checks, then records proof of what actually happened.
           </p>
           <div class="hero-actions">
-            <a class="primary-link" href="#request-title">Check a skill</a>
-            <a class="secondary-link" href="./why-skillspec.html">Read the research note</a>
+            <a class="primary-link" href="#request-title">Try Doctor</a>
+            <a class="secondary-link" href="#install-title">Install SkillSpec</a>
+            <a class="secondary-link github-link star-link" href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">
+              <span>Star on GitHub</span>
+              <span class="star-badge" aria-hidden="true">&#9733; <span data-github-stars>Star</span></span>
+            </a>
+          </div>
+          <div class="signal-strip" aria-label="What SkillSpec does">
+            <span>Check current skills</span>
+            <span>Create verified skills</span>
+            <span>Execute with proof</span>
           </div>
         </div>
       </section>
@@ -75,7 +82,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">What changes</p>
-            <h2 id="contrast-title">The same skill, with a contract that survives the run.</h2>
+            <h2 id="contrast-title">Current skills versus life after SkillSpec.</h2>
           </div>
         </div>
         <div class="contrast-grid" aria-label="Direct skills compared with SkillSpec-backed skills">
@@ -83,25 +90,25 @@
             <div class="lane-heading">
               <span class="lane-index">A</span>
               <div>
-                <h3>Existing skill, used directly</h3>
-                <p>The agent reads prose and decides how much of it to follow.</p>
+                <h3>Current skills</h3>
+                <p>A plain skill is useful documentation, but the runtime still depends on model interpretation.</p>
               </div>
             </div>
             <div class="flow-row">
               <div class="flow-node">SKILL.md</div>
               <div class="flow-arrow" aria-hidden="true"></div>
-              <div class="flow-node">Agent run</div>
+              <div class="flow-node">Model reads prose</div>
               <div class="flow-arrow broken" aria-hidden="true"></div>
-              <div class="flow-node muted-node">Different harness</div>
+              <div class="flow-node muted-node">Best-effort result</div>
             </div>
             <div class="lane-result">
-              <strong>Contract breaks</strong>
-              <span>Steps can be skipped, reordered, or interpreted differently across runs and agent harnesses.</span>
+              <strong>Intent is not enforcement</strong>
+              <span>Steps can be skipped, tools can be improvised, setup can be missed, and proof is easy to lose.</span>
             </div>
             <ul class="contrast-points" aria-label="Direct skill failure modes">
-              <li>Follow-through depends on prose interpretation.</li>
-              <li>Harness behavior can change the outcome.</li>
-              <li>Proof is whatever the final answer remembers to say.</li>
+              <li>Good prose still competes with context pressure.</li>
+              <li>Different harnesses can run the same skill differently.</li>
+              <li>Users must trust that the final answer followed the plan.</li>
             </ul>
           </article>
 
@@ -109,12 +116,12 @@
             <div class="lane-heading">
               <span class="lane-index">B</span>
               <div>
-                <h3>SkillSpec-backed skill</h3>
-                <p>The visible skill stays thin while the CLI moderates the agent through the contract.</p>
+                <h3>Life after SkillSpec</h3>
+                <p>The skill ships with a machine-checkable contract and a CLI that guides execution.</p>
               </div>
             </div>
             <div class="flow-row">
-              <div class="flow-node">SKILL trampoline</div>
+              <div class="flow-node">Skill loader</div>
               <div class="flow-arrow" aria-hidden="true"></div>
               <div class="flow-node">skill.spec.yml</div>
               <div class="flow-arrow" aria-hidden="true"></div>
@@ -123,15 +130,15 @@
               <div class="flow-node proof-node">Proof report</div>
             </div>
             <div class="lane-result">
-              <strong>Contract holds</strong>
-              <span>Routes, phase order, tool boundaries, checks, and proof stay portable across runs and harnesses.</span>
+              <strong>The skill becomes executable</strong>
+              <span>Routes, phase order, tool boundaries, checks, resume behavior, and final proof are explicit.</span>
             </div>
             <ul class="contract-tags" aria-label="SkillSpec contract parts">
               <li>routes</li>
-              <li>plan</li>
+              <li>phases</li>
               <li>tool limits</li>
               <li>checks</li>
-              <li>alignment proof</li>
+              <li>proof</li>
             </ul>
           </article>
         </div>
@@ -139,15 +146,16 @@
 
       <section class="request-panel" aria-labelledby="request-title">
         <div>
-          <p class="eyebrow">Risk profile</p>
-          <h2 id="request-title">Assess your skill and plugin risk profile</h2>
+          <p class="eyebrow">Entry point</p>
+          <h2 id="request-title">Try Doctor on one public skill URL.</h2>
           <p>
-            Run Doctor on a public skill or plugin folder to see where agents
-            may skip steps, overload context, miss references, or finish without proof.
+            Doctor is the fastest way to see the reliability gap. Paste a public
+            GitHub skill, plugin, or repo URL and get a report that shows where
+            agent execution may drift.
           </p>
         </div>
         <form id="doctor-form" class="request-form" novalidate>
-          <label for="target-url">Public GitHub skill URL</label>
+          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
           <div class="input-row">
             <input
               id="target-url"
@@ -158,7 +166,7 @@
               placeholder="https://github.com/org/repo/tree/main/skills/example"
               required
             >
-            <button type="submit">Assess risk</button>
+            <button type="submit">Run Doctor</button>
           </div>
           <p class="input-help">
             Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
@@ -170,37 +178,77 @@
         </form>
       </section>
 
-      <section class="private-note" aria-labelledby="private-title">
+      <section class="private-note" aria-labelledby="install-title" id="install">
         <div>
-          <p class="eyebrow">Local copy</p>
-          <h2 id="private-title">Private repository?</h2>
+          <p class="eyebrow">Install next</p>
+          <h2 id="install-title">Make SkillSpec your default skill path.</h2>
           <p>
-            Public Actions cannot inspect private source. Install locally and
-            run Doctor from a checkout you control, then publish the Markdown
-            report in your own repo or pull request if you want reviewers to see it.
+            Use the public Doctor for a first look, then install the CLI locally.
+            From there, create, convert, route, and run skills with the same
+            verifier-executor loop you can publish with your project.
           </p>
         </div>
         <pre><code>curl -fsSL https://skillspec.sh/install.sh | sh
-skillspec doctor /path/to/local/skill
-skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code></pre>
+skillspec doctor ./skills/my-skill
+/skillspec import ./skills/my-skill
+/skillspec install router</code></pre>
+      </section>
+
+      <section class="proof-path personas-section" aria-labelledby="personas-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Who it is for</p>
+            <h2 id="personas-title">One contract for users, authors, and product teams shipping skills.</h2>
+          </div>
+        </div>
+        <div class="persona-grid">
+          <article>
+            <h3>Skill users</h3>
+            <p>
+              Run installed skills with precise routes, allowed tools, required
+              checks, and proof instead of hoping the agent remembers every step.
+            </p>
+          </article>
+          <article>
+            <h3>Skill authors</h3>
+            <p>
+              Publish skills that explain when they should run, how they should
+              run, and what evidence proves they completed correctly.
+            </p>
+          </article>
+          <article>
+            <h3>Tool authors</h3>
+            <p>
+              Ship product skills that guide agents through the right workflow,
+              reduce misuse, and make advanced features easier to adopt.
+            </p>
+          </article>
+          <article>
+            <h3>Hardware and software teams</h3>
+            <p>
+              Package support, setup, diagnostics, and automation skills so
+              customers get repeatable action instead of fragile prompt recipes.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section class="proof-path" aria-labelledby="proof-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">From baseline to proof</p>
-            <h2 id="proof-title">What to do after Doctor</h2>
+            <p class="eyebrow">Adoption path</p>
+            <h2 id="proof-title">Try it once. Then make it how you create and use skills.</h2>
           </div>
         </div>
         <div class="proof-grid">
           <article>
             <span>1</span>
             <div class="proof-copy">
-              <h3>Measure the current skill</h3>
+              <h3>Check the skill you already have</h3>
               <p>
-                Run Doctor first against either a public GitHub skill URI or a
-                local skill folder. Treat the report as the baseline before
-                SkillSpec changes anything.
+                Run Doctor on a public URL or a local folder. The report shows
+                where execution can skip, drift, overload context, miss
+                dependencies, or finish without proof.
               </p>
             </div>
             <pre><code># Public GitHub URI
@@ -215,50 +263,60 @@ skillspec doctor ./skills/example \
           <article>
             <span>2</span>
             <div class="proof-copy">
-              <h3>Import through the harness</h3>
+              <h3>Install the verifier-executor</h3>
               <p>
-                Ask Codex, Claude, or Agents to import the same kind of target:
-                a public GitHub URI or a local folder. The agent should create
-                the structured plan, compile it, test it, and print alignment.
+                Install the CLI so SkillSpec can check private skills, compile
+                contracts, refresh the router, and guide real work from your
+                local checkout.
               </p>
             </div>
-            <pre><code># Public GitHub URI
-/skillspec import \
-  https://github.com/org/repo/tree/main/skills/example
-
-# Local folder
-/skillspec import ./skills/example
-
-Then compile, verify, test, prove,
-and print the alignment summary.</code></pre>
+            <pre><code>curl -fsSL https://skillspec.sh/install.sh | sh
+skillspec --help</code></pre>
           </article>
           <article>
             <span>3</span>
             <div class="proof-copy">
-              <h3>Read and publish proof</h3>
+              <h3>Create or convert the skill</h3>
               <p>
-                The alignment summary should show the selected route, proven steps,
-                missing proof if any, forbidden-action status, and run metrics when
-                available.
+                Convert important prose into a contract that names the route,
+                phases, tool boundaries, checks, and completion proof the agent
+                should follow.
               </p>
             </div>
-            <p class="proof-note">
-              Publish the baseline report, generated <code>skill.spec.yml</code>,
-              compiled loader, and alignment report with the repo or pull request.
-            </p>
+            <pre><code># Existing skill
+/skillspec import ./skills/my-skill
+
+# New product skill
+Write SKILL.md, then import and prove it.</code></pre>
           </article>
           <article>
             <span>4</span>
             <div class="proof-copy">
-              <h3>Try the enabled skill</h3>
+              <h3>Run through the router by default</h3>
               <p>
-                Restart the harness after install, then use the SkillSpec-backed
-                skill normally on a real task.
+                Use router mode so skills are selected intentionally, executed
+                through the SkillSpec path, and checked before they become the
+                agent's first answer.
               </p>
             </div>
             <p class="proof-note">
-              The loader stays small while the CLI guides route, phase, checks,
-              resume, and proof.
+              The visible loader stays small while SkillSpec handles routing,
+              phase order, checks, resume, and proof.
+            </p>
+          </article>
+          <article>
+            <span>5</span>
+            <div class="proof-copy">
+              <h3>Ship proof with the skill</h3>
+              <p>
+                Publish the Doctor baseline, generated <code>skill.spec.yml</code>,
+                compiled loader, and alignment report so users can see exactly
+                how the skill is meant to run.
+              </p>
+            </div>
+            <p class="proof-note">
+              This is the default path for companies shipping agent skills with
+              hardware, software, APIs, or internal operations.
             </p>
           </article>
         </div>
@@ -267,8 +325,8 @@ and print the alignment summary.</code></pre>
       <section class="reports-section" aria-labelledby="reports-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Public report history</p>
-            <h2 id="reports-title">Prior runs</h2>
+            <p class="eyebrow">Public proof</p>
+            <h2 id="reports-title">Recent Doctor reports</h2>
           </div>
           <div class="toolbar">
             <button class="filter active" type="button" data-filter="all">All</button>
@@ -286,7 +344,7 @@ and print the alignment summary.</code></pre>
       <section class="runs-section" aria-labelledby="runs-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Workflow run history</p>
+            <p class="eyebrow">Public automation</p>
             <h2 id="runs-title">Doctor runs</h2>
           </div>
         </div>

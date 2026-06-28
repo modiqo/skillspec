@@ -1382,6 +1382,27 @@ h3 {
   margin-top: 28px;
 }
 
+.signal-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 900px;
+  margin-top: 26px;
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+.signal-strip span {
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 12px 14px;
+  background: rgba(251, 248, 240, 0.64);
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-weight: 760;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .contract-contrast {
   margin-bottom: 30px;
   border: 2px solid var(--line);
@@ -1862,6 +1883,37 @@ pre code {
   overflow-wrap: anywhere;
 }
 
+.personas-section {
+  margin-top: 30px;
+}
+
+.persona-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+.persona-grid article {
+  min-width: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 22px;
+  background: rgba(251, 248, 240, 0.64);
+}
+
+.persona-grid h3 {
+  margin-bottom: 10px;
+  font-size: 1.18rem;
+}
+
+.persona-grid p {
+  margin-bottom: 0;
+  color: #5a534b;
+  line-height: 1.65;
+}
+
 .proof-note {
   grid-column: 2;
   border-left: 2px solid var(--line);
@@ -2209,6 +2261,10 @@ pre code {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .persona-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .card-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2282,6 +2338,7 @@ pre code {
   }
 
   .hero-actions,
+  .signal-strip,
   .input-row,
   .toolbar {
     display: grid;
@@ -2380,6 +2437,7 @@ pre code {
   .pressure-diagram,
   .contract-flow,
   .solution-grid,
+  .persona-grid,
   .source-list {
     grid-template-columns: 1fr;
   }
