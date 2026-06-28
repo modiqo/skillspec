@@ -32,7 +32,7 @@ form.addEventListener("submit", (event) => {
 
   const url = validation.url;
   const issueUrl = new URL(`https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new`);
-  issueUrl.searchParams.set("title", `Doctor report: ${url}`);
+  issueUrl.searchParams.set("title", "Doctor report: request");
   issueUrl.searchParams.set("labels", REPORT_LABEL);
   issueUrl.searchParams.set(
     "body",
