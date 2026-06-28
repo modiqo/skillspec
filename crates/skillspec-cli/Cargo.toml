@@ -1,6 +1,6 @@
 [package]
 name = "skillspec"
-version = "0.1.3"
+version = "0.1.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
