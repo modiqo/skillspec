@@ -55,7 +55,7 @@ and print the alignment summary.
 
 No install required to try it. Paste a public skill URL into the hosted page:
 
-**<https://modiqo.github.io/skillspec/>**
+**<https://skillspec.sh/>**
 
 ## Why This Exists
 
@@ -85,7 +85,7 @@ contract:
 Install the CLI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+curl -fsSL https://skillspec.sh/install.sh | sh
 skillspec --version
 ```
 
@@ -129,7 +129,7 @@ checksum and writes to `~/.local/bin` by default.
 Pin a version or choose an install directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \
+curl -fsSL https://skillspec.sh/install.sh \
   | SKILLSPEC_VERSION=v0.1.0 SKILLSPEC_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
@@ -227,7 +227,7 @@ still the harness's job.
 Want to check a public skill before installing or porting it? Use the hosted
 Doctor page:
 
-**<https://modiqo.github.io/skillspec/>**
+**<https://skillspec.sh/>**
 
 You can also open a
 [Doctor report request](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)

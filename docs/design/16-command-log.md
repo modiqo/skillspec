@@ -92,8 +92,8 @@ distribution commands, not SkillSpec runtime commands.
 
 | Method | Command | Explanation |
 | --- | --- | --- |
-| Release binary | `curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \| sh` | Downloads the latest published GitHub release asset for macOS or Linux x86_64, verifies the `.sha256`, and installs `skillspec` to `~/.local/bin` by default. |
-| Pinned release binary | `curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh \| SKILLSPEC_VERSION=v0.1.0 sh` | Installs a specific release tag. `SKILLSPEC_INSTALL_DIR=/path/to/bin` changes the destination. |
+| Release binary | `curl -fsSL https://skillspec.sh/install.sh \| sh` | Downloads the latest published GitHub release asset for macOS or Linux x86_64, verifies the `.sha256`, and installs `skillspec` to `~/.local/bin` by default. |
+| Pinned release binary | `curl -fsSL https://skillspec.sh/install.sh \| SKILLSPEC_VERSION=v0.1.0 sh` | Installs a specific release tag. `SKILLSPEC_INSTALL_DIR=/path/to/bin` changes the destination. |
 | Crates.io | `cargo install skillspec` | Builds and installs the published crate from crates.io. Use when Rust is already installed or a prebuilt asset is unavailable for the platform. |
 | Git main | `cargo install --git https://github.com/modiqo/skillspec --package skillspec --force` | Installs unreleased `main`; use for testing pending changes only. |
 | Local checkout | `cargo install --path crates/skillspec-cli --force` | Installs from the current repo checkout for development and release verification. |
@@ -106,7 +106,7 @@ These are repository automation surfaces, not `skillspec` CLI subcommands.
 | --- | --- | --- |
 | CI dogfood doctor | Push or pull request quality run | Runs `skillspec doctor skills/skillspec/`, prints the Markdown report to the GitHub job summary, and uploads text, Markdown, HTML, and JSON artifacts. |
 | Doctor report request issue | `Doctor report request` issue form, `doctor-report` label, or `Doctor report:` title prefix | Validates a public `https://github.com/...` skill URL from the issue body or title, rejects private or unreadable repositories with local-run instructions, runs `skillspec doctor` for accepted public targets, writes the Markdown report to the Actions run summary, comments the rendered report on the issue, and uploads Markdown/HTML/JSON/text artifacts. |
-| Public doctor Pages site | `https://modiqo.github.io/skillspec/` | Static GitHub Pages app that validates public GitHub skill URLs, opens a prefilled doctor-report issue request, lists prior public report issues, and renders the workflow's Markdown report comments without exposing a browser-side write token. |
+| Public doctor Pages site | `https://skillspec.sh/` | Static GitHub Pages app that validates public GitHub skill URLs, opens a prefilled doctor-report issue request, lists prior public report issues, and renders the workflow's Markdown report comments without exposing a browser-side write token. |
 
 ## Durable Executor Lifecycle Commands
 

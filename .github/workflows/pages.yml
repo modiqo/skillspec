@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - docs/pages/**
+      - install.sh
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -35,10 +36,16 @@ jobs:
         with:
           enablement: true
 
+      - name: Stage Pages artifact
+        run: |
+          mkdir -p _site
+          cp -R docs/pages/. _site/
+          cp install.sh _site/install.sh
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/pages
+          path: _site
 
       - name: Deploy Pages
         id: deployment
