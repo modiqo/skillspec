@@ -1074,10 +1074,29 @@ body {
 }
 
 .site-brand {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 1.55rem;
   text-decoration: none;
+}
+
+.site-brand img {
+  width: min(190px, 38vw);
+  height: auto;
+  display: block;
+}
+
+.site-brand span {
+  border-left: 1px solid var(--line-soft);
+  padding-left: 12px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 720;
+  letter-spacing: 0;
 }
 
 .site-nav {
@@ -1303,6 +1322,28 @@ h3 {
 .layer-visual img {
   min-height: 100%;
   object-fit: contain;
+}
+
+.chalk-visual {
+  overflow: hidden;
+  background: #26302c;
+}
+
+.chalk-visual img {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+}
+
+.chalk-visual figcaption {
+  border-top: 2px solid var(--paper-soft);
+  padding: 18px 22px;
+  background: #26302c;
+  color: #f2efe4;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  line-height: 1.42;
 }
 
 .hero-actions {
@@ -1759,6 +1800,45 @@ pre {
   background: rgba(251, 248, 240, 0.64);
 }
 
+.site-footer {
+  border-top: 2px solid var(--line);
+  padding: 26px min(44px, 5vw);
+  background: var(--ink);
+}
+
+.modiqo-credit {
+  display: inline-flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--paper-soft);
+  font-size: 0.98rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.modiqo-credit span {
+  color: rgba(251, 248, 240, 0.72);
+}
+
+.modiqo-credit img {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(251, 248, 240, 0.22);
+  border-radius: 999px;
+  object-fit: contain;
+}
+
+.modiqo-credit strong {
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 620;
+}
+
+.modiqo-credit:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 @media (max-width: 1080px) {
   .site-header,
   .hero,
@@ -1803,6 +1883,14 @@ pre {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .site-brand img {
+    width: min(165px, 58vw);
+  }
+
+  .site-brand span {
+    display: none;
+  }
+
   .header-search input[type="search"] {
     min-height: 44px;
   }
@@ -1839,6 +1927,10 @@ pre {
 
   .hero-body {
     padding-top: 20px;
+  }
+
+  .chalk-visual figcaption {
+    font-size: 0.98rem;
   }
 
   .hero-actions,
