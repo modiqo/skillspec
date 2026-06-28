@@ -1291,7 +1291,7 @@ h3 {
 
 .lede {
   max-width: 1120px;
-  margin-bottom: 62px;
+  margin-bottom: 48px;
   color: #5d564d;
   font-family: var(--font-display);
   font-size: 2rem;
@@ -1302,6 +1302,8 @@ h3 {
 .follow-through-wrap {
   position: relative;
   display: inline-block;
+  padding-top: 1.45em;
+  vertical-align: baseline;
   white-space: nowrap;
 }
 
@@ -1317,17 +1319,17 @@ h3 {
 
 .follow-through-note {
   position: absolute;
-  top: calc(100% + 0.7em);
-  left: 0.05em;
+  top: 0;
+  left: 0.02em;
   width: max-content;
-  max-width: min(31rem, 72vw);
+  max-width: min(34rem, 76vw);
   color: var(--green);
   font-family: var(--font-ui);
-  font-size: 0.42em;
+  font-size: 0.4em;
   font-style: normal;
   letter-spacing: 0.01em;
   line-height: 1.24;
-  transform: rotate(-1.5deg);
+  transform: rotate(-1deg);
   white-space: normal;
 }
 
@@ -2271,7 +2273,7 @@ pre code {
   }
 
   .lede {
-    margin-bottom: 54px;
+    margin-bottom: 40px;
     font-size: 1.5rem;
   }
 
@@ -2409,19 +2411,20 @@ pre code {
   }
 
   .lede {
-    margin-bottom: 48px;
+    margin-bottom: 36px;
     font-size: 1.28rem;
   }
 
   .follow-through-wrap {
+    padding-top: 1.55em;
     white-space: normal;
   }
 
   .follow-through-note {
-    top: calc(100% + 0.55em);
+    top: 0;
     left: 0;
     max-width: calc(100vw - 36px);
-    font-size: 0.52em;
+    font-size: 0.48em;
     transform: none;
   }
 
