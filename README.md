@@ -18,7 +18,7 @@ No new agent runtime. No orchestration platform. Just a CLI and a small
 
 <p align="center">
   <a href="https://github.com/modiqo/skillspec/blob/main/assets/skillspec-layer-stack.svg">
-    <img src="https://raw.githubusercontent.com/modiqo/skillspec/main/assets/skillspec-layer-stack.svg" alt="SkillSpec sits inside the skills layer" width="900">
+    <img src="https://raw.githubusercontent.com/modiqo/skillspec/main/assets/skillspec-layer-stack.svg" alt="SkillSpec sits inside the skills layer" width="1100">
   </a>
 </p>
 

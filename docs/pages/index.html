@@ -8,27 +8,35 @@
       content="Run SkillSpec Doctor on public GitHub skill repositories and review prior reports."
     >
     <title>SkillSpec Doctor Reports</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260627-article">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260627-editorial">
   </head>
   <body>
+    <header class="site-header">
+      <a class="site-brand" href="./index.html">skillspec.sh</a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#request-title">Run Doctor</a>
+        <a href="./why-skillspec.html">Why SkillSpec</a>
+        <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
+      </nav>
+    </header>
     <main class="shell">
       <section class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
-          <p class="eyebrow">SkillSpec Doctor</p>
-          <h1 id="page-title">Check a public skill before you install or port it.</h1>
+          <p class="eyebrow">Now checking · Agent skill reliability</p>
+          <h1 id="page-title">Skills agents can actually follow.</h1>
           <p class="lede">
-            Submit a public GitHub skill folder or repository. SkillSpec Doctor
-            classifies the shape, measures the risk that an agent will miss or
-            improvise instructions, and publishes a report that anyone can inspect.
+            Run Doctor on a public skill. See the shape, the follow-through risk,
+            and the evidence before you ask an agent to rely on it.
+          </p>
+          <p class="hero-body">
+            SkillSpec turns important skill prose into a routeable, testable
+            contract: when to use the skill, what path to follow, what tools are
+            allowed, what checks must pass, and what proof should exist at the end.
           </p>
           <div class="hero-actions">
-            <a class="primary-link" href="./why-skillspec.html">Read why SkillSpec exists</a>
-            <a
-              class="secondary-link"
-              href="https://github.com/modiqo/skillspec"
-              target="_blank"
-              rel="noreferrer"
-            >View GitHub repo</a>
+            <a class="primary-link" href="#request-title">Check a skill</a>
+            <a class="secondary-link" href="./why-skillspec.html">Read the research note</a>
           </div>
         </div>
         <div class="hero-visual layer-visual">
@@ -41,6 +49,7 @@
 
       <section class="request-panel" aria-labelledby="request-title">
         <div>
+          <p class="eyebrow">Public report</p>
           <h2 id="request-title">Request a report</h2>
           <p>
             Public requests are queued through GitHub Issues. You will review
@@ -71,6 +80,7 @@
 
       <section class="private-note" aria-labelledby="private-title">
         <div>
+          <p class="eyebrow">Local copy</p>
           <h2 id="private-title">Private repository?</h2>
           <p>
             Public Actions cannot inspect private source. Install locally and
