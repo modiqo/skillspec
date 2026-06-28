@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-risk-star">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-terminal-examples">
   </head>
   <body>
     <header class="site-header">
@@ -193,22 +193,39 @@ skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code>
             <div class="proof-copy">
               <h3>Measure the current skill</h3>
               <p>
-                Run Doctor first. Treat the report as a baseline for the skill as it
-                exists today, before SkillSpec changes anything.
+                Run Doctor first against either a public GitHub skill URI or a
+                local skill folder. Treat the report as the baseline before
+                SkillSpec changes anything.
               </p>
             </div>
-            <pre><code>skillspec doctor /path/to/skill --markdown &gt; docs/skillspec-doctor-baseline.md</code></pre>
+            <pre><code># Public GitHub URI
+skillspec doctor \
+  https://github.com/org/repo/tree/main/skills/example \
+  --markdown &gt; docs/skillspec-doctor-baseline.md
+
+# Local folder
+skillspec doctor ./skills/example \
+  --markdown &gt; docs/skillspec-doctor-baseline.md</code></pre>
           </article>
           <article>
             <span>2</span>
             <div class="proof-copy">
               <h3>Import through the harness</h3>
               <p>
-                Ask Codex, Claude, or Agents to port the skill. The agent should
-                create the structured plan, compile it, test it, and print alignment.
+                Ask Codex, Claude, or Agents to import the same kind of target:
+                a public GitHub URI or a local folder. The agent should create
+                the structured plan, compile it, test it, and print alignment.
               </p>
             </div>
-            <pre><code>/skillspec import &lt;skill-repo-or-folder&gt;, compile it, verify it, test it, and prove it. Print the alignment summary.</code></pre>
+            <pre><code># Public GitHub URI
+/skillspec import \
+  https://github.com/org/repo/tree/main/skills/example
+
+# Local folder
+/skillspec import ./skills/example
+
+Then compile, verify, test, prove,
+and print the alignment summary.</code></pre>
           </article>
           <article>
             <span>3</span>

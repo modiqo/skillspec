@@ -1770,7 +1770,7 @@ pre code {
 }
 
 .proof-grid article {
-  grid-template-columns: 70px minmax(250px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: 70px minmax(0, 1fr);
   gap: 24px;
   border: 0;
   border-bottom: 1px solid var(--line-soft);
@@ -1808,11 +1808,21 @@ pre code {
 }
 
 .proof-grid pre {
+  grid-column: 2;
   align-self: start;
+  width: 100%;
+  margin: 4px 0 0;
   font-size: 0.82rem;
 }
 
+.proof-grid pre code {
+  overflow-x: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .proof-note {
+  grid-column: 2;
   border-left: 2px solid var(--line);
   padding-left: 16px;
 }
