@@ -179,7 +179,9 @@ function renderWorkflowRuns(workflowRuns) {
 
     statusPill.textContent = status;
     statusPill.classList.add(status === "success" ? "success" : status === "failure" ? "error" : "pending");
-    title.textContent = run.display_title || run.name || `Run ${run.id}`;
+    const fullRunTitle = run.display_title || run.name || `Run ${run.id}`;
+    title.textContent = compactRunTitle(fullRunTitle);
+    title.title = fullRunTitle;
     meta.textContent = [
       `Run #${run.run_number}`,
       run.run_attempt > 1 ? `attempt ${run.run_attempt}` : null,
@@ -283,6 +285,7 @@ function renderCards() {
     status.classList.add(report.status);
     issueNumber.textContent = `#${report.issue.number}`;
     title.textContent = compactTitle(report.title);
+    title.title = report.title;
     node.querySelector('[data-field="verdict"]').textContent = report.verdict;
     node.querySelector('[data-field="shape"]').textContent = report.shape;
     node.querySelector('[data-field="risk"]').textContent = report.risk;
@@ -330,7 +333,52 @@ function titleFromIssue(issue) {
 }
 
 function compactTitle(title) {
-  return title.replace(/^https:\/\/github\.com\//, "");
+  const cleanTitle = title.replace(/^Doctor report:\s*/i, "").trim();
+  return compactGitHubPath(cleanTitle) || compactMiddle(cleanTitle, 74, 34, 28);
+}
+
+function compactRunTitle(title) {
+  const cleanTitle = title.replace(/^Doctor report:\s*/i, "").trim();
+  const compact = compactGitHubPath(cleanTitle) || compactMiddle(cleanTitle, 92, 42, 32);
+  return title.startsWith(cleanTitle) ? compact : `Doctor report: ${compact}`;
+}
+
+function compactGitHubPath(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch (_error) {
+    return "";
+  }
+
+  if (url.hostname.toLowerCase() !== "github.com") {
+    return "";
+  }
+
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length < 2) {
+    return value;
+  }
+
+  const ownerRepo = `${parts[0]}/${parts[1]}`;
+  let pathParts = parts.slice(2);
+  if (/^(tree|blob)$/i.test(pathParts[0] || "") && pathParts.length >= 3) {
+    pathParts = pathParts.slice(2);
+  }
+
+  if (pathParts.length === 0) {
+    return ownerRepo;
+  }
+
+  const tail = pathParts.at(-1);
+  return `${ownerRepo}/.../${tail}`;
+}
+
+function compactMiddle(value, maxLength, startLength, endLength) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, startLength)}...${value.slice(-endLength)}`;
 }
 
 function stripMarkdown(value) {
