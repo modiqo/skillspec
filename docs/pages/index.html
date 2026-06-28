@@ -8,15 +8,26 @@
       content="Run SkillSpec Doctor on public GitHub skill repositories and review prior reports."
     >
     <title>SkillSpec Doctor Reports</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260627-editorial">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260627-editorial-search">
   </head>
   <body>
     <header class="site-header">
       <a class="site-brand" href="./index.html">skillspec.sh</a>
+      <form
+        class="header-search"
+        action="https://github.com/modiqo/skillspec/search"
+        method="get"
+        target="_blank"
+        role="search"
+      >
+        <input type="hidden" name="type" value="code">
+        <label class="sr-only" for="site-search">Search SkillSpec on GitHub</label>
+        <input id="site-search" name="q" type="search" placeholder="Search">
+      </form>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="#request-title">Run Doctor</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
-        <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="github-link" href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
         <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
       </nav>
     </header>
