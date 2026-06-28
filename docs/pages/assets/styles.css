@@ -1291,12 +1291,51 @@ h3 {
 
 .lede {
   max-width: 1120px;
-  margin-bottom: 48px;
+  margin-bottom: 62px;
   color: #5d564d;
   font-family: var(--font-display);
   font-size: 2rem;
   font-style: italic;
   line-height: 1.24;
+}
+
+.follow-through-wrap {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.follow-through-mark {
+  color: var(--ink);
+  font-style: normal;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--amber);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+}
+
+.follow-through-note {
+  position: absolute;
+  top: calc(100% + 0.7em);
+  left: 0.05em;
+  width: max-content;
+  max-width: min(31rem, 72vw);
+  color: var(--green);
+  font-family: var(--font-ui);
+  font-size: 0.42em;
+  font-style: normal;
+  letter-spacing: 0.01em;
+  line-height: 1.24;
+  transform: rotate(-1.5deg);
+  white-space: normal;
+}
+
+.follow-through-note::before {
+  display: inline-block;
+  margin-right: 0.45em;
+  color: var(--amber);
+  content: "↳";
 }
 
 .hero-body {
@@ -2232,7 +2271,7 @@ pre code {
   }
 
   .lede {
-    margin-bottom: 30px;
+    margin-bottom: 54px;
     font-size: 1.5rem;
   }
 
@@ -2370,7 +2409,20 @@ pre code {
   }
 
   .lede {
+    margin-bottom: 48px;
     font-size: 1.28rem;
+  }
+
+  .follow-through-wrap {
+    white-space: normal;
+  }
+
+  .follow-through-note {
+    top: calc(100% + 0.55em);
+    left: 0;
+    max-width: calc(100vw - 36px);
+    font-size: 0.52em;
+    transform: none;
   }
 
   .request-panel,
