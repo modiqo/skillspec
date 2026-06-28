@@ -8,22 +8,33 @@
       content="Why SkillSpec exists: a research-style explanation of agent skills, attention pressure, Doctor risk analysis, structured contracts, routing, proof, and durable execution."
     >
     <title>Why SkillSpec Exists</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260627-editorial">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260627-editorial-search">
   </head>
   <body>
     <header class="site-header">
       <a class="site-brand" href="./index.html">skillspec.sh</a>
+      <form
+        class="header-search"
+        action="https://github.com/modiqo/skillspec/search"
+        method="get"
+        target="_blank"
+        role="search"
+      >
+        <input type="hidden" name="type" value="code">
+        <label class="sr-only" for="article-site-search">Search SkillSpec on GitHub</label>
+        <input id="article-site-search" name="q" type="search" placeholder="Search">
+      </form>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="./index.html">Doctor</a>
         <a href="#operator-model">Operating model</a>
         <a href="#sources">Sources</a>
-        <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="github-link" href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
     </header>
     <main class="shell article-shell">
       <nav class="page-nav" aria-label="Page navigation">
         <a href="./index.html">SkillSpec Doctor</a>
-        <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="github-link" href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
         <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
       </nav>
 
@@ -61,18 +72,27 @@
         <div class="abstract-copy">
           <p>
             The problem is that the most important skills become load-bearing
-            prose. They start as clean instructions, then grow into state machines,
-            dependency notes, tool policies, code snippets, references, and release
-            checks. At the same time, teams install more skills for more products
-            and tools. One axis makes each skill longer. The other makes the skill
-            library wider. Both compete for model attention.
+            prose.
           </p>
           <p>
+            They start as clean instructions, then grow into state machines,
+            dependency notes, tool policies, code snippets, references, and
+            release checks.
+          </p>
+          <ul class="prose-points">
+            <li>One axis makes each skill longer.</li>
+            <li>The other makes the skill library wider.</li>
+            <li>Both compete for model attention.</li>
+          </ul>
+          <p>
             SkillSpec is the answer we arrived at after measuring that pressure:
-            keep prose for judgment, but move the parts that must be followed into
-            a small, portable behavior contract. The contract says when the skill
-            applies, which route to choose, what steps to run, what tools are
-            allowed, what checks must pass, and what proof should exist at the end.
+            keep prose for judgment, but move the parts that must be followed
+            into a small, portable behavior contract.
+          </p>
+          <p>
+            The contract says when the skill applies, which route to choose,
+            what steps to run, what tools are allowed, what checks must pass,
+            and what proof should exist at the end.
           </p>
         </div>
       </section>
