@@ -125,8 +125,12 @@ The report includes:
 `--proof-digest` writes `<run_dir>/proof-digest.json`, grouping missing phase
 requirements, route fulfillment, route checks, forbids, elicitations, and
 after-success closures by the event shape needed for one `progress batch`
-append. Omit `--summary` only for debugging, failure triage, or explicit user
-requests for detailed checks.
+append. Append grouped proof with
+`skillspec progress batch <run_dir> --file <run_dir>/final-proof.jsonl
+--checkpoint "checkpointing evidence" --summary` so the transcript shows one
+foreground checkpoint while the ledger keeps every granular row. Omit
+`--summary` only for debugging, failure triage, or explicit user requests for
+detailed checks.
 
 `ok` is true when no deterministic check failed. A report can have `ok: true`
 and `status: unproven` when decision replay succeeded but execution proof is

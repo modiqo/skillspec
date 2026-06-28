@@ -407,7 +407,6 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                 requirement: Some(requirement.clone()),
                 command: command.clone(),
             });
-            allowed_commands.push(command);
         }
         let phase_completed = format!(
             "skillspec progress record {} phase-completed {} --evidence-kind <kind> --evidence-ref <ref>",
@@ -420,7 +419,15 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
             requirement: None,
             command: phase_completed.clone(),
         });
-        allowed_commands.push(phase_completed);
+        allowed_commands.push(format!(
+            "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary",
+            shell_arg(inputs.run_dir),
+            shell_arg(inputs.run_dir)
+        ));
+        do_now.push(
+            "stage routine successful proof rows in evidence-batch.jsonl and checkpoint them once"
+                .to_owned(),
+        );
         when_to_advance
             .push("record required evidence, then mark the phase completed or blocked".to_owned());
     } else if inputs.progress.current_phase.is_none()

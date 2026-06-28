@@ -157,8 +157,18 @@ skillspec progress record <run_dir> requirement-satisfied <phase> <requirement> 
   --evidence-kind <kind> \
   --evidence-ref <path-or-id>
 
+skillspec progress batch <run_dir> \
+  --file <run_dir>/evidence-batch.jsonl \
+  --checkpoint "checkpointing evidence" \
+  --summary
+
 skillspec progress show <skill.spec.yml> --run <run_dir>
 ```
+
+Use `progress record` for a single exceptional row or a user-relevant failure.
+Use `progress batch --summary` when several successful routine proof rows are
+ready at the same boundary. The transcript should show one checkpoint while
+`execution.jsonl` still receives every granular event.
 
 The run directory becomes the durable working memory:
 
@@ -315,7 +325,7 @@ doctor
 run-loop --guide agent
   guides route, phase, current gate, and resume
 
-progress record/show
+progress record/batch/show
   guides what is complete and what remains
 
 trace align --summary

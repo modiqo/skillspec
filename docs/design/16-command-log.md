@@ -30,7 +30,7 @@ These are the commands an agent or harness uses during a SkillSpec-backed run.
 | `skillspec progress stats` | `<run-dir>`, `--workspace <name>`, `--workspace-stats-report <path>`, `--workspace-stats-json <path>`, token metric flags, `--agent-visible-tokens <n>`, `--artifact-tokens-preserved <n>`, `--avoided-tokens <n>`, `--metrics-source <source>`, `--phase <id>`, `--requirement <id>`, `--message <text>`, `--json` | Appends a `stats_collected` event with workspace/token metrics so `trace align --summary` can report measured consumption/savings or direct-run estimated output economy from `--summary` blocks. | `skillspec progress stats .skillspec/traces/run-123 --agent-visible-tokens 190 --artifact-tokens-preserved 96190 --avoided-tokens 96000 --metrics-source estimated` |
 | `skillspec progress final-response` | `<run-dir>`, `--result`, `--evidence`, `--alignment`, `--token-savings`, `--phase <id>`, `--requirement <id>`, `--message <text>`, `--json` | Appends `final_response_sent` proof that the final answer includes result, evidence, alignment, and token math sections. | `skillspec progress final-response .skillspec/traces/run-123 --result --evidence --alignment --token-savings` |
 | `skillspec progress show` | `<path>`, `--run <run-dir>`, `--json` | Reads the decision trace plus `execution.jsonl`, derives `progress.json`, and reports completed, current, blocked, and remaining phases plus open requirements. Treat as an internal gate check unless details are requested or needed for a blocker/failure. | `skillspec progress show ./skill.spec.yml --run .skillspec/traces/run-123` |
-| `skillspec progress batch` | `<run-dir>`, `--events <jsonl-or-json-array>`, `--json` | Appends several structured progress/proof events to `execution.jsonl` in one command and prints one compact summary. Use for final route, route-check, closure, elicitation, forbid/no-violation, and evidence proof that would otherwise create a visible progress parade. | `skillspec progress batch .skillspec/traces/run-123 --events .skillspec/traces/run-123/final-proof.jsonl` |
+| `skillspec progress batch` | `<run-dir>`, `--file <jsonl-or-json-array>`, `--checkpoint <label>`, `--summary`, `--json`; `--events` remains a compatibility alias | Appends several structured progress/proof events to `execution.jsonl` in one foreground checkpoint and prints a compact `[checkpointing evidence...]` summary when `--summary` is used. Use after dry-run/planning, mutation, verification, route fulfillment, or before final alignment when successful routine proof rows would otherwise create a visible progress parade. | `skillspec progress batch .skillspec/traces/run-123 --file .skillspec/traces/run-123/final-proof.jsonl --checkpoint "checkpointing evidence" --summary` |
 | `skillspec trace align` | `<path>`, `--decision-trace <run-dir>`, `--execution-trace <jsonl>`, `--summary`, `--proof-digest <path>`, `--json` | Replays the decision trace against the current spec and checks structured execution evidence for obligations. `--summary` prints only the completion-facing alignment/token block while writing full detail to `<run-dir>/alignment.json`; `--proof-digest` writes grouped missing proof so agents can batch final rows once. | `skillspec trace align ./skill.spec.yml --decision-trace .skillspec/traces/run-123 --execution-trace .skillspec/traces/run-123/execution.jsonl --summary --proof-digest .skillspec/traces/run-123/proof-digest.json` |
 
 ## Authoring And QA Commands
@@ -169,9 +169,12 @@ no domain SkillSpec exists yet.
 
 `skillspec progress record` accepts these event values:
 
-For final closure, prefer `skillspec progress batch` with a JSONL proof file
-when several events need to be recorded together. It keeps the ledger exact
-without making the user watch one command per obligation.
+For final closure and routine phase checkpoints, prefer
+`skillspec progress batch --file <jsonl> --checkpoint "checkpointing evidence"
+--summary` when several successful events need to be recorded together. It
+keeps the ledger exact without making the user watch one command per
+obligation. Surface individual rows only for failures, blockers, or proof gaps
+the user must understand.
 
 | Event | Meaning | Example |
 | --- | --- | --- |

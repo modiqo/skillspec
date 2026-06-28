@@ -877,7 +877,7 @@ Options:
 ### `progress batch`
 
 ```text
-skillspec progress batch <RUN> --events <EVENTS>
+skillspec progress batch <RUN> --file <EVIDENCE_BATCH> [--checkpoint <LABEL>] [--summary]
 ```
 
 Arguments:
@@ -886,17 +886,25 @@ Arguments:
 
 Options:
 
-- `--events <EVENTS>`: JSONL file or JSON array of execution events to append.
+- `--file <EVIDENCE_BATCH>`: JSONL file or JSON array of execution events to
+  append. `--events` is accepted as a backwards-compatible alias.
   Missing `schema`, `run_id`, and `at_unix_ms` fields are filled by the CLI.
   Event names may use hyphens or underscores.
+- `--checkpoint <LABEL>`: label for compact checkpoint output. Defaults to
+  `checkpointing evidence`.
+- `--summary`: emit the compact foreground checkpoint summary:
+  `[checkpointing evidence...]`, `status`, `records`, `requirements`, and
+  `trace`.
 - `--json`: emit JSON for the compact batch report.
 
-`progress batch` records several proof events in one command and prints one
-compact summary by default. Use it for final closure proof that would otherwise
-create a visible progress parade: route fulfillment, route checks,
-after-success closures, elicitation answers or waivers, forbid/no-violation
-proof, and evidence attachments. It preserves the same `execution.jsonl` ledger
-shape as `progress record`; it only reduces command chatter.
+`progress batch` records several proof events in one foreground checkpoint. Use
+it at natural boundaries that would otherwise create a visible progress parade:
+after dry-run and planning, after create or mutation, after probe or
+verification, before route fulfillment, and before final alignment. Successful
+routine ledger writes should use `--summary`; failures, blocked requirements,
+or user-relevant proof gaps should still be surfaced individually. The command
+preserves the same granular `execution.jsonl` ledger shape as `progress record`;
+it only reduces command chatter.
 
 ### `progress stats`
 

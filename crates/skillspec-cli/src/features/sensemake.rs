@@ -91,6 +91,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     let mut items = vec![
         "start with sensemake --view index only when unfamiliar".to_owned(),
         "for active task execution, prefer run-loop --guide agent so the CLI prints start/current/end anchors and persists resume state".to_owned(),
+        "when several routine proof rows are ready, stage them in <run-dir>/evidence-batch.jsonl and run progress batch --file ... --checkpoint \"checkpointing evidence\" --summary instead of printing one progress record command per row".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
         "escalate index -> summary -> full only when needed".to_owned(),
@@ -385,6 +386,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         NavigationHint {
             intent: "resume guided task execution",
             command: format!("skillspec run-loop {spec_path} --resume <run-dir> --guide agent"),
+        },
+        NavigationHint {
+            intent: "checkpoint routine proof evidence",
+            command: "skillspec progress batch <run-dir> --file <run-dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary".to_owned(),
         },
         NavigationHint {
             intent: "task routing",

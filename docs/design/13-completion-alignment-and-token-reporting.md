@@ -267,13 +267,17 @@ Completion proof should use a bounded loop:
 
 1. Run `trace align --summary --proof-digest <run-dir>/proof-digest.json`.
 2. If real proof exists for several missing rows, write one
-   `<run-dir>/final-proof.jsonl` file and append it with `progress batch`.
+   `<run-dir>/final-proof.jsonl` file and append it with
+   `skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl
+   --checkpoint "checkpointing evidence" --summary`.
 3. Record `progress final-response` once.
 4. Rerun `trace align --summary` once and report the compact result.
 
-Do not rerun alignment after each individual `progress record`. If the final
-rerun is still partial, report the remaining missing proof rows unless there is
-one obvious additional batch to record from evidence already on disk.
+Do not rerun alignment after each individual `progress record`. The checkpoint
+command must run in the foreground so the agent cannot claim success before
+evidence is durably appended to `execution.jsonl`. If the final rerun is still
+partial, report the remaining missing proof rows unless there is one obvious
+additional batch to record from evidence already on disk.
 
 ## Report Examples
 

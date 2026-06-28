@@ -580,7 +580,9 @@ skillspec progress final-response .skillspec/traces/<run-id> \
   --requirement report_workspace_evidence_and_token_math \
   --result --evidence --alignment --token-savings
 skillspec progress batch .skillspec/traces/<run-id> \
-  --events .skillspec/traces/<run-id>/final-proof.jsonl
+  --file .skillspec/traces/<run-id>/final-proof.jsonl \
+  --checkpoint "checkpointing evidence" \
+  --summary
 skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```

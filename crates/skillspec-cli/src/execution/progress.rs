@@ -175,6 +175,7 @@ pub struct FinalResponseRecordOptions {
 pub struct BatchRecordOptions {
     pub run_dir: PathBuf,
     pub events: PathBuf,
+    pub checkpoint: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -184,7 +185,9 @@ pub struct BatchRecordReport {
     pub run_dir: String,
     pub ledger: String,
     pub events_file: String,
+    pub checkpoint: Option<String>,
     pub appended: usize,
+    pub requirements: Vec<String>,
     pub by_event: BTreeMap<String, usize>,
 }
 
@@ -477,8 +480,12 @@ pub fn record_batch(options: BatchRecordOptions) -> Result<BatchRecordReport> {
     }
 
     let mut by_event = BTreeMap::<String, usize>::new();
+    let mut requirements = BTreeSet::<String>::new();
     for event in &events {
         *by_event.entry(event.event.clone()).or_default() += 1;
+        if let Some(requirement) = event.requirement.as_ref() {
+            requirements.insert(requirement.clone());
+        }
         append_execution_event(&ledger_path, event)?;
     }
 
@@ -488,12 +495,18 @@ pub fn record_batch(options: BatchRecordOptions) -> Result<BatchRecordReport> {
         run_dir: options.run_dir.display().to_string(),
         ledger: ledger_path.display().to_string(),
         events_file: options.events.display().to_string(),
+        checkpoint: options.checkpoint,
         appended: events.len(),
+        requirements: requirements.into_iter().collect(),
         by_event,
     })
 }
 
-pub fn render_batch_report(report: &BatchRecordReport) -> String {
+pub fn render_batch_report(report: &BatchRecordReport, summary: bool) -> String {
+    if summary {
+        return render_batch_summary(report);
+    }
+
     let mut output = String::new();
     output.push_str(&format!(
         "progress batch: appended {} events\n",
@@ -505,6 +518,36 @@ pub fn render_batch_report(report: &BatchRecordReport) -> String {
         output.push_str(&format!("  - {event}: {count}\n"));
     }
     output
+}
+
+fn render_batch_summary(report: &BatchRecordReport) -> String {
+    let checkpoint = report
+        .checkpoint
+        .as_deref()
+        .unwrap_or("checkpointing evidence");
+    let mut output = String::new();
+    output.push_str(&format!("{}\n", checkpoint_label(checkpoint)));
+    output.push_str("status: ok\n");
+    output.push_str(&format!("records: {}\n", report.appended));
+    output.push_str("requirements: ");
+    if report.requirements.is_empty() {
+        output.push_str("none\n");
+    } else {
+        output.push_str(&report.requirements.join(", "));
+        output.push('\n');
+    }
+    output.push_str(&format!("trace: {}\n", report.ledger));
+    output
+}
+
+fn checkpoint_label(checkpoint: &str) -> String {
+    let mut label = checkpoint.trim();
+    if label.is_empty() {
+        label = "checkpointing evidence";
+    }
+    let label = label.trim_matches(|ch| ch == '[' || ch == ']');
+    let label = label.trim_end_matches('.').trim_end_matches("...").trim();
+    format!("[{label}...]")
 }
 
 #[derive(Clone, Debug, Default)]

@@ -1112,14 +1112,23 @@ pub(super) enum ProgressCommand {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Append multiple structured progress events from JSONL or JSON array")]
+    #[command(
+        about = "Checkpoint multiple structured progress events from JSONL or JSON array",
+        long_about = "Append several structured progress/proof events to execution.jsonl in one foreground checkpoint. Use --file with a JSONL batch and --summary for compact agent-facing output. The legacy --events alias is still accepted."
+    )]
     Batch {
         /// Trace run directory containing execution.jsonl.
         run: PathBuf,
         /// JSONL file or JSON array of execution events to append.
-        #[arg(long)]
+        #[arg(long = "file", visible_alias = "events", value_name = "EVIDENCE_BATCH")]
         events: PathBuf,
-        /// Emit JSON for the compact batch report.
+        /// Label printed in compact summary output.
+        #[arg(long)]
+        checkpoint: Option<String>,
+        /// Emit compact checkpoint output instead of event counts.
+        #[arg(long)]
+        summary: bool,
+        /// Emit JSON for the batch report.
         #[arg(long)]
         json: bool,
     },

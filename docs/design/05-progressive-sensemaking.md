@@ -310,7 +310,10 @@ skillspec trace align ./skill.spec.yml \
 Decision replay can prove deterministic steering behavior. Execution obligations
 may still be unproven if the harness did not provide execution evidence.
 When several proof rows remain, use the digest to build one final-proof JSONL
-file and append it with `progress batch` before one final alignment rerun.
+file and append it with
+`skillspec progress batch <run_dir> --file <run_dir>/final-proof.jsonl
+--checkpoint "checkpointing evidence" --summary` before one final alignment
+rerun.
 
 ## Escalation Rules
 

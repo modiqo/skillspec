@@ -619,15 +619,22 @@ pub(super) fn run(command: Command) -> Result<()> {
                     })?;
                 report::json(&event)?;
             }
-            ProgressCommand::Batch { run, events, json } => {
+            ProgressCommand::Batch {
+                run,
+                events,
+                checkpoint,
+                summary,
+                json,
+            } => {
                 let report = progress::record_batch(progress::BatchRecordOptions {
                     run_dir: run,
                     events,
+                    checkpoint,
                 })?;
                 if json {
                     report::json(&report)?;
                 } else {
-                    report::text(&progress::render_batch_report(&report))?;
+                    report::text(&progress::render_batch_report(&report, summary))?;
                 }
             }
         },

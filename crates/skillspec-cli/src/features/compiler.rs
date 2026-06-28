@@ -984,7 +984,7 @@ fn write_runtime_commands(output: &mut String) {
     output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>\n");
     output.push_str("skillspec progress final-response \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings\n");
-    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --events \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\"\n");
+    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --file \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\" --checkpoint \"checkpointing evidence\" --summary\n");
     output.push_str(
         "skillspec progress show <skill-folder>/skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
     );

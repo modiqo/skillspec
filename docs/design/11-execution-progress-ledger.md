@@ -340,9 +340,10 @@ A harness integrating SkillSpec should:
 - append ledger events after actual work;
 - run `progress show` as an internal gate check before phase transitions;
 - pass `execution.jsonl` to `trace align --summary --proof-digest`;
-- batch final route, route-check, elicitation, forbid/no-violation, and closure
-  rows with `progress batch` instead of recording and re-aligning one row at a
-  time;
+- batch routine successful proof rows with
+  `progress batch --file <jsonl> --checkpoint "checkpointing evidence"
+  --summary` at natural boundaries instead of recording and re-aligning one row
+  at a time;
 - surface missing proof rows to the user.
 
 The harness should not ask the model to remember progress from prose alone. The

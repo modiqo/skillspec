@@ -2485,8 +2485,8 @@ commands:
       dependencies:
         - skillspec_cli
   progress_batch:
-    description: Append several final route, route-check, closure, elicitation, forbid/no-violation, or evidence proof events from one JSONL file so final alignment proof does not become a visible progress parade.
-    template: skillspec progress batch <trace-dir> --events <trace-dir>/final-proof.jsonl
+    description: Append several routine proof events from one JSONL file as a compact foreground checkpoint so final alignment proof and phase checkpoints do not become a visible progress parade.
+    template: skillspec progress batch <trace-dir> --file <trace-dir>/final-proof.jsonl --checkpoint "checkpointing evidence" --summary
     safety: local_write
     requires:
       dependencies:
@@ -3290,7 +3290,9 @@ snippets:
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
       - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
       - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
+      - Stage successful routine evidence rows in a JSONL batch and run one foreground progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
       - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
+      - Surface individual progress rows only for failures, blocked requirements, or proof gaps the user must understand.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:
     text: |

@@ -555,7 +555,14 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
         .is_some_and(|command| command.contains("skillspec act"))));
     assert!(allowed_commands.iter().any(|command| command
         .as_str()
-        .is_some_and(|command| command.contains("phase-completed"))));
+        .is_some_and(|command| command.contains("progress batch")
+            && command.contains("evidence-batch.jsonl"))));
+    let progress_hints = report["current_gate"]["progress_to_record"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing progress hints"))?;
+    assert!(progress_hints
+        .iter()
+        .any(|hint| hint["event"] == "phase_completed"));
 
     let run_dir = PathBuf::from(
         report["start"]["run_dir"]
@@ -4988,6 +4995,52 @@ fn progress_batch_records_multiple_events_with_compact_output() {
     assert!(ledger.contains("\"event\":\"elicitation_answered\""));
     assert!(ledger.contains("\"event\":\"obligation_satisfied\""));
     assert!(ledger.contains("\"run_id\":\"run-progress-batch\""));
+}
+
+#[test]
+fn progress_batch_summary_checkpoints_evidence_with_file_alias() {
+    let dir = TempDir::new("progress-batch-summary");
+    let run_dir = dir.path().join("run-progress-batch-summary");
+    fs::create_dir_all(&run_dir).unwrap();
+    let events = dir.path().join("evidence-batch.jsonl");
+    write_file(
+        &events,
+        r#"{"event":"requirement-satisfied","phase":"plan","requirement":"dry_run","status":"pass","evidence":{"kind":"command","ref":"dry-run.log"}}
+{"event":"requirement-satisfied","phase":"plan","requirement":"auth_research","status":"pass","evidence":{"kind":"file","ref":"auth.md"}}
+{"event":"requirement-satisfied","phase":"create","requirement":"create","status":"pass","evidence":{"kind":"command","ref":"create.log"}}
+{"event":"requirement-satisfied","phase":"verify","requirement":"post_ops","status":"pass","evidence":{"kind":"command","ref":"probe.log"}}
+{"event":"route-fulfilled","id":"create_adapter","status":"pass","evidence":{"kind":"trace","ref":"alignment.json"}}
+"#,
+    );
+
+    let progress_batch = Command::new(bin())
+        .arg("progress")
+        .arg("batch")
+        .arg(&run_dir)
+        .arg("--file")
+        .arg(&events)
+        .arg("--checkpoint")
+        .arg("checkpointing evidence")
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&progress_batch);
+    let text = stdout(&progress_batch);
+    assert!(text.contains("[checkpointing evidence...]"));
+    assert!(text.contains("status: ok"));
+    assert!(text.contains("records: 5"));
+    assert!(text.contains("requirements: auth_research, create, dry_run, post_ops"));
+    assert!(text.contains(&format!(
+        "trace: {}",
+        run_dir.join("execution.jsonl").display()
+    )));
+    assert!(!text.contains("progress batch: appended"));
+
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert_eq!(ledger.lines().count(), 5);
+    assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
+    assert!(ledger.contains("\"requirement\":\"dry_run\""));
+    assert!(ledger.contains("\"event\":\"route_fulfilled\""));
 }
 
 #[test]

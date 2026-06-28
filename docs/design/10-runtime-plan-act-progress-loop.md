@@ -214,14 +214,20 @@ JSON array:
 
 ```sh
 skillspec progress batch .skillspec/traces/<run-id> \
-  --events .skillspec/traces/<run-id>/final-proof.jsonl
+  --file .skillspec/traces/<run-id>/final-proof.jsonl \
+  --checkpoint "checkpointing evidence" \
+  --summary
 ```
 
 Use it near the end of a run when the agent needs to record several proof rows:
 route fulfillment, after-success closures, elicitation approvals, evidence
 attachments, and no-violation proof for forbids. This keeps the ledger exact
-while avoiding a visible progress parade. The user-facing update should be one
-gate-level note, such as "final proof recorded; rerunning alignment."
+while avoiding a visible progress parade. Use the same foreground checkpoint
+shape at natural boundaries after dry-run/planning, after mutation, after
+verification, before route fulfillment, and before final alignment. The
+user-facing update should be one gate-level note, such as
+`[checkpointing evidence...]`; individual successful proof rows should stay in
+the JSONL batch and ledger, not the transcript.
 
 Each JSONL row is the same execution event shape used by `progress record`. The
 CLI fills missing `schema`, `run_id`, and timestamp fields and normalizes event

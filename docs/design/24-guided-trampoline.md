@@ -186,7 +186,7 @@ Here is what is open.
 Here is what is allowed now.
 Here is what is forbidden now.
 Here are the smallest commands to run next.
-Here is how to record progress.
+Here is how to checkpoint progress evidence compactly.
 ```
 
 Required current-gate fields:
@@ -361,7 +361,7 @@ DO NOT
 NEXT COMMANDS
 - skillspec source stage <uri> --out <staging-root> --json
 - skillspec doctor <selected_source_path>
-- skillspec progress record <run_dir> requirement-satisfied approve_remote_source approve_remote_source_access --evidence-kind user_approval --evidence-ref <ref>
+- skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint "checkpointing evidence" --summary
 
 LOAD MORE ONLY IF NEEDED
 - skillspec query ./skill.spec.yml route:remote_skill_port --view summary
@@ -545,7 +545,8 @@ Proposed schema:
       "Do not search the web or fetch raw GitHub files to locate the same URI."
     ],
     "allowed_commands": [
-      "skillspec doctor <source>"
+      "skillspec doctor <source>",
+      "skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary"
     ],
     "recommended_queries": [
       "skillspec query ./skill.spec.yml route:remote_skill_port --view summary"
