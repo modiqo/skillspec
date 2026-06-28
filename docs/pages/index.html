@@ -94,12 +94,28 @@
                 <p>A plain skill is useful documentation, but the runtime still depends on model interpretation.</p>
               </div>
             </div>
-            <div class="flow-row">
-              <div class="flow-node">SKILL.md</div>
-              <div class="flow-arrow" aria-hidden="true"></div>
-              <div class="flow-node">Model reads prose</div>
-              <div class="flow-arrow broken" aria-hidden="true"></div>
-              <div class="flow-node muted-node">Best-effort result</div>
+            <div class="skill-file-visual" aria-label="Complex SKILL.md without runtime guarantees">
+              <div class="skill-file-card">
+                <div class="file-title">SKILL.md</div>
+                <div class="file-section">
+                  <strong>Instructions</strong>
+                  <span>When the task mentions deployment, inspect config, credentials, and target.</span>
+                </div>
+                <div class="file-section">
+                  <strong>Required order</strong>
+                  <ol>
+                    <li>Check environment</li>
+                    <li>Run tests</li>
+                    <li>Publish proof</li>
+                  </ol>
+                </div>
+                <div class="code-fragment">
+                  <span>if missing_token:</span>
+                  <span>  stop_and_explain()</span>
+                  <span>deploy --verify</span>
+                </div>
+              </div>
+              <div class="unguarded-label">Agent harness chooses how much prose to follow</div>
             </div>
             <div class="lane-result">
               <strong>Intent is not enforcement</strong>
@@ -120,14 +136,23 @@
                 <p>The skill ships with a machine-checkable contract and a CLI that guides execution.</p>
               </div>
             </div>
-            <div class="flow-row">
-              <div class="flow-node">Skill loader</div>
-              <div class="flow-arrow" aria-hidden="true"></div>
-              <div class="flow-node">skill.spec.yml</div>
-              <div class="flow-arrow" aria-hidden="true"></div>
-              <div class="flow-node">SkillSpec CLI</div>
-              <div class="flow-arrow" aria-hidden="true"></div>
-              <div class="flow-node proof-node">Proof report</div>
+            <div class="spec-visual" aria-label="SkillSpec trampoline and basic skill.spec.yml skeleton">
+              <div class="trampoline-card">
+                <div class="file-title">SKILL.md</div>
+                <strong>Trampoline</strong>
+                <span>Load and follow <code>skill.spec.yml</code>.</span>
+              </div>
+              <div class="spec-arrow" aria-hidden="true"></div>
+              <div class="spec-card">
+                <div class="file-title">skill.spec.yml</div>
+                <ul>
+                  <li>route</li>
+                  <li>phases</li>
+                  <li>allowed tools</li>
+                  <li>checks</li>
+                  <li>proof</li>
+                </ul>
+              </div>
             </div>
             <div class="lane-result">
               <strong>The skill becomes executable</strong>
