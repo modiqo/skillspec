@@ -1175,6 +1175,27 @@ body {
   align-items: center;
 }
 
+.star-link {
+  gap: 12px;
+}
+
+.star-badge {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  border-left: 1px solid currentColor;
+  padding-left: 10px;
+  color: var(--ink);
+  font-size: 0.88em;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.site-nav a:hover .star-badge,
+.page-nav a:hover .star-badge {
+  color: var(--paper-soft);
+}
+
 .github-link::before {
   display: inline-block;
   width: 1.08em;
