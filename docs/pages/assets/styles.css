@@ -12,7 +12,7 @@
   --red: #dc2626;
   --shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Antic", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
 
@@ -1045,9 +1045,10 @@ code {
   --amber: #b76b12;
   --red: #b42318;
   --shadow: none;
-  --font-display: Georgia, "Times New Roman", ui-serif, serif;
+  --font-display: "Antic", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
   --font-ui:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Antic", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   --font-mono:
     "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
@@ -1209,8 +1210,8 @@ h1,
   max-width: 980px;
   margin-bottom: 24px;
   font-family: var(--font-display);
-  font-size: 5.45rem;
-  font-weight: 480;
+  font-size: clamp(4rem, 6vw, 5.45rem);
+  font-weight: 400;
   letter-spacing: 0;
   line-height: 0.96;
 }
@@ -1220,14 +1221,14 @@ h2,
   max-width: 900px;
   margin-bottom: 12px;
   font-family: var(--font-display);
-  font-size: 2.25rem;
-  font-weight: 520;
+  font-size: clamp(1.95rem, 3vw, 2.25rem);
+  font-weight: 400;
   line-height: 1.08;
 }
 
 h3 {
   font-size: 1.05rem;
-  font-weight: 760;
+  font-weight: 400;
   line-height: 1.22;
 }
 
@@ -1240,7 +1241,7 @@ h3 {
   color: var(--muted);
   font-family: var(--font-display);
   font-size: 0.9rem;
-  font-weight: 620;
+  font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1473,11 +1474,61 @@ input:focus {
 }
 
 pre {
+  position: relative;
+  overflow: hidden;
+  max-width: 100%;
   border: 2px solid var(--line);
   border-radius: 0;
-  background: #17130f;
+  padding: 48px 18px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 52px),
+    #17130f;
   color: #f7efe3;
   font-family: var(--font-mono);
+}
+
+pre::before {
+  position: absolute;
+  top: 17px;
+  left: 18px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #f97316;
+  box-shadow: 18px 0 0 #facc15, 36px 0 0 #22c55e;
+  content: "";
+}
+
+pre::after {
+  position: absolute;
+  top: 13px;
+  right: 16px;
+  color: rgba(247, 239, 227, 0.48);
+  content: "terminal";
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 0 0 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.88rem;
+  line-height: 1.68;
+  white-space: pre;
+}
+
+.report-content pre {
+  margin: 18px 0;
+}
+
+.report-content pre code {
+  padding: 0 0 4px;
+  background: transparent;
 }
 
 .proof-path,
@@ -1512,6 +1563,12 @@ pre {
   border-radius: 0;
   padding: 24px 0;
   background: transparent;
+}
+
+.proof-grid article > *,
+.report-card > *,
+.run-row > * {
+  min-width: 0;
 }
 
 .proof-grid span {
@@ -1584,7 +1641,33 @@ pre {
 }
 
 .report-card {
-  grid-template-columns: minmax(230px, 0.82fr) minmax(330px, 1.26fr) minmax(180px, auto);
+  grid-template-columns:
+    minmax(132px, 0.52fr)
+    minmax(0, 1fr)
+    minmax(390px, 1.25fr)
+    minmax(154px, 0.42fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.report-card h3 {
+  max-width: 34ch;
+  overflow-wrap: anywhere;
+}
+
+.run-row {
+  grid-template-columns: minmax(118px, auto) minmax(0, 1fr) minmax(120px, auto);
+}
+
+.run-row h3 {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-row p {
+  overflow-wrap: anywhere;
 }
 
 .status-pill {
@@ -1599,6 +1682,7 @@ pre {
 
 .card-actions {
   gap: 0;
+  align-content: start;
 }
 
 .card-actions button + a,
@@ -1814,6 +1898,16 @@ pre {
     width: 100%;
   }
 
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbar {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .header-search {
     width: 100%;
   }
@@ -1830,6 +1924,38 @@ pre {
   .proof-grid pre,
   .proof-note {
     grid-column: 2;
+  }
+
+  .report-card {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .report-card h3 {
+    max-width: none;
+  }
+
+  .report-card dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-actions button + a,
+  .card-actions a + button {
+    border-top: 2px solid var(--line);
+    border-left: 0;
+  }
+
+  .run-row {
+    grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
+  }
+
+  .run-row a {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 
@@ -1918,6 +2044,26 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .card-actions button + a,
+  .card-actions a + button {
+    border-left: 2px solid var(--line);
+    border-top: 0;
+  }
+
+  .run-row a {
+    grid-column: auto;
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .run-row h3 {
+    white-space: normal;
+  }
+
   .report-card dl {
     grid-template-columns: 1fr;
   }
@@ -1934,5 +2080,70 @@ pre {
   .solution-grid,
   .source-list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .shell,
+  .article-shell {
+    width: calc(100% - 20px);
+    padding-bottom: 48px;
+  }
+
+  .site-header {
+    padding: 12px 10px;
+  }
+
+  .site-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .site-nav a {
+    border-left: 0;
+  }
+
+  h1,
+  .article-hero h1 {
+    font-size: 2.55rem;
+    line-height: 1;
+  }
+
+  .lede {
+    font-size: 1.28rem;
+  }
+
+  .request-panel,
+  .private-note,
+  .proof-path,
+  .reports-section,
+  .runs-section,
+  .report-viewer,
+  .abstract-panel,
+  .article-body section {
+    padding: 18px;
+  }
+
+  .proof-grid article {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .proof-grid span {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .proof-grid pre,
+  .proof-note {
+    grid-column: 1 / -1;
+  }
+
+  pre {
+    padding: 44px 12px 14px;
+  }
+
+  pre code {
+    font-size: 0.78rem;
   }
 }
