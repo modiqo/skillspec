@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-contract-contrast">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-risk-star">
   </head>
   <body>
     <header class="site-header">
@@ -32,7 +32,16 @@
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="#request-title">Run Doctor</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
-        <a class="github-link" href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">GitHub</a>
+        <a
+          class="github-link star-link"
+          href="https://github.com/modiqo/skillspec"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Star SkillSpec on GitHub"
+        >
+          <span>GitHub</span>
+          <span class="star-badge" aria-hidden="true">★ <span data-github-stars>Star</span></span>
+        </a>
         <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
       </nav>
     </header>
@@ -125,11 +134,11 @@
 
       <section class="request-panel" aria-labelledby="request-title">
         <div>
-          <p class="eyebrow">Public report</p>
-          <h2 id="request-title">Request a report</h2>
+          <p class="eyebrow">Risk profile</p>
+          <h2 id="request-title">Assess your skill and plugin risk profile</h2>
           <p>
-            Public requests are queued through GitHub Issues. You will review
-            the prefilled issue before GitHub creates it.
+            Run Doctor on a public skill or plugin folder to see where agents
+            may skip steps, overload context, miss references, or finish without proof.
           </p>
         </div>
         <form id="doctor-form" class="request-form" novalidate>
@@ -144,7 +153,7 @@
               placeholder="https://github.com/org/repo/tree/main/skills/example"
               required
             >
-            <button type="submit">Open request</button>
+            <button type="submit">Assess risk</button>
           </div>
           <p class="input-help">
             Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
@@ -322,6 +331,7 @@ skillspec doctor /path/to/local/skill --markdown &gt; skillspec-doctor.md</code>
       </article>
     </template>
 
-    <script src="./assets/app.js"></script>
+    <script src="./assets/site.js?v=20260628-risk-star"></script>
+    <script src="./assets/app.js?v=20260628-risk-star"></script>
   </body>
 </html>
