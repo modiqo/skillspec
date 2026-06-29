@@ -252,6 +252,6 @@ If the doc cannot answer those questions, it needs another pass.
 This doc is grounded in the QA pattern used for the design docs in this
 directory and the repository source map in `docs/design/README.md`. It also
 reflects the repo's existing command surface in
-`crates/skillspec-cli/src/cli/args.rs` and
-`crates/skillspec-cli/src/cli/dispatch.rs`, plus the implementation files cited
+`crates/skillspec-cli/src/cli/args/` and
+`crates/skillspec-cli/src/cli/dispatch/`, plus the implementation files cited
 throughout the design-doc set.

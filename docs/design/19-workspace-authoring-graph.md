@@ -496,7 +496,7 @@ Legacy non-plugin behavior was validated against
 
 Keep these surfaces aligned whenever workspace behavior changes:
 
-- `crates/skillspec-cli/src/cli/args.rs` for command shape and help text;
+- `crates/skillspec-cli/src/cli/args/` for command shape and help text;
 - `crates/skillspec-cli/src/features/workspace.rs` and submodules for graph,
   fanout, converge, compile, install, and visibility behavior;
 - `spec/commandspec.md` for the formal command inventory;
@@ -504,5 +504,5 @@ Keep these surfaces aligned whenever workspace behavior changes:
 - `docs/README_DETAILED.md` and top-level `README.md` for user workflows;
 - `skills/skillspec/skill.spec.yml` and generated `skills/skillspec/SKILL.md`
   for prompt-driven multiplexer behavior;
-- CLI tests in `crates/skillspec-cli/tests/cli.rs`;
+- CLI tests in `crates/skillspec-cli/tests/cli/`;
 - smoke tests against a plugin-shaped repo and an ordinary multi-skill repo.

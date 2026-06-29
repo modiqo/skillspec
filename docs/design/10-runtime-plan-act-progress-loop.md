@@ -528,7 +528,7 @@ proof rows.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/cli/dispatch.rs`, which wires `plan`, `act`, `progress`, and
+- `crates/skillspec-cli/src/cli/dispatch/`, which wires `plan`, `act`, `progress`, and
   `trace align`;
 - `crates/skillspec-cli/src/execution/act.rs`, which renders phase plans, action
   checklists, OODA loops, transitions, and effective tool boundaries;

@@ -11,7 +11,7 @@ It answers four questions for each command:
 - What does a realistic invocation look like?
 
 This document is not the formal command reference. The source of truth remains
-the clap command tree in `crates/skillspec-cli/src/cli/args.rs` and the reference
+the clap command tree in `crates/skillspec-cli/src/cli/args/` and the reference
 inventory in `spec/commandspec.md`. If this table disagrees with the CLI help or
 reference spec, this table is wrong.
 
@@ -221,8 +221,8 @@ binary.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/cli/args.rs`, which defines the clap command tree;
-- `crates/skillspec-cli/src/cli/dispatch.rs`, which dispatches parsed commands;
+- `crates/skillspec-cli/src/cli/args/`, which defines the clap command tree;
+- `crates/skillspec-cli/src/cli/dispatch/`, which dispatches parsed commands;
 - `spec/commandspec.md`, which is the reference command inventory;
 - `crates/skillspec-cli/src/execution/act.rs`,
   `crates/skillspec-cli/src/execution/progress.rs`,
