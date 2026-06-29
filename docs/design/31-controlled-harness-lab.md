@@ -139,6 +139,8 @@ crates/skillspec-harness-lab/baselines/11-import-matrix.json
 crates/skillspec-harness-lab/baselines/12-imported-skill-runtime.json
 crates/skillspec-harness-lab/baselines/13-router-harness-lab.json
 crates/skillspec-harness-lab/baselines/14-durable-harness-lab.json
+crates/skillspec-harness-lab/baselines/15-durable-rote-exec-proof.json
+crates/skillspec-harness-lab/baselines/15-durable-rote-exec-live.json
 ```
 
 Normal test runs compare the candidate report against the committed baseline.
@@ -181,6 +183,16 @@ Current committed phases:
   managed-marker mutation guards, enable/disable visibility toggling, missing
   `rote` preflight behavior, and router refresh integration that keeps
   durable-executor implicit.
+- `15-durable-rote-exec-proof`: durable-executor contract coverage for local
+  command intent, `rote_exec` tool-boundary selection, direct CLI/shell forbids,
+  `rote-shell` guidance presence, and SkillSpec alignment over `rote_exec`
+  process evidence.
+- `15-durable-rote-exec-live`: opt-in local proof that copies an authenticated
+  local `rote` binary and the local `~/.rote` config, excluding existing
+  workspaces, into the lab, sets `ROTE_HOME` to the copied tree, runs `rote exec
+  -- printf skillspec-durable-proof` inside a named sandbox rote workspace, and
+  aligns the resulting evidence. This is excluded from default CI because it
+  depends on a real logged-in local rote environment.
 
 ### Layer 2: Pseudo-Harness Simulator
 
@@ -323,7 +335,8 @@ Use this stack:
 | `test/12-imported-skill-runtime` | Compile/install reviewed imported skill, retire-existing behavior, trampoline/spec presence, decision/plan/act/progress/final-response/align checks. | Imported install and runtime-proof rows. |
 | `test/13-router-harness-lab` | Router install, hooks, visibility, index, guard, route bypass/use-skill, repair, disable/enable/uninstall. | Router harness-sim rows. |
 | `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
-| `test/15-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
+| `test/15-durable-rote-exec-proof` | Durable route/act contract for `rote_exec`, `rote-shell` guidance fixture, alignment over `rote_exec` process evidence, and opt-in copied local rote binary/config execution proof with sandbox `ROTE_HOME`. | Durable substrate proof rows. |
+| `test/16-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
 
 Start small and keep the first branch test-first:
 

@@ -51,8 +51,9 @@ The verified coverage map at the time this matrix was written is:
   `crates/skillspec-harness-lab/tests/import.rs`,
   `crates/skillspec-harness-lab/tests/imported_runtime.rs`,
   `crates/skillspec-harness-lab/tests/router.rs`,
-  `crates/skillspec-harness-lab/tests/durable.rs`, and committed baselines
-  under `crates/skillspec-harness-lab/baselines/`;
+  `crates/skillspec-harness-lab/tests/durable.rs`,
+  `crates/skillspec-harness-lab/tests/durable_rote_exec.rs`, and committed
+  baselines under `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -208,6 +209,8 @@ For each test, capture:
 | Durable delete | Delete managed durable executor. | Managed installs are removed; unmanaged folders are not removed. | Harness-sim automatable | Covered |
 | Durable marker guard | Remove the managed marker before update/delete. | Update/delete refuse to mutate unmanaged durable-executor folders. | Harness-sim automatable | Covered |
 | Durable with router | Install router and durable executor together. | Durable install refreshes the router index and durable-executor remains implicit while router stays installed. | Harness-sim automatable | Covered |
+| Durable rote-exec contract | Ask durable-executor to run a local command and remember the result. | Plan/act select `one_shot_process`, allow `rote_exec`, forbid direct CLI/shell, and alignment accepts `rote_exec` process evidence. | Automatable | Covered |
+| Durable live rote-exec proof | Copy `/Users/chetanconikee/.local/bin/rote` plus `~/.rote` config into the lab, excluding existing workspaces, set `ROTE_HOME` to that copied tree, and run `rote exec -- printf skillspec-durable-proof`. | The copied authenticated local `rote` creates a named sandbox workspace, captures the command output, and SkillSpec alignment reaches `pass`. | Manual with trace review | Covered by opt-in `just harness-lab-live-durable-rote-exec` |
 | Durable happy path | Enable durable executor and run one SkillSpec-backed skill. | Workspace/evidence is preserved and final response can cite durable evidence. | Manual with trace review | Manual |
 | Durable negative | User declines observation/record/memory. | Durable executor does not record or memorize events and task can continue direct if allowed. | Manual | Manual |
 | Durable negative | Durable handoff loses required workspace or trace path. | Run reports blocker rather than pretending proof exists. | Manual with trace review | Manual |
@@ -295,8 +298,13 @@ Before merging a large lifecycle or crate-boundary PR, manually test at least:
 7. Install and enable router; verify hook, explicit visibility, index, bypass,
    and selected-skill behavior.
 8. Disable router and verify visibility restoration.
-9. Enable durable executor and run one happy-path durable skill execution.
-10. Confirm router and durable executor remain independently disableable.
+9. Run `just harness-lab-live-durable-rote-exec` to prove the local copied
+   `rote` binary and copied `~/.rote` config can execute a one-shot command
+   through `rote exec --` with `ROTE_HOME` inside the lab, then align the
+   resulting evidence.
+10. Enable durable executor and run one happy-path durable skill execution in a
+   live harness.
+11. Confirm router and durable executor remain independently disableable.
 
 Do not merge if any manual test only "looks okay" but leaves missing alignment
 proof unexplained. Record the blocker and either fix the code or narrow the

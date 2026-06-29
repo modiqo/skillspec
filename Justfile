@@ -73,6 +73,10 @@ test:
 harness-lab-test:
     cargo test --locked -p skillspec-harness-lab
 
+# Run the opt-in live durable rote-exec proof against an authenticated local rote binary/config copy.
+harness-lab-live-durable-rote-exec rote="/Users/chetanconikee/.local/bin/rote" rote_home="/Users/chetanconikee/.rote":
+    SKILLSPEC_LIVE_ROTE={{rote}} SKILLSPEC_LIVE_ROTE_HOME={{rote_home}} cargo test --locked -p skillspec-harness-lab --test durable_rote_exec -- --ignored --nocapture
+
 # Refresh committed harness lab report-card baselines intentionally.
 harness-lab-update-baselines:
     UPDATE_HARNESS_LAB_BASELINES=1 cargo test --locked -p skillspec-harness-lab
