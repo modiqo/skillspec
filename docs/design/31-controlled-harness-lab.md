@@ -85,6 +85,48 @@ It can verify:
 This proves SkillSpec's file mutations and command outputs. It does not prove
 that a real Codex or Claude process reloaded those files.
 
+Each phase should write a machine-readable report card. The JSON report is the
+stable regression artifact; any Markdown rendering is secondary. Report cards
+must use stable case ids and claim ids, normalize temp paths such as
+`<HOME>/.codex/skills`, and avoid timestamps or machine-specific absolute paths.
+
+Minimum JSON shape:
+
+```json
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "09-harness-lab-core",
+  "summary": {
+    "status": "pass",
+    "cases_total": 3,
+    "cases_passed": 3,
+    "cases_failed": 0,
+    "claims_total": 17,
+    "claims_passed": 17,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "detects_sandbox_targets_from_lab_environment",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.targets.codex.detected",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+Regression comparison should fail when a previously passing case or claim is
+missing, when a previously passing case or claim becomes failed, or when a stable
+observed value changes. This lets CI track behavior changes without relying on
+large stdout snapshots.
+
 ### Layer 2: Pseudo-Harness Simulator
 
 This layer is a small host-native test binary or helper named something like
@@ -220,6 +262,7 @@ Use this stack:
 | Branch | Scope | Primary rows moved toward `Covered` |
 | --- | --- | --- |
 | `test/09-harness-lab-core` | Shared sandbox helper, temp home, temp roots, env injection, real-home write guard. | Install/setup sandbox rows. |
+| `test/09b-harness-lab-report-cards` | Machine-readable report cards and report comparison for regression detection. | Stable evidence for every later phase. |
 | `test/10-doctor-matrix` | Doctor target-shape fixtures and output assertions in the lab. | Doctor positive and negative gaps. |
 | `test/11-import-matrix` | Import target-shape fixtures, direct `SKILL.md`, references, workspace/plugin imports, QA commands. | Import positive, negative, and QA gaps. |
 | `test/12-imported-skill-activation` | Compile/install imported skill, retire-existing behavior, trampoline/spec presence, pseudo-activation checks. | Imported install and activation-sim rows. |

@@ -1,4 +1,5 @@
 use crate::command::{skillspec_command, LabEnvironment};
+use crate::report::{write_report, HarnessLabReport};
 use crate::temp::TempDir;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -63,6 +64,20 @@ impl HarnessLab {
 
     pub fn skillspec_home(&self) -> &Path {
         &self.skillspec_home
+    }
+
+    pub fn reports_dir(&self) -> PathBuf {
+        self.root().join("reports")
+    }
+
+    pub fn report_path(&self, phase: &str) -> PathBuf {
+        self.reports_dir().join(format!("{phase}.json"))
+    }
+
+    pub fn write_report(&self, report: &HarnessLabReport) -> PathBuf {
+        let path = self.report_path(&report.phase);
+        write_report(&path, report);
+        path
     }
 
     pub fn agents_root(&self) -> PathBuf {
@@ -147,6 +162,40 @@ impl HarnessLab {
             );
         }
     }
+
+    pub fn normalize_path(&self, path: &Path) -> String {
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let lab_root = self
+            .root()
+            .canonicalize()
+            .unwrap_or_else(|_| self.root().to_path_buf());
+        let home = self
+            .home()
+            .canonicalize()
+            .unwrap_or_else(|_| self.home().to_path_buf());
+        let project = self
+            .project()
+            .canonicalize()
+            .unwrap_or_else(|_| self.project().to_path_buf());
+        let skillspec_home = self
+            .skillspec_home()
+            .canonicalize()
+            .unwrap_or_else(|_| self.skillspec_home().to_path_buf());
+
+        if let Ok(relative) = canonical.strip_prefix(&skillspec_home) {
+            return format!("<SKILLSPEC_HOME>{}", normalized_suffix(relative));
+        }
+        if let Ok(relative) = canonical.strip_prefix(&project) {
+            return format!("<PROJECT>{}", normalized_suffix(relative));
+        }
+        if let Ok(relative) = canonical.strip_prefix(&home) {
+            return format!("<HOME>{}", normalized_suffix(relative));
+        }
+        if let Ok(relative) = canonical.strip_prefix(&lab_root) {
+            return format!("<LAB_ROOT>{}", normalized_suffix(relative));
+        }
+        canonical.to_string_lossy().replace('\\', "/")
+    }
 }
 
 fn write_file(path: &Path, content: &str) {
@@ -154,4 +203,13 @@ fn write_file(path: &Path, content: &str) {
         std::fs::create_dir_all(parent).unwrap();
     }
     std::fs::write(path, content).unwrap();
+}
+
+fn normalized_suffix(relative: &Path) -> String {
+    let suffix = relative.to_string_lossy().replace('\\', "/");
+    if suffix.is_empty() {
+        String::new()
+    } else {
+        format!("/{suffix}")
+    }
 }
