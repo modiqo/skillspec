@@ -1,0 +1,141 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "09-harness-lab-core",
+  "summary": {
+    "status": "pass",
+    "cases_total": 3,
+    "cases_passed": 3,
+    "cases_failed": 0,
+    "claims_total": 18,
+    "claims_passed": 18,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "detects_sandbox_targets_from_lab_environment",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.targets.count",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        },
+        {
+          "id": "install.targets.agents.detected",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.targets.agents.path",
+          "status": "pass",
+          "expected": "<HOME>/.agents/skills",
+          "observed": "<HOME>/.agents/skills"
+        },
+        {
+          "id": "install.targets.codex.detected",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.targets.codex.path",
+          "status": "pass",
+          "expected": "<HOME>/.codex/skills",
+          "observed": "<HOME>/.codex/skills"
+        },
+        {
+          "id": "install.targets.claude-local.detected",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.targets.claude-local.path",
+          "status": "pass",
+          "expected": "<PROJECT>/.claude/skills",
+          "observed": "<PROJECT>/.claude/skills"
+        }
+      ]
+    },
+    {
+      "id": "command_outside_project_does_not_discover_claude_local_root",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.targets.count_without_project",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "install.targets.claude_local.absent_outside_project",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        }
+      ]
+    },
+    {
+      "id": "installs_skill_into_all_sandbox_roots",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.skill.name",
+          "status": "pass",
+          "expected": "example-skill",
+          "observed": "example-skill"
+        },
+        {
+          "id": "install.skill.dry_run",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "install.skill.target_count",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        },
+        {
+          "id": "install.skill.agents.skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill.agents.spec_yml",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill.codex.skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill.codex.spec_yml",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill.claude-local.skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill.claude-local.spec_yml",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}

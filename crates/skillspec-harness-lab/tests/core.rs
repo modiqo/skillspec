@@ -1,7 +1,9 @@
 use skillspec_harness_lab::{
     assert_success, basic_skill_md, basic_skill_spec, compare_reports, json_stdout, CaseStatus,
-    HarnessLab, HarnessLabReportBuilder,
+    HarnessLab, HarnessLabReport, HarnessLabReportBuilder,
 };
+
+const CORE_BASELINE: &str = include_str!("../baselines/09-harness-lab-core.json");
 
 #[test]
 fn core_phase_writes_machine_readable_report_card() {
@@ -27,6 +29,8 @@ fn core_phase_writes_machine_readable_report_card() {
         serde_json::from_slice(&std::fs::read(report_path).unwrap()).unwrap();
     assert_eq!(written.phase, "09-harness-lab-core");
     assert_eq!(written.summary.status, CaseStatus::Pass);
+
+    assert_matches_or_updates_baseline(&report);
 }
 
 #[test]
@@ -49,6 +53,28 @@ fn run_core_phase() -> skillspec_harness_lab::HarnessLabReport {
     command_outside_project_does_not_discover_claude_local_root(&mut report);
     installs_skill_into_all_sandbox_roots(&mut report);
     report.build()
+}
+
+fn assert_matches_or_updates_baseline(report: &HarnessLabReport) {
+    let baseline_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("baselines/09-harness-lab-core.json");
+    let baseline_text = if std::env::var("UPDATE_HARNESS_LAB_BASELINES").as_deref() == Ok("1") {
+        let json = serde_json::to_string_pretty(report).unwrap();
+        std::fs::write(&baseline_path, format!("{json}\n")).unwrap();
+        std::fs::read_to_string(&baseline_path).unwrap()
+    } else {
+        CORE_BASELINE.to_owned()
+    };
+
+    let baseline: HarnessLabReport = serde_json::from_str(&baseline_text).unwrap();
+    let comparison = compare_reports(&baseline, report);
+    assert_eq!(
+        comparison.status,
+        CaseStatus::Pass,
+        "harness lab report regressed against {}\n{}",
+        baseline_path.display(),
+        serde_json::to_string_pretty(&comparison).unwrap()
+    );
 }
 
 fn detects_sandbox_targets_from_lab_environment(report: &mut HarnessLabReportBuilder) {

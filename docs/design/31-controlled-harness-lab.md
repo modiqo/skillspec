@@ -127,6 +127,28 @@ missing, when a previously passing case or claim becomes failed, or when a stabl
 observed value changes. This lets CI track behavior changes without relying on
 large stdout snapshots.
 
+Committed golden baselines live under the harness lab crate, for example:
+
+```text
+crates/skillspec-harness-lab/baselines/09-harness-lab-core.json
+```
+
+Normal test runs compare the candidate report against the committed baseline.
+When behavior intentionally changes, refresh the baseline explicitly:
+
+```sh
+UPDATE_HARNESS_LAB_BASELINES=1 cargo test --locked -p skillspec-harness-lab
+```
+
+or:
+
+```sh
+just harness-lab-update-baselines
+```
+
+The resulting JSON diff is part of the review. Do not update baselines to hide
+unexpected behavior changes.
+
 ### Layer 2: Pseudo-Harness Simulator
 
 This layer is a small host-native test binary or helper named something like

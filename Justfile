@@ -73,6 +73,10 @@ test:
 harness-lab-test:
     cargo test --locked -p skillspec-harness-lab
 
+# Refresh committed harness lab report-card baselines intentionally.
+harness-lab-update-baselines:
+    UPDATE_HARNESS_LAB_BASELINES=1 cargo test --locked -p skillspec-harness-lab
+
 # Verify crate packaging boundaries without requiring already-published sibling crates.
 package-list:
     for package in {{packages}}; do \
