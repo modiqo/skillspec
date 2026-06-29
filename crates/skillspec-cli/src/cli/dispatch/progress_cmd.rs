@@ -1,15 +1,14 @@
 use crate::cli::args::ProgressCommand;
-use skillspec::{error::Result, parser, progress, report};
+use skillspec::{domain::evidence, error::Result, report};
 
 pub(super) fn run(command: ProgressCommand) -> Result<()> {
     match command {
         ProgressCommand::Show { path, run, json } => {
-            let spec = parser::load_spec(&path)?;
-            let report = progress::show(&spec, &run)?;
+            let report = evidence::show_progress(&path, &run)?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&progress::render(&report))?;
+                report::text(&evidence::render_progress(&report))?;
             }
         }
         ProgressCommand::Record {
@@ -25,7 +24,7 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             message,
             json: _,
         } => {
-            let event = progress::record(progress::RecordOptions {
+            let event = evidence::record(evidence::RecordOptions {
                 run_dir: run,
                 event: event.into(),
                 phase,
@@ -59,7 +58,7 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             message,
             json: _,
         } => {
-            let event = progress::record_stats(progress::StatsRecordOptions {
+            let event = evidence::record_stats(evidence::StatsRecordOptions {
                 run_dir: run,
                 workspace,
                 phase,
@@ -91,7 +90,7 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             message,
             json: _,
         } => {
-            let event = progress::record_final_response(progress::FinalResponseRecordOptions {
+            let event = evidence::record_final_response(evidence::FinalResponseRecordOptions {
                 run_dir: run,
                 phase,
                 requirements: requirement,
@@ -110,7 +109,7 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             summary,
             json,
         } => {
-            let report = progress::record_batch(progress::BatchRecordOptions {
+            let report = evidence::record_batch(evidence::BatchRecordOptions {
                 run_dir: run,
                 events,
                 checkpoint,
@@ -118,7 +117,7 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&progress::render_batch_report(&report, summary))?;
+                report::text(&evidence::render_batch_report(&report, summary))?;
             }
         }
     }

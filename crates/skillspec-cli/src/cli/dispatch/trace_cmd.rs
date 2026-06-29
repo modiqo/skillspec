@@ -1,10 +1,10 @@
 use crate::cli::args::TraceCommand;
-use skillspec::{align, error::Result, parser, report, trace};
+use skillspec::{domain::evidence, error::Result, report};
 
 pub(super) fn run(command: TraceCommand) -> Result<()> {
     match command {
         TraceCommand::Compact { run_dir } => {
-            let trace = trace::compact(&run_dir)?;
+            let trace = evidence::compact_trace(&run_dir)?;
             report::json(&trace)?;
         }
         TraceCommand::Align {
@@ -15,33 +15,32 @@ pub(super) fn run(command: TraceCommand) -> Result<()> {
             summary,
             json,
         } => {
-            let spec = parser::load_spec(&path)?;
-            let report =
-                align::align_decision_trace(&spec, &path, &decision_trace, &execution_trace)?;
-            let alignment_report = align::write_report_json(&decision_trace, &report)?;
-            let proof_digest_path = match proof_digest {
-                Some(path) => {
-                    let digest = align::build_proof_digest(&report, &alignment_report);
-                    Some(align::write_proof_digest_json(&path, &digest)?)
-                }
-                None => None,
-            };
+            let output = evidence::align_decision_trace(
+                &path,
+                &decision_trace,
+                &execution_trace,
+                proof_digest.as_deref(),
+            )?;
             if json {
-                report::alignment_written(&alignment_report)?;
-                if let Some(path) = &proof_digest_path {
+                report::alignment_written(&output.alignment_report)?;
+                if let Some(path) = &output.proof_digest_path {
                     report::proof_digest_written(path)?;
                 }
-                report::json(&report)?;
+                report::json(&output.report)?;
             } else if summary {
-                report::align_summary(&report, &alignment_report, proof_digest_path.as_deref())?;
+                report::align_summary(
+                    &output.report,
+                    &output.alignment_report,
+                    output.proof_digest_path.as_deref(),
+                )?;
             } else {
-                report::alignment_written(&alignment_report)?;
-                if let Some(path) = &proof_digest_path {
+                report::alignment_written(&output.alignment_report)?;
+                if let Some(path) = &output.proof_digest_path {
                     report::proof_digest_written(path)?;
                 }
-                report::align(&report)?;
+                report::align(&output.report)?;
             }
-            if report.has_failures() {
+            if output.report.has_failures() {
                 std::process::exit(1);
             }
         }
