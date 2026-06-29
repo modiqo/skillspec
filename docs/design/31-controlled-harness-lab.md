@@ -209,7 +209,25 @@ The lab must be fail-closed:
 
 ## Proposed Implementation Shape
 
-Start small and keep it test-first:
+Build the lab in the same order a user adopts SkillSpec: assess the current
+skill, import it, install and activate the imported package, then add router and
+durable lifecycle coverage. This keeps router and durable tests on top of the
+basic doctor/import/install guarantees instead of making lifecycle tests carry
+the whole adoption path.
+
+Use this stack:
+
+| Branch | Scope | Primary rows moved toward `Covered` |
+| --- | --- | --- |
+| `test/09-harness-lab-core` | Shared sandbox helper, temp home, temp roots, env injection, real-home write guard. | Install/setup sandbox rows. |
+| `test/10-doctor-matrix` | Doctor target-shape fixtures and output assertions in the lab. | Doctor positive and negative gaps. |
+| `test/11-import-matrix` | Import target-shape fixtures, direct `SKILL.md`, references, workspace/plugin imports, QA commands. | Import positive, negative, and QA gaps. |
+| `test/12-imported-skill-activation` | Compile/install imported skill, retire-existing behavior, trampoline/spec presence, pseudo-activation checks. | Imported install and activation-sim rows. |
+| `test/13-router-harness-lab` | Router install, hooks, visibility, index, guard, route bypass/use-skill, repair, disable/enable/uninstall. | Router harness-sim rows. |
+| `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
+| `test/15-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
+
+Start small and keep the first branch test-first:
 
 ```text
 crates/skillspec-cli/tests/support/harness_lab.rs
@@ -226,6 +244,7 @@ The support module should expose:
 - `lab.codex_root()`;
 - `lab.claude_root()`;
 - `lab.command("skillspec")`;
+- `lab.command_in_project("skillspec")`;
 - `lab.write_skill(root, name, skill_md, spec_yml)`;
 - `lab.assert_no_real_home_writes()`;
 - `lab.read_router_config()`;
@@ -244,22 +263,22 @@ until the scenario format stabilizes.
 
 ```yaml
 schema: skillspec/harness-lab/v0
-name: router-bypasses-ordinary-task
+name: imported-skill-activation-handoff
 harness: codex
 roots:
   codex:
-    - skill-router
-    - pdf
+    - imported-skill
 pre:
-  - skillspec router install --all-detected --apply
-prompt: what is the time today
+  - skillspec import-skill ./source-skill --out ./build/skill.spec.yml
+  - skillspec compile ./build/skill.spec.yml --out ./compiled
+  - skillspec install skill ./compiled --target codex --retire-existing
+prompt: use imported-skill for the fixture task
 expect:
-  hook_invoked: true
-  first_hop_ready: true
-  route_decision: bypass
-  loaded_domain_skills: []
+  trampoline_loaded: true
+  spec_discovered: true
+  guidance_command_available: true
   forbidden_events:
-    - domain_skill_loaded
+    - full_manual_loaded
 ```
 
 The scenario language should remain assertion-focused. It should not become a
@@ -284,8 +303,9 @@ The proposal is successful when:
    Layer 1 or Layer 2 test;
 2. live harness rows remain clearly labeled `Manual` or `Manual with trace
    review`;
-3. router-first, bypass, selected-skill, visibility restore, durable lifecycle,
-   and trampoline handoff have deterministic traces;
+3. doctor, import, imported activation, router-first, bypass, selected-skill,
+   visibility restore, durable lifecycle, and trampoline handoff have
+   deterministic traces;
 4. failures show the command, environment, touched files, and event trace needed
    to reproduce locally;
 5. the external CLI and skill contracts remain unchanged.
