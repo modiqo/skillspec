@@ -223,6 +223,8 @@ This doc is grounded in:
 
 - `crates/skillspec-cli/src/cli/args/`, which defines the clap command tree;
 - `crates/skillspec-cli/src/cli/dispatch/`, which dispatches parsed commands;
+- `crates/skillspec-cli/src/domain/`, which provides the internal command-family
+  facades used by dispatch before reaching implementation modules;
 - `spec/commandspec.md`, which is the reference command inventory;
 - `crates/skillspec-cli/src/execution/act.rs`,
   `crates/skillspec-cli/src/execution/progress.rs`,

@@ -59,6 +59,8 @@ directory listings.
 | 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
 | 26 | [Plugin Marketplace Install](26-plugin-marketplace-install.md) | How the repo is packaged as Claude and Codex plugin marketplaces, how official install differs from local `skillspec install skill`, and how validation should run before release. |
 | 27 | [Public Doctor Reports](27-public-doctor-reports.md) | How CI dogfoods `skillspec doctor` on the SkillSpec self skill, and how public issue-form requests run doctor against public GitHub skill URLs without executing target repo code or touching private repositories. |
+| 28 | [Router Guard Hooks](28-router-guard-hooks.md) | How router install/enable/update/disable manages harness hooks so router-first readiness can be checked before skill selection. |
+| 29 | [Internal Domain Facades](29-internal-domain-facades.md) | How the CLI now calls internal domain facades before implementation modules, preserving command contracts while preparing for future crate extraction. |
 
 ## Visual Explainers
 
@@ -104,7 +106,8 @@ Every design claim should be grounded in one or more of these sources:
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
 | Skill router | `crates/skillspec-cli/src/lifecycle/router.rs`, `crates/skillspec-cli/src/lifecycle/visibility.rs`, `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-cli/src/execution/trace.rs`, `crates/skillspec-cli/src/execution/progress.rs`, `crates/skillspec-cli/src/execution/align.rs`, `crates/skillspec-cli/src/execution/align/ledger.rs`, `crates/skillspec-cli/src/execution/align/types.rs` |
-| CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/` |
+| CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
+| Internal crate boundaries | `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
 
 ## Terms Used In These Docs
 
