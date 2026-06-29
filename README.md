@@ -187,15 +187,17 @@ just install-skill-all
 # Debug build, debug CLI install, and all detected harness skill installs.
 just dev-install-all
 
-# Local preflight before pushing: fmt, check, clippy, tests, and package lists.
+# Local preflight before pushing: locked CI checks, package lists, examples, and conformance.
 just preflight
 ```
 
 `just preflight` deliberately uses plain Cargo commands instead of an extra
-preflight dependency: `cargo fmt --all --check`, `cargo check --workspace
---all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`,
-`cargo test --workspace --all-targets`, and `cargo package --list` for each
-workspace crate.
+preflight dependency. It runs formatting, locked workspace check/clippy/tests,
+package file-list checks for every split crate, example validation/tests/deps,
+and conformance fixture checks. PR CI uses package file-list checks instead of
+`cargo publish --dry-run` because a same-version split crate graph cannot
+publish-dry-run downstream crates until their sibling dependencies already exist
+on crates.io; tagged releases publish the crates in dependency order.
 
 Full install notes:
 [docs/install](https://github.com/modiqo/skillspec/blob/main/docs/README.md)

@@ -58,21 +58,45 @@ fmt-check:
 
 # Type-check the full workspace, including tests and examples.
 check:
-    cargo check --workspace --all-targets
+    cargo check --locked --workspace --all-targets
 
 # Treat lint warnings as failures.
 clippy:
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --locked --workspace --all-targets -- -D warnings
 
 # Run the workspace test suite.
 test:
-    cargo test --workspace --all-targets
+    cargo test --locked --workspace --all-targets
 
-# Verify crate packaging boundaries without publishing or creating release artifacts.
+# Verify crate packaging boundaries without requiring already-published sibling crates.
 package-list:
     for package in {{packages}}; do \
-      cargo package --list -p "$package" --allow-dirty > /dev/null; \
+      cargo package --locked --list -p "$package" --allow-dirty > /dev/null; \
+    done
+
+# Validate every example spec.
+examples-validate:
+    find examples -name '*.yml' -print0 | sort -z | xargs -0 -n1 cargo run --locked -p skillspec -- validate
+
+# Run every example scenario test.
+examples-test:
+    find examples -name '*.yml' -print0 | sort -z | xargs -0 -n1 cargo run --locked -p skillspec -- test
+
+# Check every example dependency ledger.
+examples-deps:
+    find examples -name '*.yml' -print0 | sort -z | xargs -0 -n1 cargo run --locked -p skillspec -- deps check
+
+# Validate valid conformance fixtures and reject invalid ones.
+conformance:
+    for spec in $(find conformance/valid -name '*.yml' | sort); do \
+      cargo run --locked -p skillspec -- validate "$spec"; \
+    done
+    for spec in $(find conformance/invalid -name '*.yml' | sort); do \
+      if cargo run --locked -p skillspec -- validate "$spec"; then \
+        echo "invalid conformance fixture unexpectedly passed: $spec" >&2; \
+        exit 1; \
+      fi; \
     done
 
 # Local CI equivalent before pushing a branch.
-preflight: fmt-check check clippy test package-list
+preflight: fmt-check check clippy test package-list examples-validate examples-test examples-deps conformance
