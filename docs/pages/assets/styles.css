@@ -1090,12 +1090,12 @@ body {
 }
 
 .site-nav {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
-  width: fit-content;
+  width: max-content;
   max-width: 100%;
   border: 2px solid var(--line);
   background: rgba(238, 230, 216, 0.58);
@@ -2373,9 +2373,10 @@ pre code {
   }
 
   .site-nav {
+    flex-wrap: wrap;
     justify-content: flex-start;
     justify-self: start;
-    width: fit-content;
+    width: max-content;
   }
 
   .section-heading {
