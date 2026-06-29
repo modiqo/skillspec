@@ -282,7 +282,7 @@ This doc is grounded in:
   `decide`, `sensemake`, `query`, `refs`, `imports check`, `deps check`,
   `compile`, `import-skill`, and `trace align`;
 - `crates/skillspec-cli/src/execution/decision.rs`,
-  `crates/skillspec-cli/src/spec/imports.rs`,
+  `crates/skillspec-core/src/spec/imports.rs`,
   `crates/skillspec-cli/src/execution/deps.rs`, and
   `crates/skillspec-cli/src/execution/align.rs`, which implement the runtime
   and review surfaces;

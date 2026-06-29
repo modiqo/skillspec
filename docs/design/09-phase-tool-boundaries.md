@@ -258,7 +258,7 @@ agree on whether a tool was in scope.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/spec/model.rs`, which defines `ToolBoundary` and
+- `crates/skillspec-core/src/spec/model.rs`, which defines `ToolBoundary` and
   `ToolBoundaryDefault`;
 - `crates/skillspec-cli/src/execution/act.rs`, which merges entry, route, phase, and
   active forbids into the effective boundary;

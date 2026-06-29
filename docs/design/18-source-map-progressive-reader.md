@@ -102,7 +102,7 @@ Keep these surfaces aligned whenever the source-map workflow changes:
 
 - `crates/skillspec-cli/src/cli/args/` for command shape and help text;
 - `crates/skillspec-cli/src/features/source_map.rs` for map schema and query behavior;
-- `crates/skillspec-cli/src/spec/grammar.rs` for the import sequence taught by
+- `crates/skillspec-core/src/spec/grammar.rs` for the import sequence taught by
   `skillspec grammar sensemake`;
 - `crates/skillspec-cli/src/features/sensemake.rs` for navigation hints;
 - `spec/commandspec.md` for the formal command inventory;

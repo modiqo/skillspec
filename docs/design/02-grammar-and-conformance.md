@@ -11,8 +11,8 @@ references must resolve.
 
 The canonical interchange format is YAML. The conceptual grammar is documented
 in `spec/grammar.md`, the machine-readable schema lives in
-`spec/skill.spec.schema.json`, and the current CLI implementation is typed in
-`crates/skillspec-cli/src/spec/model.rs`.
+`spec/skill.spec.schema.json`, and the current core implementation is typed in
+`crates/skillspec-core/src/spec/model.rs`.
 
 For visual orientation, use the
 [`docs/grammar-atlas/`](../grammar-atlas/README.md) companion. It renders the
@@ -265,8 +265,8 @@ changed.
 
 Changing the grammar should update all relevant surfaces:
 
-- `crates/skillspec-cli/src/spec/model.rs`;
-- `crates/skillspec-cli/src/spec/parser/validation.rs`;
+- `crates/skillspec-core/src/spec/model.rs`;
+- `crates/skillspec-core/src/spec/parser/validation.rs`;
 - `crates/skillspec-cli/src/execution/decision.rs` when decision behavior changes;
 - `crates/skillspec-cli/src/features/sensemake.rs` when query or refs behavior changes;
 - `spec/skill.spec.schema.json`;
@@ -286,11 +286,11 @@ This doc is grounded in:
 
 - `spec/grammar.md`, which defines the conceptual grammar;
 - `spec/skill.spec.schema.json`, which defines the JSON Schema surface;
-- `crates/skillspec-cli/src/spec/model.rs`, which defines the typed Rust model;
-- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates schema, required fields,
+- `crates/skillspec-core/src/spec/model.rs`, which defines the typed Rust model;
+- `crates/skillspec-core/src/spec/parser/validation.rs`, which validates schema, required fields,
   identifiers, references, import cycles, orphaned imports/resources, and test
   expectations;
 - `crates/skillspec-cli/src/execution/decision.rs`, which evaluates scenario
   expectations;
-- `crates/skillspec-cli/src/spec/imports.rs`, which validates local imports;
+- `crates/skillspec-core/src/spec/imports.rs`, which validates local imports;
 - `conformance/`, which contains valid and invalid compatibility fixtures.

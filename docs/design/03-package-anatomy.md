@@ -272,5 +272,5 @@ This doc is grounded in:
 - `examples/durable-executor/deps.toml`, which shows the companion tool manifest;
 - `crates/skillspec-cli/src/execution/deps.rs`, which checks dependencies declared in
   `skill.spec.yml`;
-- `spec/imports.md` and `crates/skillspec-cli/src/spec/imports.rs`, which define and
+- `spec/imports.md` and `crates/skillspec-core/src/spec/imports.rs`, which define and
   validate local explicit imports.

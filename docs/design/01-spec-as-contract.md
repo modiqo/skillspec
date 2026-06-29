@@ -246,12 +246,12 @@ This doc is grounded in:
   structuring decisions.
 - `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.
-- `crates/skillspec-cli/src/spec/model.rs`,
-  `crates/skillspec-cli/src/spec/parser/validation.rs`,
+- `crates/skillspec-core/src/spec/model.rs`,
+  `crates/skillspec-core/src/spec/parser/validation.rs`,
   `crates/skillspec-cli/src/execution/decision.rs`,
   `crates/skillspec-cli/src/features/compiler.rs`,
   `crates/skillspec-cli/src/execution/deps.rs`,
-  `crates/skillspec-cli/src/spec/imports.rs`,
+  `crates/skillspec-core/src/spec/imports.rs`,
   `crates/skillspec-cli/src/features/importer.rs`, and
   `crates/skillspec-cli/src/execution/align.rs`, which implement the current
   contract surfaces.

@@ -154,13 +154,13 @@ Use focused source searches before committing.
 For grammar fields:
 
 ```sh
-rg -n "pub struct SkillSpec|deny_unknown_fields|pub struct Expectation" crates/skillspec-cli/src/spec/model.rs
+rg -n "pub struct SkillSpec|deny_unknown_fields|pub struct Expectation" crates/skillspec-core/src/spec/model.rs
 ```
 
 For parser validation:
 
 ```sh
-rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-cli/src/spec/parser/validation.rs
+rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.imports" crates/skillspec-core/src/spec/parser/validation.rs
 ```
 
 For decision behavior:
@@ -178,7 +178,7 @@ rg -n "SensemakeReport|navigation|outgoing_refs|select_value|query_hints" crates
 For imports:
 
 ```sh
-rg -n "import path must be local and relative|topological_load_order|markdown_has_section" crates/skillspec-cli/src/spec/imports.rs
+rg -n "import path must be local and relative|topological_load_order|markdown_has_section" crates/skillspec-core/src/spec/imports.rs
 ```
 
 For traces and alignment:
