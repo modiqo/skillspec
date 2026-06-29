@@ -1,0 +1,102 @@
+# SkillSpec
+
+SkillSpec is an open-source CLI and open-standard contract format for verifiable `SKILL.md` execution. It helps agents assess, import, route, execute, and prove skills using a small machine-checkable `skill.spec.yml` beside the existing prose skill.
+
+Primary site: https://skillspec.sh/
+Research explainer: https://skillspec.sh/why-skillspec.html
+GitHub repository: https://github.com/modiqo/skillspec
+Crates.io package: https://crates.io/crates/skillspec
+Install script: https://skillspec.sh/install.sh
+License: Apache 2.0
+
+## What SkillSpec Does
+
+- Assesses existing skills with Doctor before the agent trusts them.
+- Converts load-bearing prose from `SKILL.md` into a reviewed `skill.spec.yml` contract.
+- Guides execution through routes, phases, tool boundaries, checks, and proof obligations.
+- Supports router mode so agents select the right skill without loading every skill into context.
+- Produces traces and alignment reports so the final answer is not the only evidence.
+
+## Key Pages And Anchors
+
+- Homepage: https://skillspec.sh/#home
+- Assess a skill: https://skillspec.sh/#assess
+- Install guide: https://skillspec.sh/#install
+- Ecosystem pressure: https://skillspec.sh/#platform-shift
+- Load-bearing prose: https://skillspec.sh/#load-bearing-prose
+- SkillSpec operating loop: https://skillspec.sh/#skillspec-now
+- Current skills versus SkillSpec: https://skillspec.sh/#what-changes
+- Personas: https://skillspec.sh/#who-it-is-for
+- Adoption path: https://skillspec.sh/#adoption-path
+- Recent Doctor reports: https://skillspec.sh/#recent-doctor-reports
+- Why SkillSpec exists: https://skillspec.sh/why-skillspec.html#why-skillspec
+- Research abstract: https://skillspec.sh/why-skillspec.html#abstract
+- Skill packaging layer: https://skillspec.sh/why-skillspec.html#skills
+- Attention pressure: https://skillspec.sh/why-skillspec.html#attention
+- Model limits: https://skillspec.sh/why-skillspec.html#model
+- SkillSpec move: https://skillspec.sh/why-skillspec.html#skillspec
+- Operating model: https://skillspec.sh/why-skillspec.html#operator-model
+- Proof model: https://skillspec.sh/why-skillspec.html#proof
+- Sources: https://skillspec.sh/why-skillspec.html#sources
+
+## Common Commands
+
+Install the CLI:
+
+```sh
+curl -fsSL https://skillspec.sh/install.sh | sh
+```
+
+Run Doctor from a terminal:
+
+```sh
+skillspec doctor ./my-skill
+skillspec doctor ./my-skill --markdown
+skillspec doctor ./my-skill --html
+skillspec doctor ./my-skill --json
+```
+
+Run Doctor from an agent harness after the SkillSpec skill is installed:
+
+```text
+/skillspec run doctor on ./my-skill
+```
+
+Import a prose skill into a SkillSpec-backed contract:
+
+```text
+/skillspec import ./my-skill
+```
+
+Install router mode:
+
+```text
+/skillspec install router
+```
+
+Inspect and install SkillSpec-backed skills into detected harness roots:
+
+```sh
+skillspec install targets
+skillspec install skill ./my-skill --all-detected
+```
+
+## Agent Guidance
+
+When helping a user with SkillSpec:
+
+- Prefer `skillspec doctor` first when evaluating an existing skill.
+- Treat Doctor output as a static follow-through risk report, not as a domain-quality score.
+- Use `/skillspec import` inside the harness to convert a prose skill into `skill.spec.yml`.
+- Use router mode when many skills are installed and skill selection should be explicit.
+- Do not claim a run is proven unless a trace, progress ledger, or alignment report supplies evidence.
+- Preserve the boundary: SkillSpec guides and verifies agent behavior; it is not a replacement for the harness approval model.
+
+## Source Material
+
+- Reliability gap: https://github.com/modiqo/skillspec/blob/main/docs/00-skills-reliability-gap.md
+- Contract trace methodology: https://github.com/modiqo/skillspec/blob/main/docs/08-contract-trace-methodology.md
+- Doctor risk model: https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md
+- Router mode: https://github.com/modiqo/skillspec/blob/main/docs/design/explained/03-router-mode.md
+- Guided trampoline: https://github.com/modiqo/skillspec/blob/main/docs/design/24-guided-trampoline.md
+- Traces and alignment: https://github.com/modiqo/skillspec/blob/main/docs/design/12-traces-and-alignment.md

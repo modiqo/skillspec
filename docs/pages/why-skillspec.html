@@ -11,7 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-article-header">
+    <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260629-slugs">
   </head>
   <body>
     <header class="site-header">
@@ -31,8 +32,8 @@
       </form>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="./index.html#assess">Assess your skill</a>
-        <a href="./index.html#install-title">Install</a>
-        <a href="./index.html#personas-title">Who it is for</a>
+        <a href="./index.html#install">Install</a>
+        <a href="./index.html#who-it-is-for">Who it is for</a>
         <a href="./why-skillspec.html" aria-current="page">Why SkillSpec</a>
         <a
           class="github-link star-link"
@@ -48,10 +49,12 @@
       </nav>
     </header>
     <main class="shell article-shell">
-      <section class="article-hero" aria-labelledby="article-title">
+      <section id="why-skillspec" class="article-hero" aria-labelledby="article-title">
         <div>
           <p class="eyebrow">Research note</p>
-          <h1 id="article-title">Why SkillSpec exists</h1>
+          <h1 id="article-title">
+            <a class="heading-link" href="#why-skillspec">Why SkillSpec exists</a>
+          </h1>
           <p class="lede">
             Skills made agent knowledge portable. SkillSpec makes important
             skills followable, testable, and provable without forcing the agent
@@ -70,10 +73,12 @@
         </figure>
       </section>
 
-      <section class="article-panel abstract-panel" aria-labelledby="abstract-title">
+      <section id="abstract" class="article-panel abstract-panel" aria-labelledby="abstract-title">
         <div>
           <p class="eyebrow">Abstract</p>
-          <h2 id="abstract-title">The problem is not that skills are weak.</h2>
+          <h2 id="abstract-title">
+            <a class="heading-link" href="#abstract">The problem is not that skills are weak.</a>
+          </h2>
         </div>
         <div class="abstract-copy">
           <p>
@@ -117,7 +122,9 @@
         <article class="article-body">
           <section id="skills">
             <p class="section-kicker">1. Skills</p>
-            <h2>Skills are becoming the packaging layer for tacit domain knowledge.</h2>
+            <h2>
+              <a class="heading-link" href="#skills">Skills are becoming the packaging layer for tacit domain knowledge.</a>
+            </h2>
             <p>
               A prompt is usually a one-off instruction. A skill is a reusable
               package: frontmatter for discovery, a <code>SKILL.md</code> body
@@ -177,7 +184,9 @@
 
           <section id="attention">
             <p class="section-kicker">2. Attention</p>
-            <h2>Skill growth creates two kinds of pressure.</h2>
+            <h2>
+              <a class="heading-link" href="#attention">Skill growth creates two kinds of pressure.</a>
+            </h2>
             <p>
               Longitudinal pressure is what happens inside one skill over time.
               The skill starts short. Then it gains a decision tree, safety
@@ -230,7 +239,9 @@
 
           <section id="model">
             <p class="section-kicker">3. Model limits</p>
-            <h2>Better models help, but they do not remove the follow-through problem.</h2>
+            <h2>
+              <a class="heading-link" href="#model">Better models help, but they do not remove the follow-through problem.</a>
+            </h2>
             <p>
               A stronger model can read more, reason better, and recover from
               more ambiguity. That still does not turn prose into a guarantee.
@@ -257,7 +268,9 @@
 
           <section id="skillspec">
             <p class="section-kicker">4. The move</p>
-            <h2>SkillSpec keeps prose, but stops making prose carry everything.</h2>
+            <h2>
+              <a class="heading-link" href="#skillspec">SkillSpec keeps prose, but stops making prose carry everything.</a>
+            </h2>
             <p>
               The goal is not to replace skills. A good skill still needs
               human-readable explanation, examples, references, and judgment.
@@ -308,7 +321,9 @@
 
           <section id="operator-model">
             <p class="section-kicker">5. Operating model</p>
-            <h2>What SkillSpec gives an agent operator.</h2>
+            <h2>
+              <a class="heading-link" href="#operator-model">What SkillSpec gives an agent operator.</a>
+            </h2>
             <div class="solution-grid">
               <article>
                 <span>01</span>
@@ -386,7 +401,9 @@
 
           <section id="proof">
             <p class="section-kicker">6. Proof</p>
-            <h2>The final answer should not be the only artifact you trust.</h2>
+            <h2>
+              <a class="heading-link" href="#proof">The final answer should not be the only artifact you trust.</a>
+            </h2>
             <p>
               SkillSpec separates decision evidence from execution evidence. A
               decision trace can prove which route was selected. A progress
@@ -427,7 +444,9 @@
 
           <section id="sources" class="sources-section">
             <p class="section-kicker">Sources</p>
-            <h2>Design material behind this article.</h2>
+            <h2>
+              <a class="heading-link" href="#sources">Design material behind this article.</a>
+            </h2>
             <p>
               These links open the implementation and design notes used to write
               this page. They are intentionally public so the claims can be
@@ -470,10 +489,11 @@
       </div>
     </main>
     <footer class="site-footer">
-      <a class="modiqo-credit" href="https://www.modiqo.ai" target="_blank" rel="noreferrer">
-        <span>Open source fieldwork from</span>
-        <strong>Modiqo Research</strong>
-      </a>
+      <p class="site-credit">
+        &copy; 2026 SkillSpec &middot; Built by the
+        <a href="https://modiqo.ai" target="_blank" rel="noreferrer">Modiqo team</a>
+        &middot; Open Source under Apache 2.0 License
+      </p>
     </footer>
     <script src="./assets/site.js?v=20260628-risk-star"></script>
   </body>

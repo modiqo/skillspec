@@ -11,7 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-article-header">
+    <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260629-slugs">
   </head>
   <body>
     <header class="site-header">
@@ -31,8 +32,8 @@
       </form>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="#assess">Assess your skill</a>
-        <a href="#install-title">Install</a>
-        <a href="#personas-title">Who it is for</a>
+        <a href="#install">Install</a>
+        <a href="#who-it-is-for">Who it is for</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
         <a
           class="github-link star-link"
@@ -48,10 +49,12 @@
       </nav>
     </header>
     <main class="shell">
-      <section class="hero" aria-labelledby="page-title">
+      <section id="home" class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
           <p class="eyebrow">Agent skill verifier and executor</p>
-          <h1 id="page-title">Make agent skills follow the plan.</h1>
+          <h1 id="page-title">
+            <a class="heading-link" href="#home">Make agent skills follow the plan.</a>
+          </h1>
           <p class="lede">
             Today, most skills are instructions the model may or may not follow.
             SkillSpec checks a <code>SKILL.md</code>, turns the important parts
@@ -69,11 +72,13 @@
         </div>
       </section>
 
-      <section class="boom-tax-section" aria-labelledby="boom-tax-title">
+      <section id="platform-shift" class="boom-tax-section" aria-labelledby="boom-tax-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Platform shift</p>
-            <h2 id="boom-tax-title">Where we are: the boom, and its hidden tax</h2>
+            <h2 id="boom-tax-title">
+              <a class="heading-link" href="#platform-shift">Where we are: the boom, and its hidden tax</a>
+            </h2>
           </div>
         </div>
         <p class="boom-tax-lede">
@@ -209,11 +214,13 @@
         </div>
       </section>
 
-      <section class="load-bearing-section" aria-labelledby="load-bearing-title">
+      <section id="load-bearing-prose" class="load-bearing-section" aria-labelledby="load-bearing-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">The real failure</p>
-            <h2 id="load-bearing-title">The problem isn't weak skills, it's load-bearing prose.</h2>
+            <h2 id="load-bearing-title">
+              <a class="heading-link" href="#load-bearing-prose">The problem isn't weak skills, it's load-bearing prose.</a>
+            </h2>
           </div>
         </div>
         <p class="load-bearing-lede">
@@ -242,11 +249,13 @@
         </p>
       </section>
 
-      <section class="operating-loop-section" aria-labelledby="operating-loop-title">
+      <section id="skillspec-now" class="operating-loop-section" aria-labelledby="operating-loop-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">SkillSpec now</p>
-            <h2 id="operating-loop-title">SkillSpec: import &rarr; execute &rarr; align</h2>
+            <h2 id="operating-loop-title">
+              <a class="heading-link" href="#skillspec-now">SkillSpec: import &rarr; execute &rarr; align</a>
+            </h2>
           </div>
         </div>
         <p class="operating-loop-lede">
@@ -303,11 +312,13 @@
         </div>
       </section>
 
-      <section class="contract-contrast" aria-labelledby="contrast-title">
+      <section id="what-changes" class="contract-contrast" aria-labelledby="contrast-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">What changes</p>
-            <h2 id="contrast-title">Current skills versus life after SkillSpec.</h2>
+            <h2 id="contrast-title">
+              <a class="heading-link" href="#what-changes">Current skills versus life after SkillSpec.</a>
+            </h2>
           </div>
         </div>
         <div class="contrast-grid" aria-label="Direct skills compared with SkillSpec-backed skills">
@@ -397,7 +408,9 @@
       <section id="assess" class="request-panel" aria-labelledby="request-title">
         <div>
           <p class="eyebrow">Assessment</p>
-          <h2 id="request-title">Assess your skill before you trust it.</h2>
+          <h2 id="request-title">
+            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
+          </h2>
           <p>
             Paste a public GitHub skill, plugin, or repo URL. SkillSpec will
             report where execution can drift, overload context, collide in
@@ -431,7 +444,9 @@
       <section class="private-note" aria-labelledby="install-title" id="install">
         <div>
           <p class="eyebrow">Install next</p>
-          <h2 id="install-title">Make SkillSpec your default skill path.</h2>
+          <h2 id="install-title">
+            <a class="heading-link" href="#install">Make SkillSpec your default skill path.</a>
+          </h2>
           <p>
             Install the CLI, open your agent harness, and let SkillSpec guide
             the first assessment from chat. From there, create, convert, route,
@@ -465,11 +480,13 @@ skillspec install skill ./my-skill --all-detected
 skillspec doctor ./my-skill --markdown</code></pre>
       </section>
 
-      <section class="proof-path personas-section" aria-labelledby="personas-title">
+      <section id="who-it-is-for" class="proof-path personas-section" aria-labelledby="personas-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Who it is for</p>
-            <h2 id="personas-title">For product teams, skill operators, and engineers making agents reliable.</h2>
+            <h2 id="personas-title">
+              <a class="heading-link" href="#who-it-is-for">For product teams, skill operators, and engineers making agents reliable.</a>
+            </h2>
           </div>
         </div>
         <div class="persona-grid">
@@ -500,11 +517,13 @@ skillspec doctor ./my-skill --markdown</code></pre>
         </div>
       </section>
 
-      <section class="proof-path" aria-labelledby="proof-title">
+      <section id="adoption-path" class="proof-path" aria-labelledby="proof-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Adoption path</p>
-            <h2 id="proof-title">Try it once. Then make it how you create and use skills.</h2>
+            <h2 id="proof-title">
+              <a class="heading-link" href="#adoption-path">Try it once. Then make it how you create and use skills.</a>
+            </h2>
           </div>
         </div>
         <div class="proof-grid">
@@ -589,11 +608,13 @@ Write SKILL.md, then import and prove it.</code></pre>
         </div>
       </section>
 
-      <section class="reports-section" aria-labelledby="reports-title">
+      <section id="recent-doctor-reports" class="reports-section" aria-labelledby="reports-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Public proof</p>
-            <h2 id="reports-title">Recent Doctor reports</h2>
+            <h2 id="reports-title">
+              <a class="heading-link" href="#recent-doctor-reports">Recent Doctor reports</a>
+            </h2>
           </div>
           <div class="toolbar">
             <button class="filter active" type="button" data-filter="all">All</button>
@@ -608,11 +629,13 @@ Write SKILL.md, then import and prove it.</code></pre>
         <div id="reports-grid" class="reports-grid"></div>
       </section>
 
-      <section class="runs-section" aria-labelledby="runs-title">
+      <section id="doctor-runs" class="runs-section" aria-labelledby="runs-title">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Public automation</p>
-            <h2 id="runs-title">Doctor runs</h2>
+            <h2 id="runs-title">
+              <a class="heading-link" href="#doctor-runs">Doctor runs</a>
+            </h2>
           </div>
         </div>
         <div id="runs-status" class="reports-status" role="status" aria-live="polite">
@@ -625,7 +648,9 @@ Write SKILL.md, then import and prove it.</code></pre>
         <div class="viewer-header">
           <div>
             <p class="eyebrow">Rendered report</p>
-            <h2 id="viewer-title">Report</h2>
+            <h2 id="viewer-title">
+              <a class="heading-link" href="#report-viewer">Report</a>
+            </h2>
           </div>
           <button id="close-viewer" type="button">Close</button>
         </div>
@@ -633,10 +658,11 @@ Write SKILL.md, then import and prove it.</code></pre>
       </section>
     </main>
     <footer class="site-footer">
-      <a class="modiqo-credit" href="https://www.modiqo.ai" target="_blank" rel="noreferrer">
-        <span>Open source fieldwork from</span>
-        <strong>Modiqo Research</strong>
-      </a>
+      <p class="site-credit">
+        &copy; 2026 SkillSpec &middot; Built by the
+        <a href="https://modiqo.ai" target="_blank" rel="noreferrer">Modiqo team</a>
+        &middot; Open Source under Apache 2.0 License
+      </p>
     </footer>
 
     <template id="report-card-template">
