@@ -1,5 +1,6 @@
 use super::{command_inference::ObservedCommand, SynthesizeOptions};
-use crate::error::{Error, Result};
+use skillspec_core::error::{Error, Result};
+use skillspec_runtime::command_path;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
@@ -171,7 +172,7 @@ fn collect_required(
 }
 
 fn run_rote(args: &[&str], cwd: &Path) -> std::result::Result<String, RoteAttempt> {
-    let rote = crate::command_path::find_on_path("rote").unwrap_or_else(|| PathBuf::from("rote"));
+    let rote = command_path::find_on_path("rote").unwrap_or_else(|| PathBuf::from("rote"));
     let output = ProcessCommand::new(rote)
         .args(args)
         .current_dir(cwd)

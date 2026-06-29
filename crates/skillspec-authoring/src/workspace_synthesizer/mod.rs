@@ -1,6 +1,6 @@
-use crate::error::{Error, Result};
-use crate::import_dependency_ledger;
 use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::{import_dependency_ledger, parser};
 use std::fs;
 use std::path::PathBuf;
 
@@ -80,7 +80,7 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
     }
 
     let spec = build_spec(&skill_id, &title, &commands);
-    crate::parser::validate_spec(&spec)?;
+    parser::validate_spec(&spec)?;
 
     fs::create_dir_all(&options.out).map_err(|source| Error::Write {
         path: options.out.clone(),
@@ -91,7 +91,7 @@ pub fn synthesize_from_workspace(options: SynthesizeOptions) -> Result<Synthesis
         &options.out,
         "skillspec synthesize-from-workspace",
     )?;
-    crate::parser::write_spec(&spec_path, &spec)?;
+    parser::write_spec(&spec_path, &spec)?;
 
     Ok(SynthesisReport {
         out_dir: options.out.clone(),

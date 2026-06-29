@@ -1,5 +1,5 @@
 use super::Target;
-use crate::model::{DependencyKind, SkillSpec};
+use skillspec_core::model::{DependencyKind, SkillSpec};
 use std::fmt::Write;
 
 pub(super) fn write_frontmatter(

@@ -77,8 +77,33 @@ refactor, not a stable Rust API.
 The CLI re-exports `doctor`, `remote_source`, and `source_map` under the old
 internal names so current command dispatch, import, port-one-shot, and workspace
 flows keep compiling. `remote_source` and `source_map` live in this crate for now
-because Doctor requires them directly; the later authoring extraction may move
-or rename that shared support without changing CLI behavior.
+because Doctor requires them directly. The authoring crate depends on them
+through `skillspec-doctor`; a later shared-support extraction may move or rename
+that support without changing CLI behavior.
+
+`crates/skillspec-authoring/` owns extracted authoring modules that do not
+depend on harness lifecycle:
+
+- `src/compiler.rs` and `src/compiler/`: thin loader and markdown compilation.
+- `src/importer.rs`: prose-to-contract import scaffolding and dependency ledger
+  materialization for imported skills.
+- `src/port_one_shot.rs`: one-shot porting orchestration, QA report assembly,
+  and generated artifact summaries.
+- `src/workspace_synthesizer/`: workspace-observation evidence collection and
+  synthesized SkillSpec scaffolds.
+- `src/metrics.rs`: token and artifact metric rendering shared by authoring and
+  CLI wrappers.
+- `src/git_context.rs`: local git detection and PR-guidance text used by
+  authoring and workspace install reports.
+- `src/source_guard.rs`: private guard for commands that require one atomic
+  `SKILL.md` package instead of a multi-skill workspace root.
+
+The CLI re-exports `compiler`, `git_context`, `importer`, `metrics`,
+`port_one_shot`, and `workspace_synthesizer` under the old internal names so
+existing command dispatch, workspace wrappers, and integration tests keep
+compiling. Workspace map/import/converge/compile/install remain in the CLI for
+now because `workspace install` still depends on harness roots, visibility,
+router policy, and install lifecycle modules.
 
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
@@ -136,8 +161,15 @@ The facades are the migration seam for later internal crates:
   `skillspec-core`, then `skillspec-runtime`, then `skillspec-doctor`, then the
   CLI crate that depends on the same versions. The crate exists as an
   implementation boundary, not as a stable Rust API promise.
-- `skillspec-import`: source staging, import, port-one-shot, workspace
-  authoring, compile, and synthesis.
+- `skillspec-authoring`: implemented for compile, import, port-one-shot,
+  workspace synthesis, authoring metrics, git-context PR guidance, and the
+  single-skill source guard. It is a publishable companion crate so crates.io
+  releases remain possible: publish `skillspec-core`, then `skillspec-runtime`,
+  then `skillspec-doctor`, then `skillspec-authoring`, then the CLI crate that
+  depends on the same versions. The crate exists as an implementation boundary,
+  not as a stable Rust API promise. Workspace graph/install code has not moved
+  yet because install still crosses into harness lifecycle and router
+  visibility.
 - `skillspec-harness`: install targets, visibility, router lifecycle, durable
   lifecycle, and status.
 

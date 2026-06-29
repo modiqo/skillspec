@@ -1,6 +1,6 @@
-use crate::error::{Error, Result};
-use crate::import_dependency_ledger;
-use crate::model::{
+use skillspec_core::error::{Error, Result};
+use skillspec_core::import_dependency_ledger;
+use skillspec_core::model::{
     CodeBlock, CodeFileSource, CodeInlineSource, CodeKind, CodeProvenance, CodeRequires,
     CodeSafety, CodeSource, CommandRequires, CommandTemplate, Dependency, DependencyCheck,
     DependencyKind, Import, ImportLoad, ImportRequires, ImportRole, ImportUse, ImportUseKind,

@@ -1,6 +1,8 @@
 use super::command_inference::{dependency_id_for_tool, ObservedCommand};
-use crate::import_dependency_ledger;
-use crate::model::{
+use serde::Serialize;
+use serde_yaml::Value as YamlValue;
+use skillspec_core::import_dependency_ledger;
+use skillspec_core::model::{
     Activation, Artifact, ArtifactKind, CommandRequires, CommandTemplate, Dependency,
     DependencyCheck, DependencyKind, DependencyPermission, Elicitation, ElicitationChoice,
     ElicitationCondition, Entry, ExecutionPhase, ExecutionPlan, ExecutionPlanMode, Expectation,
@@ -8,8 +10,6 @@ use crate::model::{
     Route, RouteId, Rule, RuleId, SafetyClass, ScenarioTest, SkillSpec, ToolBoundary,
     ToolBoundaryDefault, TraceConfig, TraceEventKind, TraceMode,
 };
-use serde::Serialize;
-use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug)]
@@ -432,9 +432,9 @@ pub(super) fn build_spec(
 
     let rule = Rule {
         id: RuleId("route_parallel_profile_enrichment".to_owned()),
-        when: crate::model::Predicate {
+        when: skillspec_core::model::Predicate {
             user_says_any: activation_terms(cli_binary),
-            ..crate::model::Predicate::default()
+            ..skillspec_core::model::Predicate::default()
         },
         prefer: Some(RouteId("profile_enrichment_cli".to_owned())),
         route_order: Vec::new(),

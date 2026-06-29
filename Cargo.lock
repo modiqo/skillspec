@@ -958,10 +958,24 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "skillspec-authoring",
  "skillspec-core",
  "skillspec-doctor",
  "skillspec-runtime",
  "thiserror",
+]
+
+[[package]]
+name = "skillspec-authoring"
+version = "0.1.5"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "skillspec-core",
+ "skillspec-doctor",
+ "skillspec-runtime",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use crate::model::{
+use skillspec_core::model::{
     Artifact, ArtifactKind, CodeBlock, CodeKind, CodeSource, CommandRequires, CommandTemplate,
     Dependency, DependencyKind, Elicitation, ElicitationChoice, ExecutionPlanMode, HandoffBoundary,
     Import, ImportLoad, ImportRole, ImportUse, ImportUseKind, Predicate, Recipe, RecipeStep,
@@ -1198,7 +1198,7 @@ mod tests {
             applies_when: Vec::new(),
             entry: None,
             routes: vec![Route {
-                id: crate::model::RouteId("current_pr".to_owned()),
+                id: skillspec_core::model::RouteId("current_pr".to_owned()),
                 label: "Review current pull request".to_owned(),
                 rank: Some(10),
                 description: None,

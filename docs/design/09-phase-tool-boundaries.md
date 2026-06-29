@@ -264,4 +264,4 @@ This doc is grounded in:
   active forbids into the effective boundary;
 - `spec/grammar.md`, which documents `permission_required_for`;
 - `spec/skill.spec.schema.json`, which defines the schema surface;
-- generated loader output in `crates/skillspec-cli/src/features/compiler.rs`.
+- generated loader output in `crates/skillspec-authoring/src/compiler.rs`.

@@ -40,27 +40,23 @@ pub mod lifecycle {
 #[doc(hidden)]
 pub mod features {
     pub mod capability;
-    pub mod compiler;
-    pub mod git_context;
-    pub mod importer;
-    pub mod metrics;
-    pub mod port_one_shot;
     pub mod run_loop;
     pub mod sensemake;
     pub mod workspace;
-    pub mod workspace_synthesizer;
 
+    pub use skillspec_authoring::{
+        compiler, git_context, importer, metrics, port_one_shot, workspace_synthesizer,
+    };
     pub use skillspec_doctor as doctor;
     pub use skillspec_doctor::{remote_source, source_map};
 }
 
 #[doc(hidden)]
-pub use features::{
-    capability, compiler, git_context, importer, metrics, port_one_shot, run_loop, sensemake,
-    workspace, workspace_synthesizer,
-};
+pub use features::{capability, git_context, run_loop, sensemake, workspace};
 #[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
+#[doc(hidden)]
+pub use skillspec_authoring::{compiler, importer, metrics, port_one_shot, workspace_synthesizer};
 #[doc(hidden)]
 pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, parser};
 #[doc(hidden)]

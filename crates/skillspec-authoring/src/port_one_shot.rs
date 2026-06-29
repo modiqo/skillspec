@@ -1,5 +1,7 @@
-use crate::error::{Error, Result};
-use crate::model::{
+use crate::{compiler, git_context, importer, metrics, source_guard};
+use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{
     Artifact, ArtifactKind, CommandTemplate, ConsumerRef, Dependency, DependencyCheck,
     DependencyKind, DependencyPermission, DependencyProvision, DependencyProvisionOption,
     Elicitation, ElicitationChoice, ElicitationCondition, ExecutableRefKind, ExecutionPhase,
@@ -7,11 +9,9 @@ use crate::model::{
     RuleId, SafetyClass, ScenarioTest, SkillSpec, State, ToolBoundary, ToolBoundaryDefault,
     TraceConfig, TraceEventKind, TraceMode,
 };
-use crate::{
-    compiler, decision, deps, doctor, git_context, grammar, importer, imports, metrics, parser,
-    progress, source_map, workspace,
-};
-use serde::Serialize;
+use skillspec_core::{grammar, imports, parser};
+use skillspec_doctor::{self as doctor, source_map};
+use skillspec_runtime::{decision, deps, progress};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -93,7 +93,7 @@ pub fn run(options: PortOneShotOptions) -> Result<PortOneShotReport> {
             message: "--requirement requires --phase".to_owned(),
         });
     }
-    workspace::guard_single_skill_source(&options.source, "skillspec port-one-shot")?;
+    source_guard::guard_single_skill_source(&options.source, "skillspec port-one-shot")?;
     let spec_path = options.out.join("skill.spec.yml");
     if spec_path.exists() && !options.force {
         return Err(Error::InvalidInput {
@@ -711,13 +711,13 @@ fn shape_crib_yaml(path: &Path) -> Result<String> {
         snippets: BTreeMap::from([
             (
                 "drafting_message".to_owned(),
-                crate::model::Snippet {
+                skillspec_core::model::Snippet {
                     text: "Drafting from a typed template.".to_owned(),
                 },
             ),
             (
                 "qa_message".to_owned(),
-                crate::model::Snippet {
+                skillspec_core::model::Snippet {
                     text: "Running the QA gate.".to_owned(),
                 },
             ),

@@ -302,5 +302,5 @@ This doc is grounded in:
   imports/resources;
 - `crates/skillspec-core/src/spec/imports.rs`, which validates local import paths,
   Markdown sections, and load order;
-- `crates/skillspec-cli/src/features/importer.rs`, which scaffolds imports, resources,
+- `crates/skillspec-authoring/src/importer.rs`, which scaffolds imports, resources,
   code, commands, inferred dependencies, and review notes from prose skills.

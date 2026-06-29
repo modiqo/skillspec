@@ -273,10 +273,10 @@ replay while leaving execution obligations unproven.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/features/importer.rs`, especially `import_skill`,
+- `crates/skillspec-authoring/src/importer.rs`, especially `import_skill`,
   `imports_resources_and_code`, `commands_from_blocks`, and
   `dependencies_from_analysis`;
-- `crates/skillspec-cli/src/features/compiler.rs`, which generates thin loader skills;
+- `crates/skillspec-authoring/src/compiler.rs`, which generates thin loader skills;
 - `crates/skillspec-cli/src/cli/args/` and
   `crates/skillspec-cli/src/cli/dispatch/`, which expose `validate`, `test`,
   `decide`, `sensemake`, `query`, `refs`, `imports check`, `deps check`,

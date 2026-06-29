@@ -88,26 +88,26 @@ Every design claim should be grounded in one or more of these sources:
 | Top-level grammar shape | `crates/skillspec-core/src/spec/model.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Validation behavior | `crates/skillspec-core/src/spec/parser/validation.rs`, `conformance/valid/`, `conformance/invalid/` |
 | Route and rule decisions | `crates/skillspec-runtime/src/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
-| Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-cli/src/features/compiler.rs` |
+| Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-authoring/src/compiler.rs` |
 | Runtime phase loop | `crates/skillspec-runtime/src/act.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-cli/src/cli/dispatch/`, `spec/commandspec.md` |
 | Progressive agent guidance | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `docs/design/25-progressive-agent-guidance.md` |
 | Phase tool boundaries | `crates/skillspec-core/src/spec/model.rs`, `crates/skillspec-runtime/src/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Command log | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-core/src/spec/imports.rs`, `crates/skillspec-core/src/spec/parser/validation.rs` |
-| Prose import scaffolding | `crates/skillspec-cli/src/features/importer.rs`, `docs/02-prose-vs-skillspec.md`, `docs/design/21-one-shot-porting.md` |
-| One-shot porting | `crates/skillspec-cli/src/features/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `docs/design/21-one-shot-porting.md` |
+| Prose import scaffolding | `crates/skillspec-authoring/src/importer.rs`, `docs/02-prose-vs-skillspec.md`, `docs/design/21-one-shot-porting.md` |
+| One-shot porting | `crates/skillspec-authoring/src/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `docs/design/21-one-shot-porting.md` |
 | Source-map progressive imports | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
 | Workspace authoring graph | `crates/skillspec-cli/src/features/workspace.rs`, `crates/skillspec-cli/src/features/workspace/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
 | Doctor agent drift risk | `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
 | Guided run-loop and trampoline dogfood | `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/24-guided-trampoline.md` |
-| Performance and token economy | `crates/skillspec-cli/src/features/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-cli/src/features/workspace/import.rs`, `docs/design/20-performance-token-speed.md` |
-| Thin loader generation | `crates/skillspec-cli/src/features/compiler.rs`, `examples/durable-executor/SKILL.md` |
+| Performance and token economy | `crates/skillspec-authoring/src/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-cli/src/features/workspace/import.rs`, `docs/design/20-performance-token-speed.md` |
+| Thin loader generation | `crates/skillspec-authoring/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-runtime/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
 | Skill router | `crates/skillspec-cli/src/lifecycle/router.rs`, `crates/skillspec-cli/src/lifecycle/visibility.rs`, `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `crates/skillspec-runtime/src/align/ledger.rs`, `crates/skillspec-runtime/src/align/types.rs` |
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
-| Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
+| Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
 
 ## Terms Used In These Docs
 

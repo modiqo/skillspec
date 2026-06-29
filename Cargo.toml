@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/skillspec-cli",
+    "crates/skillspec-authoring",
     "crates/skillspec-core",
     "crates/skillspec-runtime",
     "crates/skillspec-doctor",

@@ -264,7 +264,7 @@ Use this checklist when reviewing a SkillSpec-backed package:
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/features/compiler.rs`, which generates thin loaders for
+- `crates/skillspec-authoring/src/compiler.rs`, which generates thin loaders for
   Codex and Claude skill targets;
 - `examples/durable-executor/SKILL.md`, which shows the generated loader shape;
 - `examples/durable-executor/skill.spec.yml`, which shows entry policy, routes, rules,
