@@ -1124,6 +1124,11 @@ body {
   color: var(--paper-soft);
 }
 
+.site-nav a[aria-current="page"] {
+  background: var(--ink);
+  color: var(--paper-soft);
+}
+
 .sr-only {
   position: absolute;
   overflow: hidden;
