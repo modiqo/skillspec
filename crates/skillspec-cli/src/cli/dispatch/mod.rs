@@ -1,13 +1,16 @@
 use super::args::{
-    CapabilityCommand, Command, DepsCommand, DurableExecutorCommand, GrammarCommand, GuideModeArg,
-    ImportsCommand, InstallCommand, ProgressCommand, RouterCommand, RouterIndexCommand,
-    SkillsCommand, SourceCommand, TraceCommand, VisibilityCommand, WorkspaceCommand,
+    CapabilityCommand, Command, DurableExecutorCommand, GrammarCommand, GuideModeArg,
+    InstallCommand, ProgressCommand, RouterCommand, RouterIndexCommand, SkillsCommand,
+    SourceCommand, TraceCommand, VisibilityCommand, WorkspaceCommand,
 };
+mod deps_cmd;
+mod imports_cmd;
+
 use skillspec::{
-    act, align, capability, compiler, decision, deps, doctor, durable_lifecycle, error, grammar,
-    guide, importer, imports, install, model, parser, port_one_shot, progress, remote_source,
-    report, router, router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility,
-    workspace, workspace_synthesizer,
+    act, align, capability, compiler, decision, doctor, durable_lifecycle, error, grammar, guide,
+    importer, install, model, parser, port_one_shot, progress, remote_source, report, router,
+    router_lifecycle, run_loop, sensemake, source_map, status, trace, visibility, workspace,
+    workspace_synthesizer,
 };
 use skillspec::{error::Result, install::HarnessTarget};
 use std::io::Write;
@@ -642,27 +645,8 @@ pub(super) fn run(command: Command) -> Result<()> {
                 }
             }
         },
-        Command::Deps { command } => match command {
-            DepsCommand::Check { path, command } => {
-                let spec = parser::load_spec(&path)?;
-                let spec_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
-                let report = deps::check(&spec, spec_dir, command.as_deref())?;
-                report::json(&report)?;
-                if !report.ok {
-                    std::process::exit(1);
-                }
-            }
-        },
-        Command::Imports { command } => match command {
-            ImportsCommand::Check { path } => {
-                let spec = parser::load_spec_unresolved(&path)?;
-                let report = imports::check(&spec, &path);
-                report::json(&report)?;
-                if !report.ok {
-                    std::process::exit(1);
-                }
-            }
-        },
+        Command::Deps { command } => deps_cmd::run(command)?,
+        Command::Imports { command } => imports_cmd::run(command)?,
         Command::Compile { path, target } => {
             let spec = parser::load_spec(&path)?;
             let markdown = compiler::compile(&spec, target.into());
