@@ -1,5 +1,5 @@
 use crate::cli::args::{RouterCommand, RouterIndexCommand};
-use skillspec::{error::Result, report, router, router_lifecycle};
+use skillspec::{domain::harness, error::Result, report};
 
 pub(super) fn run(command: RouterCommand) -> Result<()> {
     match command {
@@ -11,7 +11,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = router_lifecycle::install(router_lifecycle::RouterInstallOptions {
+            let report = harness::install_router(harness::RouterInstallOptions {
                 roots,
                 index,
                 manifest,
@@ -21,7 +21,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_install(&report))?;
+                report::text(&harness::render_router_install(&report))?;
             }
         }
         RouterCommand::Uninstall {
@@ -32,7 +32,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = router_lifecycle::uninstall(router_lifecycle::RouterUninstallOptions {
+            let report = harness::uninstall_router(harness::RouterUninstallOptions {
                 manifest,
                 router_name: Some(router_name),
                 index,
@@ -42,7 +42,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_uninstall(&report))?;
+                report::text(&harness::render_router_uninstall(&report))?;
             }
         }
         RouterCommand::Update {
@@ -50,42 +50,40 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = router_lifecycle::update(router_lifecycle::RouterUpdateOptions {
+            let report = harness::update_router(harness::RouterUpdateOptions {
                 backup_dir,
                 dry_run,
             })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_update(&report))?;
+                report::text(&harness::render_router_update(&report))?;
             }
         }
         RouterCommand::Enable { dry_run, json } => {
-            let report = router_lifecycle::enable(router_lifecycle::RouterModeOptions { dry_run })?;
+            let report = harness::enable_router(harness::RouterModeOptions { dry_run })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_mode(&report))?;
+                report::text(&harness::render_router_mode(&report))?;
             }
         }
         RouterCommand::Disable { dry_run, json } => {
-            let report =
-                router_lifecycle::disable(router_lifecycle::RouterModeOptions { dry_run })?;
+            let report = harness::disable_router(harness::RouterModeOptions { dry_run })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_mode(&report))?;
+                report::text(&harness::render_router_mode(&report))?;
             }
         }
         RouterCommand::Guard { config, hook, json } => {
-            let report =
-                router_lifecycle::guard(router_lifecycle::RouterGuardOptions { config, hook })?;
+            let report = harness::guard_router(harness::RouterGuardOptions { config, hook })?;
             if hook {
-                report::text(&router_lifecycle::render_guard_hook_json(&report)?)?;
+                report::text(&harness::render_router_guard_hook_json(&report)?)?;
             } else if json {
                 report::json(&report)?;
             } else {
-                report::text(&router_lifecycle::render_guard(&report))?;
+                report::text(&harness::render_router_guard(&report))?;
             }
         }
         RouterCommand::Index { command } => match command {
@@ -95,7 +93,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 visibility_manifest,
                 json,
             } => {
-                let report = router_lifecycle::refresh(router_lifecycle::RouterRefreshOptions {
+                let report = harness::refresh_router_index(harness::RouterRefreshOptions {
                     roots,
                     index,
                     visibility_manifest,
@@ -103,7 +101,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 if json {
                     report::json(&report)?;
                 } else {
-                    report::text(&router_lifecycle::render_refresh(&report))?;
+                    report::text(&harness::render_router_refresh(&report))?;
                 }
             }
             RouterIndexCommand::Status {
@@ -112,7 +110,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 visibility_manifest,
                 json,
             } => {
-                let report = router::index_status(router::IndexStatusOptions {
+                let report = harness::router_index_status(harness::IndexStatusOptions {
                     roots,
                     index,
                     visibility_manifest,
@@ -120,7 +118,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 if json {
                     report::json(&report)?;
                 } else {
-                    report::text(&router::render_index_status(&report))?;
+                    report::text(&harness::render_router_index_status(&report))?;
                 }
             }
         },

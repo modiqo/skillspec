@@ -1,5 +1,5 @@
 use crate::cli::args::VisibilityCommand;
-use skillspec::{error::Result, report, visibility};
+use skillspec::{domain::harness, error::Result, report};
 
 pub(super) fn run(command: VisibilityCommand) -> Result<()> {
     match command {
@@ -8,14 +8,14 @@ pub(super) fn run(command: VisibilityCommand) -> Result<()> {
             profile,
             json,
         } => {
-            let report = visibility::plan(visibility::VisibilityPlanOptions {
+            let report = harness::plan_visibility(harness::VisibilityPlanOptions {
                 roots,
                 profile: profile.into(),
             })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_plan(&report))?;
+                report::text(&harness::render_visibility_plan(&report))?;
             }
         }
         VisibilityCommand::Apply {
@@ -25,7 +25,7 @@ pub(super) fn run(command: VisibilityCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = visibility::apply(visibility::VisibilityApplyOptions {
+            let report = harness::apply_visibility(harness::VisibilityApplyOptions {
                 roots,
                 profile: profile.into(),
                 manifest,
@@ -34,7 +34,7 @@ pub(super) fn run(command: VisibilityCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_apply(&report))?;
+                report::text(&harness::render_visibility_apply(&report))?;
             }
         }
         VisibilityCommand::Restore {
@@ -42,12 +42,14 @@ pub(super) fn run(command: VisibilityCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report =
-                visibility::restore(visibility::VisibilityRestoreOptions { manifest, dry_run })?;
+            let report = harness::restore_visibility(harness::VisibilityRestoreOptions {
+                manifest,
+                dry_run,
+            })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_restore(&report))?;
+                report::text(&harness::render_visibility_restore(&report))?;
             }
         }
     }

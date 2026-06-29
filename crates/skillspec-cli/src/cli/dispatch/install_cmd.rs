@@ -1,10 +1,10 @@
 use crate::cli::args::InstallCommand;
-use skillspec::{error::Result, install, install::HarnessTarget, report};
+use skillspec::{domain::harness, error::Result, report};
 
 pub(super) fn run(command: InstallCommand) -> Result<()> {
     match command {
         InstallCommand::Targets => {
-            let targets = install::detect_targets()?;
+            let targets = harness::detect_targets()?;
             report::json(&targets)?;
         }
         InstallCommand::Skill {
@@ -18,9 +18,9 @@ pub(super) fn run(command: InstallCommand) -> Result<()> {
         } => {
             let targets = target
                 .into_iter()
-                .map(HarnessTarget::from)
+                .map(harness::HarnessTarget::from)
                 .collect::<Vec<_>>();
-            let report = install::install_skill(
+            let report = harness::install_skill(
                 &folder,
                 &targets,
                 all_detected,

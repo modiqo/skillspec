@@ -1,5 +1,5 @@
 use crate::cli::args::DurableExecutorCommand;
-use skillspec::{durable_lifecycle, error::Result, install::HarnessTarget, report};
+use skillspec::{domain::harness, error::Result, report};
 
 pub(super) fn run(command: DurableExecutorCommand) -> Result<()> {
     match command {
@@ -13,9 +13,9 @@ pub(super) fn run(command: DurableExecutorCommand) -> Result<()> {
         } => {
             let targets = target
                 .into_iter()
-                .map(HarnessTarget::from)
+                .map(harness::HarnessTarget::from)
                 .collect::<Vec<_>>();
-            let report = durable_lifecycle::install(durable_lifecycle::DurableInstallOptions {
+            let report = harness::install_durable(harness::DurableInstallOptions {
                 source,
                 targets,
                 all_detected,
@@ -25,7 +25,7 @@ pub(super) fn run(command: DurableExecutorCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&durable_lifecycle::render_install(&report))?;
+                report::text(&harness::render_durable_install(&report))?;
             }
         }
         DurableExecutorCommand::Update {
@@ -34,7 +34,7 @@ pub(super) fn run(command: DurableExecutorCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = durable_lifecycle::update(durable_lifecycle::DurableUpdateOptions {
+            let report = harness::update_durable(harness::DurableUpdateOptions {
                 source,
                 backup_dir,
                 dry_run,
@@ -42,34 +42,31 @@ pub(super) fn run(command: DurableExecutorCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&durable_lifecycle::render_update(&report))?;
+                report::text(&harness::render_durable_update(&report))?;
             }
         }
         DurableExecutorCommand::Delete { dry_run, json } => {
-            let report =
-                durable_lifecycle::delete(durable_lifecycle::DurableDeleteOptions { dry_run })?;
+            let report = harness::delete_durable(harness::DurableDeleteOptions { dry_run })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&durable_lifecycle::render_delete(&report))?;
+                report::text(&harness::render_durable_delete(&report))?;
             }
         }
         DurableExecutorCommand::Enable { dry_run, json } => {
-            let report =
-                durable_lifecycle::enable(durable_lifecycle::DurableModeOptions { dry_run })?;
+            let report = harness::enable_durable(harness::DurableModeOptions { dry_run })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&durable_lifecycle::render_mode(&report))?;
+                report::text(&harness::render_durable_mode(&report))?;
             }
         }
         DurableExecutorCommand::Disable { dry_run, json } => {
-            let report =
-                durable_lifecycle::disable(durable_lifecycle::DurableModeOptions { dry_run })?;
+            let report = harness::disable_durable(harness::DurableModeOptions { dry_run })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&durable_lifecycle::render_mode(&report))?;
+                report::text(&harness::render_durable_mode(&report))?;
             }
         }
     }

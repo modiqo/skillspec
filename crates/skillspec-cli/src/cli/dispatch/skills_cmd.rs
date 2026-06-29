@@ -1,14 +1,14 @@
 use crate::cli::args::SkillsCommand;
-use skillspec::{error::Result, report, router, visibility};
+use skillspec::{domain::harness, error::Result, report};
 
 pub(super) fn run(command: SkillsCommand) -> Result<()> {
     match command {
         SkillsCommand::Audit { roots, json } => {
-            let report = router::audit(&roots)?;
+            let report = harness::audit_skills(&roots)?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&router::render_audit(&report))?;
+                report::text(&harness::render_skill_audit(&report))?;
             }
         }
         SkillsCommand::SetVisibility {
@@ -19,7 +19,7 @@ pub(super) fn run(command: SkillsCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+            let report = harness::set_visibility(harness::SetVisibilityOptions {
                 roots,
                 skill,
                 visibility: visibility.into(),
@@ -29,7 +29,7 @@ pub(super) fn run(command: SkillsCommand) -> Result<()> {
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_apply(&report))?;
+                report::text(&harness::render_visibility_apply(&report))?;
             }
         }
         SkillsCommand::Disable {
@@ -39,17 +39,17 @@ pub(super) fn run(command: SkillsCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+            let report = harness::set_visibility(harness::SetVisibilityOptions {
                 roots,
                 skill,
-                visibility: router::Visibility::Off,
+                visibility: harness::Visibility::Off,
                 manifest,
                 dry_run,
             })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_apply(&report))?;
+                report::text(&harness::render_visibility_apply(&report))?;
             }
         }
         SkillsCommand::Enable {
@@ -59,17 +59,17 @@ pub(super) fn run(command: SkillsCommand) -> Result<()> {
             dry_run,
             json,
         } => {
-            let report = visibility::set_visibility(visibility::SetVisibilityOptions {
+            let report = harness::set_visibility(harness::SetVisibilityOptions {
                 roots,
                 skill,
-                visibility: router::Visibility::Implicit,
+                visibility: harness::Visibility::Implicit,
                 manifest,
                 dry_run,
             })?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&visibility::render_apply(&report))?;
+                report::text(&harness::render_visibility_apply(&report))?;
             }
         }
     }
