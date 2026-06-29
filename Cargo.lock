@@ -959,6 +959,19 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "skillspec-core",
+ "thiserror",
+]
+
+[[package]]
+name = "skillspec-core"
+version = "0.1.5"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
  "thiserror",
 ]
 

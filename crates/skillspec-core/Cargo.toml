@@ -1,0 +1,16 @@
+[package]
+name = "skillspec-core"
+version = "0.1.5"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Internal core contract modules for the SkillSpec CLI"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+serde_yaml = "0.9.34"
+sha2 = "0.10.9"
+thiserror = "2.0.12"
+rusqlite = { version = "0.32.1", features = ["bundled"] }

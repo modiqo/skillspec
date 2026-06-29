@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/skillspec-cli"]
+members = ["crates/skillspec-cli", "crates/skillspec-core"]
 resolver = "2"
 
 [workspace.package]

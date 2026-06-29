@@ -10,18 +10,14 @@
 //! intentionally designed Rust API with compatibility guarantees.
 
 #[doc(hidden)]
-pub mod error;
+pub use skillspec_core::error;
 
 #[doc(hidden)]
 pub mod domain;
 
 #[doc(hidden)]
 pub mod spec {
-    pub mod grammar;
-    pub mod import_dependency_ledger;
-    pub mod imports;
-    pub mod model;
-    pub mod parser;
+    pub use skillspec_core::spec::{grammar, import_dependency_ledger, imports, model, parser};
 }
 
 #[doc(hidden)]
@@ -74,4 +70,4 @@ pub use features::{
 #[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 #[doc(hidden)]
-pub use spec::{grammar, import_dependency_ledger, imports, model, parser};
+pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, parser};
