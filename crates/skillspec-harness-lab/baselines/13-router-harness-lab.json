@@ -1,0 +1,411 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "13-router-harness-lab",
+  "summary": {
+    "status": "pass",
+    "cases_total": 5,
+    "cases_passed": 5,
+    "cases_failed": 0,
+    "claims_total": 61,
+    "claims_passed": 61,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "router_install_writes_hooks_visibility_and_index",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.router_skill_status",
+          "status": "pass",
+          "expected": "installed",
+          "observed": "installed"
+        },
+        {
+          "id": "install.router_skill_dirs",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        },
+        {
+          "id": "install.harness_hooks",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "install.preparedness.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.preparedness.indexed_skills",
+          "status": "pass",
+          "expected": 7,
+          "observed": 7
+        },
+        {
+          "id": "install.durable_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "files.index",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "files.config",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hooks.codex.guard",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hooks.codex.preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hooks.claude.guard",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hooks.claude.preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "visibility.pdf.manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "visibility.csv.manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "visibility.router.implicit",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "index.status.stale",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "index.status.indexed_skills",
+          "status": "pass",
+          "expected": 7,
+          "observed": 7
+        }
+      ]
+    },
+    {
+      "id": "router_guard_repairs_out_of_band_skill_and_hook_context",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "status.before.stale",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "status.before.new_markdown",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.installed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.enabled",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.repaired",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.first_hop_ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.status_before_stale",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.status_after_stale",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "guard.indexed_skills",
+          "status": "pass",
+          "expected": 8,
+          "observed": 8
+        },
+        {
+          "id": "visibility.markdown.manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hook.decision_absent",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hook.context.first_hop_ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "router_routes_clear_intent_and_bypasses_ordinary_tasks",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "route.notes.decision",
+          "status": "pass",
+          "expected": "use_skill",
+          "observed": "use_skill"
+        },
+        {
+          "id": "route.notes.selected",
+          "status": "pass",
+          "expected": "notes",
+          "observed": "notes"
+        },
+        {
+          "id": "route.time.not_use_skill",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.time.selected_is_null",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.time.excludes_router",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "router_disable_enable_restores_and_reapplies_visibility",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "disable.enabled",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "disable.index_report_null",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "disable.hook_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": true
+        },
+        {
+          "id": "disable.hook_preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "disable.pdf.restored_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": false
+        },
+        {
+          "id": "disable.csv.restored_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": false
+        },
+        {
+          "id": "disable.router.manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": false
+        },
+        {
+          "id": "enable.enabled",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.preparedness.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.indexed_skills",
+          "status": "pass",
+          "expected": 8,
+          "observed": 8
+        },
+        {
+          "id": "enable.hook_installed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.markdown.manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.router.implicit",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        }
+      ]
+    },
+    {
+      "id": "router_uninstall_removes_router_and_restores_visibility",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "uninstall.router_skill_status",
+          "status": "pass",
+          "expected": "removed",
+          "observed": "removed"
+        },
+        {
+          "id": "uninstall.index_removed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "uninstall.config_removed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "files.index_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "files.config_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "files.agents_router_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "files.codex_router_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "files.claude_router_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "hooks.codex.guard_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "hooks.codex.preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hooks.claude.guard_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "hooks.claude.preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "visibility.pdf.restored",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "visibility.csv.restored",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        }
+      ]
+    }
+  ]
+}

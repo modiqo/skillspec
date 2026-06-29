@@ -1,9 +1,9 @@
 # Controlled Harness Lab
 
 Status: implementation started. The core sandbox, Doctor matrix, import matrix,
-and reviewed imported-runtime path now have committed machine-readable
-baselines; later phases should extend the same crate instead of adding broad CLI
-snapshot tests.
+reviewed imported-runtime path, and router lifecycle path now have committed
+machine-readable baselines; later phases should extend the same crate instead of
+adding broad CLI snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
 `docs/design/30-testing-matrix.md` into deterministic local and CI automation.
@@ -137,6 +137,7 @@ crates/skillspec-harness-lab/baselines/09-harness-lab-core.json
 crates/skillspec-harness-lab/baselines/10-doctor-matrix.json
 crates/skillspec-harness-lab/baselines/11-import-matrix.json
 crates/skillspec-harness-lab/baselines/12-imported-skill-runtime.json
+crates/skillspec-harness-lab/baselines/13-router-harness-lab.json
 ```
 
 Normal test runs compare the candidate report against the committed baseline.
@@ -171,6 +172,10 @@ Current committed phases:
   compile/install into all sandbox roots, `--retire-existing`, decision-only
   `unproven` alignment, batched progress evidence, final-response proof, token
   savings, and full execution alignment.
+- `13-router-harness-lab`: router install coverage for managed router skill
+  files, hooks, visibility, index and config, guard repair for out-of-band
+  skills, route use-skill/bypass behavior, disable/enable visibility toggling,
+  and uninstall cleanup.
 
 ### Layer 2: Pseudo-Harness Simulator
 

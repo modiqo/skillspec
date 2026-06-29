@@ -49,8 +49,9 @@ The verified coverage map at the time this matrix was written is:
   `crates/skillspec-harness-lab/tests/core.rs`,
   `crates/skillspec-harness-lab/tests/doctor.rs`,
   `crates/skillspec-harness-lab/tests/import.rs`,
-  `crates/skillspec-harness-lab/tests/imported_runtime.rs`, and committed
-  baselines under `crates/skillspec-harness-lab/baselines/`;
+  `crates/skillspec-harness-lab/tests/imported_runtime.rs`,
+  `crates/skillspec-harness-lab/tests/router.rs`, and committed baselines under
+  `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -180,6 +181,7 @@ For each test, capture:
 | Router install | Existing skills become explicit/manual-only. | Native visibility metadata or sidecars reflect explicit invocation. | Harness-sim automatable | Covered |
 | Router install | Index is populated. | `skillspec router index status` shows discovered and indexed skills. | Automatable | Covered |
 | Router guard | Run guard after install. | `first_hop_ready=true` and hook output is valid. | Automatable | Covered |
+| Router guard repair | Add an out-of-band skill after install, then run guard. | Guard repairs visibility/index drift and hook context reports `first_hop_ready=true`. | Harness-sim automatable | Covered |
 | Router route positive | Query clear skill intent. | `skillspec route` returns `use_skill` with selected skill. | Automatable | Covered |
 | Router route bypass | Query ordinary non-skill task. | `skillspec route` returns `bypass` or `ambiguous` and no selected skill. | Automatable | Covered |
 | Router drift | Add out-of-band implicit skill after install. | Guard or index refresh detects and repairs explicit visibility. | Harness-sim automatable | Covered |
