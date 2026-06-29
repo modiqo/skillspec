@@ -497,7 +497,7 @@ Legacy non-plugin behavior was validated against
 Keep these surfaces aligned whenever workspace behavior changes:
 
 - `crates/skillspec-cli/src/cli/args/` for command shape and help text;
-- `crates/skillspec-cli/src/features/workspace.rs` and submodules for graph,
+- `crates/skillspec-workspace/src/lib.rs` and submodules for graph,
   fanout, converge, compile, install, and visibility behavior;
 - `spec/commandspec.md` for the formal command inventory;
 - `docs/design/16-command-log.md` for the quick command table;

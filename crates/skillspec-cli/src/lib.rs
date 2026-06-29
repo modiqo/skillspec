@@ -39,7 +39,6 @@ pub mod features {
     pub mod capability;
     pub mod run_loop;
     pub mod sensemake;
-    pub mod workspace;
 
     pub use skillspec_authoring::{
         compiler, git_context, importer, metrics, port_one_shot, workspace_synthesizer,
@@ -49,7 +48,7 @@ pub mod features {
 }
 
 #[doc(hidden)]
-pub use features::{capability, git_context, run_loop, sensemake, workspace};
+pub use features::{capability, git_context, run_loop, sensemake};
 #[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 #[doc(hidden)]
@@ -64,3 +63,5 @@ pub use skillspec_doctor::{remote_source, source_map};
 pub use skillspec_runtime::{
     act, align, command_path, decision, deps, guide, progress, report, trace,
 };
+#[doc(hidden)]
+pub use skillspec_workspace as workspace;

@@ -2,10 +2,12 @@ use super::{
     dependency_edges, load_manifest, manifest_relative_path, output_package_dir, path_to_string,
     validate_workspace, write_text, WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
 };
-use crate::error::{Error, Result};
-use crate::{doctor, importer, parser, source_map};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use skillspec_authoring::importer;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::parser;
+use skillspec_doctor::{self as doctor, source_map};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

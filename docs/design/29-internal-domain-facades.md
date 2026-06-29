@@ -101,9 +101,25 @@ depend on harness lifecycle:
 The CLI re-exports `compiler`, `git_context`, `importer`, `metrics`,
 `port_one_shot`, and `workspace_synthesizer` under the old internal names so
 existing command dispatch, workspace wrappers, and integration tests keep
-compiling. Workspace map/import/converge/compile/install remain in the CLI for
-now because `workspace install` still depends on harness roots, visibility,
-router policy, and install lifecycle modules.
+compiling.
+
+`crates/skillspec-workspace/` owns the extracted workspace authoring graph:
+
+- `src/lib.rs`: workspace manifest schema, source-root mapping, validation,
+  dependency inference, reports, summaries, and shared workspace helpers.
+- `src/import.rs`: fanout import, package-level cache, package reports, and
+  source-map/Doctor/importer integration.
+- `src/converge.rs`: package sidecar validation and dependency-aware readiness
+  checks before compile.
+- `src/compile.rs`: workspace package loader compilation and compile reports.
+- `src/install.rs`: workspace install planning, manifest-safe slug policy,
+  dependency-aware package installs, optional visibility application, and
+  router refresh advice.
+
+The CLI re-exports `workspace` under the old internal name so command args,
+dispatch, domain wrappers, and integration tests keep compiling. The workspace
+crate owns workspace manifest semantics while delegating actual harness writes,
+visibility edits, and install target selection through `skillspec-harness`.
 
 `crates/skillspec-harness/` owns the extracted harness lifecycle modules:
 
@@ -123,9 +139,9 @@ router policy, and install lifecycle modules.
 
 The CLI re-exports `install`, `router`, `visibility`, `router_lifecycle`,
 `durable_lifecycle`, and `status` under the old internal names so command args,
-dispatch, workspace install, and integration tests keep compiling. Workspace
-install remains in the CLI workspace module because it owns workspace manifest
-semantics while delegating actual harness writes through this crate.
+dispatch, workspace install orchestration, and integration tests keep compiling.
+Workspace install lives in `skillspec-workspace` and delegates harness writes
+through this crate.
 
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
@@ -191,18 +207,22 @@ The facades are the migration seam for later internal crates:
   releases remain possible: publish `skillspec-core`, then `skillspec-runtime`,
   then `skillspec-doctor`, then `skillspec-authoring`, then the CLI crate that
   depends on the same versions. The crate exists as an implementation boundary,
-  not as a stable Rust API promise. Workspace graph/install code has not moved
-  yet because install still crosses into harness lifecycle and router
-  visibility.
+  not as a stable Rust API promise.
 - `skillspec-harness`: install targets, visibility, router lifecycle, durable
   lifecycle, and status. It is a publishable companion crate so crates.io
   releases remain possible: publish `skillspec-core`, then
   `skillspec-runtime`, then `skillspec-doctor`, then `skillspec-authoring`,
-  then `skillspec-harness`, then the CLI crate that depends on the same
+  then `skillspec-harness`, then the crates that depend on the same
   versions. The crate exists as an implementation boundary, not as a stable
-  Rust API promise. Workspace install remains in the CLI for now because it
-  owns workspace manifest semantics and delegates harness writes through this
-  crate.
+  Rust API promise.
+- `skillspec-workspace`: implemented for workspace map, validate, import,
+  converge, compile, install, workspace reports, summaries, and workspace token
+  metrics. It is a publishable companion crate so crates.io releases remain
+  possible: publish `skillspec-core`, then `skillspec-runtime`, then
+  `skillspec-doctor`, then `skillspec-authoring`, then `skillspec-harness`,
+  then `skillspec-workspace`, then the CLI crate that depends on the same
+  versions. The crate exists as an implementation boundary, not as a stable
+  Rust API promise.
 
 Further crates should be introduced only after the previous stack has stayed
 green and the CLI continues to prove that user contracts are unchanged.

@@ -3,12 +3,12 @@ use super::{
     topological_package_order, validate_manifest, write_text, WorkspaceDependencyEdge,
     WorkspaceInstallSlugPolicy, WorkspaceManifest, WorkspacePackage,
 };
-use crate::error::{Error, Result};
-use crate::git_context;
-use crate::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
-use crate::router::Visibility;
-use crate::visibility;
 use serde::Serialize;
+use skillspec_authoring::git_context;
+use skillspec_core::error::{Error, Result};
+use skillspec_harness::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
+use skillspec_harness::router::Visibility;
+use skillspec_harness::visibility;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

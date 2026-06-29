@@ -1,8 +1,8 @@
-use crate::error::{Error, Result};
-use crate::metrics::{self, MetricSummary};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use skillspec_authoring::metrics::{self, MetricSummary};
+use skillspec_core::error::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -801,7 +801,7 @@ fn push_next_summary(output: &mut String, next: &[String]) {
     }
 }
 
-pub(super) fn validate_manifest(
+pub(crate) fn validate_manifest(
     path: &Path,
     manifest: &WorkspaceManifest,
 ) -> WorkspaceValidationReport {
@@ -1411,7 +1411,7 @@ fn plugin_path_for_package(package_path: &str) -> String {
     }
 }
 
-pub(super) fn dependency_edges(manifest: &WorkspaceManifest) -> Vec<WorkspaceDependencyEdge> {
+pub(crate) fn dependency_edges(manifest: &WorkspaceManifest) -> Vec<WorkspaceDependencyEdge> {
     let mut edges = Vec::new();
     for package in manifest.packages.values() {
         for dependency in &package.depends_on {
@@ -1726,7 +1726,7 @@ fn normalize_relative_path(path: &Path) -> Option<PathBuf> {
     Some(normalized)
 }
 
-pub(super) fn manifest_relative_path(value: &str) -> Option<PathBuf> {
+pub(crate) fn manifest_relative_path(value: &str) -> Option<PathBuf> {
     let path = Path::new(value);
     if path.as_os_str().is_empty() {
         return None;
@@ -1742,7 +1742,7 @@ pub(super) fn manifest_relative_path(value: &str) -> Option<PathBuf> {
     (!normalized.as_os_str().is_empty()).then_some(normalized)
 }
 
-pub(super) fn output_package_dir(package: &WorkspacePackage, build_root: &Path) -> Result<PathBuf> {
+pub(crate) fn output_package_dir(package: &WorkspacePackage, build_root: &Path) -> Result<PathBuf> {
     let relative = manifest_relative_path(&package.path).ok_or_else(|| Error::InvalidInput {
         message: format!(
             "package {} path must be a relative workspace path without parent components: {}",
@@ -1752,7 +1752,7 @@ pub(super) fn output_package_dir(package: &WorkspacePackage, build_root: &Path) 
     Ok(build_root.join(relative))
 }
 
-pub(super) fn topological_package_order(manifest: &WorkspaceManifest) -> Vec<String> {
+pub(crate) fn topological_package_order(manifest: &WorkspaceManifest) -> Vec<String> {
     let mut dependents = BTreeMap::<String, BTreeSet<String>>::new();
     let mut remaining_dependency_counts = BTreeMap::<String, usize>::new();
     for package in manifest.packages.values() {
@@ -1851,7 +1851,7 @@ fn infer_package_kind(package: &SkillPackageSource) -> WorkspacePackageKind {
     WorkspacePackageKind::Helper
 }
 
-pub(super) fn apply_install_slug_policy(
+pub(crate) fn apply_install_slug_policy(
     manifest: &mut WorkspaceManifest,
     policy: WorkspaceInstallSlugPolicy,
 ) {
@@ -2032,7 +2032,7 @@ fn write_manifest(path: &Path, manifest: &WorkspaceManifest) -> Result<()> {
     write_text(path, &content)
 }
 
-pub(super) fn write_text(path: &Path, content: &str) -> Result<()> {
+pub(crate) fn write_text(path: &Path, content: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
             path: parent.to_path_buf(),
@@ -2062,7 +2062,7 @@ fn display_paths(paths: &[PathBuf]) -> String {
         .join(", ")
 }
 
-pub(super) fn path_to_string(path: &Path) -> String {
+pub(crate) fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 

@@ -232,7 +232,7 @@ This doc is grounded in:
   `crates/skillspec-runtime/src/deps.rs`,
   `crates/skillspec-core/src/spec/grammar.rs`,
   `crates/skillspec-core/src/spec/imports.rs`,
-  `crates/skillspec-cli/src/features/workspace.rs`,
+  `crates/skillspec-workspace/src/lib.rs`,
   `crates/skillspec-authoring/src/compiler.rs`,
   `crates/skillspec-authoring/src/importer.rs`,
   `crates/skillspec-cli/src/features/capability.rs`,

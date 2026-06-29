@@ -952,7 +952,6 @@ version = "0.1.5"
 dependencies = [
  "clap",
  "jsonschema",
- "regex",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -962,6 +961,7 @@ dependencies = [
  "skillspec-doctor",
  "skillspec-harness",
  "skillspec-runtime",
+ "skillspec-workspace",
 ]
 
 [[package]]
@@ -1023,6 +1023,21 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-core",
+]
+
+[[package]]
+name = "skillspec-workspace"
+version = "0.1.5"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-authoring",
+ "skillspec-core",
+ "skillspec-doctor",
+ "skillspec-harness",
 ]
 
 [[package]]

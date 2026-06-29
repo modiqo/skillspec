@@ -2,10 +2,10 @@ use super::{
     dependency_edges, load_manifest, output_package_dir, path_to_string, topological_package_order,
     validate_workspace, write_text, WorkspaceDependencyEdge, WorkspacePackage, WorkspaceReference,
 };
-use crate::compiler::{self, Target};
-use crate::error::{Error, Result};
-use crate::parser;
 use serde::Serialize;
+use skillspec_authoring::compiler::{self, Target};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::parser;
 use std::collections::BTreeMap;
 use std::path::Path;
 
