@@ -4,7 +4,6 @@ version = "0.1.5"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
 description = "Internal core contract modules for the SkillSpec CLI"
 
 [dependencies]

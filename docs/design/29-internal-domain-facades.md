@@ -75,9 +75,10 @@ them explicit compatibility rules.
 The facades are the migration seam for later internal crates:
 
 - `skillspec-core`: implemented for error, model, parser, imports, grammar, and
-  import dependency ledger. It is currently `publish = false`; a crates.io
-  release that keeps the CLI depending on it must either publish this crate
-  first or deliberately collapse the dependency before release.
+  import dependency ledger. It is a publishable companion crate so crates.io
+  releases remain possible: publish this crate first, then publish the CLI crate
+  that depends on the same version. The crate exists as an implementation
+  boundary, not as a stable Rust API promise.
 - `skillspec-runtime`: runtime decisions, act/plan/run-loop, traces, progress,
   and alignment.
 - `skillspec-doctor`: doctor reports and renderers.
