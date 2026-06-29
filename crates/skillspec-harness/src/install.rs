@@ -1,6 +1,7 @@
-use crate::error::{Error, Result};
-use crate::model::{CodeSource, DependencyKind, SkillSpec};
 use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{CodeSource, DependencyKind, SkillSpec};
+use skillspec_core::parser;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -152,7 +153,7 @@ fn install_skill_impl(
         None => infer_skill_name(skill_folder)?,
     };
     validate_skill_folder(skill_folder)?;
-    let spec = crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
+    let spec = parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
     let support_files = declared_package_files(skill_folder, &spec)?;
 
     let target_roots = selected_roots(targets, all_detected)?;
@@ -258,7 +259,7 @@ fn install_skill_impl(
 
 pub fn sync_skill_package(skill_folder: &Path, install_dir: &Path) -> Result<()> {
     validate_skill_folder(skill_folder)?;
-    let spec = crate::parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
+    let spec = parser::load_spec(&skill_folder.join("skill.spec.yml"))?;
     let support_files = declared_package_files(skill_folder, &spec)?;
     copy_skill_package(skill_folder, install_dir, &support_files)
 }

@@ -29,12 +29,9 @@ pub mod execution {
 
 #[doc(hidden)]
 pub mod lifecycle {
-    pub mod durable_lifecycle;
-    pub mod install;
-    pub mod router;
-    pub mod router_lifecycle;
-    pub mod status;
-    pub mod visibility;
+    pub use skillspec_harness::{
+        durable_lifecycle, install, router, router_lifecycle, status, visibility,
+    };
 }
 
 #[doc(hidden)]

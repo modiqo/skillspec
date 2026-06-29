@@ -1,8 +1,9 @@
-use crate::error::{Error, Result};
-use crate::model::SkillSpec;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::SkillSpec;
+use skillspec_core::parser;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -181,7 +182,7 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    pub(crate) fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Implicit => "implicit",
             Self::ManualOnly => "manual-only",
@@ -749,7 +750,7 @@ fn read_skill_entry(root: &Path, root_index: usize, skill_path: &Path) -> Result
         .to_path_buf();
     let spec_path = skill_dir.join("skill.spec.yml");
     let spec = if spec_path.is_file() {
-        crate::parser::load_spec(&spec_path).ok()
+        parser::load_spec(&spec_path).ok()
     } else {
         None
     };

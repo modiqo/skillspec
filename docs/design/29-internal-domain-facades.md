@@ -105,6 +105,28 @@ compiling. Workspace map/import/converge/compile/install remain in the CLI for
 now because `workspace install` still depends on harness roots, visibility,
 router policy, and install lifecycle modules.
 
+`crates/skillspec-harness/` owns the extracted harness lifecycle modules:
+
+- `src/install.rs`: harness target detection, skill package install, target
+  retirement, support-file validation, and router-hook refresh triggers.
+- `src/router.rs`: skill-root scanning, router index build/status, route
+  decisions, audit reports, visibility parsing, and router match scoring.
+- `src/visibility.rs`: Codex and Claude visibility edits, manifests, restore,
+  router-mode visibility, and per-skill visibility updates.
+- `src/router_lifecycle.rs` and `src/router_lifecycle/`: router install,
+  uninstall, update, enable, disable, guard, refresh, hooks, templates, and
+  renderers.
+- `src/durable_lifecycle.rs`: durable-executor install/update/delete/mode
+  lifecycle and router hook refresh integration.
+- `src/status.rs`: combined harness status report for supported roots, router,
+  durable executor, and skill inventory.
+
+The CLI re-exports `install`, `router`, `visibility`, `router_lifecycle`,
+`durable_lifecycle`, and `status` under the old internal names so command args,
+dispatch, workspace install, and integration tests keep compiling. Workspace
+install remains in the CLI workspace module because it owns workspace manifest
+semantics while delegating actual harness writes through this crate.
+
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
 - `authoring.rs`: compile, import, port-one-shot, source map, grammar,
@@ -121,8 +143,10 @@ router policy, and install lifecycle modules.
 - `workspace.rs`: workspace map, validate, import, converge, compile, install,
   and workspace report rendering.
 
-The lower-level remaining `features/` and `lifecycle/` modules still implement
-the remaining CLI behavior. They remain hidden implementation modules.
+The lower-level remaining `features/` modules still implement CLI-owned
+behavior. The `lifecycle` module in the CLI is now a re-export compatibility
+shim over `skillspec-harness`. These modules remain hidden implementation
+modules.
 
 ## Refactor Rules
 
@@ -171,7 +195,14 @@ The facades are the migration seam for later internal crates:
   yet because install still crosses into harness lifecycle and router
   visibility.
 - `skillspec-harness`: install targets, visibility, router lifecycle, durable
-  lifecycle, and status.
+  lifecycle, and status. It is a publishable companion crate so crates.io
+  releases remain possible: publish `skillspec-core`, then
+  `skillspec-runtime`, then `skillspec-doctor`, then `skillspec-authoring`,
+  then `skillspec-harness`, then the CLI crate that depends on the same
+  versions. The crate exists as an implementation boundary, not as a stable
+  Rust API promise. Workspace install remains in the CLI for now because it
+  owns workspace manifest semantics and delegates harness writes through this
+  crate.
 
 Further crates should be introduced only after the previous stack has stayed
 green and the CLI continues to prove that user contracts are unchanged.

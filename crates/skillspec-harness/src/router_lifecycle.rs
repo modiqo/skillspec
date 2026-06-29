@@ -1,8 +1,8 @@
 use crate::durable_lifecycle;
-use crate::error::{Error, Result};
 use crate::router::{self, IndexReport, IndexStatusReport};
 use crate::visibility::{self, VisibilityApplyReport, VisibilityRestoreReport};
 use serde::{Deserialize, Serialize};
+use skillspec_core::error::{Error, Result};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -953,7 +953,6 @@ dependencies = [
  "clap",
  "jsonschema",
  "regex",
- "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -961,8 +960,8 @@ dependencies = [
  "skillspec-authoring",
  "skillspec-core",
  "skillspec-doctor",
+ "skillspec-harness",
  "skillspec-runtime",
- "thiserror",
 ]
 
 [[package]]
@@ -1000,6 +999,19 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-core",
+]
+
+[[package]]
+name = "skillspec-harness"
+version = "0.1.5"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
+ "skillspec-runtime",
 ]
 
 [[package]]

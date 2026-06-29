@@ -1,8 +1,8 @@
-use crate::error::{Error, Result};
 use crate::router::{self, SkillEntry, Visibility};
 use serde::{Deserialize, Serialize};
 use serde_json::Map as JsonMap;
 use serde_yaml::Mapping as YamlMapping;
+use skillspec_core::error::{Error, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};

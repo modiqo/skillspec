@@ -236,10 +236,10 @@ This doc is grounded in:
   `crates/skillspec-authoring/src/compiler.rs`,
   `crates/skillspec-authoring/src/importer.rs`,
   `crates/skillspec-cli/src/features/capability.rs`,
-  `crates/skillspec-cli/src/lifecycle/install.rs`,
-  `crates/skillspec-cli/src/lifecycle/router.rs`,
-  `crates/skillspec-cli/src/lifecycle/visibility.rs`,
-  `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, and
-  `crates/skillspec-cli/src/lifecycle/durable_lifecycle.rs`, which implement
+  `crates/skillspec-harness/src/install.rs`,
+  `crates/skillspec-harness/src/router.rs`,
+  `crates/skillspec-harness/src/visibility.rs`,
+  `crates/skillspec-harness/src/router_lifecycle.rs`, and
+  `crates/skillspec-harness/src/durable_lifecycle.rs`, which implement
   the listed command behavior;
 - `skillspec --help` and subcommand help output from the current local binary.

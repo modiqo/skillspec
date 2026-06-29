@@ -1,9 +1,10 @@
-use crate::error::{Error, Result};
 use crate::install::{self, HarnessTarget, InstallReport};
 use crate::router;
 use crate::router_lifecycle::{self, RouterHookReport};
 use crate::visibility;
 use serde::{Deserialize, Serialize};
+use skillspec_core::error::{Error, Result};
+use skillspec_runtime::command_path;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -617,7 +618,7 @@ fn rote_preflight_report() -> RotePreflightReport {
 }
 
 fn command_on_path(command: &str) -> bool {
-    crate::command_path::find_on_path(command).is_some()
+    command_path::find_on_path(command).is_some()
 }
 
 fn frontmatter_names_durable_executor(text: &str) -> bool {

@@ -1,9 +1,9 @@
 use crate::durable_lifecycle::{self, DurableStatusReport};
-use crate::error::Result;
 use crate::install;
 use crate::router::{self, Visibility};
 use crate::router_lifecycle::{self, RouterStatusReport};
 use serde::Serialize;
+use skillspec_core::error::Result;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
