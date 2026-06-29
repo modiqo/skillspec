@@ -1,5 +1,5 @@
 use crate::cli::args::SourceCommand;
-use skillspec::{error::Result, remote_source, report, source_map};
+use skillspec::{domain::authoring, error::Result, report};
 
 pub(super) fn run(command: SourceCommand) -> Result<()> {
     match command {
@@ -10,19 +10,19 @@ pub(super) fn run(command: SourceCommand) -> Result<()> {
             json,
         } => {
             let stage_report =
-                remote_source::stage_remote_source(&uri, out.as_deref(), !no_detect_candidates)?;
+                authoring::stage_remote_source(&uri, out.as_deref(), !no_detect_candidates)?;
             if json {
                 report::json(&stage_report)?;
             } else {
-                report::text(&remote_source::render_stage_report(&stage_report))?;
+                report::text(&authoring::render_stage_report(&stage_report))?;
             }
         }
         SourceCommand::Map { path, out, json } => {
-            let report = source_map::create_source_map(&path, &out)?;
+            let report = authoring::create_source_map(&path, &out)?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&source_map::render_write_report(&report))?;
+                report::text(&authoring::render_source_map_write(&report))?;
             }
         }
         SourceCommand::Query {
@@ -31,28 +31,28 @@ pub(super) fn run(command: SourceCommand) -> Result<()> {
             view,
             json,
         } => {
-            let report = source_map::query(&map, &handle, view.into())?;
+            let report = authoring::query_source_map(&map, &handle, view.into())?;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&source_map::render_query(&report))?;
+                report::text(&authoring::render_source_query(&report))?;
             }
         }
         SourceCommand::Coverage { map, json } => {
-            let map = source_map::load(&map)?;
+            let coverage = authoring::source_coverage(&map)?;
             if json {
-                report::json(&map.coverage)?;
+                report::json(&coverage)?;
             } else {
-                report::text(&source_map::render_coverage(&map.coverage))?;
+                report::text(&authoring::render_source_coverage(&coverage))?;
             }
         }
         SourceCommand::Stale { map, root, json } => {
-            let report = source_map::stale(&map, root.as_deref())?;
+            let report = authoring::stale_source_map(&map, root.as_deref())?;
             let ok = report.ok;
             if json {
                 report::json(&report)?;
             } else {
-                report::text(&source_map::render_stale(&report))?;
+                report::text(&authoring::render_source_stale(&report))?;
             }
             if !ok {
                 std::process::exit(1);

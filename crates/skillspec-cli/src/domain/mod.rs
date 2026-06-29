@@ -1,3 +1,4 @@
+pub mod authoring;
 pub mod doctor;
 pub mod evidence;
 pub mod harness;

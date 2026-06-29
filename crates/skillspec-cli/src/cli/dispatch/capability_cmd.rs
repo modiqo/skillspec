@@ -1,10 +1,10 @@
 use crate::cli::args::CapabilityCommand;
-use skillspec::{capability, error::Result, report};
+use skillspec::{domain::authoring, error::Result, report};
 
 pub(super) fn run(command: CapabilityCommand) -> Result<()> {
     match command {
         CapabilityCommand::Store => {
-            report::json(&capability::store()?)?;
+            report::json(&authoring::capability_store()?)?;
         }
         CapabilityCommand::Add {
             id,
@@ -25,7 +25,7 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             evidence_command,
             suggested_skill_id,
         } => {
-            let report = capability::add(capability::AddOptions {
+            let report = authoring::capability_add(authoring::AddOptions {
                 id,
                 domain,
                 kind,
@@ -80,13 +80,13 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             mark_failed,
         } => {
             let verification_status = if mark_failed {
-                Some(capability::VerificationStatus::Failed)
+                Some(authoring::VerificationStatus::Failed)
             } else if mark_unverified {
-                Some(capability::VerificationStatus::Unverified)
+                Some(authoring::VerificationStatus::Unverified)
             } else {
                 None
             };
-            let report = capability::update(capability::UpdateOptions {
+            let report = authoring::capability_update(authoring::UpdateOptions {
                 id,
                 domain,
                 kind,
@@ -121,7 +121,7 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             report::json(&report)?;
         }
         CapabilityCommand::List { domain } => {
-            report::json(&capability::list(domain.as_deref())?)?;
+            report::json(&authoring::capability_list(domain.as_deref())?)?;
         }
         CapabilityCommand::Search {
             capability: capability_id,
@@ -131,7 +131,7 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             local_only,
             preferred_seed,
         } => {
-            let report = capability::search(capability::SearchOptions {
+            let report = authoring::capability_search(authoring::SearchOptions {
                 capability: capability_id,
                 domain,
                 local_only,
@@ -144,14 +144,14 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             domain,
             json: _,
         } => {
-            report::json(&capability::inspect(&id, domain.as_deref())?)?;
+            report::json(&authoring::capability_inspect(&id, domain.as_deref())?)?;
         }
         CapabilityCommand::Verify {
             id,
             domain,
             json: _,
         } => {
-            report::json(&capability::verify(&id, domain.as_deref())?)?;
+            report::json(&authoring::capability_verify(&id, domain.as_deref())?)?;
         }
         CapabilityCommand::Prefer {
             id,
@@ -159,7 +159,7 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             for_capability,
             priority,
         } => {
-            let report = capability::prefer(capability::PreferOptions {
+            let report = authoring::capability_prefer(authoring::PreferOptions {
                 id,
                 domain,
                 for_capability,
@@ -168,10 +168,10 @@ pub(super) fn run(command: CapabilityCommand) -> Result<()> {
             report::json(&report)?;
         }
         CapabilityCommand::Remove { id, domain } => {
-            report::json(&capability::remove(&id, domain.as_deref())?)?;
+            report::json(&authoring::capability_remove(&id, domain.as_deref())?)?;
         }
         CapabilityCommand::Scan => {
-            report::json(&capability::scan()?)?;
+            report::json(&authoring::capability_scan()?)?;
         }
     }
 

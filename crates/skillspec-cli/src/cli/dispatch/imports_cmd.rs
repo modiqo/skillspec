@@ -1,11 +1,10 @@
 use crate::cli::args::ImportsCommand;
-use skillspec::{error::Result, imports, parser, report};
+use skillspec::{domain::authoring, error::Result, report};
 
 pub(super) fn run(command: ImportsCommand) -> Result<()> {
     match command {
         ImportsCommand::Check { path } => {
-            let spec = parser::load_spec_unresolved(&path)?;
-            let report = imports::check(&spec, &path);
+            let report = authoring::check_imports(&path)?;
             report::json(&report)?;
             if !report.ok {
                 std::process::exit(1);
