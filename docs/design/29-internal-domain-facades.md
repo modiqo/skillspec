@@ -18,6 +18,23 @@ external contract.
 `crates/skillspec-cli/src/cli/dispatch/` owns final command dispatch, stdout
 format selection, and process exit decisions.
 
+`crates/skillspec-core/` owns the extracted core contract modules:
+
+- `src/error.rs`: shared CLI result/error type used by core and downstream
+  implementation modules.
+- `src/spec/model.rs`: the typed `SkillSpec` contract model.
+- `src/spec/parser.rs` and `src/spec/parser/validation.rs`: YAML loading,
+  validation, spec-cache behavior, and package sidecar validation.
+- `src/spec/grammar.rs`: embedded grammar/schema sensemaking commands.
+- `src/spec/imports.rs`: import validation and load ordering.
+- `src/spec/import_dependency_ledger.rs`: generated dependency ledger helpers.
+
+`crates/skillspec-cli/src/lib.rs` re-exports those modules under the old
+internal names (`error`, `model`, `parser`, `grammar`, `imports`, and
+`import_dependency_ledger`) so existing CLI implementation code and integration
+tests keep compiling. Those re-exports are compatibility scaffolding for the
+refactor, not a stable Rust API.
+
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
 - `authoring.rs`: compile, import, port-one-shot, source map, grammar,
@@ -34,8 +51,8 @@ format selection, and process exit decisions.
 - `workspace.rs`: workspace map, validate, import, converge, compile, install,
   and workspace report rendering.
 
-The lower-level `spec/`, `execution/`, `features/`, and `lifecycle/` modules
-still implement the actual behavior. They remain hidden implementation modules.
+The lower-level `execution/`, `features/`, and `lifecycle/` modules still
+implement the remaining CLI behavior. They remain hidden implementation modules.
 
 ## Refactor Rules
 
@@ -57,7 +74,10 @@ them explicit compatibility rules.
 
 The facades are the migration seam for later internal crates:
 
-- `skillspec-core`: model, parser, imports, grammar, source maps, decision logic.
+- `skillspec-core`: implemented for error, model, parser, imports, grammar, and
+  import dependency ledger. It is currently `publish = false`; a crates.io
+  release that keeps the CLI depending on it must either publish this crate
+  first or deliberately collapse the dependency before release.
 - `skillspec-runtime`: runtime decisions, act/plan/run-loop, traces, progress,
   and alignment.
 - `skillspec-doctor`: doctor reports and renderers.
@@ -66,5 +86,5 @@ The facades are the migration seam for later internal crates:
 - `skillspec-harness`: install targets, visibility, router lifecycle, durable
   lifecycle, and status.
 
-Those crates should be introduced only after the facade layer has stayed green
-and the CLI continues to prove that user contracts are unchanged.
+Further crates should be introduced only after the previous stack has stayed
+green and the CLI continues to prove that user contracts are unchanged.
