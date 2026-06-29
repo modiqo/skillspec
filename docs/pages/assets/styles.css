@@ -1094,17 +1094,25 @@ body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
+  width: fit-content;
+  max-width: 100%;
   border: 2px solid var(--line);
   background: rgba(238, 230, 216, 0.58);
 }
 
 .site-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-left: 1px solid var(--line-soft);
   padding: 13px 18px;
   color: var(--muted);
   font-size: 0.96rem;
   font-weight: 650;
+  line-height: 1.2;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .site-nav a:first-child {
@@ -2366,7 +2374,8 @@ pre code {
 
   .site-nav {
     justify-content: flex-start;
-    width: 100%;
+    justify-self: start;
+    width: fit-content;
   }
 
   .section-heading {
@@ -2446,6 +2455,7 @@ pre code {
   .site-nav {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .site-brand img {
