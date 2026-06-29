@@ -2,10 +2,9 @@
 
 Status: implementation started. The core sandbox, Doctor matrix, import matrix,
 reviewed imported-runtime path, router lifecycle path, durable-executor
-lifecycle path, and durable rote-exec proof path now have committed
-machine-readable baselines. The current tightening pass documents exact
-coverage, live-check findings, and the remaining manual gates; later phases
-should extend the same crate instead of adding broad CLI snapshot tests.
+lifecycle path, durable rote-exec proof path, and pseudo-harness simulator now
+have committed machine-readable baselines. Later phases should extend the same
+crate instead of adding broad CLI snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
 `docs/design/30-testing-matrix.md` into deterministic local and CI automation.
@@ -195,6 +194,11 @@ Current committed phases:
   -- printf skillspec-durable-proof` inside a named sandbox rote workspace, and
   aligns the resulting evidence. This is excluded from default CI because it
   depends on a real logged-in local rote environment.
+- `17-pseudo-harness-simulator`: deterministic event-order coverage for the
+  harness boundary: hook before catalog, bypass without domain load, selected
+  skill loads exactly one domain skill, out-of-band repair before catalog,
+  imported trampoline handoff, durable implicit observer visibility, and the
+  current duplicate-root ambiguity gap.
 
 Current phase entrypoints:
 
@@ -208,6 +212,7 @@ Current phase entrypoints:
 | `14-durable-harness-lab` | `crates/skillspec-harness-lab/tests/durable.rs` | `baselines/14-durable-harness-lab.json` |
 | `15-durable-rote-exec-proof` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs` | `baselines/15-durable-rote-exec-proof.json` |
 | `15-durable-rote-exec-live` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs --ignored` | `baselines/15-durable-rote-exec-live.json` |
+| `17-pseudo-harness-simulator` | `crates/skillspec-harness-lab/tests/pseudo_harness.rs` | `baselines/17-pseudo-harness-simulator.json` |
 
 Live checkpoint from 2026-06-29:
 
@@ -224,7 +229,8 @@ Live checkpoint from 2026-06-29:
   binary, copied local `~/.rote` config, sandbox `ROTE_HOME`, and a real
   `rote exec -- printf skillspec-durable-proof` command.
 
-The same checkpoint exposed two gaps that should drive the simulator phase:
+The same checkpoint exposed two gaps that drove the first simulator phase and
+still need product fixes or cleanup semantics:
 
 - duplicate same-skill installs across `agents`, `codex`, and `claude-local`
   can produce equal route candidates and `ambiguous_match`;
@@ -377,7 +383,7 @@ Use this stack:
 | `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
 | `test/15-durable-rote-exec-proof` | Durable route/act contract for `rote_exec`, `rote-shell` guidance fixture, alignment over `rote_exec` process evidence, and opt-in copied local rote binary/config execution proof with sandbox `ROTE_HOME`. | Durable substrate proof rows. |
 | `test/16-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
-| `test/17-pseudo-harness-simulator` | Add deterministic pseudo-harness scenarios for pre-call hook ordering, bypass/no-load behavior, domain selected-skill loading, duplicate-root collapse, imported trampoline handoff, and durable implicit observer behavior. | Router and durable boundary rows that do not require a live harness UI. |
+| `test/17-pseudo-harness-simulator` | Add deterministic pseudo-harness scenarios for pre-call hook ordering, bypass/no-load behavior, domain selected-skill loading, imported trampoline handoff, durable implicit observer behavior, and current duplicate-root ambiguity tracking. | Router and durable boundary rows that do not require a live harness UI. |
 
 The implementation lives in a separate test crate so the crate refactor and CLI
 boundary stay clean:

@@ -76,6 +76,7 @@ candidate report against the committed JSON baseline.
 | `14-durable-harness-lab` | `crates/skillspec-harness-lab/tests/durable.rs` | `crates/skillspec-harness-lab/baselines/14-durable-harness-lab.json` |
 | `15-durable-rote-exec-proof` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs` | `crates/skillspec-harness-lab/baselines/15-durable-rote-exec-proof.json` |
 | `15-durable-rote-exec-live` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs --ignored` | `crates/skillspec-harness-lab/baselines/15-durable-rote-exec-live.json` |
+| `17-pseudo-harness-simulator` | `crates/skillspec-harness-lab/tests/pseudo_harness.rs` | `crates/skillspec-harness-lab/baselines/17-pseudo-harness-simulator.json` |
 
 The live durable rote-exec baseline is opt-in because it depends on a local
 authenticated `rote` install. It is intentionally excluded from default CI.
@@ -110,6 +111,10 @@ Remaining live gates:
 - Router guard warned about stale visibility manifest entries for missing
   `rote-onboard-*` skills. This is not a first-hop failure, but it should become
   a repairable cleanup assertion.
+- `17-pseudo-harness-simulator` now captures deterministic event-order checks
+  for hook-before-catalog, bypass/no-load, selected-skill load, imported
+  trampoline handoff, durable implicit observer visibility, and the current
+  duplicate-root ambiguity gap.
 
 ## Test Environment Model
 
