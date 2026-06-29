@@ -1675,6 +1675,95 @@ h3 {
   line-height: 1.62;
 }
 
+.operating-loop-section {
+  margin-bottom: 30px;
+  border: 2px solid var(--line);
+  background: rgba(238, 230, 216, 0.42);
+  padding: 34px 38px;
+}
+
+.operating-loop-section .section-heading {
+  align-items: end;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 20px;
+}
+
+.operating-loop-section h2 {
+  max-width: 940px;
+}
+
+.operating-loop-lede {
+  max-width: 980px;
+  margin: 0 0 24px;
+  color: #4f4942;
+  font-size: 1.18rem;
+  line-height: 1.72;
+}
+
+.operating-loop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+.operating-loop-grid article {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 22px;
+  background: rgba(251, 248, 240, 0.64);
+}
+
+.loop-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  color: var(--green);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.operating-loop-grid h3 {
+  margin: 4px 0 0;
+  font-size: 1.28rem;
+}
+
+.operating-loop-grid p {
+  margin: 0;
+  color: #5a534b;
+  line-height: 1.62;
+}
+
+.operating-loop-proof {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 22px;
+  border-left: 2px solid var(--line);
+  padding-left: 18px;
+}
+
+.operating-loop-proof strong {
+  color: var(--ink);
+  font-size: 1.04rem;
+  line-height: 1.45;
+}
+
+.operating-loop-proof span {
+  color: #5a534b;
+  line-height: 1.62;
+}
+
 .contract-contrast {
   margin-bottom: 30px;
   border: 2px solid var(--line);
@@ -2692,6 +2781,10 @@ pre code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .operating-loop-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tax-grid,
   .load-bearing-grid,
   .boom-sources ol {
@@ -2797,6 +2890,7 @@ pre code {
   .private-note,
   .boom-tax-section,
   .load-bearing-section,
+  .operating-loop-section,
   .contract-contrast,
   .proof-path,
   .reports-section,
@@ -2882,6 +2976,8 @@ pre code {
   .boom-metric-grid,
   .tax-grid,
   .load-bearing-grid,
+  .operating-loop-grid,
+  .operating-loop-proof,
   .solution-grid,
   .persona-grid,
   .boom-sources ol,
@@ -2937,6 +3033,7 @@ pre code {
   .private-note,
   .boom-tax-section,
   .load-bearing-section,
+  .operating-loop-section,
   .contract-contrast,
   .proof-path,
   .reports-section,

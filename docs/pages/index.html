@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-load-bearing-prose">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-operating-loop">
   </head>
   <body>
     <header class="site-header">
@@ -238,6 +238,67 @@
           judgment, and move the must-follow parts into a small, checkable
           contract beside it.
         </p>
+      </section>
+
+      <section class="operating-loop-section" aria-labelledby="operating-loop-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SkillSpec now</p>
+            <h2 id="operating-loop-title">SkillSpec: import &rarr; execute &rarr; align</h2>
+          </div>
+        </div>
+        <p class="operating-loop-lede">
+          SkillSpec adds one small file, <code>skill.spec.yml</code>, next to
+          your existing <code>SKILL.md</code>. The skill still works anywhere;
+          the contract just makes the critical parts machine-checkable.
+        </p>
+
+        <div class="operating-loop-grid" aria-label="SkillSpec operating loop">
+          <article>
+            <span class="loop-index">01</span>
+            <h3>Assess</h3>
+            <p>
+              Doctor measures a skill before you trust it: token load, buried
+              instructions, name collisions, missing proof, and public URL risk.
+              It gives you a number, not a vibe.
+            </p>
+          </article>
+          <article>
+            <span class="loop-index">02</span>
+            <h3>Import</h3>
+            <p>
+              Convert the load-bearing prose once into routes, rules, forbids,
+              deny-by-default tool boundaries, and regression tests that can be
+              reviewed and versioned.
+            </p>
+          </article>
+          <article>
+            <span class="loop-index">03</span>
+            <h3>Execute</h3>
+            <p>
+              At run time, ask the CLI for the current route, phase, and tool
+              boundary. The manual stays on disk; the agent only holds the slice
+              it needs now.
+            </p>
+          </article>
+          <article>
+            <span class="loop-index">04</span>
+            <h3>Align</h3>
+            <p>
+              Replay the decision trace and compare the run to the resolved
+              contract. The verdict is honest: aligned, partial, or unproven.
+            </p>
+          </article>
+        </div>
+
+        <div class="operating-loop-proof">
+          <strong>First run explores. Every later run recalls.</strong>
+          <span>
+            The trace records which rule caused which route, fingerprinted by
+            the resolved spec and input hash, so drift is visible when the skill
+            changes.
+          </span>
+        </div>
       </section>
 
       <section class="contract-contrast" aria-labelledby="contrast-title">
