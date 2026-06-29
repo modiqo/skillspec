@@ -61,6 +61,7 @@ directory listings.
 | 27 | [Public Doctor Reports](27-public-doctor-reports.md) | How CI dogfoods `skillspec doctor` on the SkillSpec self skill, and how public issue-form requests run doctor against public GitHub skill URLs without executing target repo code or touching private repositories. |
 | 28 | [Router Guard Hooks](28-router-guard-hooks.md) | How router install/enable/update/disable manages harness hooks so router-first readiness can be checked before skill selection. |
 | 29 | [Internal Domain Facades](29-internal-domain-facades.md) | How the CLI now calls internal domain facades before implementation modules, preserving command contracts while preparing for future crate extraction. |
+| 30 | [Testing Matrix](30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
 
 ## Visual Explainers
 
@@ -108,6 +109,7 @@ Every design claim should be grounded in one or more of these sources:
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `crates/skillspec-runtime/src/align/ledger.rs`, `crates/skillspec-runtime/src/align/types.rs` |
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
 | Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
+| Release-candidate testing | `Justfile`, `.github/workflows/ci.yml`, `crates/skillspec-cli/tests/cli/`, `conformance/`, `examples/`, `docs/design/30-testing-matrix.md` |
 
 ## Terms Used In These Docs
 
