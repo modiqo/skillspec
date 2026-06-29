@@ -70,8 +70,8 @@ Review check:
 - Visibility is manifest-backed for restore.
 - After harness restart, the router is the implicit first hop for every request
   in managed roots.
-- Routed skills are explicit-only/manual-only and should be loaded only after
-  router selection.
+- Routed skills are explicit-only/manual-only and should be loaded only after a
+  router `use_skill` decision.
 - `durable-executor` remains implicit only when installed and enabled.
 
 This is the strongest guarantee SkillSpec can make at the skill layer: the
@@ -83,19 +83,21 @@ their skill metadata.
 ## 3. Runtime Routing Uses The Index
 
 The router is a discovery first-hop, not an execution envelope. It ranks
-candidates from the local index and returns the selected skill path plus
-candidates and confidence. If the router finds no suitable skill, the agent
-continues with the normal path for the request instead of loading an unrelated
-skill.
+candidates from the local index and returns a decision: `use_skill`, `bypass`,
+or `ambiguous`. Only `use_skill` authorizes loading the selected skill. `bypass`
+and `ambiguous` keep the agent on the normal path instead of loading an
+unrelated or uncertain candidate.
 
 ```mermaid
 flowchart LR
     A[user task] --> B[skillspec route]
     C[skill index] --> B
-    B --> D[selected skill]
+    B --> D[decision]
     B --> E[candidates]
     B --> F[confidence]
-    D --> G[harness loads selected skill explicitly]
+    D --> G{use_skill?}
+    G -->|yes| H[harness loads selected skill explicitly]
+    G -->|bypass or ambiguous| I[normal agent behavior]
 ```
 
 Grounded command:
@@ -109,8 +111,10 @@ skillspec route \
 
 Review check:
 
-- Router chooses; it does not perform the selected skill's task.
-- The selected skill still owns its own SkillSpec or prose contract.
+- Router decides whether to load a skill; it does not perform the selected
+  skill's task.
+- A selected skill is loaded only for `decision: use_skill`; its SkillSpec or
+  prose contract still owns the domain work.
 - Durable execution remains a separate execution policy.
 
 ## 4. Out-Of-Band Skills Are Repaired

@@ -104,8 +104,11 @@ pub struct AuditEntry {
 #[derive(Clone, Debug, Serialize)]
 pub struct RouteReport {
     pub query: String,
+    pub decision: RouteDecision,
     pub selected: Option<RouteCandidate>,
     pub candidates: Vec<RouteCandidate>,
+    pub bypass_reason: Option<RouteBypassReason>,
+    pub decision_reason: String,
     pub elicitation: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
     pub index: PathBuf,
@@ -123,7 +126,43 @@ pub struct RouteCandidate {
     pub has_skill_spec: bool,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteDecision {
+    UseSkill,
+    Bypass,
+    Ambiguous,
+}
+
+impl RouteDecision {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::UseSkill => "use_skill",
+            Self::Bypass => "bypass",
+            Self::Ambiguous => "ambiguous",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteBypassReason {
+    NoCandidates,
+    LowConfidence,
+    AmbiguousMatch,
+}
+
+impl RouteBypassReason {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NoCandidates => "no_candidates",
+            Self::LowConfidence => "low_confidence",
+            Self::AmbiguousMatch => "ambiguous_match",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Confidence {
     High,
@@ -375,7 +414,8 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
     let conn = Connection::open(&index)?;
     let entries = read_entries(&conn, &index)?;
     let candidates = score_candidates(&entries, &options.query, options.top);
-    let selected = candidates.first().cloned();
+    let match_decision = decide_candidate_match(&candidates);
+    let selected = match_decision.selected;
     let elicitation = if options.execution_mode.is_none() && selected.is_some() {
         Some("execution_mode_direct_or_durable".to_owned())
     } else {
@@ -383,8 +423,11 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
     };
     Ok(RouteReport {
         query: options.query,
+        decision: match_decision.decision,
         selected,
         candidates,
+        bypass_reason: match_decision.bypass_reason,
+        decision_reason: match_decision.decision_reason,
         elicitation,
         execution_mode: options.execution_mode,
         index,
@@ -558,6 +601,11 @@ pub fn render_route(report: &RouteReport) -> String {
     let mut output = String::new();
     output.push_str("Skill router route\n\n");
     output.push_str(&format!("Query: {}\n", report.query));
+    output.push_str(&format!("Decision: {}\n", report.decision.as_str()));
+    output.push_str(&format!("Reason: {}\n", report.decision_reason));
+    if let Some(reason) = report.bypass_reason {
+        output.push_str(&format!("Bypass reason: {}\n", reason.as_str()));
+    }
     if let Some(selected) = &report.selected {
         output.push_str(&format!(
             "Selected: {} ({:.3})\n",
@@ -584,6 +632,49 @@ pub fn render_route(report: &RouteReport) -> String {
         }
     }
     output
+}
+
+struct MatchDecision {
+    decision: RouteDecision,
+    selected: Option<RouteCandidate>,
+    bypass_reason: Option<RouteBypassReason>,
+    decision_reason: String,
+}
+
+fn decide_candidate_match(candidates: &[RouteCandidate]) -> MatchDecision {
+    let Some(top) = candidates.first() else {
+        return MatchDecision {
+            decision: RouteDecision::Bypass,
+            selected: None,
+            bypass_reason: Some(RouteBypassReason::NoCandidates),
+            decision_reason: "no indexed skill produced a positive route score".to_owned(),
+        };
+    };
+    if top.confidence == Confidence::High {
+        return MatchDecision {
+            decision: RouteDecision::UseSkill,
+            selected: Some(top.clone()),
+            bypass_reason: None,
+            decision_reason: "top candidate passed the high-confidence match gate".to_owned(),
+        };
+    }
+    if let Some(second) = candidates.get(1) {
+        if second.score > 0.0 && top.score <= second.score * 1.10 {
+            return MatchDecision {
+                decision: RouteDecision::Ambiguous,
+                selected: None,
+                bypass_reason: Some(RouteBypassReason::AmbiguousMatch),
+                decision_reason: "top candidates are too close for automatic skill selection"
+                    .to_owned(),
+            };
+        }
+    }
+    MatchDecision {
+        decision: RouteDecision::Bypass,
+        selected: None,
+        bypass_reason: Some(RouteBypassReason::LowConfidence),
+        decision_reason: "best candidate did not pass the automatic match gate".to_owned(),
+    }
 }
 
 pub(crate) fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Result<Vec<SkillEntry>> {
@@ -1337,5 +1428,72 @@ mod tests {
         ];
         let candidates = score_candidates(&entries, "use pdf to extract text", 3);
         assert_eq!(candidates[0].name, "pdf");
+    }
+
+    #[test]
+    fn match_gate_uses_only_high_confidence_skill() {
+        let candidate = route_candidate("pdf", 9.0, Confidence::High);
+
+        let decision = decide_candidate_match(&[candidate]);
+
+        assert_eq!(decision.decision, RouteDecision::UseSkill);
+        assert_eq!(decision.selected.unwrap().name, "pdf");
+        assert_eq!(decision.bypass_reason, None);
+    }
+
+    #[test]
+    fn match_gate_bypasses_without_positive_candidates() {
+        let decision = decide_candidate_match(&[]);
+
+        assert_eq!(decision.decision, RouteDecision::Bypass);
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::NoCandidates)
+        );
+    }
+
+    #[test]
+    fn match_gate_bypasses_low_or_medium_confidence() {
+        let candidate = route_candidate("notes", 3.5, Confidence::Medium);
+
+        let decision = decide_candidate_match(&[candidate]);
+
+        assert_eq!(decision.decision, RouteDecision::Bypass);
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::LowConfidence)
+        );
+    }
+
+    #[test]
+    fn match_gate_marks_close_candidates_ambiguous() {
+        let candidates = vec![
+            route_candidate("notes", 4.0, Confidence::Medium),
+            route_candidate("docs", 3.8, Confidence::Medium),
+        ];
+
+        let decision = decide_candidate_match(&candidates);
+
+        assert_eq!(decision.decision, RouteDecision::Ambiguous);
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::AmbiguousMatch)
+        );
+    }
+
+    fn route_candidate(name: &str, score: f64, confidence: Confidence) -> RouteCandidate {
+        RouteCandidate {
+            id: name.to_owned(),
+            name: name.to_owned(),
+            path: PathBuf::from(format!("/tmp/{name}/SKILL.md")),
+            score,
+            confidence,
+            reason: "test".to_owned(),
+            visibility: Visibility::Implicit,
+            has_skill_spec: false,
+        }
     }
 }

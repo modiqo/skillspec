@@ -17,10 +17,10 @@ pub(super) fn render_router_spec(router_name: &str, index: &Path) -> String {
         r#"schema: skillspec/v0
 id: skill.router
 title: Skill Router
-description: Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index for a matching installed skill, load the selected skill when one fits, and continue with normal agent behavior when no suitable skill is found. The installed SKILL.md is only the native loader; this SkillSpec is the router contract.
+description: Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index, load a selected skill only when the route decision is use_skill, and continue with normal agent behavior when the decision is bypass or ambiguous. The installed SKILL.md is only the native loader; this SkillSpec is the router contract.
 
 activation:
-  summary: Use first for every request when router mode is enabled. Route through the local skill index, load a selected skill only when there is a suitable match, and otherwise continue with normal agent behavior.
+  summary: Use first for every request when router mode is enabled. Route through the local skill index, load a selected skill only when the route decision is use_skill, and otherwise continue with normal agent behavior.
   keywords:
     - every request
     - any request
@@ -58,6 +58,7 @@ applies_when:
   - user_intent:
       - handle every user request through the router before skill-specific work
       - route any request that may be handled by an installed local skill
+      - decide whether route output is use_skill, bypass, or ambiguous before loading a skill
       - answer a question that may mention an installed skill by name or topic
       - explain, describe, inspect, or use a named local skill
       - choose the correct skill before loading skill-specific instructions
@@ -71,7 +72,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. Load this SkillSpec, route from the local index before reading or searching for domain skill material, then load only the selected skill when one is suitable; if no suitable skill is found, continue with normal agent behavior.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. Load this SkillSpec, route from the local index before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -91,7 +92,7 @@ routes:
   - id: route_from_index
     label: Route from the skill index
     rank: 10
-    description: Use the local SQLite index to choose the best candidate skill for the user request.
+    description: Use the local SQLite index to decide whether a candidate skill should run or whether normal agent behavior should continue.
     execution_plan:
       mode: ordered
       phases:
@@ -102,12 +103,17 @@ routes:
             - inspect_router_index_status
         - id: route_query
           owner_skill: {router_skill}
-          description: Query the router index and select or present candidate skills.
+          description: Query the router index, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
+        - id: match_gate
+          owner_skill: {router_skill}
+          description: If decision is use_skill and selected is non-null, load that selected skill explicitly. If decision is bypass, continue normal agent behavior. If decision is ambiguous, do not silently load a candidate; ask only when the user explicitly wanted skill selection, otherwise continue normal behavior.
+          requires:
+            - apply_route_decision
         - id: execution_mode_elicitation
           owner_skill: {router_skill}
-          description: Ask direct versus durable execution only when route output requests it and the user has not already chosen.
+          description: Ask direct versus durable execution only when route output requests it for a use_skill decision and the user has not already chosen.
           requires:
             - ask_direct_or_durable_when_needed
 
@@ -218,8 +224,13 @@ commands:
     safety: local_read
 
   run_route_query:
-    description: Route the user request to candidate skills from the index.
+    description: Route the user request to candidate skills from the index. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate.
     template: {route_command}
+    safety: local_read
+
+  apply_route_decision:
+    description: Apply route JSON without inventing a match. Load selected only for decision use_skill. For bypass, continue normal agent behavior. For ambiguous, ask only when the user explicitly requested skill choice; otherwise continue normal behavior.
+    template: 'inspect route JSON fields: decision, selected, bypass_reason, candidates'
     safety: local_read
 
   show_router_lifecycle_plan:
@@ -249,6 +260,11 @@ tests:
       route: route_from_index
       matched_rules:
         - route_queries_use_index
+
+  - name: bypass does not force skill
+    input: tell me what you changed in this repository
+    expect:
+      route: route_from_index
 
   - name: lifecycle uses router commands
     input: enable router and refresh index

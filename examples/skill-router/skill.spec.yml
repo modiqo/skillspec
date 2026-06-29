@@ -1,19 +1,32 @@
 schema: skillspec/v0
 id: skill.router
 title: skill router
-description: Route user requests to the best local skill from a large indexed library and manage native visibility controls for Codex and Claude.
+description: Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index, load a selected skill only when the route decision is use_skill, and continue with normal agent behavior when the decision is bypass or ambiguous.
 
 activation:
-  summary: Use for skill discovery, large skill catalogs, shortened skill descriptions, router install/uninstall, index refresh/status, and Codex or Claude implicit invocation controls.
+  summary: Use first for every request when router mode is enabled. Route through the local skill index, load a selected skill only when the route decision is use_skill, and otherwise continue with normal agent behavior.
   keywords:
+    - every request
+    - any request
+    - user request
+    - tell me
+    - explain
+    - what is
+    - help with
+    - router first hop
     - skill router
     - route to a skill
     - choose the right skill
+    - choose from installed skills
+    - select local skill
+    - find matching skill
     - many skills installed
     - skill descriptions shortened
     - 2% skills context budget
     - install router
     - uninstall router
+    - enable router
+    - disable router
     - refresh skill index
     - out-of-band skill
     - prose skill added
@@ -26,16 +39,23 @@ activation:
 
 applies_when:
   - user_intent:
+      - handle every user request through the router before skill-specific work
+      - route any request that may be handled by an installed local skill
+      - decide whether route output is use_skill, bypass, or ambiguous before loading a skill
+      - answer a question that may mention an installed skill by name or topic
+      - explain, describe, inspect, or use a named local skill
+      - choose the correct skill before loading skill-specific instructions
       - select a skill from a large local skill library
       - route a request to the best SkillSpec or SKILL.md package
       - reduce native skill discovery context pressure
       - install or uninstall the SkillSpec router
+      - enable or disable router mode without deleting the router package
       - make skills manual-only, name-only, implicit, or off
       - refresh a skill index after skill additions or removals
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: Route first, then load only the selected skill or ask for direct versus durable execution.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. Load this SkillSpec, route from the local index before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -55,7 +75,7 @@ routes:
   - id: route_from_index
     label: Route from the skill index
     rank: 10
-    description: Use the local SQLite index to choose the best candidate skill for the user request.
+    description: Use the local SQLite index to decide whether a candidate skill should run or whether normal agent behavior should continue.
     execution_plan:
       mode: ordered
       phases:
@@ -66,17 +86,22 @@ routes:
             - inspect_router_index_status
         - id: route_query
           owner_skill: skill-router
-          description: Query the router index and select or present candidate skills.
+          description: Query the router index, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
+        - id: match_gate
+          owner_skill: skill-router
+          description: If decision is use_skill and selected is non-null, load that selected skill explicitly. If decision is bypass, continue normal agent behavior. If decision is ambiguous, do not silently load a candidate; ask only when the user explicitly wanted skill selection, otherwise continue normal behavior.
+          requires:
+            - apply_route_decision
         - id: execution_mode_elicitation
           owner_skill: skill-router
-          description: Ask direct versus durable execution only when route output requests it and the user has not already chosen.
+          description: Ask direct versus durable execution only when route output requests it for a use_skill decision and the user has not already chosen.
           requires:
             - ask_direct_or_durable_when_needed
 
   - id: manage_router_lifecycle
-    label: Install, refresh, or uninstall router
+    label: Install, update, refresh, or uninstall router
     rank: 20
     description: Install the explicit-only router skill, manage prompt guard hooks, apply visibility, build and verify the index, refresh out-of-band additions, verify guard readiness, or uninstall and restore visibility from the manifest.
     execution_plan:
@@ -89,7 +114,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: skill-router
-          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks; disable removes managed guard hooks.
+          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -138,6 +163,8 @@ rules:
       user_says_any:
         - install router
         - uninstall router
+        - enable router
+        - disable router
         - router index
         - refresh index
         - index status
@@ -150,6 +177,7 @@ rules:
     when:
       user_says_any:
         - set visibility
+        - explicit-only
         - manual-only
         - name-only
         - implicit invocation
@@ -181,8 +209,13 @@ commands:
     safety: local_read
 
   run_route_query:
-    description: Route the user request to candidate skills from the index.
+    description: Route the user request to candidate skills from the index. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate.
     template: "skillspec route --index {{index}} --query {{query}} --top 5 --json"
+    safety: local_read
+
+  apply_route_decision:
+    description: Apply route JSON without inventing a match. Load selected only for decision use_skill. For bypass, continue normal agent behavior. For ambiguous, ask only when the user explicitly requested skill choice; otherwise continue normal behavior.
+    template: "inspect route JSON fields: decision, selected, bypass_reason, candidates"
     safety: local_read
 
   show_router_lifecycle_plan:
@@ -191,7 +224,7 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use disable to remove managed guard hooks.
+    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
     template: "skillspec router install|enable|disable|update|uninstall|guard|index refresh|index status"
     safety: local_write
 
@@ -214,14 +247,19 @@ tests:
         - route_queries_use_index
 
   - name: lifecycle uses router commands
-    input: install router and refresh index
+    input: enable router and refresh index
     expect:
       route: manage_router_lifecycle
       matched_rules:
         - lifecycle_requests_use_router_commands
 
+  - name: bypass does not force skill
+    input: tell me what changed in this repository
+    expect:
+      route: route_from_index
+
   - name: visibility uses native controls
-    input: set a noisy skill to manual-only with allow_implicit_invocation false
+    input: set a noisy skill to explicit-only with allow_implicit_invocation false
     expect:
       route: manage_visibility
       matched_rules:

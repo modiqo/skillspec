@@ -1037,7 +1037,7 @@ fn write_router_skill(skill_dir: &Path, router_name: &str, index: &Path) -> Resu
     let skill = format!(
         r#"---
 name: {router_name_yaml}
-description: Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index for a matching installed skill, load the selected skill when one fits, and continue with normal agent behavior when no suitable skill is found.
+description: Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index, load the selected skill only when route decision is use_skill, and continue with normal agent behavior when the decision is bypass or ambiguous.
 metadata:
   routing:
     tags: [skills, router, discovery, codex, claude]
@@ -1069,9 +1069,10 @@ Load and follow `./skill.spec.yml`; that file is the router contract.
 When router mode is enabled and the harness has been restarted, this router is
 the first hop for every user request in the managed skill roots. All routed
 skills are explicit-only/manual-only, so check the router index before reading,
-searching for, or guessing at a domain skill. If the index returns a suitable
-skill, load that selected skill explicitly. If no suitable skill is found,
-continue with the normal agent path for the user request.
+searching for, or guessing at a domain skill. Load a domain skill only when
+`skillspec route --json` returns `decision: "use_skill"` and a non-null
+`selected` skill. If the decision is `bypass` or `ambiguous`, do not load any
+candidate skill; continue with the normal agent path for the user request.
 `durable-executor` remains implicit only when its own lifecycle state is enabled.
 "#
     );

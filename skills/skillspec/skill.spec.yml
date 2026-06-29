@@ -617,7 +617,7 @@ routes:
     description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain normal fallback when the index finds no suitable skill.
+      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain that route JSON only loads a skill for decision use_skill while bypass or ambiguous continues normal behavior.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -2638,7 +2638,7 @@ commands:
       dependencies:
         - rote_cli
   router_install:
-    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks, make routed skills explicit-only, and preserve no-match fallback to normal agent behavior.
+    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks, make routed skills explicit-only, and install a decision-gated router that loads a skill only for route decision use_skill.
     template: skillspec router install --roots <skill-roots> --index <router-index>
     safety: local_write
     requires:
@@ -2666,14 +2666,14 @@ commands:
       dependencies:
         - skillspec_cli
   router_update:
-    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, refresh managed guard hooks, then report the harness restart warning.
+    description: Back up and update every recorded skill-router install, preserve enabled/disabled mode, refresh managed guard hooks and decision-gated router text, then report the harness restart warning.
     template: skillspec router update --json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   verify_router_install:
-    description: Verify the generated skill-router files, visibility metadata, and index status under the selected roots.
+    description: Verify the generated skill-router files, route decision gate, visibility metadata, and index status under the selected roots.
     template: skillspec router index status --roots <skill-roots> --index <router-index>
     safety: read_only
     requires:
@@ -3099,7 +3099,7 @@ recipes:
       - run_command: router_guard
       - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
       - note: Report guard hook paths from harness_hooks and whether router guard returned first_hop_ready. Router-first is guaranteed only when managed hooks are loaded by the active harness.
-      - note: Report that every request should route through skill-router first, and if the index returns no suitable selected skill the agent should continue with normal behavior instead of forcing an unrelated skill.
+      - note: Report that every request should route through skill-router first, and the agent must load a domain skill only when route JSON says decision use_skill with a non-null selected skill. For bypass or ambiguous, continue normal behavior instead of forcing an unrelated skill.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.

@@ -1,6 +1,6 @@
 ---
 name: skill-router
-description: "Use when selecting the right local skill from a large SkillSpec-indexed skill library, especially when many skills are installed, skill descriptions are shortened, or the user asks to install, uninstall, refresh, route, audit, or manage skill visibility through the SkillSpec router. Do not use for ordinary code generation when a specific domain skill is already selected."
+description: "Use for every user request when SkillSpec router mode is enabled. First check the local SkillSpec router index, load the selected skill only when route decision is use_skill, and continue with normal agent behavior when the decision is bypass or ambiguous."
 metadata:
   routing:
     tags: [skills, router, discovery, codex, claude]
@@ -19,10 +19,15 @@ metadata:
 
 This skill is a thin native harness loader for the SkillSpec router.
 Load and follow `./skill.spec.yml`; that file is the router contract.
-This router is explicit-only; `durable-executor` remains the implicit first-hop
-when it is installed separately in the managed roots.
+When router mode is enabled and the harness has been restarted, this router is
+the first hop for every user request in managed skill roots. All routed skills
+are explicit-only/manual-only, so check the router index before reading,
+searching for, or guessing at a domain skill.
 
-The router does not execute task work. It selects a likely skill, reports confidence and candidate paths, and asks for direct or durable execution when the task will use tools and the user has not already chosen an execution mode.
+The router does not execute task work. It decides whether a local skill should
+be loaded, reports confidence and candidate paths, and asks for direct or
+durable execution only after a `use_skill` decision when the task will use tools
+and the user has not already chosen an execution mode.
 
 ## Runtime Contract
 
@@ -33,10 +38,10 @@ The router does not execute task work. It selects a likely skill, reports confid
    skillspec route --index <index-file-or-router-dir> --query '<user task>' --top 5 --json
    ```
 
-3. If the selected candidate has high confidence, read that skill's `SKILL.md` and follow it.
-4. If confidence is medium, compare the top candidates briefly and choose the best fit.
-5. If confidence is low, ask the user to choose a skill or continue without a skill.
-6. If route output includes `execution_mode_direct_or_durable`, ask the user whether to run direct or durable before tool-backed execution.
+3. If route output says `decision: "use_skill"` and `selected` is non-null, read that skill's `SKILL.md` and follow it.
+4. If route output says `decision: "bypass"`, do not load any candidate skill; continue with normal agent behavior for the request.
+5. If route output says `decision: "ambiguous"`, do not silently choose a candidate. Ask only when the user explicitly requested skill selection; otherwise continue with normal agent behavior.
+6. If route output includes `execution_mode_direct_or_durable` for a `use_skill` decision, ask the user whether to run direct or durable before tool-backed execution.
 7. If the user chooses durable execution, hand the selected skill and task context to `durable-executor`. The router still only routes; durable-executor owns workspace evidence, rote execution policy, alignment, token stats, and final closure.
 
 ## Router Management

@@ -1106,6 +1106,8 @@ description: Helps with notes.
         .unwrap();
     assert_success(&route);
     let route_report = json_stdout(&route);
+    assert_eq!(route_report["decision"], "use_skill");
+    assert_eq!(route_report["bypass_reason"], Value::Null);
     assert_eq!(route_report["selected"]["name"], "pdf");
     assert_eq!(
         Path::new(route_report["selected"]["path"].as_str().unwrap())
@@ -1133,6 +1135,8 @@ description: Helps with notes.
         .unwrap();
     assert_success(&direct_route);
     let direct_report = json_stdout(&direct_route);
+    assert_eq!(direct_report["decision"], "use_skill");
+    assert_eq!(direct_report["bypass_reason"], Value::Null);
     assert_eq!(direct_report["selected"]["name"], "deploy");
     assert_eq!(direct_report["execution_mode"], "direct");
     assert_eq!(direct_report["elicitation"], Value::Null);
@@ -1379,6 +1383,8 @@ description: Use as the durable execution first-hop for tool-backed requests tha
         .unwrap();
     assert_success(&route);
     let route_report = json_stdout(&route);
+    assert_eq!(route_report["decision"], "bypass");
+    assert_eq!(route_report["bypass_reason"], "no_candidates");
     assert_eq!(route_report["selected"], Value::Null);
     assert!(route_report["candidates"].as_array().unwrap().is_empty());
 }
@@ -1485,14 +1491,16 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     assert!(router_skill.contains("the first hop for every user request"));
     assert!(router_skill.contains("continue with the normal agent path"));
     assert!(router_skill.contains("explicit-only"));
-    assert!(router_skill.contains("load that selected skill explicitly"));
+    assert!(router_skill.contains("decision: \"use_skill\""));
+    assert!(router_skill.contains("do not load any"));
     assert!(router_skill.contains("durable-executor"));
     assert!(!router_skill.contains("visible discovery surface"));
     let router_spec = fs::read_to_string(root.join("skill-router/skill.spec.yml")).unwrap();
     assert!(router_spec.contains("schema: skillspec/v0"));
     assert!(router_spec.contains("Use for every user request"));
     assert!(router_spec.contains("first hop for every request"));
-    assert!(router_spec.contains("no suitable skill is found"));
+    assert!(router_spec.contains("apply_route_decision"));
+    assert!(router_spec.contains("decision is use_skill"));
     assert!(!router_spec.contains("--router-root"));
     let validate_router_spec = Command::new(bin())
         .arg("validate")
@@ -1605,6 +1613,7 @@ routes:
         .unwrap();
     assert_success(&route_notes);
     let route_report = json_stdout(&route_notes);
+    assert_eq!(route_report["decision"], "use_skill");
     assert_eq!(route_report["selected"]["name"], "notes");
 
     let uninstall_router = Command::new(bin())

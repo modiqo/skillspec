@@ -10,9 +10,11 @@ many installed skills
 -> implicit skill selection becomes less reliable
 ```
 
-The router does not replace native skills and does not execute the selected
-skill. It builds a local SQLite catalog, ranks candidate skills for a user
-request, and returns the selected `SKILL.md` path plus confidence and candidates.
+The router does not replace native skills and does not execute task work. It
+builds a local SQLite catalog, ranks candidate skills for a user request, and
+returns a route decision: `use_skill`, `bypass`, or `ambiguous`. Only
+`use_skill` authorizes loading the returned `selected` `SKILL.md`; `bypass` and
+`ambiguous` preserve normal agent behavior without silently loading a candidate.
 
 The top-level `skillspec index` command is part of this router surface. It is
 not a general repository search command, source map, workspace map, or import
@@ -94,14 +96,17 @@ unavailable until durable-executor is installed separately.
 The router guarantee is visibility-backed, not prose-only. Within configured
 roots, router install/enable writes native metadata and managed prompt guard
 hooks so the router is the first hop for every request while routed skills stop
-competing for implicit selection. The router must query the local index first.
-If the index returns no suitable skill, the agent continues with the normal path
-for the request, including ordinary workspace or web search when those are
-otherwise allowed. A harness restart is required before active sessions
-reliably observe the metadata and hook changes. Skills outside the managed
-roots, stale harness sessions, disabled hooks, or harness-specific selection
-bugs are outside the guarantee; `skillspec status`, `skillspec router guard`,
-and `skillspec router index status` are the verification gates.
+competing for implicit selection. The router must query the local index first
+and obey the route decision before loading any domain skill. If the decision is
+`bypass`, the agent continues with the normal path for the request, including
+ordinary workspace or web search when those are otherwise allowed. If the
+decision is `ambiguous`, the agent must not silently load a candidate; it asks
+only when the user explicitly requested skill selection, otherwise it continues
+normally. A harness restart is required before active sessions reliably observe
+the metadata and hook changes. Skills outside the managed roots, stale harness
+sessions, disabled hooks, or harness-specific selection bugs are outside the
+guarantee; `skillspec status`, `skillspec router guard`, and `skillspec router
+index status` are the verification gates.
 
 `durable-executor` has its own managed lifecycle. `skillspec durable-executor
 install <source-folder>` first checks that `rote` is available on `PATH`, then
@@ -238,10 +243,19 @@ The first implementation uses deterministic BM25-style lexical scoring over:
   and rule reasons.
 
 It adds exact-name and trigger bonuses, subtracts negative-trigger penalties, and
-filters out `off` skills. The route result includes the selected candidate,
-scores, confidence, visibility, whether the skill is SkillSpec-backed, and an
-execution-mode elicitation hint when the caller has not already supplied direct
-or durable execution mode.
+filters out `off` skills. The route result includes the decision, optional
+selected candidate, scores, confidence, visibility, whether the skill is
+SkillSpec-backed, bypass reason when no skill should load, and an execution-mode
+elicitation hint when the caller has not already supplied direct or durable
+execution mode.
+
+The match gate is intentionally conservative:
+
+- `use_skill`: the top candidate has high confidence and clears the separation
+  threshold from the next candidate.
+- `bypass`: no positive candidate exists or the best candidate is only low or
+  medium confidence.
+- `ambiguous`: top candidates are too close for automatic skill selection.
 
 ## Durable Execution
 
@@ -250,7 +264,7 @@ The router and durable-executor are separate layers.
 Router mode answers:
 
 ```text
-Which local skill best matches this request?
+Should this request load a local skill, and if so which one?
 ```
 
 Durable-executor mode answers:
@@ -262,7 +276,7 @@ How should tool-backed work execute and prove itself?
 Durability is a global execution envelope, not a per-skill or per-tool index
 flag. The index should not accumulate flags such as `git_requires_durable`,
 `browser_requires_durable`, or `npm_requires_durable`. `skillspec route`
-returns the best domain skill plus an execution-mode hint when appropriate.
+returns a `use_skill` decision plus an execution-mode hint when appropriate.
 
 Normal routing:
 
@@ -270,15 +284,16 @@ Normal routing:
 user task
 -> implicit skill-router first-hop for every request after router install/enable and harness restart
 -> skillspec route
--> if selected, load the selected domain skill
--> if no suitable skill, continue normal agent behavior
+-> if decision is use_skill and selected is non-null, load the selected domain skill
+-> if decision is bypass, continue normal agent behavior
+-> if decision is ambiguous, do not silently load a candidate
 ```
 
 Durable routing:
 
 ```text
 tool-backed user task
--> skillspec route selects a domain skill
+-> skillspec route returns decision use_skill for a domain skill
 -> user has explicitly chosen durable mode, or durable-executor was invoked
 -> durable-executor creates the execution envelope
 -> selected skill supplies domain interpretation

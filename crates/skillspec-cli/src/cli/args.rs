@@ -330,7 +330,7 @@ pub(super) enum Command {
         #[arg(long)]
         json: bool,
     },
-    #[command(about = "Route a user request to candidate skills from an index")]
+    #[command(about = "Decide whether a user request should load a skill from an index")]
     Route {
         /// SQLite index file created by `skillspec index`, or a router directory containing skill-index.sqlite.
         #[arg(long)]
