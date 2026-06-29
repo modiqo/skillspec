@@ -1,7 +1,7 @@
 use crate::decision;
-use crate::error::{Error, Result};
-use crate::model::{RouteId, SkillSpec, TraceEventKind};
 use crate::trace::{self, TraceEnvelope};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{RouteId, SkillSpec, TraceEventKind};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

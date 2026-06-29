@@ -331,7 +331,7 @@ Alignment: fail
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/execution/align.rs`, which defines alignment summaries,
+- `crates/skillspec-runtime/src/align.rs`, which defines alignment summaries,
   completion fields, token summaries, proof rows, and layer statuses;
 - `crates/skillspec-cli/src/features/compiler.rs`, which emits loader instructions for
   alignment and token reporting;

@@ -1,8 +1,8 @@
 use crate::decision::{DecisionEvent, DecisionWithEvents};
-use crate::error::{Error, Result};
-use crate::model::{SkillSpec, TraceConfig, TraceEventKind};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{SkillSpec, TraceConfig, TraceEventKind};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;

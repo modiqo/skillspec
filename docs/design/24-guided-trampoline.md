@@ -688,11 +688,11 @@ Create a dedicated guide module rather than bloating `run_loop.rs`.
 Suggested files:
 
 ```text
-crates/skillspec-cli/src/features/guide.rs
-crates/skillspec-cli/src/features/guide/types.rs
-crates/skillspec-cli/src/features/guide/state.rs
-crates/skillspec-cli/src/features/guide/render.rs
-crates/skillspec-cli/src/features/guide/fingerprint.rs
+crates/skillspec-runtime/src/guide/mod.rs
+crates/skillspec-runtime/src/guide/types.rs
+crates/skillspec-runtime/src/guide/state.rs
+crates/skillspec-runtime/src/guide/render.rs
+crates/skillspec-runtime/src/guide/fingerprint.rs
 ```
 
 Suggested top-level structs:

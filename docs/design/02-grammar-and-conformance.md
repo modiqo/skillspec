@@ -267,7 +267,7 @@ Changing the grammar should update all relevant surfaces:
 
 - `crates/skillspec-core/src/spec/model.rs`;
 - `crates/skillspec-core/src/spec/parser/validation.rs`;
-- `crates/skillspec-cli/src/execution/decision.rs` when decision behavior changes;
+- `crates/skillspec-runtime/src/decision.rs` when decision behavior changes;
 - `crates/skillspec-cli/src/features/sensemake.rs` when query or refs behavior changes;
 - `spec/skill.spec.schema.json`;
 - `spec/grammar.md`;
@@ -290,7 +290,7 @@ This doc is grounded in:
 - `crates/skillspec-core/src/spec/parser/validation.rs`, which validates schema, required fields,
   identifiers, references, import cycles, orphaned imports/resources, and test
   expectations;
-- `crates/skillspec-cli/src/execution/decision.rs`, which evaluates scenario
+- `crates/skillspec-runtime/src/decision.rs`, which evaluates scenario
   expectations;
 - `crates/skillspec-core/src/spec/imports.rs`, which validates local imports;
 - `conformance/`, which contains valid and invalid compatibility fixtures.

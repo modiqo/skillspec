@@ -1,8 +1,8 @@
 use crate::align::{AlignCheckStatus, AlignProofStatus, AlignReport, AlignStatus};
 use crate::decision::{Decision, TestRun};
-use crate::error::Result;
-use crate::model::SkillSpec;
 use crate::trace::TraceWriteResult;
+use skillspec_core::error::Result;
+use skillspec_core::model::SkillSpec;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -536,6 +536,6 @@ fn obligation_kind_name(kind: crate::align::AlignObligationKind) -> &'static str
     }
 }
 
-pub fn error(error: crate::error::Error) {
+pub fn error(error: skillspec_core::error::Error) {
     let _ = writeln!(io::stderr().lock(), "error: {error}");
 }

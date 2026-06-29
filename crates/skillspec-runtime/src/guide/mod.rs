@@ -5,10 +5,10 @@ mod types;
 
 use crate::act::{self, ActPhase, ActReport};
 use crate::decision::{self, DecisionWithEvents};
-use crate::error::{Error, Result};
-use crate::model::SkillSpec;
 use crate::progress::{self, ProgressReport};
 use crate::trace::{self, TraceEnvelope};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::SkillSpec;
 use std::path::Path;
 
 pub use render::render_text;

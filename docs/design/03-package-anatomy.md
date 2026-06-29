@@ -270,7 +270,7 @@ This doc is grounded in:
 - `examples/durable-executor/skill.spec.yml`, which shows entry policy, routes, rules,
   dependencies, file dependency `deps_toml`, and command template `deps_check`;
 - `examples/durable-executor/deps.toml`, which shows the companion tool manifest;
-- `crates/skillspec-cli/src/execution/deps.rs`, which checks dependencies declared in
+- `crates/skillspec-runtime/src/deps.rs`, which checks dependencies declared in
   `skill.spec.yml`;
 - `spec/imports.md` and `crates/skillspec-core/src/spec/imports.rs`, which define and
   validate local explicit imports.

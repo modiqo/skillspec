@@ -248,10 +248,10 @@ This doc is grounded in:
   review-driven.
 - `crates/skillspec-core/src/spec/model.rs`,
   `crates/skillspec-core/src/spec/parser/validation.rs`,
-  `crates/skillspec-cli/src/execution/decision.rs`,
+  `crates/skillspec-runtime/src/decision.rs`,
   `crates/skillspec-cli/src/features/compiler.rs`,
-  `crates/skillspec-cli/src/execution/deps.rs`,
+  `crates/skillspec-runtime/src/deps.rs`,
   `crates/skillspec-core/src/spec/imports.rs`,
   `crates/skillspec-cli/src/features/importer.rs`, and
-  `crates/skillspec-cli/src/execution/align.rs`, which implement the current
+  `crates/skillspec-runtime/src/align.rs`, which implement the current
   contract surfaces.

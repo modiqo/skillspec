@@ -1,9 +1,9 @@
 use crate::act;
 use crate::decision;
-use crate::error::{Error, Result};
-use crate::model::SkillSpec;
 use crate::trace::{self, TraceEnvelope};
 use serde::{Deserialize, Serialize};
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::SkillSpec;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;

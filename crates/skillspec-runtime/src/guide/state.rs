@@ -1,6 +1,6 @@
 use super::render;
 use super::types::{GuideReport, PriorGuideState};
-use crate::error::{Error, Result};
+use skillspec_core::error::{Error, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 

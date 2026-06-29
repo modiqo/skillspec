@@ -35,6 +35,32 @@ internal names (`error`, `model`, `parser`, `grammar`, `imports`, and
 tests keep compiling. Those re-exports are compatibility scaffolding for the
 refactor, not a stable Rust API.
 
+`crates/skillspec-runtime/` owns the extracted runtime execution modules:
+
+- `src/decision.rs`: route/rule decision algebra and scenario test execution.
+- `src/act.rs`: plan/action reports, phase selection, handoff boundaries, and
+  effective tool-boundary rendering.
+- `src/trace.rs`: decision trace envelopes, run directories, summaries,
+  compaction, and fingerprints.
+- `src/progress.rs`: structured execution events, progress reports, stats
+  evidence, and final-response evidence.
+- `src/align.rs` and `src/align/`: decision replay, execution proof alignment,
+  proof digests, ledger parsing, and alignment report types.
+- `src/deps.rs`: dependency checks.
+- `src/command_path.rs`: local command lookup.
+- `src/report.rs`: runtime report rendering used by CLI dispatch.
+- `src/guide/`: guided run-loop start/resume/end anchors and persisted guide
+  state.
+- `src/run_loop.rs`: runtime run-loop report assembly. The CLI keeps
+  `crates/skillspec-cli/src/features/run_loop.rs` as a thin wrapper for
+  sensemake integration and token-metric rendering.
+
+`crates/skillspec-cli/src/lib.rs` re-exports these runtime modules under the old
+internal names (`act`, `align`, `command_path`, `decision`, `deps`, `guide`,
+`progress`, `report`, and `trace`) so existing command dispatch and integration
+tests keep compiling. Those re-exports are compatibility scaffolding for the
+refactor, not a stable Rust API.
+
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
 - `authoring.rs`: compile, import, port-one-shot, source map, grammar,
@@ -51,8 +77,8 @@ refactor, not a stable Rust API.
 - `workspace.rs`: workspace map, validate, import, converge, compile, install,
   and workspace report rendering.
 
-The lower-level `execution/`, `features/`, and `lifecycle/` modules still
-implement the remaining CLI behavior. They remain hidden implementation modules.
+The lower-level remaining `features/` and `lifecycle/` modules still implement
+the remaining CLI behavior. They remain hidden implementation modules.
 
 ## Refactor Rules
 
@@ -79,8 +105,12 @@ The facades are the migration seam for later internal crates:
   releases remain possible: publish this crate first, then publish the CLI crate
   that depends on the same version. The crate exists as an implementation
   boundary, not as a stable Rust API promise.
-- `skillspec-runtime`: runtime decisions, act/plan/run-loop, traces, progress,
-  and alignment.
+- `skillspec-runtime`: implemented for runtime decisions, act/plan, run-loop
+  report assembly, traces, progress, guidance, dependency checks, report
+  rendering, and alignment. It is a publishable companion crate so crates.io
+  releases remain possible: publish `skillspec-core`, then `skillspec-runtime`,
+  then the CLI crate that depends on the same versions. The crate exists as an
+  implementation boundary, not as a stable Rust API promise.
 - `skillspec-doctor`: doctor reports and renderers.
 - `skillspec-import`: source staging, import, port-one-shot, workspace
   authoring, compile, and synthesis.

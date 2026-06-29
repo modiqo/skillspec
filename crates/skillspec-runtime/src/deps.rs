@@ -1,6 +1,6 @@
-use crate::error::{Error, Result};
-use crate::model::{Dependency, DependencyKind, SkillSpec};
 use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{Dependency, DependencyKind, SkillSpec};
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
@@ -285,7 +285,7 @@ tests:
       route: local
 "#;
         let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
-        crate::parser::validate_spec(&spec).unwrap();
+        skillspec_core::parser::validate_spec(&spec).unwrap();
 
         let report = check(&spec, Path::new("."), None).unwrap();
 

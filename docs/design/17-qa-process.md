@@ -166,7 +166,7 @@ rg -n "validate_|UnknownReference|imports.orphan|resources.orphan|requires.impor
 For decision behavior:
 
 ```sh
-rg -n "default_route_order|matches_predicate|apply_rule|RouteSelectionBasis|dedupe_strings" crates/skillspec-cli/src/execution/decision.rs
+rg -n "default_route_order|matches_predicate|apply_rule|RouteSelectionBasis|dedupe_strings" crates/skillspec-runtime/src/decision.rs
 ```
 
 For sensemaking:
@@ -184,7 +184,7 @@ rg -n "import path must be local and relative|topological_load_order|markdown_ha
 For traces and alignment:
 
 ```sh
-rg -n "TraceEnvelope|write_decision_trace|AlignReport|AlignStatus|obligations_for|report_status" crates/skillspec-cli/src/execution/trace.rs crates/skillspec-cli/src/execution/align.rs
+rg -n "TraceEnvelope|write_decision_trace|AlignReport|AlignStatus|obligations_for|report_status" crates/skillspec-runtime/src/trace.rs crates/skillspec-runtime/src/align.rs
 ```
 
 ## Final Repo QA

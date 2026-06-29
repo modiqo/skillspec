@@ -1,11 +1,11 @@
 use crate::decision::{Decision, RouteSelectionBasis};
-use crate::error::{Error, Result};
-use crate::model::{
+use crate::trace::TraceWriteResult;
+use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::model::{
     ExecutionPhase, HandoffBoundary, RouteHandoff, RouteId, SkillSpec, ToolBoundary,
     ToolBoundaryDefault,
 };
-use crate::trace::TraceWriteResult;
-use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -431,7 +431,7 @@ fn handoff_report(handoff: &RouteHandoff) -> ActHandoff {
 fn selected_route_ref<'a>(
     spec: &'a SkillSpec,
     selected_route: Option<&RouteId>,
-) -> Option<&'a crate::model::Route> {
+) -> Option<&'a skillspec_core::model::Route> {
     let selected_route = selected_route?;
     spec.routes
         .iter()
@@ -441,7 +441,7 @@ fn selected_route_ref<'a>(
 fn forbidden_items(
     decision: &Decision,
     current_phase: Option<&ActPhase>,
-    selected_route: Option<&crate::model::Route>,
+    selected_route: Option<&skillspec_core::model::Route>,
 ) -> Vec<String> {
     let mut items = decision.forbid.clone();
     if let Some(phase) = current_phase {
@@ -460,7 +460,7 @@ fn forbidden_items(
 
 fn effective_tool_boundary(
     spec: &SkillSpec,
-    selected_route: Option<&crate::model::Route>,
+    selected_route: Option<&skillspec_core::model::Route>,
     current_phase: Option<&ActPhase>,
     active_forbids: &[String],
 ) -> ActToolBoundary {
@@ -578,7 +578,7 @@ fn merge_declared_tool_boundary(
 fn allowed_now(
     decision: &Decision,
     current_phase: Option<&ActPhase>,
-    selected_route: Option<&crate::model::Route>,
+    selected_route: Option<&skillspec_core::model::Route>,
     forbidden: &[String],
 ) -> Vec<String> {
     let mut allowed = Vec::new();
@@ -634,7 +634,7 @@ fn allowed_now(
 
 fn required_transitions(
     phases: &[ActPhase],
-    selected_route: Option<&crate::model::Route>,
+    selected_route: Option<&skillspec_core::model::Route>,
 ) -> Vec<String> {
     let mut transitions = Vec::new();
     if phases.len() > 1 {

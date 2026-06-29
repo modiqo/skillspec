@@ -230,7 +230,7 @@ This doc is grounded in:
   `HandoffBoundary`, `ExecutionPlan`, `ExecutionPhase`, and `ExecutionJump`;
 - `crates/skillspec-core/src/spec/parser/validation.rs`, which validates state references and
   route ids;
-- `crates/skillspec-cli/src/execution/decision.rs`, which attaches the selected route's
+- `crates/skillspec-runtime/src/decision.rs`, which attaches the selected route's
   execution plan to the decision;
 - `crates/skillspec-cli/src/features/sensemake.rs`, which exposes state refs and route
   execution-plan refs;

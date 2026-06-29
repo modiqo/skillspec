@@ -226,7 +226,7 @@ This doc is grounded in:
 
 - `crates/skillspec-core/src/spec/model.rs`, which defines `Route`, `Rule`,
   `Predicate`, and `Expectation`;
-- `crates/skillspec-cli/src/execution/decision.rs`, which defines `RouteSelection` and
+- `crates/skillspec-runtime/src/decision.rs`, which defines `RouteSelection` and
   `RouteSelectionBasis`, and implements default route order, predicate matching,
   rule application, dedupe, decision events, execution-plan attachment, and
   scenario-test comparison;

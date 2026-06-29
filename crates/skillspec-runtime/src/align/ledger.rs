@@ -1,5 +1,5 @@
 use super::AlignTokenSummary;
-use crate::error::{Error, Result};
+use skillspec_core::error::{Error, Result};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

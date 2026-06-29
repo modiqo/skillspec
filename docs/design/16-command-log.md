@@ -226,10 +226,10 @@ This doc is grounded in:
 - `crates/skillspec-cli/src/domain/`, which provides the internal command-family
   facades used by dispatch before reaching implementation modules;
 - `spec/commandspec.md`, which is the reference command inventory;
-- `crates/skillspec-cli/src/execution/act.rs`,
-  `crates/skillspec-cli/src/execution/progress.rs`,
-  `crates/skillspec-cli/src/execution/align.rs`,
-  `crates/skillspec-cli/src/execution/deps.rs`,
+- `crates/skillspec-runtime/src/act.rs`,
+  `crates/skillspec-runtime/src/progress.rs`,
+  `crates/skillspec-runtime/src/align.rs`,
+  `crates/skillspec-runtime/src/deps.rs`,
   `crates/skillspec-core/src/spec/grammar.rs`,
   `crates/skillspec-core/src/spec/imports.rs`,
   `crates/skillspec-cli/src/features/workspace.rs`,

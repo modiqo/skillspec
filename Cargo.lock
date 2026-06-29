@@ -960,6 +960,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-core",
+ "skillspec-runtime",
  "thiserror",
 ]
 
@@ -973,6 +974,17 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "skillspec-runtime"
+version = "0.1.5"
+dependencies = [
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
 ]
 
 [[package]]

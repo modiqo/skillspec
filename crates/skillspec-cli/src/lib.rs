@@ -22,14 +22,9 @@ pub mod spec {
 
 #[doc(hidden)]
 pub mod execution {
-    pub mod act;
-    pub mod align;
-    pub mod command_path;
-    pub mod decision;
-    pub mod deps;
-    pub mod progress;
-    pub mod report;
-    pub mod trace;
+    pub use skillspec_runtime::{
+        act, align, command_path, decision, deps, progress, report, trace,
+    };
 }
 
 #[doc(hidden)]
@@ -48,7 +43,6 @@ pub mod features {
     pub mod compiler;
     pub mod doctor;
     pub mod git_context;
-    pub mod guide;
     pub mod importer;
     pub mod metrics;
     pub mod port_one_shot;
@@ -61,13 +55,15 @@ pub mod features {
 }
 
 #[doc(hidden)]
-pub use execution::{act, align, command_path, decision, deps, progress, report, trace};
-#[doc(hidden)]
 pub use features::{
-    capability, compiler, doctor, git_context, guide, importer, metrics, port_one_shot,
-    remote_source, run_loop, sensemake, source_map, workspace, workspace_synthesizer,
+    capability, compiler, doctor, git_context, importer, metrics, port_one_shot, remote_source,
+    run_loop, sensemake, source_map, workspace, workspace_synthesizer,
 };
 #[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 #[doc(hidden)]
 pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, parser};
+#[doc(hidden)]
+pub use skillspec_runtime::{
+    act, align, command_path, decision, deps, guide, progress, report, trace,
+};

@@ -281,10 +281,10 @@ This doc is grounded in:
   `crates/skillspec-cli/src/cli/dispatch/`, which expose `validate`, `test`,
   `decide`, `sensemake`, `query`, `refs`, `imports check`, `deps check`,
   `compile`, `import-skill`, and `trace align`;
-- `crates/skillspec-cli/src/execution/decision.rs`,
+- `crates/skillspec-runtime/src/decision.rs`,
   `crates/skillspec-core/src/spec/imports.rs`,
-  `crates/skillspec-cli/src/execution/deps.rs`, and
-  `crates/skillspec-cli/src/execution/align.rs`, which implement the runtime
+  `crates/skillspec-runtime/src/deps.rs`, and
+  `crates/skillspec-runtime/src/align.rs`, which implement the runtime
   and review surfaces;
 - `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.

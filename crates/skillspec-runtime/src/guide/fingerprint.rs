@@ -1,8 +1,8 @@
 use crate::act::ActReport;
 use crate::decision::Decision;
-use crate::error::Result;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use skillspec_core::error::Result;
 
 #[derive(Serialize)]
 struct DecisionFingerprint<'a> {

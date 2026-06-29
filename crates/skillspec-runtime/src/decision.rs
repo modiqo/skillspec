@@ -1,8 +1,8 @@
-use crate::model::{
+use serde::Serialize;
+use skillspec_core::model::{
     ExecutionPlan, Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec,
     TraceEventKind,
 };
-use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Serialize)]
@@ -597,7 +597,7 @@ fn default_route_order(spec: &SkillSpec) -> Vec<RouteId> {
 fn selected_route<'a>(
     spec: &'a SkillSpec,
     route_id: Option<&RouteId>,
-) -> Option<&'a crate::model::Route> {
+) -> Option<&'a skillspec_core::model::Route> {
     let route_id = route_id?;
     spec.routes.iter().find(|route| &route.id == route_id)
 }
@@ -751,7 +751,7 @@ tests:
       not_matched_rules: []
 "#;
         let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
-        crate::parser::validate_spec(&spec).unwrap();
+        skillspec_core::parser::validate_spec(&spec).unwrap();
 
         let result = run_tests(&spec);
 
