@@ -50,8 +50,9 @@ The verified coverage map at the time this matrix was written is:
   `crates/skillspec-harness-lab/tests/doctor.rs`,
   `crates/skillspec-harness-lab/tests/import.rs`,
   `crates/skillspec-harness-lab/tests/imported_runtime.rs`,
-  `crates/skillspec-harness-lab/tests/router.rs`, and committed baselines under
-  `crates/skillspec-harness-lab/baselines/`;
+  `crates/skillspec-harness-lab/tests/router.rs`,
+  `crates/skillspec-harness-lab/tests/durable.rs`, and committed baselines
+  under `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -205,7 +206,8 @@ For each test, capture:
 | Durable disable | Disable durable executor. | Durable executor visibility becomes manual-only without deleting files. | Harness-sim automatable | Covered |
 | Durable update | Update managed durable executor. | Existing install is backed up and refreshed from source. | Harness-sim automatable | Covered |
 | Durable delete | Delete managed durable executor. | Managed installs are removed; unmanaged folders are not removed. | Harness-sim automatable | Covered |
-| Durable with router | Install router and durable executor together. | Durable executor can be implicit outer observer while router remains selection authority. | Manual with trace review | Manual |
+| Durable marker guard | Remove the managed marker before update/delete. | Update/delete refuse to mutate unmanaged durable-executor folders. | Harness-sim automatable | Covered |
+| Durable with router | Install router and durable executor together. | Durable install refreshes the router index and durable-executor remains implicit while router stays installed. | Harness-sim automatable | Covered |
 | Durable happy path | Enable durable executor and run one SkillSpec-backed skill. | Workspace/evidence is preserved and final response can cite durable evidence. | Manual with trace review | Manual |
 | Durable negative | User declines observation/record/memory. | Durable executor does not record or memorize events and task can continue direct if allowed. | Manual | Manual |
 | Durable negative | Durable handoff loses required workspace or trace path. | Run reports blocker rather than pretending proof exists. | Manual with trace review | Manual |

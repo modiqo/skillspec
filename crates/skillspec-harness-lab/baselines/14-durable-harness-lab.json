@@ -1,0 +1,309 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "14-durable-harness-lab",
+  "summary": {
+    "status": "pass",
+    "cases_total": 5,
+    "cases_passed": 5,
+    "cases_failed": 0,
+    "claims_total": 44,
+    "claims_passed": 44,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "durable_install_update_delete_managed_dirs",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.skill_name",
+          "status": "pass",
+          "expected": "durable-executor",
+          "observed": "durable-executor"
+        },
+        {
+          "id": "install.rote_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.status",
+          "status": "pass",
+          "expected": "installed",
+          "observed": "installed"
+        },
+        {
+          "id": "install.skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.marker",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.config",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "update.status",
+          "status": "pass",
+          "expected": "updated",
+          "observed": "updated"
+        },
+        {
+          "id": "update.backup_path_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "update.skill_md_contains_updated",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "delete.status",
+          "status": "pass",
+          "expected": "removed",
+          "observed": "removed"
+        },
+        {
+          "id": "delete.config_removed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "delete.install_dir_removed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "durable_refuses_update_and_delete_without_marker",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "update.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "update.stderr_marker",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "update.install_dir_preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "delete.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "delete.stderr_marker",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "delete.install_dir_preserved",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "durable_disable_enable_toggles_implicit_invocation",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.target_count",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "disable.enabled",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "disable.agents_frontmatter_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "disable.agents_openai_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "disable.codex_openai_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.enabled",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.rote_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.agents_frontmatter_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.agents_openai_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.codex_openai_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "durable_install_and_enable_require_rote",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "install.stderr_rote",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.no_managed_dir_write",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.no_config_write",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "dry_run.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "dry_run.rote_present",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "enable.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "enable.stderr_rote",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "enable.visibility_remains_manual",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "durable_install_refreshes_router_and_remains_implicit",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "router.preparedness.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "durable.router_hook_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "durable.skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "durable.no_openai_sidecar",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "durable.not_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "router.status.stale",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "router.status.indexed_skills",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        }
+      ]
+    }
+  ]
+}
