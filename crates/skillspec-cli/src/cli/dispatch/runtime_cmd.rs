@@ -20,7 +20,7 @@ pub(super) fn test(path: PathBuf) -> Result<()> {
 pub(super) fn decide(path: PathBuf, input: String, trace_dir: Option<PathBuf>) -> Result<()> {
     let decision = runtime::decide(&path, &input, trace_dir.as_deref())?;
     if let Some(trace) = &decision.trace {
-        report::trace_written(&trace)?;
+        report::trace_written(trace)?;
     }
     report::json(&decision.value.decision)
 }
@@ -41,7 +41,7 @@ pub(super) fn act(
         phase.as_deref(),
     )?;
     if let Some(trace) = &act_report.trace {
-        report::trace_written(&trace)?;
+        report::trace_written(trace)?;
     }
     if json {
         report::json(&act_report.value)
@@ -58,7 +58,7 @@ pub(super) fn plan(
 ) -> Result<()> {
     let act_report = runtime::plan(&path, &input, trace_dir.as_deref())?;
     if let Some(trace) = &act_report.trace {
-        report::trace_written(&trace)?;
+        report::trace_written(trace)?;
     }
     if json {
         report::json(&act_report.value)
@@ -105,7 +105,7 @@ pub(super) fn run_loop(
 pub(super) fn explain(path: PathBuf, input: String, trace_dir: Option<PathBuf>) -> Result<()> {
     let decision = runtime::explain(&path, &input, trace_dir.as_deref())?;
     if let Some(trace) = &decision.trace {
-        report::trace_written(&trace)?;
+        report::trace_written(trace)?;
     }
     report::explain(&decision.value.decision)
 }

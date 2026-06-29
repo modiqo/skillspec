@@ -8,9 +8,9 @@ pub struct Traced<T> {
 }
 
 pub enum RunLoopOutput {
-    Guide(guide::GuideReport),
+    Guide(Box<guide::GuideReport>),
     Summary {
-        report: run_loop::RunLoopReport,
+        report: Box<run_loop::RunLoopReport>,
         elapsed: Duration,
     },
 }
@@ -116,7 +116,7 @@ pub fn run_loop(
             phase_override: phase,
             guide_mode,
         })?;
-        Ok(RunLoopOutput::Guide(guide_report))
+        Ok(RunLoopOutput::Guide(Box::new(guide_report)))
     } else {
         let input = input.ok_or_else(|| error::Error::InvalidInput {
             message: "run-loop requires --input unless --guide --resume is used".to_owned(),
@@ -129,7 +129,7 @@ pub fn run_loop(
         ensure_trace_available(&spec, trace_dir)?;
         let report = run_loop::build_report(&spec, path, input, view, trace_dir, phase)?;
         Ok(RunLoopOutput::Summary {
-            report,
+            report: Box::new(report),
             elapsed: started.elapsed(),
         })
     }
