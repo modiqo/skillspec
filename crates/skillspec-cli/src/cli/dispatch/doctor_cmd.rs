@@ -1,4 +1,4 @@
-use skillspec::{doctor, error::Result, report};
+use skillspec::{domain::doctor, error::Result, report};
 
 pub(super) fn run(path: String, json: bool, html: bool, markdown: bool) -> Result<()> {
     let doctor_report = doctor::inspect_target(&path)?;
