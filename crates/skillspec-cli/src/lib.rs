@@ -13,6 +13,9 @@
 pub mod error;
 
 #[doc(hidden)]
+pub mod domain;
+
+#[doc(hidden)]
 pub mod spec {
     pub mod grammar;
     pub mod import_dependency_ledger;
