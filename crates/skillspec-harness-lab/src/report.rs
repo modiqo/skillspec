@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub const REPORT_SCHEMA: &str = "skillspec/harness-lab-report/v0";
+pub const UPDATE_BASELINES_ENV: &str = "UPDATE_HARNESS_LAB_BASELINES";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HarnessLabReport {
@@ -240,6 +241,28 @@ pub fn compare_reports(
         },
         regressions,
     }
+}
+
+pub fn baseline_path(phase: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("baselines")
+        .join(format!("{phase}.json"))
+}
+
+pub fn compare_or_update_baseline(
+    phase: &str,
+    embedded_baseline: &str,
+    report: &HarnessLabReport,
+) -> ReportComparison {
+    let path = baseline_path(phase);
+    let baseline_text = if std::env::var(UPDATE_BASELINES_ENV).as_deref() == Ok("1") {
+        write_report(&path, report);
+        std::fs::read_to_string(&path).unwrap()
+    } else {
+        embedded_baseline.to_owned()
+    };
+    let baseline = serde_json::from_str(&baseline_text).unwrap();
+    compare_reports(&baseline, report)
 }
 
 pub(crate) fn write_report(path: &Path, report: &HarnessLabReport) {

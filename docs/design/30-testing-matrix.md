@@ -45,6 +45,10 @@ The verified coverage map at the time this matrix was written is:
   `crates/skillspec-cli/tests/cli/runtime_contracts.rs`;
 - router and durable-executor lifecycle:
   `crates/skillspec-cli/tests/cli/lifecycle.rs`;
+- controlled harness-lab regression cards:
+  `crates/skillspec-harness-lab/tests/core.rs`,
+  `crates/skillspec-harness-lab/tests/doctor.rs`, and committed baselines under
+  `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -110,16 +114,17 @@ For each test, capture:
 
 | Area | Case | Expected Result | Class | Coverage |
 | --- | --- | --- | --- | --- |
-| Doctor negative | Pass a non-`SKILL.md` file path. | Error explains expected target shape. | Automatable | Gap |
-| Doctor negative | Pass a folder with empty `SKILL.md`. | Report or error identifies unusable/empty skill content. | Automatable | Gap |
+| Doctor shape-only | Pass a non-`SKILL.md` file path. | Current contract returns a shape-only `non_skill_repository` report with `no_skill_entrypoint`. | Automatable | Covered |
+| Doctor negative | Pass a folder with empty `SKILL.md`. | Report identifies unusable/empty skill content without panic. | Automatable | Covered |
 | Doctor negative | Pass a folder with malformed frontmatter. | Report flags frontmatter discovery risk or parse problem without panic. | Automatable | Covered |
 | Doctor negative | Pass a folder with malformed Markdown structure and no useful instructions. | Report identifies high drift/proof risk without crashing. | Automatable | Partial |
-| Doctor negative | Pass non-existent path. | Command fails with clear path error. | Automatable | Gap |
+| Doctor negative | Pass non-existent path. | Command fails with clear path error. | Automatable | Covered |
 | Doctor positive | Pass folder with one proper `SKILL.md`. | Simple skill report includes risk, activation surface, findings, and next action. | Automatable | Covered |
-| Doctor positive | Pass direct `SKILL.md` path. | Report is equivalent to the parent single-skill target. | Automatable | Gap |
+| Doctor positive | Pass direct `SKILL.md` path. | Report is equivalent to the parent single-skill target. | Automatable | Covered |
 | Doctor positive | Pass folder with multiple `SKILL.md` files and cross references. | Workspace/package report includes one package report per skill and aggregate risk. | Automatable | Covered |
 | Doctor positive | Pass plugin-shaped folder. | Plugin workspace shape and package namespace are reported. | Automatable | Covered |
 | Doctor positive | Pass SkillSpec-backed skill. | Report recognizes contract mitigation and does not grade it as plain prose only. | Automatable | Covered |
+| Doctor shape-only | Pass ordinary code repository without `SKILL.md`. | Shape-only report returns `non_skill_repository` and `no_skill_entrypoint`. | Automatable | Covered |
 | Doctor remote | Pass public GitHub folder URL. | Remote sparse checkout is staged, analyzed, and cleaned up. | Automatable | Gap |
 | Doctor remote negative | Pass private or invalid GitHub URL. | Error is clear and does not leak credentials. | Automatable | Gap |
 | Doctor output | Run text, JSON, Markdown, and HTML output modes. | Each output parses/renders and contains the same core report facts. | Automatable | Covered |

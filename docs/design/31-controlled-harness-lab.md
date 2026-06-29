@@ -1,6 +1,8 @@
 # Controlled Harness Lab
 
-Status: proposal.
+Status: implementation started. The core sandbox and Doctor matrix now have
+committed machine-readable baselines; later phases should extend the same crate
+instead of adding broad CLI snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
 `docs/design/30-testing-matrix.md` into deterministic local and CI automation.
@@ -131,6 +133,7 @@ Committed golden baselines live under the harness lab crate, for example:
 
 ```text
 crates/skillspec-harness-lab/baselines/09-harness-lab-core.json
+crates/skillspec-harness-lab/baselines/10-doctor-matrix.json
 ```
 
 Normal test runs compare the candidate report against the committed baseline.
@@ -148,6 +151,15 @@ just harness-lab-update-baselines
 
 The resulting JSON diff is part of the review. Do not update baselines to hide
 unexpected behavior changes.
+
+Current committed phases:
+
+- `09-harness-lab-core`: sandbox root discovery, project-local target
+  detection, and all-detected skill install.
+- `10-doctor-matrix`: Doctor target-shape coverage for non-skill files,
+  missing paths, empty skills, simple folders, direct `SKILL.md` paths,
+  malformed frontmatter, cross-referenced subskills, plugin workspaces, and
+  ordinary code repos.
 
 ### Layer 2: Pseudo-Harness Simulator
 

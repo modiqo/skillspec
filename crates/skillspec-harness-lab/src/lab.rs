@@ -138,6 +138,15 @@ impl HarnessLab {
         skill_dir
     }
 
+    pub fn write_file(&self, path: &Path, content: &str) {
+        assert!(
+            path.starts_with(self.root()),
+            "harness lab fixtures must stay under lab root: {}",
+            path.display()
+        );
+        write_file(path, content);
+    }
+
     pub fn assert_no_real_home_writes(&self) {
         let real_home = std::env::var_os("HOME").map(PathBuf::from);
         if let Some(real_home) = real_home {
