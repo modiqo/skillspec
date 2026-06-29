@@ -433,42 +433,36 @@
           <p class="eyebrow">Install next</p>
           <h2 id="install-title">Make SkillSpec your default skill path.</h2>
           <p>
-            Use the public Doctor for a first look, then install the CLI and
-            add the SkillSpec skill to your harness. From there, create, convert,
-            route, and run skills with the same verifier-executor loop you can
-            publish with your project.
+            Install the CLI, open your agent harness, and let SkillSpec guide
+            the first assessment from chat. From there, create, convert, route,
+            and run skills with the same verifier-executor loop you can publish
+            with your project.
           </p>
         </div>
         <pre><code># Terminal: install the CLI.
 curl -fsSL https://skillspec.sh/install.sh | sh
 
-# Terminal: assess a local SKILL.md, skill folder, GitHub folder, or repo.
+# Start your favorite harness: Claude, Codex, or both.
+# Ask the agent to assess the skill and explain what it finds.
+/skillspec run doctor on ./my-skill
+
+# Convert plain skill prose into a contract. Yes, SkillSpec runs on SkillSpec.
+/skillspec import ./my-skill
+
+# Make router mode the default first hop for future skill selection.
+/skillspec install router
+
+# Terminal: save a Doctor report when you need an artifact.
+# Works with a local SKILL.md, skill folder, GitHub folder, or repo.
 # Formats: default text, --markdown, --html, or --json.
-skillspec doctor ./skills/my-skill --markdown
+skillspec doctor ./my-skill --markdown
 
 # Terminal: see the harness roots SkillSpec can install into.
 skillspec install targets
 
 # Terminal, later: install a SkillSpec-backed skill everywhere detected.
 # Targets include agents, codex, and claude-local when present.
-skillspec install skill ./skills/my-skill --all-detected
-
-# Claude Code: install SkillSpec so /skillspec exists in chat.
-claude plugin marketplace add modiqo/skillspec \
-  --sparse .claude-plugin plugins/skillspec
-claude plugin install skillspec@skillspec
-
-# Codex: install SkillSpec so /skillspec exists in chat.
-codex plugin marketplace add modiqo/skillspec \
-  --ref main --sparse .agents --sparse plugins/skillspec
-codex plugin add skillspec@skillspec
-
-# Start your favorite harness: Claude, Codex, or both.
-# Convert plain skill prose into a contract. Yes, SkillSpec runs on SkillSpec.
-/skillspec import ./skills/my-skill
-
-# Make router mode the default first hop for future skill selection.
-/skillspec install router</code></pre>
+skillspec install skill ./my-skill --all-detected</code></pre>
       </section>
 
       <section class="proof-path personas-section" aria-labelledby="personas-title">
