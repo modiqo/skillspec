@@ -1489,10 +1489,13 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     assert!(router_skill.contains("skill.spec.yml"));
     assert!(router_skill.contains("Use for every user request"));
     assert!(router_skill.contains("the first hop for every user request"));
+    assert!(router_skill.contains("Fast Path"));
+    assert!(router_skill.contains("do not run"));
+    assert!(router_skill.contains("router index status"));
     assert!(router_skill.contains("continue with the normal agent path"));
     assert!(router_skill.contains("explicit-only"));
     assert!(router_skill.contains("decision: \"use_skill\""));
-    assert!(router_skill.contains("do not load any"));
+    assert!(router_skill.contains("candidate skill"));
     assert!(router_skill.contains("durable-executor"));
     assert!(!router_skill.contains("visible discovery surface"));
     let router_spec = fs::read_to_string(root.join("skill-router/skill.spec.yml")).unwrap();
@@ -1501,6 +1504,7 @@ description: Use as the durable execution first-hop for tool-backed requests tha
     assert!(router_spec.contains("first hop for every request"));
     assert!(router_spec.contains("apply_route_decision"));
     assert!(router_spec.contains("decision is use_skill"));
+    assert!(!router_spec.contains("id: check_index_status"));
     assert!(!router_spec.contains("--router-root"));
     let validate_router_spec = Command::new(bin())
         .arg("validate")
@@ -1615,6 +1619,25 @@ routes:
     let route_report = json_stdout(&route_notes);
     assert_eq!(route_report["decision"], "use_skill");
     assert_eq!(route_report["selected"]["name"], "notes");
+
+    let route_time = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("what is the time today")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&route_time);
+    let route_time_report = json_stdout(&route_time);
+    assert_ne!(route_time_report["decision"], "use_skill");
+    assert_eq!(route_time_report["selected"], Value::Null);
+    assert!(route_time_report["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|candidate| candidate["name"] != "skill-router"));
 
     let uninstall_router = Command::new(bin())
         .env("HOME", &home)

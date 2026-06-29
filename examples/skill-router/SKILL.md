@@ -18,7 +18,6 @@ metadata:
 # Skill Router
 
 This skill is a thin native harness loader for the SkillSpec router.
-Load and follow `./skill.spec.yml`; that file is the router contract.
 When router mode is enabled and the harness has been restarted, this router is
 the first hop for every user request in managed skill roots. All routed skills
 are explicit-only/manual-only, so check the router index before reading,
@@ -31,8 +30,8 @@ and the user has not already chosen an execution mode.
 
 ## Runtime Contract
 
-1. Load `./skill.spec.yml` before taking task actions.
-2. For normal discovery, run:
+1. For ordinary requests with prompt-hook context `first_hop_ready=true`, use the fast path: do not read `./skill.spec.yml` and do not run `skillspec router index status`.
+2. Run one route query:
 
    ```bash
    skillspec route --index <index-file-or-router-dir> --query '<user task>' --top 5 --json
@@ -42,7 +41,8 @@ and the user has not already chosen an execution mode.
 4. If route output says `decision: "bypass"`, do not load any candidate skill; continue with normal agent behavior for the request.
 5. If route output says `decision: "ambiguous"`, do not silently choose a candidate. Ask only when the user explicitly requested skill selection; otherwise continue with normal agent behavior.
 6. If route output includes `execution_mode_direct_or_durable` for a `use_skill` decision, ask the user whether to run direct or durable before tool-backed execution.
-7. If the user chooses durable execution, hand the selected skill and task context to `durable-executor`. The router still only routes; durable-executor owns workspace evidence, rote execution policy, alignment, token stats, and final closure.
+7. Load and follow `./skill.spec.yml` only for router lifecycle, repair, visibility, guard, index status, index refresh, or when guard context is missing or failed.
+8. If the user chooses durable execution, hand the selected skill and task context to `durable-executor`. The router still only routes; durable-executor owns workspace evidence, rote execution policy, alignment, token stats, and final closure.
 
 ## Router Management
 

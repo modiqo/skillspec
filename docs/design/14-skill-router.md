@@ -85,6 +85,9 @@ Router mode is the managed state created by `skillspec router install`:
 - `skillspec router guard` can be run by users or prompt hooks to verify
   `first_hop_ready`; when enabled and index/visibility drift is detected it
   reapplies router-managed visibility and rebuilds the index before reporting;
+- ordinary first-hop routing does not run index status or repair checks when the
+  prompt hook has already reported `first_hop_ready=true`; it runs a single
+  `skillspec route` decision and obeys that result;
 - the manifest is the only rollback authority.
 
 Router install does not install or copy `durable-executor`. If
@@ -96,17 +99,21 @@ unavailable until durable-executor is installed separately.
 The router guarantee is visibility-backed, not prose-only. Within configured
 roots, router install/enable writes native metadata and managed prompt guard
 hooks so the router is the first hop for every request while routed skills stop
-competing for implicit selection. The router must query the local index first
-and obey the route decision before loading any domain skill. If the decision is
-`bypass`, the agent continues with the normal path for the request, including
-ordinary workspace or web search when those are otherwise allowed. If the
-decision is `ambiguous`, the agent must not silently load a candidate; it asks
-only when the user explicitly requested skill selection, otherwise it continues
-normally. A harness restart is required before active sessions reliably observe
-the metadata and hook changes. Skills outside the managed roots, stale harness
-sessions, disabled hooks, or harness-specific selection bugs are outside the
-guarantee; `skillspec status`, `skillspec router guard`, and `skillspec router
-index status` are the verification gates.
+competing for implicit selection. The prompt hook owns freshness and repair; the
+ordinary router first-hop owns only dispatch. When hook context says
+`first_hop_ready=true`, the router must query the local index once and obey the
+route decision before loading any domain skill. It must not run
+`skillspec router index status` or read the full router SkillSpec for a normal
+prompt. If the decision is `bypass`, the agent continues with the normal path
+for the request, including ordinary workspace or web search when those are
+otherwise allowed. If the decision is `ambiguous`, the agent must not silently
+load a candidate; it asks only when the user explicitly requested skill
+selection, otherwise it continues normally. A harness restart is required before
+active sessions reliably observe the metadata and hook changes. Skills outside
+the managed roots, stale harness sessions, disabled hooks, or harness-specific
+selection bugs are outside the guarantee; `skillspec status`,
+`skillspec router guard`, and `skillspec router index status` are the
+verification gates.
 
 `durable-executor` has its own managed lifecycle. `skillspec durable-executor
 install <source-folder>` first checks that `rote` is available on `PATH`, then
@@ -255,7 +262,8 @@ The match gate is intentionally conservative:
   threshold from the next candidate.
 - `bypass`: no positive candidate exists or the best candidate is only low or
   medium confidence.
-- `ambiguous`: top candidates are too close for automatic skill selection.
+- `ambiguous`: strong top candidates are too close for automatic skill
+  selection.
 
 ## Durable Execution
 
@@ -283,7 +291,8 @@ Normal routing:
 ```text
 user task
 -> implicit skill-router first-hop for every request after router install/enable and harness restart
--> skillspec route
+-> prompt hook has already verified first_hop_ready=true
+-> skillspec route once
 -> if decision is use_skill and selected is non-null, load the selected domain skill
 -> if decision is bypass, continue normal agent behavior
 -> if decision is ambiguous, do not silently load a candidate

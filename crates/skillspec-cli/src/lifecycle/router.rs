@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const SCHEMA_VERSION: i64 = 1;
 pub(crate) const DEFAULT_INDEX_FILE: &str = "skill-index.sqlite";
+const ROUTER_MANAGED_MARKER: &str = ".skillspec-router-managed";
 
 #[derive(Clone, Debug)]
 pub struct IndexOptions {
@@ -659,7 +660,7 @@ fn decide_candidate_match(candidates: &[RouteCandidate]) -> MatchDecision {
         };
     }
     if let Some(second) = candidates.get(1) {
-        if second.score > 0.0 && top.score <= second.score * 1.10 {
+        if top.score >= 8.0 && second.score > 0.0 && top.score <= second.score * 1.10 {
             return MatchDecision {
                 decision: RouteDecision::Ambiguous,
                 selected: None,
@@ -1219,7 +1220,14 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
     if query_terms.is_empty() {
         return Vec::new();
     }
-    let docs = entries
+    let routable_entries = entries
+        .iter()
+        .filter(|entry| !is_managed_router_entry(entry))
+        .collect::<Vec<_>>();
+    if routable_entries.is_empty() {
+        return Vec::new();
+    }
+    let docs = routable_entries
         .iter()
         .map(|entry| tokenize(&entry.text))
         .collect::<Vec<_>>();
@@ -1232,7 +1240,7 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
             .count();
         document_frequency.insert(term, count);
     }
-    let mut candidates = entries
+    let mut candidates = routable_entries
         .iter()
         .zip(docs.iter())
         .filter(|(entry, _)| entry.visibility != Visibility::Off)
@@ -1241,7 +1249,7 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
                 doc,
                 &query_terms,
                 &document_frequency,
-                entries.len(),
+                routable_entries.len(),
                 avg_len,
             );
             let query_lower = query.to_lowercase();
@@ -1299,6 +1307,10 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
     }
     candidates.truncate(top);
     candidates
+}
+
+fn is_managed_router_entry(entry: &SkillEntry) -> bool {
+    entry.skill_dir.join(ROUTER_MANAGED_MARKER).is_file()
 }
 
 fn parse_index_json(index_path: &Path, column: &str, json: &str) -> Result<Vec<String>> {
@@ -1431,6 +1443,59 @@ mod tests {
     }
 
     #[test]
+    fn route_ignores_managed_router_skill() {
+        let router_dir = std::env::temp_dir().join(format!(
+            "skillspec-router-test-{}-{}",
+            std::process::id(),
+            now_unix()
+        ));
+        fs::create_dir_all(&router_dir).unwrap();
+        fs::write(router_dir.join(ROUTER_MANAGED_MARKER), "managed").unwrap();
+        let entries = vec![
+            SkillEntry {
+                id: "skill-router".to_owned(),
+                name: "skill-router".to_owned(),
+                path: router_dir.join("SKILL.md"),
+                skill_dir: router_dir.clone(),
+                description: "Use for every request, tell me, explain, what is, help with."
+                    .to_owned(),
+                short_description: None,
+                source: "test".to_owned(),
+                visibility: Visibility::Implicit,
+                has_skill_spec: true,
+                checksum: "sha256:test".to_owned(),
+                tags: Vec::new(),
+                triggers: vec!["what is".to_owned()],
+                negative_triggers: Vec::new(),
+                text: "skill router every request tell me explain what is help with".to_owned(),
+            },
+            SkillEntry {
+                id: "notes".to_owned(),
+                name: "notes".to_owned(),
+                path: PathBuf::from("/tmp/notes/SKILL.md"),
+                skill_dir: PathBuf::from("/tmp/notes"),
+                description: "Use for notes.".to_owned(),
+                short_description: None,
+                source: "test".to_owned(),
+                visibility: Visibility::Implicit,
+                has_skill_spec: false,
+                checksum: "sha256:test".to_owned(),
+                tags: Vec::new(),
+                triggers: Vec::new(),
+                negative_triggers: Vec::new(),
+                text: "notes meeting action items".to_owned(),
+            },
+        ];
+
+        let candidates = score_candidates(&entries, "what is the time today", 5);
+
+        assert!(candidates
+            .iter()
+            .all(|candidate| candidate.name != "skill-router"));
+        let _ = fs::remove_dir_all(router_dir);
+    }
+
+    #[test]
     fn match_gate_uses_only_high_confidence_skill() {
         let candidate = route_candidate("pdf", 9.0, Confidence::High);
 
@@ -1470,8 +1535,8 @@ mod tests {
     #[test]
     fn match_gate_marks_close_candidates_ambiguous() {
         let candidates = vec![
-            route_candidate("notes", 4.0, Confidence::Medium),
-            route_candidate("docs", 3.8, Confidence::Medium),
+            route_candidate("notes", 9.0, Confidence::Medium),
+            route_candidate("docs", 8.6, Confidence::Medium),
         ];
 
         let decision = decide_candidate_match(&candidates);

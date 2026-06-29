@@ -72,7 +72,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. Load this SkillSpec, route from the local index before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -92,18 +92,13 @@ routes:
   - id: route_from_index
     label: Route from the skill index
     rank: 10
-    description: Use the local SQLite index to decide whether a candidate skill should run or whether normal agent behavior should continue.
+    description: Fast dispatch through the local SQLite index. Guard owns freshness; this route only decides whether a candidate skill should run or whether normal agent behavior should continue.
     execution_plan:
       mode: ordered
       phases:
-        - id: check_index_status
-          owner_skill: {router_skill}
-          description: Check whether the router index exists, whether it is stale for the configured roots, and whether new or changed skills are prose-only or SkillSpec-backed.
-          requires:
-            - inspect_router_index_status
         - id: route_query
           owner_skill: {router_skill}
-          description: Query the router index, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
+          description: Query the router index once, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
         - id: match_gate
@@ -287,6 +282,6 @@ pub(super) fn yaml_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
-fn shell_single_quote(value: &str) -> String {
+pub(super) fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r#"'\''"#))
 }

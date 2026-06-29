@@ -88,16 +88,22 @@ or `ambiguous`. Only `use_skill` authorizes loading the selected skill. `bypass`
 and `ambiguous` keep the agent on the normal path instead of loading an
 unrelated or uncertain candidate.
 
+Prompt-hook guard owns freshness. When guard context says
+`first_hop_ready=true`, the ordinary router path is a single `skillspec route`
+query. It does not run index status, repair visibility, or read the full router
+SkillSpec unless the user is asking for router lifecycle or repair.
+
 ```mermaid
 flowchart LR
-    A[user task] --> B[skillspec route]
-    C[skill index] --> B
-    B --> D[decision]
-    B --> E[candidates]
-    B --> F[confidence]
-    D --> G{use_skill?}
-    G -->|yes| H[harness loads selected skill explicitly]
-    G -->|bypass or ambiguous| I[normal agent behavior]
+    A[user task] --> B[prompt hook guard ready]
+    B --> C[skillspec route once]
+    D[skill index] --> C
+    C --> E[decision]
+    C --> F[candidates]
+    C --> G[confidence]
+    E --> H{use_skill?}
+    H -->|yes| I[harness loads selected skill explicitly]
+    H -->|bypass or ambiguous| J[normal agent behavior]
 ```
 
 Grounded command:
@@ -115,6 +121,8 @@ Review check:
   skill's task.
 - A selected skill is loaded only for `decision: use_skill`; its SkillSpec or
   prose contract still owns the domain work.
+- Index status and repair are lifecycle operations, not part of ordinary
+  dispatch when guard already reports `first_hop_ready=true`.
 - Durable execution remains a separate execution policy.
 
 ## 4. Out-Of-Band Skills Are Repaired
