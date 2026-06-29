@@ -1,5 +1,5 @@
 use crate::cli::args::WorkspaceCommand;
-use skillspec::{error::Result, install::HarnessTarget, report, workspace};
+use skillspec::{domain::workspace, error::Result, report};
 use std::time::Instant;
 
 pub(super) fn run(command: WorkspaceCommand) -> Result<()> {
@@ -131,7 +131,7 @@ pub(super) fn run(command: WorkspaceCommand) -> Result<()> {
         } => {
             let targets = target
                 .into_iter()
-                .map(HarnessTarget::from)
+                .map(workspace::HarnessTarget::from)
                 .collect::<Vec<_>>();
             let started = Instant::now();
             let install_report =
