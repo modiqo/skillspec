@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="SkillSpec is an open-source verifier and executor for agent skills. Try Doctor, install the CLI, then create and run skills with routes, checks, and proof."
+      content="SkillSpec is an open-source verifier and executor for agent skills. Assess a skill, install the CLI, then create and run skills with routes, checks, and proof."
     >
     <title>SkillSpec - Verifiable Agent Skills</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-operating-loop">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-assess-skill">
   </head>
   <body>
     <header class="site-header">
@@ -30,7 +30,7 @@
         <input id="site-search" name="q" type="search" placeholder="Search">
       </form>
       <nav class="site-nav" aria-label="Primary navigation">
-        <a href="#request-title">Try Doctor</a>
+        <a href="#assess">Assess your skill</a>
         <a href="#install-title">Install</a>
         <a href="#personas-title">Who it is for</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
@@ -392,14 +392,14 @@
         </div>
       </section>
 
-      <section class="request-panel" aria-labelledby="request-title">
+      <section id="assess" class="request-panel" aria-labelledby="request-title">
         <div>
-          <p class="eyebrow">Entry point</p>
-          <h2 id="request-title">Try Doctor on one public skill URL.</h2>
+          <p class="eyebrow">Assessment</p>
+          <h2 id="request-title">Assess your skill before you trust it.</h2>
           <p>
-            Doctor is the fastest way to see the reliability gap. Paste a public
-            GitHub skill, plugin, or repo URL and get a report that shows where
-            agent execution may drift.
+            Paste a public GitHub skill, plugin, or repo URL. SkillSpec will
+            report where execution can drift, overload context, collide in
+            discovery, or finish without proof.
           </p>
         </div>
         <form id="doctor-form" class="request-form" novalidate>
@@ -414,7 +414,7 @@
               placeholder="https://github.com/org/repo/tree/main/skills/example"
               required
             >
-            <button type="submit">Run Doctor</button>
+            <button type="submit">Assess skill</button>
           </div>
           <p class="input-help">
             Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
@@ -490,7 +490,7 @@ skillspec doctor ./skills/my-skill
             <div class="proof-copy">
               <h3>Check the skill you already have</h3>
               <p>
-                Run Doctor on a public URL or a local folder. The report shows
+                Assess a public URL or a local folder. The report shows
                 where execution can skip, drift, overload context, miss
                 dependencies, or finish without proof.
               </p>

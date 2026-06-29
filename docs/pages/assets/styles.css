@@ -2162,6 +2162,19 @@ button:hover,
   grid-template-columns: minmax(260px, 0.44fr) minmax(0, 1fr);
   gap: 40px;
   padding: 34px 38px;
+  border-color: #2e271f;
+  background: #3a3027;
+  color: var(--paper-soft);
+}
+
+.request-panel h2,
+.request-panel .eyebrow,
+.request-panel .request-form label {
+  color: var(--paper-soft);
+}
+
+.request-panel .eyebrow::before {
+  background: var(--amber);
 }
 
 .request-panel p,
@@ -2172,6 +2185,33 @@ button:hover,
   color: #544e47;
   font-size: 1.02rem;
   line-height: 1.72;
+}
+
+.request-panel p,
+.request-panel .input-help,
+.request-panel .form-message {
+  color: rgba(251, 248, 240, 0.78);
+}
+
+.request-panel input {
+  border-color: #201a15;
+  background: #fbf8ef;
+}
+
+.request-panel button {
+  border-color: #201a15;
+  background: #17120f;
+  color: var(--paper-soft);
+}
+
+.request-panel button:hover {
+  background: #0f0b09;
+}
+
+.request-panel .input-help code {
+  border-color: rgba(251, 248, 240, 0.28);
+  background: rgba(251, 248, 240, 0.08);
+  color: var(--paper-soft);
 }
 
 .abstract-copy p {
