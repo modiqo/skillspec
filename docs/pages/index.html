@@ -51,10 +51,12 @@
       <section class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
           <p class="eyebrow">Agent skill verifier and executor</p>
-          <h1 id="page-title">Make agent skills reliable.</h1>
+          <h1 id="page-title">Make agent skills follow the plan.</h1>
           <p class="lede">
-            Start with Doctor. Install SkillSpec. Make it your default way to
-            create and run skills that agents can actually follow.
+            Today, most skills are instructions the model may or may not follow.
+            SkillSpec checks a <code>SKILL.md</code>, turns the important parts
+            into a contract, and helps the agent run the right skill with the
+            right steps, tools, checks, and proof.
           </p>
           <p class="hero-body">
             SkillSpec is an open-source CLI and contract format for
@@ -223,36 +225,32 @@ skillspec doctor ./skills/my-skill
         <div class="section-heading">
           <div>
             <p class="eyebrow">Who it is for</p>
-            <h2 id="personas-title">One contract for users, authors, and product teams shipping skills.</h2>
+            <h2 id="personas-title">For product teams, skill operators, and engineers making agents reliable.</h2>
           </div>
         </div>
         <div class="persona-grid">
           <article>
-            <h3>Skill users</h3>
+            <h3>Product teams shipping skills</h3>
             <p>
-              Run installed skills with precise routes, allowed tools, required
-              checks, and proof instead of hoping the agent remembers every step.
+              Ship a product with a skill agents can use correctly: declared
+              routes, allowed tools, required checks, and proof that the workflow
+              completed instead of drifting onto your product.
             </p>
           </article>
           <article>
-            <h3>Skill authors</h3>
+            <h3>Agent operators with many skills</h3>
             <p>
-              Publish skills that explain when they should run, how they should
-              run, and what evidence proves they completed correctly.
+              Route to the right product skill without loading the whole library.
+              Keep context lean, reduce wrong-skill picks, and get a provable
+              result for each run.
             </p>
           </article>
           <article>
-            <h3>Tool authors</h3>
+            <h3>Forward deployment engineers</h3>
             <p>
-              Ship product skills that guide agents through the right workflow,
-              reduce misuse, and make advanced features easier to adopt.
-            </p>
-          </article>
-          <article>
-            <h3>Hardware and software teams</h3>
-            <p>
-              Package support, setup, diagnostics, and automation skills so
-              customers get repeatable action instead of fragile prompt recipes.
+              Baseline drift with Doctor, turn prose into contracts, tune token
+              use, and leave behind durable harness behavior with an audit trail
+              of which rule drove which action.
             </p>
           </article>
         </div>
