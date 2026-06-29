@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260628-header-nav">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260628-skill-tax">
   </head>
   <body>
     <header class="site-header">
@@ -64,6 +64,146 @@
             routeable workflow, guides execution through phases, tools, and
             checks, then records proof of what actually happened.
           </p>
+        </div>
+      </section>
+
+      <section class="boom-tax-section" aria-labelledby="boom-tax-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Platform shift</p>
+            <h2 id="boom-tax-title">Where we are: the boom, and its hidden tax</h2>
+          </div>
+        </div>
+        <p class="boom-tax-lede">
+          Skills won. They are now a shared packaging format across major agent
+          surfaces, and the public ecosystem jumped from a small catalog into a
+          real infrastructure layer. The cost is that every new skill also adds
+          routing pressure, context pressure, and trust pressure.
+        </p>
+
+        <div class="boom-metric-grid" aria-label="Skill ecosystem growth metrics">
+          <article class="boom-metric boom-metric-primary">
+            <span class="metric-label">20-day surge</span>
+            <strong>18.5x</strong>
+            <p>Reported growth from 2,179 skills on Jan 16 to 40,285 by early February.</p>
+          </article>
+          <article class="boom-metric">
+            <span class="metric-label">Published skills</span>
+            <strong>40,285</strong>
+            <p>Verified public corpus in the Agent Skills data-driven analysis.</p>
+          </article>
+          <article class="boom-metric">
+            <span class="metric-label">Peak day</span>
+            <strong>8,857</strong>
+            <p>Skills reportedly added on Jan 25 alone at the burst peak.</p>
+          </article>
+          <article class="boom-metric">
+            <span class="metric-label">Name collisions</span>
+            <strong>46%</strong>
+            <p>Listed skills share a name with at least one other skill in the analyzed catalog.</p>
+          </article>
+        </div>
+
+        <div class="tax-grid" aria-label="Hidden taxes created by large skill libraries">
+          <article class="tax-card">
+            <div class="tax-card-header">
+              <span>01</span>
+              <h3>The context tax compounds</h3>
+            </div>
+            <p>
+              Every installed skill advertises itself before work starts. At
+              roughly 100 tokens per skill, small libraries feel cheap; large
+              libraries become a standing bill. Codex caps the initial skill
+              list at 2% of context, or 8,000 characters when the window is
+              unknown, then shortens or omits skills. Once selected, the full
+              body is still read; the 40k-skill study reports a median body
+              around 1,414 tokens with a heavy tail.
+            </p>
+            <div class="tax-evidence">
+              <strong>Failure mode</strong>
+              <span>Expensive skills quietly become less discoverable.</span>
+            </div>
+          </article>
+
+          <article class="tax-card">
+            <div class="tax-card-header">
+              <span>02</span>
+              <h3>Discovery is already breaking</h3>
+            </div>
+            <p>
+              In a catalog this large, near-duplicates are normal. About 46% of
+              listed skills share a name with at least one other skill, so the
+              agent is asked to pick the right capability from a pile of similar
+              names and compressed descriptions.
+            </p>
+            <div class="tax-evidence">
+              <strong>Failure mode</strong>
+              <span>Wrong-skill selection becomes routine, not exceptional.</span>
+            </div>
+          </article>
+
+          <article class="tax-card">
+            <div class="tax-card-header">
+              <span>03</span>
+              <h3>The trust gap becomes a security gap</h3>
+            </div>
+            <p>
+              A skill is prose, and prose can be skipped, reframed, or forgotten.
+              Description-only framing selected adversarial variants in 77.6% of
+              paired trials, and context compaction can erase safety rules and
+              push prohibited tool actions from 0% to as high as 59%.
+            </p>
+            <div class="tax-evidence">
+              <strong>Failure mode</strong>
+              <span>The final answer is not proof that the plan was followed.</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="boom-sources" aria-label="Sources for skill growth and hidden tax claims">
+          <h3>Sources</h3>
+          <ol>
+            <li>
+              <a href="https://arxiv.org/abs/2602.08004" target="_blank" rel="noreferrer">
+                Ling, Zhong &amp; Huang, Agent Skills: A Data-Driven Analysis
+              </a>
+              verifies the 40,285-skill corpus; day-by-day growth and peak figures
+              are derived from reported analyses of that dataset.
+            </li>
+            <li>
+              <a href="https://learn.microsoft.com/en-us/agent-framework/agents/skills" target="_blank" rel="noreferrer">
+                Microsoft Agent Skills documentation
+              </a>
+              describes the advertise, load, resource, and script stages, including
+              the roughly 100-token advertise tier.
+            </li>
+            <li>
+              <a href="https://developers.openai.com/codex/skills" target="_blank" rel="noreferrer">
+                OpenAI Codex Agent Skills documentation
+              </a>
+              describes initial skill-list budgeting, description shortening or
+              omission, and full <code>SKILL.md</code> loading after selection.
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2605.11418" target="_blank" rel="noreferrer">
+                Under the Hood of SKILL.md
+              </a>
+              studies semantic supply-chain attacks against skill discovery,
+              selection, and governance.
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2606.22528" target="_blank" rel="noreferrer">
+                Governance Decay
+              </a>
+              measures context-compaction failures that erase safety constraints.
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2604.20911" target="_blank" rel="noreferrer">
+                Omission Constraints Decay While Commission Constraints Persist
+              </a>
+              analyzes why prohibition-style constraints decay under context pressure.
+            </li>
+          </ol>
         </div>
       </section>
 
