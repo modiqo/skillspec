@@ -1608,6 +1608,73 @@ h3 {
   text-underline-offset: 3px;
 }
 
+.load-bearing-section {
+  margin-bottom: 30px;
+  border: 2px solid var(--line);
+  background: rgba(251, 248, 240, 0.7);
+  padding: 34px 38px;
+}
+
+.load-bearing-section .section-heading {
+  align-items: end;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 20px;
+}
+
+.load-bearing-section h2 {
+  max-width: 940px;
+}
+
+.load-bearing-lede,
+.load-bearing-close {
+  max-width: 980px;
+  color: #4f4942;
+  font-size: 1.18rem;
+  line-height: 1.72;
+}
+
+.load-bearing-lede {
+  margin: 0 0 22px;
+}
+
+.load-bearing-close {
+  margin: 22px 0 0;
+  border-left: 2px solid var(--line);
+  padding-left: 18px;
+  color: var(--ink);
+}
+
+.load-bearing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+.load-bearing-grid article {
+  min-width: 0;
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 22px;
+  background: rgba(238, 230, 216, 0.42);
+}
+
+.load-bearing-grid span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--green);
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  line-height: 1.15;
+}
+
+.load-bearing-grid p {
+  margin: 0;
+  color: #5a534b;
+  line-height: 1.62;
+}
+
 .contract-contrast {
   margin-bottom: 30px;
   border: 2px solid var(--line);
@@ -2626,6 +2693,7 @@ pre code {
   }
 
   .tax-grid,
+  .load-bearing-grid,
   .boom-sources ol {
     grid-template-columns: 1fr;
   }
@@ -2728,6 +2796,7 @@ pre code {
   .request-panel,
   .private-note,
   .boom-tax-section,
+  .load-bearing-section,
   .contract-contrast,
   .proof-path,
   .reports-section,
@@ -2812,6 +2881,7 @@ pre code {
   .contract-flow,
   .boom-metric-grid,
   .tax-grid,
+  .load-bearing-grid,
   .solution-grid,
   .persona-grid,
   .boom-sources ol,
@@ -2866,6 +2936,7 @@ pre code {
   .request-panel,
   .private-note,
   .boom-tax-section,
+  .load-bearing-section,
   .contract-contrast,
   .proof-path,
   .reports-section,
