@@ -47,8 +47,9 @@ The verified coverage map at the time this matrix was written is:
   `crates/skillspec-cli/tests/cli/lifecycle.rs`;
 - controlled harness-lab regression cards:
   `crates/skillspec-harness-lab/tests/core.rs`,
-  `crates/skillspec-harness-lab/tests/doctor.rs`, and committed baselines under
-  `crates/skillspec-harness-lab/baselines/`;
+  `crates/skillspec-harness-lab/tests/doctor.rs`,
+  `crates/skillspec-harness-lab/tests/import.rs`, and committed baselines
+  under `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -134,13 +135,15 @@ For each test, capture:
 
 | Area | Case | Expected Result | Class | Coverage |
 | --- | --- | --- | --- | --- |
-| Import negative | Pass a non-`SKILL.md` file path. | Command fails with expected target-shape guidance. | Automatable | Gap |
-| Import negative | Pass folder with empty `SKILL.md`. | Command fails or generates no false-valid contract; error is actionable. | Automatable | Gap |
-| Import negative | Pass folder with malformed `SKILL.md`. | Command preserves source evidence and reports review blockers. | Automatable | Gap |
+| Import negative | Pass non-existent path. | Command fails and does not write a draft. | Automatable | Covered |
+| Import positive | Pass a direct Markdown file path. | Current contract imports the file as a review-required `source_kind: file` draft. | Automatable | Covered |
+| Import draft | Pass folder with empty `SKILL.md`. | Current contract writes a review-required draft with dependency ledger evidence instead of pretending it is final. | Automatable | Covered |
+| Import draft | Pass folder with malformed `SKILL.md`. | Command preserves source evidence and writes a review-required draft without parsing frontmatter as a hard gate. | Automatable | Covered |
 | Import negative | Pass parent folder with multiple `SKILL.md` files to single-skill import. | Command rejects and points to workspace map/import flow. | Automatable | Covered |
-| Import positive | Pass folder with proper single `SKILL.md`. | Draft `skill.spec.yml`, source map, deps ledger, and reports are generated. | Automatable | Covered |
-| Import positive | Pass direct `SKILL.md` path. | Draft output is generated from the file target without requiring the caller to pass the parent folder. | Automatable | Gap |
+| Import positive | Pass folder with proper single `SKILL.md`. | Draft `skill.spec.yml`, preserved non-discoverable source copy, deps ledger, and review notes are generated. | Automatable | Covered |
+| Import positive | Pass direct `SKILL.md` path. | Draft output is generated from the file target without requiring the caller to pass the parent folder. | Automatable | Covered |
 | Import positive | Pass skill with references/resources. | Generated draft preserves references as imports/resources or review notes. | Automatable | Covered |
+| Import negative | Pass stale `source-map.json` to import. | Command rejects the stale map and tells caller to rerun source map before import. | Automatable | Covered |
 | Workspace import positive | Map/import folder with multiple cross-referenced skills. | Workspace manifest, package graph, dependency edges, and package drafts are generated. | Automatable | Covered |
 | Workspace import positive | Map/import plugin-shaped folder. | Plugin namespaces are preserved and install slugs are deterministic. | Automatable | Covered |
 | Import QA | Run validate/imports check/deps check/test/compile after import. | Generated package reaches the expected QA stage or reports explicit blockers. | Automatable | Partial |

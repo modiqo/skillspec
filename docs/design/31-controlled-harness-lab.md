@@ -160,6 +160,10 @@ Current committed phases:
   missing paths, empty skills, simple folders, direct `SKILL.md` paths,
   malformed frontmatter, cross-referenced subskills, plugin workspaces, and
   ordinary code repos.
+- `11-import-matrix`: import-skill target-shape coverage for missing paths,
+  single folders, direct `SKILL.md`, direct Markdown files, empty and malformed
+  drafts, stale source maps, multi-skill rejection, workspace fanout, and
+  plugin workspace import.
 
 ### Layer 2: Pseudo-Harness Simulator
 

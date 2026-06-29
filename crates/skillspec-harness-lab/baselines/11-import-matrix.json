@@ -1,0 +1,393 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "11-import-matrix",
+  "summary": {
+    "status": "pass",
+    "cases_total": 10,
+    "cases_passed": 10,
+    "cases_failed": 0,
+    "claims_total": 53,
+    "claims_passed": 53,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "import_skill_rejects_missing_path",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "import.stderr.missing_path",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_absent",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_imports_single_skill_folder",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.preserved_source",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.no_discoverable_source_skill",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "import.source_unchanged",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.review_required",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.imports",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.deps.ledger_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_imports_direct_skill_md_file",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.source_kind_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.preserved_source",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_imports_direct_markdown_file_as_file_source",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.source_kind_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.no_preserved_skill_source",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        }
+      ]
+    },
+    {
+      "id": "import_skill_scaffolds_empty_skill_for_review",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.review_required",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.dependency_ledger",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_scaffolds_malformed_frontmatter_for_review",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.title_from_heading",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.spec.review_required",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_rejects_parent_folder_with_multiple_skills",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "import.stderr.atomic_package",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.stderr.workspace_map_guidance",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_absent",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "import_skill_rejects_stale_source_map",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "source_map.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "source_map.files",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "import.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "import.stderr.source_map",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.stderr.stale",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "import.out_absent",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "workspace_import_fans_out_multiple_skills",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "workspace.map.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.map.package_count",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "workspace.import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.ok",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.built_count",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "workspace.import.failed_count",
+          "status": "pass",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "id": "workspace.import.shared_spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.review_spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "workspace_import_preserves_plugin_namespace",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "workspace.map.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.map.package_count",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "workspace.map.namespace",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.ok",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.import.built_count",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "workspace.import.plugin_spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "workspace.manifest.public_name",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}
