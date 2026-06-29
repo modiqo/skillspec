@@ -160,6 +160,43 @@ skillspec install skill skills/skillspec --target agents --retire-existing
 skillspec install skill skills/skillspec --target claude-local --retire-existing
 ```
 
+For day-to-day development, the repository includes a `Justfile` that keeps the
+crate split and local harness install flow in one place:
+
+```bash
+# Show the local crate hierarchy and dependency direction.
+just packages
+
+# Build every workspace package.
+just build-debug
+just build-release
+
+# Install this checkout as the active local CLI.
+just install-debug
+just install-release
+
+# See which harness roots SkillSpec can install into.
+just install-targets
+
+# Install the repo's SkillSpec skill into one harness, or every detected harness.
+just install-skill codex
+just install-skill agents
+just install-skill claude-local
+just install-skill-all
+
+# Debug build, debug CLI install, and all detected harness skill installs.
+just dev-install-all
+
+# Local preflight before pushing: fmt, check, clippy, tests, and package lists.
+just preflight
+```
+
+`just preflight` deliberately uses plain Cargo commands instead of an extra
+preflight dependency: `cargo fmt --all --check`, `cargo check --workspace
+--all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo test --workspace --all-targets`, and `cargo package --list` for each
+workspace crate.
+
 Full install notes:
 [docs/install](https://github.com/modiqo/skillspec/blob/main/docs/README.md)
 
