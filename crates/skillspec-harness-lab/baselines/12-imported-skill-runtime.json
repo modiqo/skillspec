@@ -1,0 +1,273 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "12-imported-skill-runtime",
+  "summary": {
+    "status": "pass",
+    "cases_total": 4,
+    "cases_passed": 4,
+    "cases_failed": 0,
+    "claims_total": 39,
+    "claims_passed": 39,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "compiled_loader_installs_into_all_detected_roots",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "compile.loader_contains_run_loop",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.skill_name",
+          "status": "pass",
+          "expected": "reviewed-runtime",
+          "observed": "reviewed-runtime"
+        },
+        {
+          "id": "install.target_count",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        },
+        {
+          "id": "install.agents.loader",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.agents.spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.agents.preserved_source",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.codex.loader",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.codex.spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.codex.preserved_source",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.claude-local.loader",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.claude-local.spec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.claude-local.preserved_source",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "retire_existing_replaces_prose_skill",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.status",
+          "status": "pass",
+          "expected": "installed",
+          "observed": "installed"
+        },
+        {
+          "id": "install.retired_existing",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.backup_skill_md",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.backup_stale_file",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "install.stale_removed",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "install.loader_replaced",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "decision_trace_without_execution_is_unproven",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "decide.route",
+          "status": "pass",
+          "expected": "verify_skill",
+          "observed": "verify_skill"
+        },
+        {
+          "id": "plan.selected_route",
+          "status": "pass",
+          "expected": "verify_skill",
+          "observed": "verify_skill"
+        },
+        {
+          "id": "plan.phase_count",
+          "status": "pass",
+          "expected": 2,
+          "observed": 2
+        },
+        {
+          "id": "align.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "align.status",
+          "status": "pass",
+          "expected": "unproven",
+          "observed": "unproven"
+        },
+        {
+          "id": "align.scope",
+          "status": "pass",
+          "expected": "decision_trace_only",
+          "observed": "decision_trace_only"
+        },
+        {
+          "id": "align.execution_alignment",
+          "status": "pass",
+          "expected": "not_evaluated",
+          "observed": "not_evaluated"
+        }
+      ]
+    },
+    {
+      "id": "progress_batch_and_alignment_prove_reviewed_import",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "decide.route",
+          "status": "pass",
+          "expected": "verify_skill",
+          "observed": "verify_skill"
+        },
+        {
+          "id": "plan.selected_route",
+          "status": "pass",
+          "expected": "verify_skill",
+          "observed": "verify_skill"
+        },
+        {
+          "id": "act.current_phase",
+          "status": "pass",
+          "expected": "assess",
+          "observed": "assess"
+        },
+        {
+          "id": "progress.batch.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "progress.batch.records",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "progress.stats.avoided_tokens",
+          "status": "pass",
+          "expected": 2280,
+          "observed": 2280
+        },
+        {
+          "id": "progress.final_response.alignment",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "progress.final_response.token_savings",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "align.status",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "align.requirements",
+          "status": "pass",
+          "expected": "2/2 proven",
+          "observed": "2/2 proven"
+        },
+        {
+          "id": "align.completion",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "align.report_written",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}

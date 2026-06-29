@@ -1,8 +1,9 @@
 # Controlled Harness Lab
 
-Status: implementation started. The core sandbox and Doctor matrix now have
-committed machine-readable baselines; later phases should extend the same crate
-instead of adding broad CLI snapshot tests.
+Status: implementation started. The core sandbox, Doctor matrix, import matrix,
+and reviewed imported-runtime path now have committed machine-readable
+baselines; later phases should extend the same crate instead of adding broad CLI
+snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
 `docs/design/30-testing-matrix.md` into deterministic local and CI automation.
@@ -134,6 +135,8 @@ Committed golden baselines live under the harness lab crate, for example:
 ```text
 crates/skillspec-harness-lab/baselines/09-harness-lab-core.json
 crates/skillspec-harness-lab/baselines/10-doctor-matrix.json
+crates/skillspec-harness-lab/baselines/11-import-matrix.json
+crates/skillspec-harness-lab/baselines/12-imported-skill-runtime.json
 ```
 
 Normal test runs compare the candidate report against the committed baseline.
@@ -164,6 +167,10 @@ Current committed phases:
   single folders, direct `SKILL.md`, direct Markdown files, empty and malformed
   drafts, stale source maps, multi-skill rejection, workspace fanout, and
   plugin workspace import.
+- `12-imported-skill-runtime`: reviewed imported package coverage for
+  compile/install into all sandbox roots, `--retire-existing`, decision-only
+  `unproven` alignment, batched progress evidence, final-response proof, token
+  savings, and full execution alignment.
 
 ### Layer 2: Pseudo-Harness Simulator
 
@@ -303,7 +310,7 @@ Use this stack:
 | `test/09b-harness-lab-report-cards` | Machine-readable report cards and report comparison for regression detection. | Stable evidence for every later phase. |
 | `test/10-doctor-matrix` | Doctor target-shape fixtures and output assertions in the lab. | Doctor positive and negative gaps. |
 | `test/11-import-matrix` | Import target-shape fixtures, direct `SKILL.md`, references, workspace/plugin imports, QA commands. | Import positive, negative, and QA gaps. |
-| `test/12-imported-skill-activation` | Compile/install imported skill, retire-existing behavior, trampoline/spec presence, pseudo-activation checks. | Imported install and activation-sim rows. |
+| `test/12-imported-skill-runtime` | Compile/install reviewed imported skill, retire-existing behavior, trampoline/spec presence, decision/plan/act/progress/final-response/align checks. | Imported install and runtime-proof rows. |
 | `test/13-router-harness-lab` | Router install, hooks, visibility, index, guard, route bypass/use-skill, repair, disable/enable/uninstall. | Router harness-sim rows. |
 | `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
 | `test/15-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |

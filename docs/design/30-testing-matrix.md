@@ -48,8 +48,9 @@ The verified coverage map at the time this matrix was written is:
 - controlled harness-lab regression cards:
   `crates/skillspec-harness-lab/tests/core.rs`,
   `crates/skillspec-harness-lab/tests/doctor.rs`,
-  `crates/skillspec-harness-lab/tests/import.rs`, and committed baselines
-  under `crates/skillspec-harness-lab/baselines/`;
+  `crates/skillspec-harness-lab/tests/import.rs`,
+  `crates/skillspec-harness-lab/tests/imported_runtime.rs`, and committed
+  baselines under `crates/skillspec-harness-lab/baselines/`;
 - command help and sensemaking surfaces:
   `crates/skillspec-cli/tests/cli/cli_core.rs` and
   `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
@@ -147,7 +148,7 @@ For each test, capture:
 | Workspace import positive | Map/import folder with multiple cross-referenced skills. | Workspace manifest, package graph, dependency edges, and package drafts are generated. | Automatable | Covered |
 | Workspace import positive | Map/import plugin-shaped folder. | Plugin namespaces are preserved and install slugs are deterministic. | Automatable | Covered |
 | Import QA | Run validate/imports check/deps check/test/compile after import. | Generated package reaches the expected QA stage or reports explicit blockers. | Automatable | Partial |
-| Install imported skill | Compile and install imported skill into sandbox target. | Generated trampoline and `skill.spec.yml` are installed. | Harness-sim automatable | Partial |
+| Install imported skill | Compile and install a reviewed imported skill into sandbox targets. | Generated trampoline, `skill.spec.yml`, dependency ledger, and preserved source are installed. | Harness-sim automatable | Covered |
 | Replacement install | Install imported skill over existing prose skill with `--retire-existing`. | Old files are backed up and retired; new files are active. | Harness-sim automatable | Covered |
 | Replacement negative | Replacement install without retire/force. | Existing files remain and collision is reported. | Harness-sim automatable | Covered |
 | Activation | Invoke imported skill in live harness. | Trampoline hands off to SkillSpec CLI guidance instead of re-reading the full manual. | Manual with trace review | Manual |
@@ -158,6 +159,7 @@ For each test, capture:
 | Area | Case | Expected Result | Class | Coverage |
 | --- | --- | --- | --- | --- |
 | Plan/act | Run `skillspec plan` and `skillspec act` on a known spec. | Selected route, matched rules, forbids, and phase boundary are rendered. | Automatable | Covered |
+| Reviewed import runtime | Import a prose skill, review it into a route/phase contract, then decide, plan, act, record progress, and align. | Decision-only traces remain `unproven`; complete execution evidence aligns and writes `alignment.json`. | Automatable | Covered |
 | Progress ledger | Record phase-completed and requirement evidence. | `<run-dir>/execution.jsonl` receives compact structured events. | Automatable | Covered |
 | Batch progress | Use `skillspec progress batch` for grouped proof. | Multiple evidence events are recorded in one compact operation. | Automatable | Covered |
 | Progress display | Run `skillspec progress show`. | Current/completed/blocked/remaining phase summary is accurate. | Automatable | Covered |
