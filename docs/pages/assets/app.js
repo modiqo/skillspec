@@ -3,6 +3,9 @@ const REPO_NAME = "skillspec";
 const REPORT_LABEL = "doctor-report";
 const REPORT_MARKER = "<!-- skillspec-doctor-report -->";
 const REPORT_WORKFLOW = "doctor-report.yml";
+const CACHE_TTL_MS = 60 * 60 * 1000;
+const REPORTS_CACHE_KEY = "skillspec.publicReports.v1";
+const RUNS_CACHE_KEY = "skillspec.workflowRuns.v1";
 
 const form = document.querySelector("#doctor-form");
 const targetInput = document.querySelector("#target-url");
@@ -123,7 +126,15 @@ function showFormMessage(message, isError = false) {
 }
 
 async function loadReports() {
-  reportsStatus.textContent = "Loading reports...";
+  const cached = readCache(REPORTS_CACHE_KEY);
+  if (isFreshCache(cached)) {
+    reports = cached.data;
+    renderCards();
+    appendCacheNotice(reportsStatus, cached);
+    return;
+  }
+
+  reportsStatus.textContent = cached ? "Refreshing reports from GitHub..." : "Loading reports...";
   reportsGrid.replaceChildren();
 
   try {
@@ -135,16 +146,35 @@ async function loadReports() {
         .map((issue) => loadIssueReport(issue)),
     );
 
-    reports = issueReports.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    reports = issueReports
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .map(compactReport);
+    const cache = writeCache(REPORTS_CACHE_KEY, reports);
     renderCards();
+    appendCacheNotice(reportsStatus, cache);
   } catch (error) {
+    if (cached) {
+      const checkedCache = touchCache(REPORTS_CACHE_KEY, cached);
+      reports = checkedCache.data;
+      renderCards();
+      reportsStatus.textContent = `Showing cached reports from ${formatCacheTimestamp(checkedCache.cachedAt)} because GitHub refresh failed: ${error.message}. Next GitHub refresh after ${formatCacheExpiry(checkedCache)}.`;
+      return;
+    }
+
     reports = [];
     reportsStatus.textContent = `Could not load public reports: ${error.message}`;
   }
 }
 
 async function loadWorkflowRuns() {
-  runsStatus.textContent = "Loading workflow runs...";
+  const cached = readCache(RUNS_CACHE_KEY);
+  if (isFreshCache(cached)) {
+    renderWorkflowRuns(cached.data);
+    appendCacheNotice(runsStatus, cached);
+    return;
+  }
+
+  runsStatus.textContent = cached ? "Refreshing workflow runs from GitHub..." : "Loading workflow runs...";
   runsList.replaceChildren();
 
   try {
@@ -154,11 +184,126 @@ async function loadWorkflowRuns() {
     runsUrl.searchParams.set("per_page", "50");
 
     const payload = await fetchJson(runsUrl);
-    const workflowRuns = payload.workflow_runs || [];
+    const workflowRuns = (payload.workflow_runs || []).map(compactWorkflowRun);
+    const cache = writeCache(RUNS_CACHE_KEY, workflowRuns);
     renderWorkflowRuns(workflowRuns);
+    appendCacheNotice(runsStatus, cache);
   } catch (error) {
+    if (cached) {
+      const checkedCache = touchCache(RUNS_CACHE_KEY, cached);
+      renderWorkflowRuns(checkedCache.data);
+      runsStatus.textContent = `Showing cached workflow runs from ${formatCacheTimestamp(checkedCache.cachedAt)} because GitHub refresh failed: ${error.message}. Next GitHub refresh after ${formatCacheExpiry(checkedCache)}.`;
+      return;
+    }
+
     runsStatus.textContent = `Could not load workflow runs: ${error.message}`;
   }
+}
+
+function readCache(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Number.isFinite(parsed.cachedAt) || !Array.isArray(parsed.data)) {
+      return null;
+    }
+
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeCache(key, data) {
+  const cache = {
+    cachedAt: Date.now(),
+    checkedAt: Date.now(),
+    data,
+  };
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(cache));
+    return cache;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function touchCache(key, cache) {
+  const checkedCache = {
+    ...cache,
+    checkedAt: Date.now(),
+  };
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(checkedCache));
+    return checkedCache;
+  } catch (_error) {
+    return checkedCache;
+  }
+}
+
+function isFreshCache(cache) {
+  return Boolean(cache && Date.now() - (cache.checkedAt || cache.cachedAt) < CACHE_TTL_MS);
+}
+
+function appendCacheNotice(statusElement, cache) {
+  if (!cache) {
+    return;
+  }
+
+  const current = statusElement.textContent.trim();
+  const notice = `Cached ${formatCacheTimestamp(cache.cachedAt)}. Next GitHub refresh after ${formatCacheExpiry(cache)}.`;
+  statusElement.textContent = current ? `${current} ${notice}` : notice;
+}
+
+function formatCacheTimestamp(cachedAt) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(cachedAt));
+}
+
+function formatCacheExpiry(cache) {
+  const checkedAt = cache.checkedAt || cache.cachedAt;
+  return new Intl.DateTimeFormat(undefined, {
+    timeStyle: "short",
+  }).format(new Date(checkedAt + CACHE_TTL_MS));
+}
+
+function compactReport(report) {
+  return {
+    issue: {
+      number: report.issue.number,
+      html_url: report.issue.html_url,
+      title: report.issue.title,
+    },
+    status: report.status,
+    title: report.title,
+    shape: report.shape,
+    verdict: report.verdict,
+    risk: report.risk,
+    markdown: report.markdown,
+    updatedAt: report.updatedAt,
+  };
+}
+
+function compactWorkflowRun(run) {
+  return {
+    id: run.id,
+    conclusion: run.conclusion,
+    status: run.status,
+    display_title: run.display_title,
+    name: run.name,
+    run_number: run.run_number,
+    run_attempt: run.run_attempt,
+    created_at: run.created_at,
+    html_url: run.html_url,
+  };
 }
 
 function renderWorkflowRuns(workflowRuns) {
