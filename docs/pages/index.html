@@ -442,6 +442,13 @@
         <pre><code># Terminal: install the CLI.
 curl -fsSL https://skillspec.sh/install.sh | sh
 
+# Terminal: see the harness roots SkillSpec can install into.
+skillspec install targets
+
+# Terminal, later: install a SkillSpec-backed skill everywhere detected.
+# Targets include agents, codex, and claude-local when present.
+skillspec install skill ./my-skill --all-detected
+
 # Start your favorite harness: Claude, Codex, or both.
 # Ask the agent to assess the skill and explain what it finds.
 /skillspec run doctor on ./my-skill
@@ -455,14 +462,7 @@ curl -fsSL https://skillspec.sh/install.sh | sh
 # Terminal: save a Doctor report when you need an artifact.
 # Works with a local SKILL.md, skill folder, GitHub folder, or repo.
 # Formats: default text, --markdown, --html, or --json.
-skillspec doctor ./my-skill --markdown
-
-# Terminal: see the harness roots SkillSpec can install into.
-skillspec install targets
-
-# Terminal, later: install a SkillSpec-backed skill everywhere detected.
-# Targets include agents, codex, and claude-local when present.
-skillspec install skill ./my-skill --all-detected</code></pre>
+skillspec doctor ./my-skill --markdown</code></pre>
       </section>
 
       <section class="proof-path personas-section" aria-labelledby="personas-title">
