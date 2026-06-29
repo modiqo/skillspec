@@ -2364,6 +2364,11 @@ pre code {
   white-space: pre;
 }
 
+.private-note pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .report-content pre {
   margin: 18px 0;
 }
