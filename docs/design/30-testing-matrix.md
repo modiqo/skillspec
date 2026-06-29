@@ -14,14 +14,42 @@ The goal is to prove that the external contract remains stable:
 
 ## Automation Classes
 
-Use these classes in the matrix.
+Use these classes in the matrix. The class is automation feasibility, not a
+claim that the exact row is already covered by a committed test. Current
+coverage is tracked separately in the `Coverage` column.
 
 | Class | Meaning | Why |
 | --- | --- | --- |
-| `Automated` | Can run in CI or a local script using temporary files, temporary `HOME`, and CLI assertions. | The behavior is owned by SkillSpec code and can be checked without an interactive harness session. |
-| `Harness-sim automated` | Can be automated with disposable harness roots and fixture files, but does not prove a real Codex or Claude session reloaded the hook. | SkillSpec owns the generated files and metadata, but the real harness runtime is outside this repo. |
+| `Automatable` | Can run in CI or a local script using temporary files, temporary `HOME`, and CLI assertions. | The behavior is owned by SkillSpec code and can be checked without an interactive harness session. |
+| `Harness-sim automatable` | Can be automated with disposable harness roots and fixture files, but does not prove a real Codex or Claude session reloaded the hook. | SkillSpec owns the generated files and metadata, but the real harness runtime is outside this repo. |
 | `Manual` | Needs a live harness UI/session or a human judgment of agent behavior. | The observable behavior depends on external harness skill loading, prompt hooks, model decisions, or user approval UX. |
 | `Manual with trace review` | Needs a live harness run plus inspection of SkillSpec traces, progress ledgers, and final output. | The result is not just command success; it requires confirming the agent followed the trampoline and reported proof correctly. |
+
+## Coverage Labels
+
+Use these labels to state what has been verified in the current repo.
+
+| Coverage | Meaning |
+| --- | --- |
+| `Covered` | Current Rust integration/unit tests, conformance tests, examples, package checks, or CI preflight exercise this row directly. |
+| `Partial` | Current tests cover the command family or a neighboring case, but not the exact row end-to-end. |
+| `Gap` | The row is automatable, but no exact committed coverage has been verified yet. |
+| `Manual` | The row depends on live Codex/Claude/harness behavior or human review and is not fully provable inside this repo. |
+
+The verified coverage map at the time this matrix was written is:
+
+- doctor: `crates/skillspec-cli/tests/cli/doctor.rs`;
+- import, workspace, and install: `crates/skillspec-cli/tests/cli/authoring.rs`
+  and `crates/skillspec-cli/tests/cli/workspace_install.rs`;
+- runtime execution, progress, alignment, and token reports:
+  `crates/skillspec-cli/tests/cli/runtime_contracts.rs`;
+- router and durable-executor lifecycle:
+  `crates/skillspec-cli/tests/cli/lifecycle.rs`;
+- command help and sensemaking surfaces:
+  `crates/skillspec-cli/tests/cli/cli_core.rs` and
+  `crates/skillspec-cli/tests/cli/capability_sensemake.rs`;
+- package hygiene: `Justfile`, `.github/workflows/ci.yml`, conformance
+  fixtures, and package dry-run checks.
 
 ## Test Environment Model
 
@@ -59,115 +87,116 @@ For each test, capture:
 
 ## Install And Setup Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| CLI install | Install released CLI with public script. | `skillspec --version` works and resolves to requested version. | Manual |
-| CLI install | Install local checkout in debug mode with `just install-debug`. | Local `skillspec` resolves to checkout version. | Automated |
-| CLI install | Install local checkout in release mode with `just install-release`. | Release-profile binary installs and reports version. | Automated |
-| Package hygiene | Run `just preflight`. | fmt, locked check/clippy/tests, package lists, examples, deps, and conformance pass. | Automated |
-| Harness target discovery | Run `skillspec install targets` in a sandbox with agents, Codex, and Claude project roots. | Detected targets match created roots. | Harness-sim automated |
-| Skill install | Install `skills/skillspec` into `agents`. | Skill files are copied and support files are present. | Harness-sim automated |
-| Skill install | Install `skills/skillspec` into `codex`. | Skill files are copied and support files are present. | Harness-sim automated |
-| Skill install | Install `skills/skillspec` into `claude-local`. | Project-local skill files are copied. | Harness-sim automated |
-| Skill install | Install into all detected targets. | All sandbox roots receive the skill exactly once. | Harness-sim automated |
-| Skill install negative | Install into missing or unsupported target. | Command fails with actionable target error. | Automated |
-| Skill install negative | Install a folder without `SKILL.md`. | Command fails before writing target files. | Automated |
-| Skill install negative | Install a skill with unsafe nested discoverable `SKILL.md` support file. | Command rejects nested discoverable skill package. | Automated |
-| Skill install replacement | Install over an existing skill without `--retire-existing` or force behavior. | Collision is reported and existing skill remains. | Harness-sim automated |
-| Skill install replacement | Install with `--retire-existing`. | Existing folder is backed up and new skill is installed. | Harness-sim automated |
-| Harness setup | Open Codex/Claude after install and invoke `/skillspec`. | Harness sees the installed skill and follows the trampoline. | Manual |
-| Harness setup | Verify setup across every supported harness on a developer machine. | Codex, Claude, and agents roots behave as documented. | Manual |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| CLI install | Install released CLI with public script. | `skillspec --version` works and resolves to requested version. | Manual | Manual |
+| CLI install | Install local checkout in debug mode with `just install-debug`. | Local `skillspec` resolves to checkout version. | Automatable | Gap |
+| CLI install | Install local checkout in release mode with `just install-release`. | Release-profile binary installs and reports version. | Automatable | Gap |
+| Package hygiene | Run `just preflight`. | fmt, locked check/clippy/tests, package lists, examples, deps, and conformance pass. | Automatable | Covered |
+| Harness target discovery | Run `skillspec install targets` in a sandbox with agents, Codex, and Claude project roots. | Detected targets match created roots. | Harness-sim automatable | Partial |
+| Skill install | Install `skills/skillspec` into `agents`. | Skill files are copied and support files are present. | Harness-sim automatable | Partial |
+| Skill install | Install `skills/skillspec` into `codex`. | Skill files are copied and support files are present. | Harness-sim automatable | Partial |
+| Skill install | Install `skills/skillspec` into `claude-local`. | Project-local skill files are copied. | Harness-sim automatable | Covered |
+| Skill install | Install into all detected targets. | All sandbox roots receive the skill exactly once. | Harness-sim automatable | Partial |
+| Skill install negative | Install into missing or unsupported target. | Command fails with actionable target error. | Automatable | Gap |
+| Skill install negative | Install a folder without `SKILL.md`. | Command fails before writing target files. | Automatable | Gap |
+| Skill install negative | Install a skill with unsafe nested discoverable `SKILL.md` support file. | Command rejects nested discoverable skill package. | Automatable | Covered |
+| Skill install replacement | Install over an existing skill without `--retire-existing` or force behavior. | Collision is reported and existing skill remains. | Harness-sim automatable | Covered |
+| Skill install replacement | Install with `--retire-existing`. | Existing folder is backed up and new skill is installed. | Harness-sim automatable | Covered |
+| Harness setup | Open Codex/Claude after install and invoke `/skillspec`. | Harness sees the installed skill and follows the trampoline. | Manual | Manual |
+| Harness setup | Verify setup across every supported harness on a developer machine. | Codex, Claude, and agents roots behave as documented. | Manual | Manual |
 
 ## Doctor Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| Doctor negative | Pass a file path instead of a folder or `SKILL.md`-acceptable target. | Error explains expected target shape. | Automated |
-| Doctor negative | Pass a folder with empty `SKILL.md`. | Report or error identifies unusable/empty skill content. | Automated |
-| Doctor negative | Pass a folder with malformed frontmatter. | Report flags frontmatter discovery risk or parse problem without panic. | Automated |
-| Doctor negative | Pass a folder with malformed Markdown structure and no useful instructions. | Report identifies high drift/proof risk without crashing. | Automated |
-| Doctor negative | Pass non-existent path. | Command fails with clear path error. | Automated |
-| Doctor positive | Pass folder with one proper `SKILL.md`. | Simple skill report includes risk, activation surface, findings, and next action. | Automated |
-| Doctor positive | Pass direct `SKILL.md` path when supported by doctor target handling. | Report is equivalent to the parent single-skill target or gives a precise unsupported-shape error. | Automated |
-| Doctor positive | Pass folder with multiple `SKILL.md` files and cross references. | Workspace/package report includes one package report per skill and aggregate risk. | Automated |
-| Doctor positive | Pass plugin-shaped folder. | Plugin workspace shape and package namespace are reported. | Automated |
-| Doctor positive | Pass SkillSpec-backed skill. | Report recognizes contract mitigation and does not grade it as plain prose only. | Automated |
-| Doctor remote | Pass public GitHub folder URL. | Remote sparse checkout is staged, analyzed, and cleaned up. | Automated |
-| Doctor remote negative | Pass private or invalid GitHub URL. | Error is clear and does not leak credentials. | Automated |
-| Doctor output | Run text, JSON, Markdown, and HTML output modes. | Each output parses/renders and contains the same core report facts. | Automated |
-| Doctor in harness | Ask `/skillspec run doctor on ./my-skill` and ask agent to explain. | Agent invokes doctor and explains the report accurately. | Manual with trace review |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| Doctor negative | Pass a non-`SKILL.md` file path. | Error explains expected target shape. | Automatable | Gap |
+| Doctor negative | Pass a folder with empty `SKILL.md`. | Report or error identifies unusable/empty skill content. | Automatable | Gap |
+| Doctor negative | Pass a folder with malformed frontmatter. | Report flags frontmatter discovery risk or parse problem without panic. | Automatable | Covered |
+| Doctor negative | Pass a folder with malformed Markdown structure and no useful instructions. | Report identifies high drift/proof risk without crashing. | Automatable | Partial |
+| Doctor negative | Pass non-existent path. | Command fails with clear path error. | Automatable | Gap |
+| Doctor positive | Pass folder with one proper `SKILL.md`. | Simple skill report includes risk, activation surface, findings, and next action. | Automatable | Covered |
+| Doctor positive | Pass direct `SKILL.md` path. | Report is equivalent to the parent single-skill target. | Automatable | Gap |
+| Doctor positive | Pass folder with multiple `SKILL.md` files and cross references. | Workspace/package report includes one package report per skill and aggregate risk. | Automatable | Covered |
+| Doctor positive | Pass plugin-shaped folder. | Plugin workspace shape and package namespace are reported. | Automatable | Covered |
+| Doctor positive | Pass SkillSpec-backed skill. | Report recognizes contract mitigation and does not grade it as plain prose only. | Automatable | Covered |
+| Doctor remote | Pass public GitHub folder URL. | Remote sparse checkout is staged, analyzed, and cleaned up. | Automatable | Gap |
+| Doctor remote negative | Pass private or invalid GitHub URL. | Error is clear and does not leak credentials. | Automatable | Gap |
+| Doctor output | Run text, JSON, Markdown, and HTML output modes. | Each output parses/renders and contains the same core report facts. | Automatable | Covered |
+| Doctor in harness | Ask `/skillspec run doctor on ./my-skill` and ask agent to explain. | Agent invokes doctor and explains the report accurately. | Manual with trace review | Manual |
 
 ## Import Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| Import negative | Pass a file path where an atomic package folder is required. | Command fails with expected target-shape guidance. | Automated |
-| Import negative | Pass folder with empty `SKILL.md`. | Command fails or generates no false-valid contract; error is actionable. | Automated |
-| Import negative | Pass folder with malformed `SKILL.md`. | Command preserves source evidence and reports review blockers. | Automated |
-| Import negative | Pass parent folder with multiple `SKILL.md` files to single-skill import. | Command rejects and points to workspace map/import flow. | Automated |
-| Import positive | Pass folder with proper single `SKILL.md`. | Draft `skill.spec.yml`, source map, deps ledger, and reports are generated. | Automated |
-| Import positive | Pass skill with references/resources. | Generated draft preserves references as imports/resources or review notes. | Automated |
-| Workspace import positive | Map/import folder with multiple cross-referenced skills. | Workspace manifest, package graph, dependency edges, and package drafts are generated. | Automated |
-| Workspace import positive | Map/import plugin-shaped folder. | Plugin namespaces are preserved and install slugs are deterministic. | Automated |
-| Import QA | Run validate/imports check/deps check/test/compile after import. | Generated package reaches the expected QA stage or reports explicit blockers. | Automated |
-| Install imported skill | Compile and install imported skill into sandbox target. | Generated trampoline and `skill.spec.yml` are installed. | Harness-sim automated |
-| Replacement install | Install imported skill over existing prose skill with `--retire-existing`. | Old files are backed up and retired; new files are active. | Harness-sim automated |
-| Replacement negative | Replacement install without retire/force. | Existing files remain and collision is reported. | Harness-sim automated |
-| Activation | Invoke imported skill in live harness. | Trampoline hands off to SkillSpec CLI guidance instead of re-reading the full manual. | Manual with trace review |
-| Activation negative | Activate imported skill when `skillspec` binary is missing. | Trampoline reports missing CLI and does not claim full alignment proof. | Manual |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| Import negative | Pass a non-`SKILL.md` file path. | Command fails with expected target-shape guidance. | Automatable | Gap |
+| Import negative | Pass folder with empty `SKILL.md`. | Command fails or generates no false-valid contract; error is actionable. | Automatable | Gap |
+| Import negative | Pass folder with malformed `SKILL.md`. | Command preserves source evidence and reports review blockers. | Automatable | Gap |
+| Import negative | Pass parent folder with multiple `SKILL.md` files to single-skill import. | Command rejects and points to workspace map/import flow. | Automatable | Covered |
+| Import positive | Pass folder with proper single `SKILL.md`. | Draft `skill.spec.yml`, source map, deps ledger, and reports are generated. | Automatable | Covered |
+| Import positive | Pass direct `SKILL.md` path. | Draft output is generated from the file target without requiring the caller to pass the parent folder. | Automatable | Gap |
+| Import positive | Pass skill with references/resources. | Generated draft preserves references as imports/resources or review notes. | Automatable | Covered |
+| Workspace import positive | Map/import folder with multiple cross-referenced skills. | Workspace manifest, package graph, dependency edges, and package drafts are generated. | Automatable | Covered |
+| Workspace import positive | Map/import plugin-shaped folder. | Plugin namespaces are preserved and install slugs are deterministic. | Automatable | Covered |
+| Import QA | Run validate/imports check/deps check/test/compile after import. | Generated package reaches the expected QA stage or reports explicit blockers. | Automatable | Partial |
+| Install imported skill | Compile and install imported skill into sandbox target. | Generated trampoline and `skill.spec.yml` are installed. | Harness-sim automatable | Partial |
+| Replacement install | Install imported skill over existing prose skill with `--retire-existing`. | Old files are backed up and retired; new files are active. | Harness-sim automatable | Covered |
+| Replacement negative | Replacement install without retire/force. | Existing files remain and collision is reported. | Harness-sim automatable | Covered |
+| Activation | Invoke imported skill in live harness. | Trampoline hands off to SkillSpec CLI guidance instead of re-reading the full manual. | Manual with trace review | Manual |
+| Activation negative | Activate imported skill when `skillspec` binary is missing. | Trampoline reports missing CLI and does not claim full alignment proof. | Manual | Manual |
 
 ## Activation And Execution Behavior Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| Plan/act | Run `skillspec plan` and `skillspec act` on a known spec. | Selected route, matched rules, forbids, and phase boundary are rendered. | Automated |
-| Progress ledger | Record phase-completed and requirement evidence. | `<run-dir>/execution.jsonl` receives compact structured events. | Automated |
-| Batch progress | Use `skillspec progress batch` for grouped proof. | Multiple evidence events are recorded in one compact operation. | Automated |
-| Progress display | Run `skillspec progress show`. | Current/completed/blocked/remaining phase summary is accurate. | Automated |
-| Trace alignment | Run `skillspec trace align` with decision trace and execution ledger. | Alignment status is `aligned`, `partial`, or `unproven` with missing proof rows. | Automated |
-| Final response proof | Run `skillspec progress final-response`. | Final response evidence records result/evidence/alignment/token-savings sections. | Automated |
-| Token stats | Run progress stats with a valid workspace stats report. | Token consumption and savings evidence is recorded and appears in alignment. | Automated |
-| Token stats negative | Run stats with missing/empty token evidence. | Command refuses to invent token savings. | Automated |
-| Harness behavior | Live agent uses fewer progress updates by batching evidence. | User sees compact updates while ledger still captures proof. | Manual with trace review |
-| Harness behavior | Live agent final answer includes alignment and token report. | Final answer reports alignment summary, missing proof if any, and token usage honestly. | Manual with trace review |
-| Harness negative | Live agent skips a required proof step. | Alignment reports partial/unproven rather than success. | Manual with trace review |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| Plan/act | Run `skillspec plan` and `skillspec act` on a known spec. | Selected route, matched rules, forbids, and phase boundary are rendered. | Automatable | Covered |
+| Progress ledger | Record phase-completed and requirement evidence. | `<run-dir>/execution.jsonl` receives compact structured events. | Automatable | Covered |
+| Batch progress | Use `skillspec progress batch` for grouped proof. | Multiple evidence events are recorded in one compact operation. | Automatable | Covered |
+| Progress display | Run `skillspec progress show`. | Current/completed/blocked/remaining phase summary is accurate. | Automatable | Covered |
+| Trace alignment | Run `skillspec trace align` with decision trace and execution ledger. | Alignment status is `aligned`, `partial`, or `unproven` with missing proof rows. | Automatable | Covered |
+| Final response proof | Run `skillspec progress final-response`. | Final response evidence records result/evidence/alignment/token-savings sections. | Automatable | Covered |
+| Token stats | Run progress stats with a valid workspace stats report. | Token consumption and savings evidence is recorded and appears in alignment. | Automatable | Covered |
+| Token stats negative | Run stats with missing/empty token evidence. | Command refuses to invent token savings. | Automatable | Covered |
+| Harness behavior | Live agent uses fewer progress updates by batching evidence. | User sees compact updates while ledger still captures proof. | Manual with trace review | Manual |
+| Harness behavior | Live agent final answer includes alignment and token report. | Final answer reports alignment summary, missing proof if any, and token usage honestly. | Manual with trace review | Manual |
+| Harness negative | Live agent skips a required proof step. | Alignment reports partial/unproven rather than success. | Manual with trace review | Manual |
 
 ## Router Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| Router install | Install router into sandbox roots. | Managed `skill-router` folders, config, visibility manifest, hooks, and index are written. | Harness-sim automated |
-| Router install | Verify pre-call hook files for chosen harnesses. | Hook command invokes `skillspec router guard` with installed config. | Harness-sim automated |
-| Router install | Existing skills become explicit/manual-only. | Native visibility metadata or sidecars reflect explicit invocation. | Harness-sim automated |
-| Router install | Index is populated. | `skillspec router index status` shows discovered and indexed skills. | Automated |
-| Router guard | Run guard after install. | `first_hop_ready=true` and hook output is valid. | Automated |
-| Router route positive | Query clear skill intent. | `skillspec route` returns `use_skill` with selected skill. | Automated |
-| Router route bypass | Query ordinary non-skill task. | `skillspec route` returns `bypass` or `ambiguous` and no selected skill. | Automated |
-| Router drift | Add out-of-band implicit skill after install. | Guard or index refresh detects and repairs explicit visibility. | Harness-sim automated |
-| Router stale index | Modify skill roots after index. | Status reports stale/missing/index mismatch. | Automated |
-| Router disable | Disable router mode. | Router first-hop is disabled and managed visibility is restored from manifest. | Harness-sim automated |
-| Router disable check | Verify existing skills are switched back to their previous visibility, not blindly all implicit. | Visibility manifest restore is correct. | Harness-sim automated |
-| Router enable | Re-enable router after disable. | Index refreshes and routed skills become explicit/manual-only again. | Harness-sim automated |
-| Router uninstall | Uninstall router. | Router skill folders and hooks are removed or disabled; visibility is restored. | Harness-sim automated |
-| Router negative | Install with invalid router name. | Command rejects invalid name. | Automated |
-| Router negative | Guard with missing config. | Command fails with repair/install guidance. | Automated |
-| Router live | Start Codex/Claude after router install and ask ordinary task. | Hook fires, router bypasses, and answer has no unnecessary router hops. | Manual |
-| Router live | Ask task that should activate a domain skill. | Router chooses one skill and only that domain skill is loaded. | Manual with trace review |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| Router install | Install router into sandbox roots. | Managed `skill-router` folders, config, visibility manifest, hooks, and index are written. | Harness-sim automatable | Covered |
+| Router install | Verify pre-call hook files for chosen harnesses. | Hook command invokes `skillspec router guard` with installed config. | Harness-sim automatable | Covered |
+| Router install | Existing skills become explicit/manual-only. | Native visibility metadata or sidecars reflect explicit invocation. | Harness-sim automatable | Covered |
+| Router install | Index is populated. | `skillspec router index status` shows discovered and indexed skills. | Automatable | Covered |
+| Router guard | Run guard after install. | `first_hop_ready=true` and hook output is valid. | Automatable | Covered |
+| Router route positive | Query clear skill intent. | `skillspec route` returns `use_skill` with selected skill. | Automatable | Covered |
+| Router route bypass | Query ordinary non-skill task. | `skillspec route` returns `bypass` or `ambiguous` and no selected skill. | Automatable | Covered |
+| Router drift | Add out-of-band implicit skill after install. | Guard or index refresh detects and repairs explicit visibility. | Harness-sim automatable | Covered |
+| Router stale index | Modify skill roots after index. | Status reports stale/missing/index mismatch. | Automatable | Covered |
+| Router disable | Disable router mode. | Router first-hop is disabled and managed visibility is restored from manifest. | Harness-sim automatable | Covered |
+| Router disable check | Verify existing skills are switched back to their previous visibility, not blindly all implicit. | Visibility manifest restore is correct. | Harness-sim automatable | Covered |
+| Router enable | Re-enable router after disable. | Index refreshes and routed skills become explicit/manual-only again. | Harness-sim automatable | Covered |
+| Router uninstall | Uninstall router. | Router skill folders and hooks are removed or disabled; visibility is restored. | Harness-sim automatable | Covered |
+| Router negative | Install with invalid router name. | Command rejects invalid name. | Automatable | Covered |
+| Router negative | Guard with missing config. | Command fails with repair/install guidance. | Automatable | Gap |
+| Router live | Start Codex/Claude after router install and ask ordinary task. | Hook fires, router bypasses, and answer has no unnecessary router hops. | Manual | Manual |
+| Router live | Ask task that should activate a domain skill. | Router chooses one skill and only that domain skill is loaded. | Manual with trace review | Manual |
 
 ## Durable Executor Matrix
 
-| Area | Case | Expected Result | Class |
-| --- | --- | --- | --- |
-| Durable install | Install durable-executor from explicit source into sandbox roots. | Managed durable-executor folders and config are written. | Harness-sim automated |
-| Durable install negative | Install without `rote` on PATH. | Command fails before writing managed durable executor. | Automated |
-| Durable enable | Enable durable executor. | Durable executor visibility becomes implicit and config records enabled state. | Harness-sim automated |
-| Durable disable | Disable durable executor. | Durable executor visibility becomes manual-only without deleting files. | Harness-sim automated |
-| Durable update | Update managed durable executor. | Existing install is backed up and refreshed from source. | Harness-sim automated |
-| Durable delete | Delete managed durable executor. | Managed installs are removed; unmanaged folders are not removed. | Harness-sim automated |
-| Durable with router | Install router and durable executor together. | Durable executor can be implicit outer observer while router remains selection authority. | Manual with trace review |
-| Durable happy path | Enable durable executor and run one SkillSpec-backed skill. | Workspace/evidence is preserved and final response can cite durable evidence. | Manual with trace review |
-| Durable negative | User declines observation/record/memory. | Durable executor does not record or memorize events and task can continue direct if allowed. | Manual |
-| Durable negative | Durable handoff loses required workspace or trace path. | Run reports blocker rather than pretending proof exists. | Manual with trace review |
+| Area | Case | Expected Result | Class | Coverage |
+| --- | --- | --- | --- | --- |
+| Durable install | Install durable-executor from explicit source into sandbox roots. | Managed durable-executor folders and config are written. | Harness-sim automatable | Covered |
+| Durable install negative | Install without `rote` on PATH. | Command fails before writing managed durable executor. | Automatable | Covered |
+| Durable enable | Enable durable executor. | Durable executor visibility becomes implicit and config records enabled state. | Harness-sim automatable | Covered |
+| Durable disable | Disable durable executor. | Durable executor visibility becomes manual-only without deleting files. | Harness-sim automatable | Covered |
+| Durable update | Update managed durable executor. | Existing install is backed up and refreshed from source. | Harness-sim automatable | Covered |
+| Durable delete | Delete managed durable executor. | Managed installs are removed; unmanaged folders are not removed. | Harness-sim automatable | Covered |
+| Durable with router | Install router and durable executor together. | Durable executor can be implicit outer observer while router remains selection authority. | Manual with trace review | Manual |
+| Durable happy path | Enable durable executor and run one SkillSpec-backed skill. | Workspace/evidence is preserved and final response can cite durable evidence. | Manual with trace review | Manual |
+| Durable negative | User declines observation/record/memory. | Durable executor does not record or memorize events and task can continue direct if allowed. | Manual | Manual |
+| Durable negative | Durable handoff loses required workspace or trace path. | Run reports blocker rather than pretending proof exists. | Manual with trace review | Manual |
 
 ## Automation Plan
 
