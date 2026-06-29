@@ -1,6 +1,6 @@
-use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use skillspec_core::error::{Error, Result};
 use std::collections::BTreeMap;
 use std::fs;
 

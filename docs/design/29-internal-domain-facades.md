@@ -61,6 +61,25 @@ internal names (`act`, `align`, `command_path`, `decision`, `deps`, `guide`,
 tests keep compiling. Those re-exports are compatibility scaffolding for the
 refactor, not a stable Rust API.
 
+`crates/skillspec-doctor/` owns the extracted Doctor analysis modules:
+
+- `src/lib.rs`: Doctor target inspection, local and remote skill shape
+  classification, score assembly, issue generation, and public report model.
+- `src/frontmatter.rs`, `src/risk.rs`, `src/metrics.rs`, `src/types.rs`,
+  `src/renderer.rs`, and `src/workspace_report.rs`: Doctor-specific analysis
+  and rendering helpers.
+- `src/remote_source.rs`: public GitHub target parsing, sparse checkout, and
+  stage reporting used by Doctor and current authoring commands.
+- `src/source_map.rs` and `src/source_map/`: source-map schema, local source
+  discovery, Markdown mapping, query, coverage, and stale checks used by Doctor
+  and current authoring commands.
+
+The CLI re-exports `doctor`, `remote_source`, and `source_map` under the old
+internal names so current command dispatch, import, port-one-shot, and workspace
+flows keep compiling. `remote_source` and `source_map` live in this crate for now
+because Doctor requires them directly; the later authoring extraction may move
+or rename that shared support without changing CLI behavior.
+
 `crates/skillspec-cli/src/domain/` owns command-family orchestration:
 
 - `authoring.rs`: compile, import, port-one-shot, source map, grammar,
@@ -111,7 +130,12 @@ The facades are the migration seam for later internal crates:
   releases remain possible: publish `skillspec-core`, then `skillspec-runtime`,
   then the CLI crate that depends on the same versions. The crate exists as an
   implementation boundary, not as a stable Rust API promise.
-- `skillspec-doctor`: doctor reports and renderers.
+- `skillspec-doctor`: implemented for Doctor inspection, reports, renderers,
+  remote source staging support, and source-map support. It is a publishable
+  companion crate so crates.io releases remain possible: publish
+  `skillspec-core`, then `skillspec-runtime`, then `skillspec-doctor`, then the
+  CLI crate that depends on the same versions. The crate exists as an
+  implementation boundary, not as a stable Rust API promise.
 - `skillspec-import`: source staging, import, port-one-shot, workspace
   authoring, compile, and synthesis.
 - `skillspec-harness`: install targets, visibility, router lifecycle, durable

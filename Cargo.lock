@@ -952,7 +952,6 @@ version = "0.1.5"
 dependencies = [
  "clap",
  "jsonschema",
- "markdown",
  "regex",
  "rusqlite",
  "serde",
@@ -960,6 +959,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-core",
+ "skillspec-doctor",
  "skillspec-runtime",
  "thiserror",
 ]
@@ -974,6 +974,18 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "skillspec-doctor"
+version = "0.1.5"
+dependencies = [
+ "markdown",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
 ]
 
 [[package]]

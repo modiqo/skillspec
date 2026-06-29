@@ -1,5 +1,5 @@
-use crate::error::{Error, Result};
 use serde::Serialize;
+use skillspec_core::error::{Error, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;

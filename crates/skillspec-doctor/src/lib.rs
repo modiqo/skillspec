@@ -1,20 +1,21 @@
-use crate::error::{Error, Result};
-use crate::remote_source::{self, RemoteSkillSource};
+use crate::remote_source::RemoteSkillSource;
 use crate::source_map::{
-    self, SourceClassificationKind, SourceFileKind, SourceFileLoadStatus, SourceMap,
-    SourceReferenceKind,
+    SourceClassificationKind, SourceFileKind, SourceFileLoadStatus, SourceMap, SourceReferenceKind,
 };
-use crate::{model::SkillSpec, parser};
 mod frontmatter;
 mod metrics;
+pub mod remote_source;
 mod renderer;
 mod risk;
+pub mod source_map;
 mod types;
 mod workspace_report;
 
 pub use renderer::{render, render_html, render_markdown};
 
 use serde::Serialize;
+use skillspec_core::error::{Error, Result};
+use skillspec_core::{model::SkillSpec, parser};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -1885,7 +1886,7 @@ mod tests {
         rewrite_remote_error, rewrite_remote_locations, DoctorCounts, DoctorReport,
         DoctorShapeReport, SurfaceReport,
     };
-    use crate::error::Error;
+    use skillspec_core::error::Error;
     use std::path::Path;
 
     #[test]
