@@ -127,7 +127,15 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 22px;
+  margin-top: 8px;
+}
+
+.hero-note {
+  max-width: 680px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.5;
 }
 
 .primary-link,
@@ -1304,7 +1312,7 @@ h3 {
 
 .lede {
   max-width: 1120px;
-  margin-bottom: 48px;
+  margin-bottom: 22px;
   color: #5d564d;
   font-family: var(--font-display);
   font-size: 2rem;
@@ -1353,16 +1361,6 @@ h3 {
   content: "↳";
 }
 
-.hero-body {
-  max-width: 760px;
-  margin-bottom: 0;
-  border-top: 2px solid var(--line);
-  padding-top: 28px;
-  color: #4f4942;
-  font-size: 1.08rem;
-  line-height: 1.72;
-}
-
 .hero-visual,
 .article-figure,
 .request-panel,
@@ -1392,7 +1390,16 @@ h3 {
 
 .hero-actions {
   gap: 0;
-  margin-top: 28px;
+  margin-top: 0;
+}
+
+.hero-note {
+  max-width: 760px;
+  margin-top: 18px;
+  border-top: 2px solid var(--line);
+  padding-top: 18px;
+  color: #5d564d;
+  font-size: 1rem;
 }
 
 .signal-strip {
@@ -2905,11 +2912,11 @@ pre code {
   }
 
   .lede {
-    margin-bottom: 40px;
+    margin-bottom: 22px;
     font-size: 1.5rem;
   }
 
-  .hero-body {
+  .hero-note {
     padding-top: 20px;
   }
 
