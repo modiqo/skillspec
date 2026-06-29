@@ -1015,6 +1015,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "skillspec-harness-lab"
+version = "0.1.5"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "skillspec-runtime"
 version = "0.1.5"
 dependencies = [

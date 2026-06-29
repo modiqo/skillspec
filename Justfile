@@ -11,7 +11,8 @@ packages:
       "4. skillspec-authoring -> skillspec-core, skillspec-runtime, skillspec-doctor" \
       "5. skillspec-harness -> skillspec-core, skillspec-runtime" \
       "6. skillspec-workspace -> skillspec-core, skillspec-doctor, skillspec-authoring, skillspec-harness" \
-      "7. skillspec CLI -> all internal crates"
+      "7. skillspec CLI -> all internal crates" \
+      "test-only. skillspec-harness-lab -> sandbox harness test helpers"
 
 # List detected harness skill roots.
 install-targets:
@@ -67,6 +68,10 @@ clippy:
 # Run the workspace test suite.
 test:
     cargo test --locked --workspace --all-targets
+
+# Run only the controlled harness lab tests.
+harness-lab-test:
+    cargo test --locked -p skillspec-harness-lab
 
 # Verify crate packaging boundaries without requiring already-published sibling crates.
 package-list:
