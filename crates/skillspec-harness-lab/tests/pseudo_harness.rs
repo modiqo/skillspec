@@ -14,9 +14,9 @@ fn pseudo_harness_phase_matches_baseline() {
     assert_eq!(report.schema, "skillspec/harness-lab-report/v0");
     assert_eq!(report.phase, PHASE);
     assert_eq!(report.summary.status, CaseStatus::Pass);
-    assert_eq!(report.summary.cases_total, 9);
+    assert_eq!(report.summary.cases_total, 6);
     assert_eq!(report.summary.cases_failed, 0);
-    assert!(report.summary.claims_total >= 70);
+    assert!(report.summary.claims_total >= 40);
     assert_eq!(report.summary.claims_failed, 0);
 
     assert_matches_or_updates_baseline(&report);
@@ -44,9 +44,6 @@ fn run_pseudo_harness_phase() -> HarnessLabReport {
     pseudo_harness_matrix::router::duplicate_root_candidates_collapse_to_one_logical_selection(
         &mut report,
     );
-    pseudo_harness_matrix::router::local_action_without_rote_shell_reports_repair(&mut report);
-    pseudo_harness_matrix::router::local_action_with_rote_shell_selects_rote_shell(&mut report);
-    pseudo_harness_matrix::router::browser_action_with_rote_browse_selects_rote_browse(&mut report);
     pseudo_harness_matrix::durable::durable_observer_remains_implicit_with_router(&mut report);
     pseudo_harness_matrix::imported::imported_trampoline_handoff_is_visible(&mut report);
     report.build()

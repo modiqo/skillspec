@@ -64,7 +64,7 @@ directory listings.
 | 30 | [Testing Matrix](30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
 | 31 | [Controlled Harness Lab](31-controlled-harness-lab.md) | Proposal for no-Docker sandbox harness simulation using isolated homes, fake harness roots, pseudo-harness traces, and optional real harness smoke runs. |
 | 32 | [Router Duplicate Root Selection](32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
-| 33 | [Router Execution Policy Gate](33-router-execution-policy-gate.md) | How route separates skill discovery from durable rote substrate selection for service/API, local action, and browser work. |
+| 33 | [Router Provider Neutrality](33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
 
 ## Visual Explainers
 

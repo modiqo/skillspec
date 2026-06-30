@@ -1,111 +1,85 @@
-# Router Execution Policy Gate
+# Router Provider Neutrality
 
-Router mode has two different jobs that must stay separate:
+Router mode has one job: select the logical skill, if the request clearly
+matches one. It must stay universal and open-source friendly. It must not
+hardcode a vendor, adapter system, browser system, shell runner, recorder, or
+durable execution substrate.
 
-1. Select the logical skill, if the request clearly matches one.
-2. Decide whether the selected work must run through a durable rote substrate.
+## Boundary
 
-The router is still not the execution engine. It returns a decision and a policy
-that the first-hop loader must obey before reading domain skill instructions or
-using tools.
+`skillspec route` returns:
+
+- `use_skill` with a selected skill path when the match is clear;
+- `bypass` when no skill should be loaded;
+- `ambiguous` when the router cannot choose safely.
+
+That is the router boundary. Execution policy belongs after selection:
+
+- the selected skill's own `skill.spec.yml` owns route phases, tool boundaries,
+  forbids, checks, and proof;
+- durable-executor owns the durable execution envelope when it is explicitly or
+  implicitly active;
+- future provider/capability routing must be declarative skill metadata, not
+  hardcoded router knowledge.
 
 ## YAML Surfaces
 
-This feature touches three SkillSpec YAML surfaces:
+Router behavior is described in three SkillSpec YAML surfaces:
 
 - `crates/skillspec-harness/src/router_lifecycle/template.rs` renders the
-  installed `skill-router/skill.spec.yml`. This is the runtime contract used
-  after `skillspec router install`, `enable`, or `update`.
-- `examples/skill-router/skill.spec.yml` is the hand-maintained example of that
+  installed `skill-router/skill.spec.yml`.
+- `examples/skill-router/skill.spec.yml` is the maintained example of that
   runtime contract.
-- `skills/skillspec/skill.spec.yml` is the standard SkillSpec self-skill. It
-  teaches `/skillspec install router`, `/skillspec router update`, and operator
-  explanations. It is not the runtime router contract, but it must describe the
-  same behavior so installs and docs do not drift.
+- `skills/skillspec/skill.spec.yml` teaches `/skillspec install router`,
+  `/skillspec router update`, and operator explanations.
 
-Do not edit installed copies under `.agents`, `.codex`, `.claude`, or
-`.claude/skills/skillspec` directly. They are generated or local installs.
-
-## Ladder
-
-`skillspec route` emits `execution_policy` when the request needs a managed rote
-substrate:
-
-| Kind | Substrate | Required skills | Use case |
-| --- | --- | --- | --- |
-| `service_api` | `rote_adapter` | `durable-executor` plus a service-specific rote skill or `rote` | `connect to X`, `fetch from X`, `fetch information from X`, service/vendor/SaaS/API work |
-| `local_action` | `rote_shell` | `durable-executor`, `rote-shell` | shell, CLI, scripts, builds, tests, package installs, git, local file mutation |
-| `browse` | `rote_browse` | `durable-executor`, `rote-browse` | browser, web page, dashboard, login, authenticated session, navigation, click, URL, web search |
-
-When the policy is active, route can choose the substrate skill even if lexical
-confidence alone would be too low. For example, a browse request should select
-`rote-browse` when `durable-executor` and `rote-browse` are active.
-
-When required substrate is unavailable, route returns:
-
-```json
-{
-  "decision": "bypass",
-  "bypass_reason": "required_execution_substrate_unavailable",
-  "execution_policy": {
-    "availability": "unavailable",
-    "repair": "install or enable required execution skills: durable-executor, rote-browse"
-  }
-}
-```
-
-The harness must not silently fall back to direct Chrome, Playwright, shell,
-HTTP, SDK, or web-search tooling for a request that matched one of these
-policies. It either follows the active substrate or reports the repair.
-
-## Browse Defaults
-
-Browse policy is intentionally strict:
-
-- forbid direct browser tooling;
-- forbid direct Chrome/Playwright;
-- forbid REPL-based browser control;
-- forbid direct web search;
-- prefer the current authenticated browser session;
-- fall back to headless only when no active session is available.
-
-The reason is practical: many useful pages require authentication or a
-post-authenticated state. Headless should be a fallback, not the default.
+These surfaces must describe the same provider-neutral behavior. Do not edit
+installed copies under `.agents`, `.codex`, `.claude`, or
+`.claude/skills/skillspec` directly; they are generated or local installs.
 
 ## Activation Anchor Gate
 
-The router also applies an activation-anchor gate before accepting normal
-lexical matches. A broad skill cannot win only because the query contains
-generic words such as `docs`, `document`, `create`, `skill`, `router`, or
-`rote`.
+The router applies an activation-anchor gate before accepting normal lexical
+matches. A broad skill cannot win only because the query contains generic words
+such as `docs`, `document`, `create`, `skill`, or `router`.
 
 The selected candidate must match its full name or a non-generic name anchor.
 Examples:
 
-- `fetch information from Linear API` can activate `rote-linear`.
 - `extract text from a pdf` can activate `pdf`.
 - `create a Stripe adapter` can activate adapter authoring because `adapter` is
   an anchor.
 - `ok, do this and document it in docs/design` should bypass rather than
-  selecting `rote-adapter-create`.
+  selecting a broad creation skill.
 
 ## Non-Goals
 
-- The router does not execute rote.
+- The router does not execute tools.
 - The router does not create adapters.
 - The router does not infer credentials or service auth state.
-- The router does not make unavailable durable substrates optional for matched
-  policy work.
+- The router does not translate browser, shell, API, or SaaS intent into a
+  provider-specific runtime.
+- The router does not make durable execution decisions except to surface the
+  existing direct-versus-durable elicitation when a skill is selected and the
+  caller has not already chosen.
 
-These remain runtime, durable-executor, or rote responsibilities.
+## Future Provider Routing
+
+If SkillSpec later supports a portable provider/capability layer, the router can
+consume declarative metadata from skills or specs. That design must keep the
+router generic:
+
+- providers advertise capabilities in metadata;
+- skills declare requirements or preferences;
+- the router ranks compatible installed skills without naming a specific
+  provider in harness code;
+- unavailable providers produce a provider-neutral bypass or repair state.
 
 ## Regression Coverage
 
-Core unit tests cover:
+Core unit tests and pseudo-harness report cards cover:
 
-- generic docs prompts bypassing broad rote-adapter false positives;
-- browse selecting `rote-browse` when active;
-- local action selecting `rote-shell` when active;
-- service/API selecting a service-specific rote skill ahead of adapter creation;
-- unavailable substrate returning
-  `required_execution_substrate_unavailable`.
+- generic docs prompts bypassing broad false positives;
+- duplicate physical installs collapsing to one logical selection;
+- route decisions loading a domain skill only for `use_skill`;
+- `bypass` and `ambiguous` never silently loading a candidate.

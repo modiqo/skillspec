@@ -617,7 +617,7 @@ routes:
     description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain the fast path; guard owns freshness, ordinary requests run one route query with harness/root context when available, duplicate physical roots collapse to one logical skill, execution_policy selects rote adapter, rote-shell, or rote-browse substrate for service/API, local action, or browser work when active, and route JSON only loads a skill for decision use_skill while bypass or ambiguous continues normal behavior.
+      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain the fast path; guard owns freshness, ordinary requests run one route query with harness/root context when available, duplicate physical roots collapse to one logical skill, the router stays provider-neutral, and route JSON only loads a skill for decision use_skill while bypass or ambiguous continues normal behavior.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -947,7 +947,7 @@ routes:
               - workspace
               - trace_dir
               - return_to
-              - execution_policy
+              - execution_constraints
               - evidence_context
             forbid:
               - direct_cli_without_rote_exec
@@ -2638,7 +2638,7 @@ commands:
       dependencies:
         - rote_cli
   router_install:
-    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks with harness context, make routed skills explicit-only, and install a fast-path decision-gated router that collapses duplicate logical skills, applies execution_policy for rote adapter/rote-shell/rote-browse substrate selection, and loads a skill only for route decision use_skill.
+    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks with harness context, make routed skills explicit-only, and install a fast-path decision-gated provider-neutral router that collapses duplicate logical skills and loads a skill only for route decision use_skill.
     template: skillspec router install --roots <skill-roots> --index <router-index>
     safety: local_write
     requires:
@@ -3099,7 +3099,7 @@ recipes:
       - run_command: router_guard
       - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
       - note: Report guard hook paths from harness_hooks and whether router guard returned first_hop_ready. Router-first is guaranteed only when managed hooks are loaded by the active harness.
-      - note: Report that every request should route through skill-router first, but ordinary prompts should use the fast path after guard readiness; run one route query, do not run index status, and load a domain skill only when route JSON says decision use_skill with a non-null selected skill. Duplicate physical roots are collapsed by logical skill identity before matching, and harness/root context only chooses the installed copy. execution_policy is the step ladder from route to rote substrate; service/API work uses rote adapter execution, local shell/tool work uses rote-shell, and browser/web work uses rote-browse when required skills are active. Unavailable substrate returns repair guidance instead of silently using direct tools. For bypass or ambiguous, continue normal behavior instead of forcing an unrelated skill.
+      - note: Report that every request should route through skill-router first, but ordinary prompts should use the fast path after guard readiness; run one route query, do not run index status, and load a domain skill only when route JSON says decision use_skill with a non-null selected skill. Duplicate physical roots are collapsed by logical skill identity before matching, and harness/root context only chooses the installed copy. The router is provider-neutral; execution substrate policy belongs to the selected skill or durable-executor. For bypass or ambiguous, continue normal behavior instead of forcing an unrelated skill.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.

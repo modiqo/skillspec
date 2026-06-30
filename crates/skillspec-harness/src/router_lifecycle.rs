@@ -1090,13 +1090,11 @@ skillspec route --index {index_arg} --query '<user task>'{route_context_args} --
 ```
 
 Load a domain skill only when route JSON returns `decision: "use_skill"` and a
-non-null `selected` skill. Before acting, inspect `execution_policy`: active
-service/API, local shell/tool, and browser/web policies must use the selected
-rote substrate and obey its forbids/preferences; unavailable substrate should be
-reported with repair guidance. If the decision is `bypass` or `ambiguous`, do
-not load any candidate skill; continue with the normal agent path for the user
+non-null `selected` skill. If the decision is `bypass` or `ambiguous`, do not
+load any candidate skill; continue with the normal agent path for the user
 request. Duplicate physical roots collapse to one logical skill before matching;
-route context only chooses the installed copy to load.
+route context only chooses the installed copy to load. Execution substrate
+policy belongs to the selected skill or durable-executor, not to the router.
 
 Load and follow `./skill.spec.yml` only for router lifecycle, repair,
 visibility, guard, index status, index refresh, or when the prompt hook is

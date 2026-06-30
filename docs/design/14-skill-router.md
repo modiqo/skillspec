@@ -287,53 +287,44 @@ The first implementation uses deterministic BM25-style lexical scoring over:
 It adds exact-name and trigger bonuses, subtracts negative-trigger penalties, and
 filters out `off` skills. The route result includes the decision, optional
 selected candidate, scores, confidence, visibility, whether the skill is
-SkillSpec-backed, bypass reason when no skill should load, optional
-`execution_policy`, and an execution-mode elicitation hint when the caller has
-not already supplied direct or durable execution mode.
+SkillSpec-backed, bypass reason when no skill should load, and an execution-mode
+elicitation hint when the caller has not already supplied direct or durable
+execution mode.
 
 The match gate is intentionally conservative:
 
 - `use_skill`: the top candidate has high confidence and clears the separation
   threshold from the next candidate.
-- `bypass`: no positive candidate exists or the best candidate is only low or
-  medium confidence, the top candidate lacks an activation anchor, or a required
-  execution substrate is unavailable.
+- `bypass`: no positive candidate exists, the best candidate is only low or
+  medium confidence, or the top candidate lacks an activation anchor.
 - `ambiguous`: strong top candidates are too close for automatic skill
   selection.
 
 The activation-anchor gate prevents broad skills from winning on generic prose
 overlap. A candidate must match its name or a non-generic name anchor such as
 `linear`, `pdf`, `adapter`, or `browse`; generic words such as `docs`,
-`document`, `create`, `skill`, `router`, and `rote` are not enough by
-themselves.
+`document`, `create`, `skill`, and `router` are not enough by themselves.
 
-## Execution Policy Ladder
+## Execution Substrate Boundary
 
-Route owns one more decision after logical skill selection: whether the request
-requires a durable rote substrate before any work starts. This is reported as
-`execution_policy` in route JSON.
+The router is provider-neutral. It answers only whether a local skill should be
+loaded, and which installed copy should be loaded. It must not hardcode a vendor,
+adapter system, browser system, shell runner, or durable execution substrate.
 
-The ladder is:
+Execution substrate policy belongs in one of these places:
 
-1. `service_api` -> `rote_adapter`: requests such as `connect to X`,
-   `fetch from X`, `fetch information from X`, or explicit service/vendor/SaaS
-   API work. Prefer a service-specific rote skill such as `rote-linear`; never
-   select `rote-adapter-create` unless the user is actually creating or
-   configuring an adapter.
-2. `local_action` -> `rote_shell`: local shell, CLI, script, build, test,
-   package, git, or file mutation work that needs recorded process evidence.
-3. `browse` -> `rote_browse`: browser/web/dashboard/login/page/navigation work.
-   The policy forbids direct browser tooling, direct Chrome/Playwright,
-   REPL-based browser control, and direct web search. It prefers attaching to
-   the current authenticated browser session, falling back to headless only when
-   no active session is available.
+- the selected skill's own `skill.spec.yml`, when a domain skill declares its
+  allowed tools, forbids, phases, checks, and evidence;
+- the optional durable-executor skill, when the user or installation policy
+  chooses durable execution;
+- a future declarative capability contract, if SkillSpec grows a portable way
+  for skills to advertise execution substrates without binding the router to a
+  particular provider.
 
-All three paths require `durable-executor` to be active. `local_action` also
-requires `rote-shell`, `browse` requires `rote-browse`, and `service_api`
-requires a selected service-specific rote skill or the generic `rote` path. If
-the required substrate is unavailable, route returns `bypass` with
-`required_execution_substrate_unavailable` and repair guidance instead of
-silently allowing direct tools.
+This boundary matters for open source adoption. A project should be able to use
+SkillSpec router with its own skills, tools, adapters, browser automation, and
+execution recorder without inheriting another vendor's runtime policy from the
+harness.
 
 ## Durable Execution
 
@@ -393,8 +384,8 @@ the user already chose durable/direct mode, the task is pure discussion, or the
 selected skill is `durable-executor` itself.
 
 When durable mode is active, the durable envelope wins on execution substrate.
-For example, if the selected domain skill says to run `git status`, the durable
-envelope still requires the actual process to run through `rote exec`.
+For example, if a selected domain skill asks for a local process, the active
+durable-executor contract decides how that process is recorded and proved.
 
 ## Safety Boundaries
 

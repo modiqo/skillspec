@@ -1,5 +1,5 @@
 use skillspec_harness_lab::HarnessLab;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct PseudoHarnessFixture {
     pub lab: HarnessLab,
@@ -40,11 +40,6 @@ pub fn write_duplicate_durable_roots(lab: &HarnessLab) {
         &durable_executor_skill(),
         None,
     );
-}
-
-pub fn install_rote_execution_skills(lab: &HarnessLab) {
-    copy_rote_install_snapshot_skill(lab, "rote-shell");
-    copy_rote_install_snapshot_skill(lab, "rote-browse");
 }
 
 pub fn write_imported_widget_skill(lab: &HarnessLab) {
@@ -96,31 +91,6 @@ description: Use when working with CSV files and spreadsheet exports. Do not use
 # CSV
 "#
     .to_owned()
-}
-
-fn copy_rote_install_snapshot_skill(lab: &HarnessLab, skill_name: &str) {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("fixtures/rote-install-snapshot")
-        .join(skill_name);
-    let target = lab.agents_root().join(skill_name);
-    copy_dir(&source, &target);
-}
-
-fn copy_dir(source: &Path, target: &Path) {
-    std::fs::create_dir_all(target).unwrap();
-    for entry in std::fs::read_dir(source).unwrap() {
-        let entry = entry.unwrap();
-        let source_path = entry.path();
-        let target_path = target.join(entry.file_name());
-        if source_path.is_dir() {
-            copy_dir(&source_path, &target_path);
-        } else {
-            if let Some(parent) = target_path.parent() {
-                std::fs::create_dir_all(parent).unwrap();
-            }
-            std::fs::copy(&source_path, &target_path).unwrap();
-        }
-    }
 }
 
 fn notes_skill() -> String {
