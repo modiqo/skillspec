@@ -2622,15 +2622,15 @@ commands:
       dependencies:
         - skillspec_cli
   run_loop:
-    description: "Start the stateful agent guide in one spec load: select route, write trace, print start/current/end anchors, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent
+    description: "Start the stateful agent guide in one spec load: select route, write trace, emit JSON control data, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent --json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   run_loop_resume:
-    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and printing the current gate.
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent
+    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and emitting JSON control data.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent --json
     safety: local_write
     requires:
       dependencies:

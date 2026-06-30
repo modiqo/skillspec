@@ -32,8 +32,8 @@ the execution proof.
 The current CLI implements these runtime commands:
 
 ```sh
-skillspec run-loop <spec> --input '<task>' --trace-dir .skillspec/traces --guide agent
-skillspec run-loop <spec> --resume .skillspec/traces/<run-id> --guide agent
+skillspec run-loop <spec> --input '<task>' --trace-dir .skillspec/traces --guide agent --json
+skillspec run-loop <spec> --resume .skillspec/traces/<run-id> --guide agent --json
 skillspec sensemake <spec> --view index
 skillspec plan <spec> --input '<task>' --trace-dir .skillspec/traces
 skillspec act <spec> --input '<task>' --run .skillspec/traces/<run-id> --phase <phase-id>
@@ -424,7 +424,7 @@ The final response should include:
 - result;
 - evidence references;
 - alignment summary;
-- token usage;
+- token usage from alignment, or an explicit reason it was not recorded;
 - trace path.
 
 It should not report a bare `unproven`. If proof is incomplete, say which proof

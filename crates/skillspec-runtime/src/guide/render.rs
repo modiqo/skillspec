@@ -147,6 +147,10 @@ fn render_end(output: &mut String, report: &GuideReport) {
         report.end.route_fulfillment_event
     ));
     output.push_str(&format!(
+        "- token_stats: `{}`\n",
+        report.end.token_stats_command
+    ));
+    output.push_str(&format!(
         "- final_progress: `{}`\n",
         report.end.final_progress_command
     ));

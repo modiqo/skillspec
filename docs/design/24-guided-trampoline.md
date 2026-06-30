@@ -221,9 +221,10 @@ End means:
 The route is fulfilled or intentionally partial.
 Required checks have passed or gaps are named.
 Progress evidence is recorded.
+Token stats are recorded quietly when measured or estimated metrics are available.
 Final-response evidence is recorded.
 Alignment summary exists.
-Token usage or token economy is reported or explicitly not recorded.
+Token usage or token economy is reported from alignment, or explicitly not recorded with reason.
 ```
 
 For diagnostic/read-only routes, such as Doctor/source-shape assessment, the
@@ -237,6 +238,7 @@ Required end fields:
 ```text
 done_when:
 route_fulfillment_event:
+token_stats_command:
 final_progress_command:
 alignment_command:
 final_response_must_include:
@@ -379,11 +381,12 @@ NEXT COMMANDS
 
 END
 - done_when: source shape classified; route obligations complete or explicitly partial; final-response evidence recorded; alignment artifacts generated quietly
+- token_stats: skillspec progress stats <run_dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet
 - final_progress: skillspec progress final-response <run_dir> --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings --quiet
 - align: skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --proof-digest <run_dir>/proof-digest.json --quiet
 
 RESUME
-- skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent
+- skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent --json
 ```
 
 JSON output must expose the same fields with stable names.
@@ -575,21 +578,23 @@ Proposed schema:
       "selected route fulfilled or intentionally partial",
       "required checks passed or gaps reported",
       "progress evidence recorded",
+      "token stats recorded when measured or estimated metrics are available",
       "final-response evidence recorded",
       "alignment artifacts generated quietly"
     ],
     "route_fulfillment_event": "route_fulfilled",
+    "token_stats_command": "skillspec progress stats <run_dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet",
     "final_progress_command": "skillspec progress final-response <run_dir> ... --quiet",
     "alignment_command": "skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --proof-digest <run_dir>/proof-digest.json --quiet",
     "final_response_must_include": [
       "result",
       "evidence",
       "alignment summary",
-      "token usage",
+      "token usage from alignment, or not recorded with reason",
       "SkillSpec route/run_dir/status"
     ]
   },
-  "resume_command": "skillspec run-loop ./skill.spec.yml --resume .skillspec/traces/run-123 --guide agent",
+  "resume_command": "skillspec run-loop ./skill.spec.yml --resume .skillspec/traces/run-123 --guide agent --json",
   "generated_at_unix_ms": 1234567890
 }
 ```
@@ -826,13 +831,13 @@ description: "Use for inspecting, porting, proving, installing, routing, or mana
 Start the SkillSpec guide:
 
 ```bash
-skillspec run-loop ./skill.spec.yml --input '<user task>' --trace-dir "${PWD}/.skillspec/traces" --guide agent
+skillspec run-loop ./skill.spec.yml --input '<user task>' --trace-dir "${PWD}/.skillspec/traces" --guide agent --json
 ```
 
 Resume an existing run:
 
 ```bash
-skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent
+skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent --json
 ```
 
 Follow the printed current gate. The selected route, matched rules, forbids,
@@ -842,9 +847,11 @@ authoritative.
 Use `skillspec query` and `skillspec refs` only for handles named by the guide.
 Do not read the full spec unless the guide, a blocker, or the user asks for it.
 
-Before the final response, follow the guide's end anchor: record final-response
+Before the final response, follow the guide's end anchor: record quiet token
+stats when measured or estimated metrics are available, record final-response
 evidence, run compact alignment, and report result, evidence, alignment summary,
-token usage, selected route, and run directory.
+token usage from alignment or why it was not recorded, selected route, and run
+directory.
 
 If the CLI is unavailable, read `skill.spec.yml` directly and manually follow
 the same route, rule, phase, dependency, forbid, proof, and completion contract.
@@ -1029,7 +1036,7 @@ proof.
 Deliver:
 
 ```text
-skillspec run-loop <spec> --input <task> --trace-dir <dir> --guide agent
+skillspec run-loop <spec> --input <task> --trace-dir <dir> --guide agent --json
 ```
 
 Implement:
@@ -1048,7 +1055,7 @@ Tests:
 
 - selected route appears in start anchor
 - current phase appears
-- end anchor includes final progress and trace align commands
+- end anchor includes token stats, final progress, and trace align commands
 - state files are written
 - normal `run-loop` output unchanged without `--guide`
 
@@ -1057,7 +1064,7 @@ Tests:
 Deliver:
 
 ```text
-skillspec run-loop <spec> --resume <run_dir> --guide agent
+skillspec run-loop <spec> --resume <run_dir> --guide agent --json
 ```
 
 Implement:
@@ -1123,7 +1130,7 @@ Tests:
 - frontmatter discovery risk remains low
 - `skillspec validate skills/skillspec/skill.spec.yml`
 - `skillspec test skills/skillspec/skill.spec.yml`
-- `skillspec run-loop skills/skillspec/skill.spec.yml --input 'what is the shape of this skill' --trace-dir /tmp/... --guide agent`
+- `skillspec run-loop skills/skillspec/skill.spec.yml --input 'what is the shape of this skill' --trace-dir /tmp/... --guide agent --json`
 
 ### Phase 5: Doctor Contract Mitigation
 
@@ -1187,8 +1194,8 @@ cargo clippy -p skillspec --all-targets -- -D warnings
 cargo test -p skillspec --test cli
 cargo run -p skillspec -- validate skills/skillspec/skill.spec.yml
 cargo run -p skillspec -- test skills/skillspec/skill.spec.yml
-cargo run -p skillspec -- run-loop skills/skillspec/skill.spec.yml --input 'what is the shape of this skill' --trace-dir /tmp/skillspec-guide-test --guide agent
-cargo run -p skillspec -- run-loop skills/skillspec/skill.spec.yml --resume /tmp/skillspec-guide-test/<run-id> --guide agent
+cargo run -p skillspec -- run-loop skills/skillspec/skill.spec.yml --input 'what is the shape of this skill' --trace-dir /tmp/skillspec-guide-test --guide agent --json
+cargo run -p skillspec -- run-loop skills/skillspec/skill.spec.yml --resume /tmp/skillspec-guide-test/<run-id> --guide agent --json
 cargo run -p skillspec -- doctor skills/skillspec/
 git diff --check
 ```

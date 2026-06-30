@@ -111,9 +111,9 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     let allowed_commands = report["current_gate"]["allowed_commands"]
         .as_array()
         .ok_or_else(|| invalid_json_shape("missing allowed commands"))?;
-    assert!(allowed_commands.iter().any(|command| command
+    assert!(allowed_commands.iter().all(|command| command
         .as_str()
-        .is_some_and(|command| command.contains("skillspec act"))));
+        .is_some_and(|command| !command.contains("skillspec act"))));
     assert!(allowed_commands.iter().any(|command| command
         .as_str()
         .is_some_and(|command| command.contains("progress batch")
@@ -122,16 +122,35 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     assert!(allowed_commands.iter().any(|command| command
         .as_str()
         .is_some_and(|command| command.contains("progress show") && command.contains("--quiet"))));
+    let allowed_now = report["current_gate"]["allowed_now"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing allowed_now"))?;
+    assert!(allowed_now.iter().all(|item| {
+        item.as_str().is_some_and(|item| {
+            !item.contains("skillspec query") && !item.contains("skillspec refs")
+        })
+    }));
     assert!(report["end"]["final_progress_command"]
         .as_str()
         .is_some_and(
             |command| command.contains("progress final-response") && command.contains("--quiet")
         ));
+    assert!(report["end"]["token_stats_command"]
+        .as_str()
+        .is_some_and(|command| command.contains("progress stats")
+            && command.contains("--agent-visible-tokens")
+            && command.contains("--artifact-tokens-preserved")
+            && command.contains("--avoided-tokens")
+            && command.contains("--metrics-source estimated")
+            && command.contains("--quiet")));
     assert!(report["end"]["alignment_command"]
         .as_str()
         .is_some_and(|command| command.contains("trace align")
             && command.contains("--quiet")
             && !command.contains("--summary")));
+    assert!(report["resume"]["command"]
+        .as_str()
+        .is_some_and(|command| command.contains("--guide agent") && command.contains("--json")));
     assert!(report["current_gate"]["recommended_queries"]
         .as_array()
         .is_some_and(|queries| queries.is_empty()));
@@ -243,6 +262,10 @@ commands:
         .is_some_and(|hints| hints.is_empty()));
     assert_eq!(
         diagnostic_report["end"]["alignment_command"],
+        "not required for this diagnostic route"
+    );
+    assert_eq!(
+        diagnostic_report["end"]["token_stats_command"],
         "not required for this diagnostic route"
     );
 

@@ -24,7 +24,7 @@ skillspec <COMMAND>
 | `test <path>` | Run scenario tests declared in a SkillSpec. |
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
-| `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and action checklist in one spec load; with `--guide`, emit start/current/end anchors and persisted resume state. |
+| `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and current-gate control data in one spec load; with `--guide agent --json`, emit machine-readable start/current/end anchors and persisted resume state. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
@@ -135,15 +135,18 @@ Options:
 - `--phase <PHASE>`: expand this execution phase instead of the first pending
   phase.
 - `--guide <GUIDE>`: emit a stateful guide. Values are `agent` and `full`.
-  `agent` prints compact start/current/end anchors plus next commands; `full`
-  adds fingerprints and progress-record detail.
+  Use `agent --json` for normal harness execution so the model consumes
+  machine-readable start/current/end anchors without a human checklist parade.
+  Proof-bearing end anchors include a quiet token-stats command before
+  final-response and alignment proof. `full` adds fingerprints and debug
+  navigation detail.
 - `--json`: emit JSON instead of a compact human report.
 
 `run-loop` is a batching convenience for the common agent planning path. It
-loads the spec once, runs sensemake, decision, plan, and action-checklist
-construction in process, and prints a compact summary with wall-clock and
-estimated output metrics. It does not execute tools or mutate external systems
-except optional decision trace output.
+loads the spec once, runs sensemake, decision, plan, and current-gate
+construction in process, and emits either JSON control data or a compact human
+summary with wall-clock and estimated output metrics. It does not execute tools
+or mutate external systems except optional decision trace output.
 
 With `--guide agent`, `run-loop` also writes:
 

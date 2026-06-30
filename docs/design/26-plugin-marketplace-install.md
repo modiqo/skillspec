@@ -134,8 +134,8 @@ SkillSpec behavior contract. It should:
 
 - resolve the directory that contains the loaded `SKILL.md`;
 - treat `<skill_dir>/skill.spec.yml` as the source of truth;
-- call `skillspec run-loop <skill_dir>/skill.spec.yml --guide agent`;
-- resume with `skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent`;
+- call `skillspec run-loop <skill_dir>/skill.spec.yml --guide agent --json`;
+- resume with `skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent --json`;
 - ask the user to install the CLI if `skillspec` is missing;
 - fall back to reading `<skill_dir>/skill.spec.yml` only when the CLI exists but
   guide mode fails.

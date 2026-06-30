@@ -117,7 +117,7 @@ skillspec run-loop ./skill.spec.yml \
 For resume after compaction:
 
 ```bash
-skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent
+skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent --json
 ```
 
 The guided loop prints:

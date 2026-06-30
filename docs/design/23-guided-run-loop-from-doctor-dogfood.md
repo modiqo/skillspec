@@ -495,7 +495,7 @@ current_phase: run_shape_doctor
 open_requirements: doctor_source_shape
 do_not: port, import, compile, install
 next command: skillspec doctor <source>
-resume: skillspec run-loop <spec> --resume <run_dir> --guide agent
+resume: skillspec run-loop <spec> --resume <run_dir> --guide agent --json
 ```
 
 That is the behavioral improvement: the CLI selects the right route, names the

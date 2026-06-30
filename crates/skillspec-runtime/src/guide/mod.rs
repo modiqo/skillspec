@@ -297,7 +297,7 @@ fn assemble_report(inputs: AssembleInputs<'_>) -> Result<GuideReport> {
     );
     let resume = ResumeAnchor {
         command: format!(
-            "skillspec run-loop {} --resume {} --guide agent",
+            "skillspec run-loop {} --resume {} --guide agent --json",
             shell_arg(&spec_path),
             shell_arg(&run_dir)
         ),
@@ -412,12 +412,14 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                 inputs.act.elicitations.join(", ")
             ));
         }
-        allowed_commands.push(format!(
-            "skillspec act {} --input '<same-task>' --run {} --phase {}",
-            shell_arg(inputs.spec_path),
-            shell_arg(inputs.run_dir),
-            phase.id
-        ));
+        if expose_debug_queries {
+            allowed_commands.push(format!(
+                "skillspec act {} --input '<same-task>' --run {} --phase {} --json",
+                shell_arg(inputs.spec_path),
+                shell_arg(inputs.run_dir),
+                phase.id
+            ));
+        }
         if inputs.proof_suppressed {
             do_now.push(
                 "answer from the diagnostic output and stop; no progress ledger or alignment proof is required for this route"
@@ -487,17 +489,17 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
         ));
     }
 
-    let allowed_now = if inputs.proof_suppressed {
-        inputs
-            .act
-            .allowed_now
-            .iter()
-            .filter(|item| !item.contains("evidence for later alignment"))
-            .cloned()
-            .collect()
-    } else {
-        inputs.act.allowed_now.clone()
-    };
+    let allowed_now = inputs
+        .act
+        .allowed_now
+        .iter()
+        .filter(|item| !inputs.proof_suppressed || !item.contains("evidence for later alignment"))
+        .filter(|item| {
+            expose_debug_queries
+                || !(item.contains("skillspec query") || item.contains("skillspec refs"))
+        })
+        .cloned()
+        .collect();
 
     CurrentGate {
         phase: inputs.phase.map(|phase| phase.id.clone()),
@@ -535,6 +537,7 @@ fn build_end_anchor(
                     .to_owned(),
             ],
             route_fulfillment_event: "not_required_for_diagnostic_route".to_owned(),
+            token_stats_command: "not required for this diagnostic route".to_owned(),
             final_progress_command: "not required for this diagnostic route".to_owned(),
             alignment_command: "not required for this diagnostic route".to_owned(),
             final_response_must_include: vec![
@@ -550,10 +553,15 @@ fn build_end_anchor(
             "selected route is fulfilled or intentionally partial".to_owned(),
             "required checks passed or proof gaps are named".to_owned(),
             "progress evidence is recorded in execution.jsonl".to_owned(),
+            "token stats are recorded quietly when measured or estimated metrics are available".to_owned(),
             "final-response evidence is recorded".to_owned(),
             "alignment artifacts are generated quietly".to_owned(),
         ],
         route_fulfillment_event: "route-fulfilled".to_owned(),
+        token_stats_command: format!(
+            "skillspec progress stats {} --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet",
+            shell_arg(run_dir)
+        ),
         final_progress_command: format!(
             "skillspec progress final-response {} --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings --quiet",
             shell_arg(run_dir)
@@ -569,7 +577,7 @@ fn build_end_anchor(
             "result".to_owned(),
             "evidence paths".to_owned(),
             "alignment status or alignment report path".to_owned(),
-            "token usage or not recorded".to_owned(),
+            "token usage from alignment, or not recorded with reason".to_owned(),
             "selected route".to_owned(),
             "run directory".to_owned(),
         ],

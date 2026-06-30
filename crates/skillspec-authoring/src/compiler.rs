@@ -82,16 +82,16 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
     output.push_str("Use the directory that contains this loaded `SKILL.md` as `<skill_dir>`.\n");
     output.push_str("The SkillSpec contract is `<skill_dir>/skill.spec.yml`; do not assume the user's current working directory contains the spec.\n\n");
     output.push_str("Start the SkillSpec guide with the user's task:\n\n");
-    output.push_str("`skillspec run-loop <skill_dir>/skill.spec.yml --input '<user task>' --trace-dir \"${PWD}/.skillspec/traces\" --guide agent`\n\n");
+    output.push_str("`skillspec run-loop <skill_dir>/skill.spec.yml --input '<user task>' --trace-dir \"${PWD}/.skillspec/traces\" --guide agent --json`\n\n");
     output.push_str("Resume an existing guided run:\n\n");
     output.push_str(
-        "`skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent`\n\n",
+        "`skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent --json`\n\n",
     );
-    output.push_str("Follow the printed current gate. The selected route, matched rules, forbids, allowed commands, open requirements, resume command, and end proof from the CLI guide are authoritative.\n\n");
+    output.push_str("Use the JSON current gate as internal control data. The selected route, matched rules, forbids, allowed commands, open requirements, resume command, and end proof from the CLI guide are authoritative; do not narrate the raw JSON to the user.\n\n");
     output.push_str("Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, evidence-batch JSONL rows, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.\n\n");
-    output.push_str("Use `skillspec query` and `skillspec refs` only for handles named by the guide. Do not read the full spec unless the guide, a blocker, or the user asks for it.\n\n");
+    output.push_str("Do not run `skillspec act`, `skillspec query`, `skillspec refs`, or `skillspec --help` during normal execution. Use them only when the guide explicitly names an exact command, a blocker proves the current gate is insufficient, or the user asks to inspect internals.\n\n");
     output.push_str("For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.\n\n");
-    output.push_str("For proof-bearing execution routes, batch routine successful evidence into a JSONL file without displaying the rows and run one quiet `skillspec progress batch ... --quiet` checkpoint at natural phase boundaries. Do not run `skillspec progress ... --help` or query `command:progress_*` during normal execution; the guide provides the needed JSONL shape. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor with quiet progress/alignment commands, then report result, evidence paths, alignment status or report path, token usage when recorded, selected route, and run directory.\n\n");
+    output.push_str("For proof-bearing execution routes, batch routine successful evidence into a JSONL file without displaying the rows and run one quiet `skillspec progress batch ... --quiet` checkpoint at natural phase boundaries. Do not run `skillspec progress ... --help` or query `command:progress_*` during normal execution; the guide provides the needed JSONL shape. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor with quiet token-stats, final-progress, and alignment commands when metrics are available, then report result, evidence paths, alignment status or report path, token usage from alignment or why it was not recorded, selected route, and run directory.\n\n");
     output.push_str("If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:\n\n");
     output.push_str("```bash\n");
     output.push_str(
@@ -1235,6 +1235,7 @@ mod tests {
         assert!(output.contains("skill.spec.yml"));
         assert!(output.contains("skillspec run-loop <skill_dir>/skill.spec.yml"));
         assert!(output.contains("--guide agent"));
+        assert!(output.contains("--guide agent --json"));
         assert!(output.contains("--trace-dir"));
         assert!(output.contains("--resume <run_dir>"));
         assert!(output.contains("trace align"));

@@ -91,6 +91,7 @@ pub struct ProgressRecordHint {
 pub struct EndAnchor {
     pub done_when: Vec<String>,
     pub route_fulfillment_event: String,
+    pub token_stats_command: String,
     pub final_progress_command: String,
     pub alignment_command: String,
     pub final_response_must_include: Vec<String>,
