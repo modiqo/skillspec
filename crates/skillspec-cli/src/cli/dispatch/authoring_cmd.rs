@@ -1,4 +1,4 @@
-use crate::cli::args::{CompileTarget, RouterExecutionModeArg};
+use crate::cli::args::{CompileTarget, RouteHarnessArg, RouterExecutionModeArg};
 use skillspec::{domain::authoring, error::Result, report};
 use std::io::Write;
 use std::path::PathBuf;
@@ -105,6 +105,8 @@ pub(super) fn route(
     query: String,
     top: usize,
     execution_mode: Option<RouterExecutionModeArg>,
+    current_harness: Option<RouteHarnessArg>,
+    current_root: Option<PathBuf>,
     json: bool,
 ) -> Result<()> {
     let route_report = authoring::route(authoring::RouteOptions {
@@ -112,6 +114,8 @@ pub(super) fn route(
         query,
         top,
         execution_mode: execution_mode.map(Into::into),
+        current_harness: current_harness.map(Into::into),
+        current_root,
     })?;
     if json {
         report::json(&route_report)

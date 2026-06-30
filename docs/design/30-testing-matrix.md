@@ -103,18 +103,18 @@ Remaining live gates:
 
 - Restarted Codex/Claude prompt-level observation is still manual; CLI checks
   cannot prove the running harness reloaded hooks or loaded only one skill.
-- Multi-root installs can produce duplicate same-skill route candidates. During
-  live probing, `skillspec`, `durable-executor`, and `rote-shell` intents became
-  `ambiguous_match` when identical skills were present in multiple roots. This
-  needs deterministic duplicate collapse or root preference coverage before it
-  can be called automated.
+- Multi-root installs previously produced duplicate same-skill route candidates.
+  During live probing, `skillspec`, `durable-executor`, and `rote-shell` intents
+  became `ambiguous_match` when identical skills were present in multiple roots.
+  The router now collapses duplicate logical skills and applies deterministic
+  root/harness preference for the physical copy.
 - Router guard warned about stale visibility manifest entries for missing
   `rote-onboard-*` skills. This is not a first-hop failure, but it should become
   a repairable cleanup assertion.
 - `17-pseudo-harness-simulator` now captures deterministic event-order checks
   for hook-before-catalog, bypass/no-load, selected-skill load, imported
-  trampoline handoff, durable implicit observer visibility, and the current
-  duplicate-root ambiguity gap.
+  trampoline handoff, durable implicit observer visibility, and duplicate-root
+  collapse.
 
 ## Test Environment Model
 
@@ -242,7 +242,7 @@ For each test, capture:
 | Router guard repair | Add an out-of-band skill after install, then run guard. | Guard repairs visibility/index drift and hook context reports `first_hop_ready=true`. | Harness-sim automatable | Covered |
 | Router route positive | Query clear skill intent. | `skillspec route` returns `use_skill` with selected skill. | Automatable | Covered |
 | Router route bypass | Query ordinary non-skill task. | `skillspec route` returns `bypass` or `ambiguous` and no selected skill. | Automatable | Covered |
-| Router route duplicates | Install the same logical skill in multiple detected roots, then query that skill intent. | Duplicate same-skill candidates are collapsed or resolved by deterministic root preference; duplicate roots alone must not cause `ambiguous_match`. | Harness-sim automatable | Gap |
+| Router route duplicates | Install the same logical skill in multiple detected roots, then query that skill intent. | Duplicate same-skill candidates are collapsed or resolved by deterministic root preference; duplicate roots alone must not cause `ambiguous_match`. | Harness-sim automatable | Covered |
 | Router drift | Add out-of-band implicit skill after install. | Guard or index refresh detects and repairs explicit visibility. | Harness-sim automatable | Covered |
 | Router stale index | Modify skill roots after index. | Status reports stale/missing/index mismatch. | Automatable | Covered |
 | Router stale visibility refs | Visibility manifest references removed skills. | Guard reports stale references as cleanup/repairable drift without blocking ready roots. | Harness-sim automatable | Gap |
@@ -267,7 +267,7 @@ For each test, capture:
 | Durable delete | Delete managed durable executor. | Managed installs are removed; unmanaged folders are not removed. | Harness-sim automatable | Covered |
 | Durable marker guard | Remove the managed marker before update/delete. | Update/delete refuse to mutate unmanaged durable-executor folders. | Harness-sim automatable | Covered |
 | Durable with router | Install router and durable executor together. | Durable install refreshes the router index and durable-executor remains implicit while router stays installed. | Harness-sim automatable | Covered |
-| Durable with router duplicates | Install durable-executor in multiple detected roots while router mode is enabled. | Durable remains the implicit observer exception or resolves as one logical durable skill; duplicate roots must not block durable activation with `ambiguous_match`. | Harness-sim automatable | Gap |
+| Durable with router duplicates | Install durable-executor in multiple detected roots while router mode is enabled. | Durable remains the implicit observer exception or resolves as one logical durable skill; duplicate roots must not block durable activation with `ambiguous_match`. | Harness-sim automatable | Covered |
 | Durable rote-exec contract | Ask durable-executor to run a local command and remember the result. | Plan/act select `one_shot_process`, allow `rote_exec`, forbid direct CLI/shell, and alignment accepts `rote_exec` process evidence. | Automatable | Covered |
 | Durable live rote-exec proof | Copy `/Users/chetanconikee/.local/bin/rote` plus `~/.rote` config into the lab, excluding existing workspaces, set `ROTE_HOME` to that copied tree, and run `rote exec -- printf skillspec-durable-proof`. | The copied authenticated local `rote` creates a named sandbox workspace, captures the command output, and SkillSpec alignment reaches `pass`. | Manual with trace review | Covered by opt-in `just harness-lab-live-durable-rote-exec` |
 | Durable happy path | Enable durable executor and run one SkillSpec-backed skill. | Workspace/evidence is preserved and final response can cite durable evidence. | Manual with trace review | Manual |

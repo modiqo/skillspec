@@ -41,7 +41,9 @@ fn run_pseudo_harness_phase() -> HarnessLabReport {
     pseudo_harness_matrix::router::router_bypass_does_not_load_domain_skill(&mut report);
     pseudo_harness_matrix::router::router_selected_domain_loads_one_skill(&mut report);
     pseudo_harness_matrix::router::router_guard_repairs_before_catalog_build(&mut report);
-    pseudo_harness_matrix::router::duplicate_root_ambiguity_is_tracked_gap(&mut report);
+    pseudo_harness_matrix::router::duplicate_root_candidates_collapse_to_one_logical_selection(
+        &mut report,
+    );
     pseudo_harness_matrix::durable::durable_observer_remains_implicit_with_router(&mut report);
     pseudo_harness_matrix::imported::imported_trampoline_handoff_is_visible(&mut report);
     report.build()

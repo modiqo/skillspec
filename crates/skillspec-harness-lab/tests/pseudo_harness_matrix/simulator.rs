@@ -147,9 +147,17 @@ fn loaded_skill(fixture: &PseudoHarnessFixture, route: &Value) -> Option<LoadedS
     if name == "skill-router" {
         return None;
     }
-    let path = find_skill(fixture, name)?;
-    let trampoline =
-        path.join("skill.spec.yml").is_file() && file_contains(path.join("SKILL.md"), "SkillSpec");
+    let path = route["selected"]["path"]
+        .as_str()
+        .map(PathBuf::from)
+        .or_else(|| find_skill(fixture, name))?;
+    let skill_dir = if path.file_name().and_then(|value| value.to_str()) == Some("SKILL.md") {
+        path.parent().unwrap_or(&path)
+    } else {
+        &path
+    };
+    let trampoline = skill_dir.join("skill.spec.yml").is_file()
+        && file_contains(skill_dir.join("SKILL.md"), "SkillSpec");
     Some(LoadedSkill {
         name: name.to_owned(),
         path,

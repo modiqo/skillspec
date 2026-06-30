@@ -370,6 +370,12 @@ pub(super) enum Command {
         /// Execution mode already selected by user or caller.
         #[arg(long, value_enum)]
         execution_mode: Option<RouterExecutionModeArg>,
+        /// Harness currently making the route decision; only used to choose between duplicate installed copies of the same logical skill.
+        #[arg(long, value_enum)]
+        current_harness: Option<RouteHarnessArg>,
+        /// Skill root currently visible to the active harness; only used to choose between duplicate installed copies of the same logical skill.
+        #[arg(long)]
+        current_root: Option<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

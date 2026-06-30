@@ -88,6 +88,10 @@ or `ambiguous`. Only `use_skill` authorizes loading the selected skill. `bypass`
 and `ambiguous` keep the agent on the normal path instead of loading an
 unrelated or uncertain candidate.
 
+If the same logical skill is installed in several roots, route collapses those
+physical copies before matching. Harness/root context only chooses which copy to
+load after the logical skill has already won.
+
 Prompt-hook guard owns freshness. When guard context says
 `first_hop_ready=true`, the ordinary router path is a single `skillspec route`
 query. It does not run index status, repair visibility, or read the full router
@@ -112,6 +116,8 @@ Grounded command:
 skillspec route \
   --index <router-index> \
   --query '<user task>' \
+  --current-harness codex \
+  --current-root <active-skill-root> \
   --json
 ```
 
@@ -121,6 +127,8 @@ Review check:
   skill's task.
 - A selected skill is loaded only for `decision: use_skill`; its SkillSpec or
   prose contract still owns the domain work.
+- Duplicate physical installs of the same logical skill should not create
+  `ambiguous`; true different skills still can.
 - Index status and repair are lifecycle operations, not part of ordinary
   dispatch when guard already reports `first_hop_ready=true`.
 - Durable execution remains a separate execution policy.

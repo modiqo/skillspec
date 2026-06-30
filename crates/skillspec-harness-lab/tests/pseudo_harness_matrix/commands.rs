@@ -49,6 +49,10 @@ pub fn route_json(fixture: &PseudoHarnessFixture, query: &str) -> Value {
         .arg(&fixture.index)
         .arg("--query")
         .arg(query)
+        .arg("--current-harness")
+        .arg("claude-local")
+        .arg("--current-root")
+        .arg(fixture.lab.claude_root())
         .arg("--json")
         .output()
         .unwrap();

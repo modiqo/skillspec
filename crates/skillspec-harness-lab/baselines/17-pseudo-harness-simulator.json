@@ -6,8 +6,8 @@
     "cases_total": 6,
     "cases_passed": 6,
     "cases_failed": 0,
-    "claims_total": 43,
-    "claims_passed": 43,
+    "claims_total": 44,
+    "claims_passed": 44,
     "claims_failed": 0
   },
   "cases": [
@@ -162,7 +162,7 @@
       ]
     },
     {
-      "id": "duplicate_root_ambiguity_is_tracked_gap",
+      "id": "duplicate_root_candidates_collapse_to_one_logical_selection",
       "status": "pass",
       "claims": [
         {
@@ -172,34 +172,40 @@
           "observed": true
         },
         {
-          "id": "route.current_decision",
+          "id": "route.decision",
           "status": "pass",
-          "expected": "ambiguous",
-          "observed": "ambiguous"
+          "expected": "use_skill",
+          "observed": "use_skill"
         },
         {
-          "id": "route.current_bypass_reason",
+          "id": "route.selected",
           "status": "pass",
-          "expected": "ambiguous_match",
-          "observed": "ambiguous_match"
+          "expected": "durable-executor",
+          "observed": "durable-executor"
         },
         {
-          "id": "route.selected_null",
+          "id": "route.durable_candidate_count",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "domain.loaded",
           "status": "pass",
           "expected": true,
           "observed": true
         },
         {
-          "id": "route.durable_candidate_count",
+          "id": "domain.loaded_name",
           "status": "pass",
-          "expected": 3,
-          "observed": 3
+          "expected": "durable-executor",
+          "observed": "durable-executor"
         },
         {
-          "id": "domain.loaded",
+          "id": "domain.selected_path",
           "status": "pass",
-          "expected": false,
-          "observed": false
+          "expected": "<PROJECT>/.claude/skills/durable-executor/SKILL.md",
+          "observed": "<PROJECT>/.claude/skills/durable-executor/SKILL.md"
         }
       ]
     },

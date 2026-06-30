@@ -197,8 +197,8 @@ Current committed phases:
 - `17-pseudo-harness-simulator`: deterministic event-order coverage for the
   harness boundary: hook before catalog, bypass without domain load, selected
   skill loads exactly one domain skill, out-of-band repair before catalog,
-  imported trampoline handoff, durable implicit observer visibility, and the
-  current duplicate-root ambiguity gap.
+  imported trampoline handoff, durable implicit observer visibility, and
+  duplicate-root collapse.
 
 Current phase entrypoints:
 
@@ -229,11 +229,13 @@ Live checkpoint from 2026-06-29:
   binary, copied local `~/.rote` config, sandbox `ROTE_HOME`, and a real
   `rote exec -- printf skillspec-durable-proof` command.
 
-The same checkpoint exposed two gaps that drove the first simulator phase and
-still need product fixes or cleanup semantics:
+The same checkpoint exposed two issues that drove the first simulator phase and
+the follow-up router fix:
 
 - duplicate same-skill installs across `agents`, `codex`, and `claude-local`
-  can produce equal route candidates and `ambiguous_match`;
+  could produce equal route candidates and `ambiguous_match`; the router fix
+  collapses duplicate logical skills before matching and prefers the active
+  harness/root only when choosing the physical copy;
 - stale visibility manifest entries for removed skills can appear as guard
   warnings and need a repairable cleanup assertion.
 
@@ -383,7 +385,7 @@ Use this stack:
 | `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
 | `test/15-durable-rote-exec-proof` | Durable route/act contract for `rote_exec`, `rote-shell` guidance fixture, alignment over `rote_exec` process evidence, and opt-in copied local rote binary/config execution proof with sandbox `ROTE_HOME`. | Durable substrate proof rows. |
 | `test/16-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
-| `test/17-pseudo-harness-simulator` | Add deterministic pseudo-harness scenarios for pre-call hook ordering, bypass/no-load behavior, domain selected-skill loading, imported trampoline handoff, durable implicit observer behavior, and current duplicate-root ambiguity tracking. | Router and durable boundary rows that do not require a live harness UI. |
+| `test/17-pseudo-harness-simulator` | Add deterministic pseudo-harness scenarios for pre-call hook ordering, bypass/no-load behavior, domain selected-skill loading, imported trampoline handoff, durable implicit observer behavior, and duplicate-root collapse regression coverage. | Router and durable boundary rows that do not require a live harness UI. |
 
 The implementation lives in a separate test crate so the crate refactor and CLI
 boundary stay clean:

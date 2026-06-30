@@ -132,7 +132,9 @@ pub fn router_guard_repairs_before_catalog_build(report: &mut HarnessLabReportBu
     case.finish();
 }
 
-pub fn duplicate_root_ambiguity_is_tracked_gap(report: &mut HarnessLabReportBuilder) {
+pub fn duplicate_root_candidates_collapse_to_one_logical_selection(
+    report: &mut HarnessLabReportBuilder,
+) {
     let fixture = pseudo_fixture("pseudo-router-duplicates");
     write_duplicate_durable_roots(&fixture.lab);
     let install = install_router_json(&fixture);
@@ -142,8 +144,14 @@ pub fn duplicate_root_ambiguity_is_tracked_gap(report: &mut HarnessLabReportBuil
         &fixture,
         "use durable-executor to run a shell command and preserve proof",
     );
-    assert_eq!(run.route["decision"], "ambiguous");
-    assert!(run.loaded_skill.is_none());
+    assert_eq!(run.route["decision"], "use_skill");
+    let loaded = run
+        .loaded_skill
+        .as_ref()
+        .expect("expected collapsed durable-executor selection");
+    assert_eq!(loaded.name, "durable-executor");
+    let expected_path = fixture.lab.claude_root().join("durable-executor/SKILL.md");
+    assert_eq!(loaded.path, expected_path);
     fixture.lab.assert_no_real_home_writes();
 
     let durable_candidates = run
@@ -155,20 +163,21 @@ pub fn duplicate_root_ambiguity_is_tracked_gap(report: &mut HarnessLabReportBuil
         .filter(|candidate| candidate["name"] == "durable-executor")
         .count();
 
-    let mut case = report.case("duplicate_root_ambiguity_is_tracked_gap");
+    let mut case = report.case("duplicate_root_candidates_collapse_to_one_logical_selection");
     case.claim_pass("install.ready", true, &install["preparedness"]["ready"]);
+    case.claim_pass("route.decision", "use_skill", &run.route["decision"]);
     case.claim_pass(
-        "route.current_decision",
-        "ambiguous",
-        &run.route["decision"],
+        "route.selected",
+        "durable-executor",
+        &run.route["selected"]["name"],
     );
+    case.claim_pass("route.durable_candidate_count", 1, durable_candidates);
+    case.claim_pass("domain.loaded", true, run.loaded_skill.is_some());
+    case.claim_pass("domain.loaded_name", "durable-executor", &loaded.name);
     case.claim_pass(
-        "route.current_bypass_reason",
-        "ambiguous_match",
-        &run.route["bypass_reason"],
+        "domain.selected_path",
+        fixture.lab.normalize_path(&expected_path),
+        fixture.lab.normalize_path(&loaded.path),
     );
-    case.claim_pass("route.selected_null", true, run.route["selected"].is_null());
-    case.claim_pass("route.durable_candidate_count", 3, durable_candidates);
-    case.claim_pass("domain.loaded", false, run.loaded_skill.is_some());
     case.finish();
 }

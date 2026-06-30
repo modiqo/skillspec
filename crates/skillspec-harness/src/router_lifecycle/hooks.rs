@@ -11,6 +11,7 @@ pub(super) fn guard(options: RouterGuardOptions) -> Result<RouterGuardReport> {
         return Ok(inactive_guard_report(
             config_path,
             false,
+            options.current_harness,
             "router config is missing; run `skillspec router install` to enable router-first mode",
             "skillspec router install --roots <skill-roots> --index <router-index>",
         ));
@@ -20,6 +21,7 @@ pub(super) fn guard(options: RouterGuardOptions) -> Result<RouterGuardReport> {
         return Ok(inactive_guard_report(
             config_path,
             true,
+            options.current_harness,
             "router config is installed but disabled; run `skillspec router enable` to restore router-first mode",
             "skillspec router enable --json",
         ));
@@ -92,6 +94,7 @@ pub(super) fn guard(options: RouterGuardOptions) -> Result<RouterGuardReport> {
         config: config_path,
         installed: true,
         enabled: true,
+        current_harness: options.current_harness,
         repaired,
         first_hop_ready,
         router_skill_dirs,
@@ -112,9 +115,9 @@ pub(super) fn apply_harness_hooks_for_config(
     enabled: bool,
     dry_run: bool,
 ) -> Result<Vec<RouterHarnessHookReport>> {
-    let command = managed_hook_command(config_path);
     let mut reports = Vec::new();
     for target in hook_targets_for_roots(&config.roots) {
+        let command = managed_hook_command(config_path, target.harness);
         let report = if enabled {
             install_hook(&target, &command, dry_run)?
         } else {
@@ -129,10 +132,12 @@ pub(super) fn inspect_harness_hooks_for_config(
     config_path: &Path,
     config: &RouterConfig,
 ) -> Vec<RouterHarnessHookReport> {
-    let command = managed_hook_command(config_path);
     hook_targets_for_roots(&config.roots)
         .into_iter()
-        .map(|target| inspect_hook(&target, &command))
+        .map(|target| {
+            let command = managed_hook_command(config_path, target.harness);
+            inspect_hook(&target, &command)
+        })
         .collect()
 }
 
@@ -140,6 +145,13 @@ pub(super) fn hook_json_for_guard(report: &RouterGuardReport) -> Value {
     if report.first_hop_ready {
         let mut context =
             "SkillSpec router guard: first_hop_ready=true. Use skill-router as the first hop before loading domain skills.".to_owned();
+        if let Some(harness) = report.current_harness {
+            context.push_str(&format!(
+                " Current harness: {}; pass `--current-harness {}` to `skillspec route` for duplicate-root physical selection.",
+                harness.as_str(),
+                harness.as_str()
+            ));
+        }
         if report.repaired {
             context.push_str(" The guard repaired router visibility/index drift before this turn.");
         }
@@ -160,6 +172,7 @@ pub(super) fn hook_json_for_guard(report: &RouterGuardReport) -> Value {
 fn inactive_guard_report(
     config: PathBuf,
     installed: bool,
+    current_harness: Option<router::RouteHarness>,
     message: &str,
     repair_command: &str,
 ) -> RouterGuardReport {
@@ -167,6 +180,7 @@ fn inactive_guard_report(
         config,
         installed,
         enabled: false,
+        current_harness,
         repaired: false,
         first_hop_ready: false,
         router_skill_dirs: Vec::new(),
@@ -497,10 +511,15 @@ fn is_managed_hook(hook: &Value) -> bool {
         .is_some_and(|command| command.contains(MANAGED_HOOK_MATCH) && command.contains("--hook"))
 }
 
-fn managed_hook_command(config_path: &Path) -> String {
+fn managed_hook_command(config_path: &Path, harness: RouterHarness) -> String {
+    let route_harness = match harness {
+        RouterHarness::Codex => router::RouteHarness::Codex,
+        RouterHarness::Claude => router::RouteHarness::ClaudeLocal,
+    };
     format!(
-        "skillspec router guard --config {} --hook",
-        shell_quote(&config_path.to_string_lossy())
+        "skillspec router guard --config {} --hook --harness {}",
+        shell_quote(&config_path.to_string_lossy()),
+        route_harness.as_str()
     )
 }
 

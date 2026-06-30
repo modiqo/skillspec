@@ -30,6 +30,13 @@ pub(in crate::cli) enum RouterExecutionModeArg {
     Durable,
 }
 
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(in crate::cli) enum RouteHarnessArg {
+    Agents,
+    Codex,
+    ClaudeLocal,
+}
+
 #[derive(Clone, Debug, clap::ValueEnum)]
 pub(in crate::cli) enum VisibilityArg {
     Implicit,
@@ -133,6 +140,16 @@ impl From<RouterExecutionModeArg> for router::ExecutionMode {
         match value {
             RouterExecutionModeArg::Direct => Self::Direct,
             RouterExecutionModeArg::Durable => Self::Durable,
+        }
+    }
+}
+
+impl From<RouteHarnessArg> for router::RouteHarness {
+    fn from(value: RouteHarnessArg) -> Self {
+        match value {
+            RouteHarnessArg::Agents => Self::Agents,
+            RouteHarnessArg::Codex => Self::Codex,
+            RouteHarnessArg::ClaudeLocal => Self::ClaudeLocal,
         }
     }
 }

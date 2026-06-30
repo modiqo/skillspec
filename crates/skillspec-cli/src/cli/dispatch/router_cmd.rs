@@ -76,8 +76,17 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 report::text(&harness::render_router_mode(&report))?;
             }
         }
-        RouterCommand::Guard { config, hook, json } => {
-            let report = harness::guard_router(harness::RouterGuardOptions { config, hook })?;
+        RouterCommand::Guard {
+            config,
+            hook,
+            harness: current_harness,
+            json,
+        } => {
+            let report = harness::guard_router(harness::RouterGuardOptions {
+                config,
+                hook,
+                current_harness: current_harness.map(Into::into),
+            })?;
             if hook {
                 report::text(&harness::render_router_guard_hook_json(&report)?)?;
             } else if json {

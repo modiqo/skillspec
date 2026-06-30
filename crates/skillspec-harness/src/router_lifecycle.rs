@@ -52,6 +52,7 @@ pub struct RouterRefreshOptions {
 pub struct RouterGuardOptions {
     pub config: Option<PathBuf>,
     pub hook: bool,
+    pub current_harness: Option<router::RouteHarness>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -182,6 +183,8 @@ pub struct RouterGuardReport {
     pub config: PathBuf,
     pub installed: bool,
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_harness: Option<router::RouteHarness>,
     pub repaired: bool,
     pub first_hop_ready: bool,
     pub router_skill_dirs: Vec<RouterSkillInstallStatus>,
@@ -1035,6 +1038,11 @@ fn write_router_skill(skill_dir: &Path, router_name: &str, index: &Path) -> Resu
     })?;
     let router_name_yaml = template::yaml_single_quote(router_name);
     let index_arg = template::shell_single_quote(&index.display().to_string());
+    let current_root = skill_dir.parent();
+    let current_root_arg =
+        current_root.map(|root| template::shell_single_quote(&root.display().to_string()));
+    let current_harness = router::route_harness_for_skill_dir(skill_dir);
+    let route_context_args = route_context_args(current_harness, current_root_arg.as_deref());
     let skill = format!(
         r#"---
 name: {router_name_yaml}
@@ -1078,13 +1086,14 @@ For ordinary user requests, do not read `./skill.spec.yml` and do not run
 `skillspec router guard`; when it reports `first_hop_ready=true`, run only:
 
 ```bash
-skillspec route --index {index_arg} --query '<user task>' --top 5 --json
+skillspec route --index {index_arg} --query '<user task>'{route_context_args} --top 5 --json
 ```
 
 Load a domain skill only when route JSON returns `decision: "use_skill"` and a
 non-null `selected` skill. If the decision is `bypass` or `ambiguous`, do not
 load any candidate skill; continue with the normal agent path for the user
-request.
+request. Duplicate physical roots collapse to one logical skill before
+matching; route context only chooses the installed copy to load.
 
 Load and follow `./skill.spec.yml` only for router lifecycle, repair,
 visibility, guard, index status, index refresh, or when the prompt hook is
@@ -1095,7 +1104,7 @@ missing or reports that router readiness failed.
     write_file(&skill_dir.join("SKILL.md"), &skill)?;
     write_file(
         &skill_dir.join("skill.spec.yml"),
-        &template::render_router_spec(router_name, index),
+        &template::render_router_spec(router_name, index, current_harness, current_root),
     )?;
     write_file(
         &skill_dir.join(ROUTER_MARKER),
@@ -1104,6 +1113,20 @@ missing or reports that router readiness failed.
             now_unix()
         ),
     )
+}
+
+fn route_context_args(
+    current_harness: Option<router::RouteHarness>,
+    current_root_arg: Option<&str>,
+) -> String {
+    let mut args = String::new();
+    if let Some(harness) = current_harness {
+        args.push_str(&format!(" --current-harness {}", harness.as_str()));
+    }
+    if let Some(root) = current_root_arg {
+        args.push_str(&format!(" --current-root {root}"));
+    }
+    args
 }
 
 fn validate_router_name(router_name: &str) -> Result<()> {

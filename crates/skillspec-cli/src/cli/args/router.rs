@@ -1,3 +1,4 @@
+use crate::cli::args::RouteHarnessArg;
 use clap::Subcommand;
 use skillspec::router_lifecycle;
 use std::path::PathBuf;
@@ -93,6 +94,9 @@ pub(in crate::cli) enum RouterCommand {
         /// Emit harness hook JSON for UserPromptSubmit.
         #[arg(long)]
         hook: bool,
+        /// Harness invoking this guard hook; emitted as route context for duplicate-root selection.
+        #[arg(long, value_enum)]
+        harness: Option<RouteHarnessArg>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
