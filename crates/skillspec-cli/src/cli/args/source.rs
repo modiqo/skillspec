@@ -48,6 +48,23 @@ pub(in crate::cli) enum SourceCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Show the next source block to port and prove",
+        long_about = "Render a deterministic progressive review lens over source-map.json. Each unit is one parsed Markdown block with its source hash, countdown position, classifications, references, and required SkillSpec target kinds. Use this during semantic promotion: inspect one unit, port it into structural SkillSpec constructs, validate, record the unit in promotion proof, then advance with the returned next_cursor."
+    )]
+    Lens {
+        /// Path to source-map.json.
+        map: PathBuf,
+        /// 1-based unit cursor to show.
+        #[arg(long, default_value_t = 1)]
+        cursor: usize,
+        /// Number of units to show. Defaults to one to force progressive review.
+        #[arg(long, default_value_t = 1)]
+        limit: usize,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
     #[command(about = "Show source-map coverage and review-required counts")]
     Coverage {
         /// Path to source-map.json.

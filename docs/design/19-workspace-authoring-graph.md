@@ -245,9 +245,9 @@ to contain colons.
 
    Use `local-name` only when the intent is to replace canonical installed
    skills, for example retiring `rote-setup` with a generated `rote-setup`
-   package. Validation rejects duplicate `install_slug` values before install,
-   so plugin workspaces with repeated local names must keep `workspace-path` or
-   manually choose unique manifest slugs.
+   package. Validation rejects `local-name` for plugin-shaped workspaces because
+   it flattens plugin-local identity. Plugin workspaces must keep
+   `workspace-path` or use a native plugin export/install path.
 
 6. Build the skill invocation index.
 
@@ -307,7 +307,7 @@ For a single atomic skill:
 
 For an ordinary multi-skill workspace:
 
-1. `workspace map` decides the package graph;
+1. `workspace map` decides the package graph and records `source_shape`;
 2. `workspace validate` blocks broken paths, cycles, self-dependencies, and
    install slug collisions;
 3. `workspace import` creates one generated package folder per atomic source
@@ -332,9 +332,8 @@ For a plugin-shaped workspace:
 4. explicit namespace invocations can cross plugin boundaries;
 5. plugin workflow links are preserved as references for reports and alignment
    without turning the whole plugin library into one cyclic dependency graph;
-6. install uses namespaced public names plus `workspace-path` install slugs by
-   default; replacement installs may opt into `local-name` only when duplicate
-   install slugs are not present.
+6. install uses namespaced public names plus `workspace-path` install slugs;
+   `local-name` is rejected because it flattens plugin-local identity.
 
 Workspace install can optionally apply visibility. With the default
 `entry-implicit` policy, entry packages stay implicitly visible and shared,
@@ -368,9 +367,11 @@ Between `import` and `converge`, each package needs real promotion work. The
 operator or agent must review that package's source, source map, doctor report,
 dependency ledger, and package references, then encode the behavior into
 activation, routes, rules, elicitations, dependencies, tool boundaries, checks,
-tests, and proof obligations. A wrapper that simply tells the harness to load
-the original `SKILL.md` as authoritative runtime instructions is still a
-scaffold.
+tests, and proof obligations. `skillspec source lens <source-map.json> --cursor
+<n>` is the deterministic progressive view for this pass: review one parsed
+block, port that block, validate, record its hash and target, then advance. A
+wrapper that simply tells the harness to load the original `SKILL.md` as
+authoritative runtime instructions is still a scaffold.
 
 Every promoted workspace package writes:
 
@@ -381,15 +382,39 @@ Every promoted workspace package writes:
 The proof file uses schema `skillspec/workspace-promotion/v0` and records:
 
 - `package_id`;
+- `review_session` with the package-local countdown:
+  `package_index`, `package_count`, and `remaining_after`;
 - `status: reviewed`;
 - `source_sha256`, `spec_sha256`, and optional `source_map_sha256`;
 - review flags for activation, routes, rules, dependencies, checks/tests, and
-  proof.
+  proof;
+- `source_obligation_coverage`, a `skillspec/source-obligation-coverage/v0`
+  object that accounts for every computed source-map obligation.
+
+Source obligation coverage is generic. It is computed from source-map
+classifications, source references, and text-bearing source nodes; it is not
+domain-specific. Each obligation must be marked `promoted` with one or more
+existing SkillSpec target refs, or `not_applicable` with a specific reason. If
+the source lens exposes a block hash, the coverage entry must repeat that hash.
+If the lens says the block requires a specific target kind such as `rule`,
+`resource`, `code`, or `dependency`, a generic `route` target is not enough.
+`deferred`, `unresolved`, `waived`, missing, duplicate, stale, targetless,
+hashless, or construct-incompatible obligations block the package.
+
+The review session is also package-local. `workspace import` writes
+`.skillspec/workspace-import.json` with the package index, total package count,
+and remaining package count. `workspace converge`, `workspace compile`, and
+`workspace install` require `.skillspec/workspace-promotion.json` to repeat
+that countdown for the same package. A proof that says one representative
+package was reviewed and then bulk-applied to other packages is not installable;
+each package must be reviewed, fixed, verified, and proven from its own
+`source/SKILL_md.old` and source map.
 
 `converge` and `install` recompute the hashes and block packages when promotion
-proof is missing, stale, incomplete, or paired with a prose-wrapper contract.
-This is intentionally separate from trace alignment. Alignment proof cannot be
-used to declare that a generated workspace scaffold was promoted.
+proof is missing, stale, incomplete, missing source-obligation coverage, or
+paired with a prose-wrapper contract. This is intentionally separate from trace
+alignment. Alignment proof cannot be used to declare that a generated workspace
+scaffold was promoted.
 
 `converge` checks generated drafts and promotion proof against the graph.
 `--summary` keeps agent-facing output compact by printing wall-clock and

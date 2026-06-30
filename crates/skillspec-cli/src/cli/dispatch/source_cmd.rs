@@ -38,6 +38,19 @@ pub(super) fn run(command: SourceCommand) -> Result<()> {
                 report::text(&authoring::render_source_query(&report))?;
             }
         }
+        SourceCommand::Lens {
+            map,
+            cursor,
+            limit,
+            json,
+        } => {
+            let report = authoring::source_lens(&map, cursor, limit)?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&authoring::render_source_lens(&report))?;
+            }
+        }
         SourceCommand::Coverage { map, json } => {
             let coverage = authoring::source_coverage(&map)?;
             if json {

@@ -24,7 +24,7 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert!(loader_out.contains("--resume <run_dir>"));
     assert!(loader_out.contains("Keep SkillSpec mechanics in the background"));
     assert!(loader_out.contains("For read-only diagnostic routes"));
-    assert!(loader_out.contains("batch routine successful evidence"));
+    assert!(loader_out.contains("record routine successful evidence"));
     assert!(loader_out.contains("cargo install skillspec"));
     assert!(loader_out.contains("skill.spec.yml"));
     assert!(loader_out.lines().count() < 70);
@@ -405,4 +405,83 @@ import pypdf
     assert_success(&deps);
     let deps_text = serde_json::to_string(&json_stdout(&deps)).unwrap();
     assert!(deps_text.contains("pypdf"));
+}
+
+#[test]
+fn source_lens_extracts_progressive_review_units() {
+    let dir = TempDir::new("source-lens");
+    let skill_dir = dir.path().join("source-skill");
+    let map_dir = dir.path().join("source-map");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"---
+name: lens-skill
+description: Use when a port needs progressive source review.
+---
+
+# Lens Skill
+
+Always preserve this rule.
+
+If the user asks for a handoff, capture the blocker first.
+
+Read [reference](reference.md).
+
+```python
+import pypdf
+```
+"#,
+    );
+    write_file(&skill_dir.join("reference.md"), "# Reference\n");
+
+    let map = Command::new(bin())
+        .arg("source")
+        .arg("map")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    let first = Command::new(bin())
+        .arg("source")
+        .arg("lens")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&first);
+    let first = json_stdout(&first);
+    assert_eq!(first["schema"], "skillspec/source-review-lens/v0");
+    assert_eq!(first["cursor"], 1);
+    assert_eq!(first["shown"], 1);
+    assert!(first["total"].as_u64().unwrap() >= 4);
+    assert_eq!(first["units"][0]["index"], 1);
+    assert!(first["units"][0]["hash"].as_str().is_some());
+    assert!(first["next_cursor"].as_u64().unwrap() > 1);
+
+    let batch = Command::new(bin())
+        .arg("source")
+        .arg("lens")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--cursor")
+        .arg("1")
+        .arg("--limit")
+        .arg("20")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&batch);
+    let batch = json_stdout(&batch);
+    let units = batch["units"].as_array().unwrap();
+    let serialized = serde_json::to_string(units).unwrap();
+    assert!(serialized.contains("required_target_kinds"));
+    assert!(serialized.contains("conditional_rule_candidate"));
+    assert!(
+        serialized.contains("rule")
+            || serialized.contains("resource")
+            || serialized.contains("dependency")
+    );
 }

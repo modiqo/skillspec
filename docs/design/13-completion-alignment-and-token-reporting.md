@@ -269,10 +269,10 @@ The model can render the report, but the harness should provide the data.
 Completion proof should use a bounded loop:
 
 1. Run `trace align --quiet --proof-digest <run-dir>/proof-digest.json`.
-2. If evidence was captured during the work but not yet appended, write one
-   `<run-dir>/evidence-batch.jsonl` file and append it with
-   `skillspec progress batch <run-dir> --file <run-dir>/evidence-batch.jsonl
-   --checkpoint "checkpointing evidence" --quiet`.
+2. If evidence was captured during the work but not yet appended, record the
+   real rows with one `skillspec progress checkpoint <run-dir> ... --checkpoint
+   "checkpointing evidence" --quiet` command. Use file-based `progress batch`
+   only when a JSONL or JSON array proof artifact already exists.
 3. Record `progress final-response --quiet` once.
 4. Rerun `trace align --quiet` once and report the final result in plain language.
 

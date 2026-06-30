@@ -91,7 +91,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     let mut items = vec![
         "start with sensemake --view index only when unfamiliar".to_owned(),
         "for active task execution, prefer run-loop --guide agent --json so the CLI emits machine-readable current-gate control data and persists resume state".to_owned(),
-        "when several routine proof rows are ready, stage them in <run-dir>/evidence-batch.jsonl and run progress batch --file ... --checkpoint \"checkpointing evidence\" --quiet instead of printing one progress record command per row".to_owned(),
+        "when several routine proof rows are ready, run progress checkpoint ... --checkpoint \"checkpointing evidence\" --quiet with typed flags instead of printing one progress record command per row or hand-authoring event JSONL".to_owned(),
         "do not backfill missing route, obligation, elicitation, or phase proof after alignment; report partial alignment unless the evidence was captured when the work happened".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
@@ -117,7 +117,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_source_import(spec) {
         items.push(
-            "for URI imports, run source map on the GitHub URI and let SkillSpec perform the sparse staging; use the returned source_path for stale/import-skill, ask the user only when multiple candidates are reported; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for URI imports, run source map on the GitHub URI and let SkillSpec perform the sparse staging; use the returned source_path for stale/import-skill, ask the user only when multiple candidates are reported; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/coverage/lens/query/stale before import-skill, use source lens to review one parsed block at a time, and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
@@ -392,7 +392,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         },
         NavigationHint {
             intent: "checkpoint routine proof evidence",
-            command: "skillspec progress batch <run-dir> --file <run-dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --quiet".to_owned(),
+            command: "skillspec progress checkpoint <run-dir> --requirement-satisfied <phase>/<requirement>=<kind>:<ref> --phase-completed <phase>=<kind>:<ref> --checkpoint \"checkpointing evidence\" --quiet".to_owned(),
         },
         NavigationHint {
             intent: "task routing",
@@ -594,6 +594,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 intent: "inspect source structure",
                 command:
                     "skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "review next source block",
+                command:
+                    "skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1"
                         .to_owned(),
             },
             NavigationHint {

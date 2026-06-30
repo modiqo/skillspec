@@ -490,6 +490,20 @@ fn classify_node(ctx: &mut ParseContext<'_>, record: &SourceNodeRecord, node: &V
         });
     }
 
+    let conditional_signals = conditional_signals(&lowered);
+    if !conditional_signals.is_empty() {
+        ctx.classifications.push(SourceClassificationRecord {
+            id: format!("class:{}:conditional", record.id),
+            target: record.id.clone(),
+            kind: SourceClassificationKind::ConditionalRuleCandidate,
+            signals: conditional_signals,
+            suggested_constructs: vec!["rule".to_owned()],
+            confidence: "medium".to_owned(),
+            reason: "Text contains conditional workflow language.".to_owned(),
+            coverage_status: SourceCoverageStatus::ReviewRequired,
+        });
+    }
+
     let dependency_signals = signals(
         &lowered,
         &[
@@ -584,6 +598,20 @@ fn classify_text_record(
             suggested_constructs: vec!["rule".to_owned()],
             confidence: "medium".to_owned(),
             reason: "Text contains modal obligation language.".to_owned(),
+            coverage_status: SourceCoverageStatus::ReviewRequired,
+        });
+    }
+
+    let conditional_signals = conditional_signals(&lowered);
+    if !conditional_signals.is_empty() {
+        classifications.push(SourceClassificationRecord {
+            id: format!("class:{}:conditional", record.id),
+            target: record.id.clone(),
+            kind: SourceClassificationKind::ConditionalRuleCandidate,
+            signals: conditional_signals,
+            suggested_constructs: vec!["rule".to_owned()],
+            confidence: "medium".to_owned(),
+            reason: "Text contains conditional workflow language.".to_owned(),
             coverage_status: SourceCoverageStatus::ReviewRequired,
         });
     }
@@ -1007,6 +1035,33 @@ fn signals(text: &str, candidates: &[&str]) -> Vec<String> {
         .filter(|candidate| text.contains(**candidate))
         .map(|candidate| (*candidate).to_owned())
         .collect()
+}
+
+fn conditional_signals(text: &str) -> Vec<String> {
+    [
+        "if",
+        "when",
+        "unless",
+        "only if",
+        "except when",
+        "provided that",
+        "in case",
+        "whenever",
+        "before",
+        "after",
+    ]
+    .into_iter()
+    .filter(|candidate| contains_condition_signal(text, candidate))
+    .map(str::to_owned)
+    .collect()
+}
+
+fn contains_condition_signal(text: &str, candidate: &str) -> bool {
+    if candidate.contains(' ') {
+        return text.contains(candidate);
+    }
+    text.split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+        .any(|word| word == candidate)
 }
 
 fn python_imports(source: &str) -> BTreeSet<String> {

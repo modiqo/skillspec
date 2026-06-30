@@ -1,5 +1,6 @@
 use crate::support::*;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 
 #[test]
 fn workspace_map_and_validate_reports_package_graph() {
@@ -56,6 +57,8 @@ Run `/coding-standards` before the wrapper.
     assert_success(&map);
     let map_report = json_stdout(&map);
     assert_eq!(map_report["package_count"], 3);
+    assert_eq!(map_report["source_shape"]["kind"], "multi_skill_workspace");
+    assert_eq!(map_report["source_shape"]["skill_files"], 3);
     let edges = map_report["dependency_edges"].as_array().unwrap();
     assert!(edges
         .iter()
@@ -100,6 +103,8 @@ Run `/coding-standards` before the wrapper.
     assert!(map_summary.contains("avoided_tokens: ~"));
     assert!(map_summary.contains("metrics_source: estimated"));
     assert!(map_summary.contains("- install_slug_policy: workspace-path"));
+    assert!(map_summary.contains("- source_shape: multi_skill_workspace"));
+    assert!(map_summary.contains("- source_skill_files: 3"));
     assert!(map_summary.contains(&format!("- manifest: {}", normalize_path(&manifest))));
     assert!(!map_summary.contains("## Packages"));
 
@@ -157,6 +162,7 @@ description: Root package.
     assert_success(&map);
     let map_report = json_stdout(&map);
     assert_eq!(map_report["install_slug_policy"], "local-name");
+    assert_eq!(map_report["source_shape"]["kind"], "single_skill");
 
     let manifest_yaml = fs::read_to_string(&manifest).unwrap();
     assert!(manifest_yaml.contains("install_slug_policy: local-name"));
@@ -254,6 +260,15 @@ description: Privacy use-case triage.
     assert_success(&map);
     let map_report = json_stdout(&map);
     assert_eq!(map_report["package_count"], 4);
+    assert_eq!(map_report["source_shape"]["kind"], "plugin_workspace");
+    assert_eq!(map_report["source_shape"]["skill_files"], 4);
+    assert_eq!(
+        map_report["source_shape"]["plugin_roots"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert!(map_report["duplicate_public_names"]
         .as_array()
         .unwrap()
@@ -329,7 +344,7 @@ description: Privacy use-case triage.
         .unwrap();
     assert_success(&import);
 
-    promote_all_workspace_scaffolds(&build);
+    promote_workspace_scaffolds_with_per_package_proof(&build);
 
     let compile = Command::new(bin())
         .arg("workspace")
@@ -427,6 +442,9 @@ fn workspace_map_local_name_policy_reports_plugin_slug_collisions() {
         .output()
         .unwrap();
     assert_failure(&validate);
+    assert!(
+        stdout(&validate).contains("plugin-shaped workspaces must preserve plugin/package shape")
+    );
     assert!(stdout(&validate).contains("duplicate install_slug \"review\""));
 }
 
@@ -456,6 +474,7 @@ disable-model-invocation: true
 ---
 # Code Review
 
+Always preserve the review checklist.
 Read `../coding-standards/SKILL.md`.
 "#,
     );
@@ -504,6 +523,13 @@ Read `../coding-standards/SKILL.md`.
         .join("code-review")
         .join(".skillspec/workspace-import.json")
         .is_file());
+    let review_import_evidence: Value = serde_json::from_str(
+        &fs::read_to_string(build.join("code-review/.skillspec/workspace-import.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(review_import_evidence["package_count"], 2);
+    assert!(review_import_evidence["package_index"].as_u64().unwrap() >= 1);
+    assert!(review_import_evidence["remaining_after"].as_u64().unwrap() < 2);
 
     let import_summary = Command::new(bin())
         .arg("workspace")
@@ -666,6 +692,63 @@ Read `../coding-standards/SKILL.md`.
         .unwrap()
         .contains("missing workspace promotion proof"));
 
+    write_workspace_promotion_proofs_without_review_session_for_all(&build);
+    let no_countdown_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&no_countdown_converge);
+    let no_countdown_converge_report = json_stdout(&no_countdown_converge);
+    assert_eq!(no_countdown_converge_report["ok"], false);
+    let no_countdown_messages = workspace_package_messages(&no_countdown_converge_report);
+    assert!(
+        no_countdown_messages.contains("missing per-package review_session countdown"),
+        "messages:\n{no_countdown_messages}"
+    );
+
+    write_workspace_promotion_proofs_without_coverage_for_all(&build);
+    let uncovered_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&uncovered_converge);
+    let uncovered_converge_report = json_stdout(&uncovered_converge);
+    assert_eq!(uncovered_converge_report["ok"], false);
+    let uncovered_messages = workspace_package_messages(&uncovered_converge_report);
+    assert!(
+        uncovered_messages.contains("missing source obligation coverage proof"),
+        "messages:\n{uncovered_messages}"
+    );
+
+    write_workspace_promotion_proofs_with_route_only_coverage_for_all(&build);
+    let shallow_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&shallow_converge);
+    let shallow_converge_report = json_stdout(&shallow_converge);
+    assert_eq!(shallow_converge_report["ok"], false);
+    let shallow_messages = workspace_package_messages(&shallow_converge_report);
+    assert!(
+        shallow_messages.contains("requires one of target kind(s)"),
+        "messages:\n{shallow_messages}"
+    );
+
     write_workspace_promotion_proofs_for_all(&build);
 
     let converge = Command::new(bin())
@@ -760,12 +843,13 @@ Read `../coding-standards/SKILL.md`.
         .exists());
 
     let collision_home = dir.path().join("collision-home");
+    let collision_skillspec_home = dir.path().join("collision-skillspec-home");
     fs::create_dir_all(collision_home.join(".agents/skills")).unwrap();
+    let legacy_collision_dir = collision_home
+        .join(".agents/skills")
+        .join("legacy-code-review");
     write_file(
-        &collision_home
-            .join(".agents/skills")
-            .join("skills--code-review")
-            .join("SKILL.md"),
+        &legacy_collision_dir.join("SKILL.md"),
         "---\nname: code-review\ndescription: Existing skill.\n---\n# Existing\n",
     );
     let blocked_install = Command::new(bin())
@@ -796,6 +880,75 @@ Read `../coding-standards/SKILL.md`.
     assert!(!collision_home
         .join(".agents/skills/skills--coding-standards/SKILL.md")
         .exists());
+
+    let retire_collision_plan = Command::new(bin())
+        .env("HOME", &collision_home)
+        .env("SKILLSPEC_HOME", &collision_skillspec_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--retire-existing")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&retire_collision_plan);
+    let retire_collision_plan = json_stdout(&retire_collision_plan);
+    let review_package = retire_collision_plan["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "code-review")
+        .unwrap();
+    let review_target = &review_package["targets"][0];
+    assert!(review_target["public_name_collisions"][0]
+        .as_str()
+        .unwrap()
+        .ends_with("/.agents/skills/legacy-code-review"));
+    let public_name_retirement = &review_target["retired_public_name_collisions"][0];
+    assert!(public_name_retirement["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/.agents/skills/legacy-code-review"));
+    assert!(public_name_retirement["backup_path"]
+        .as_str()
+        .unwrap()
+        .contains("backups/retired-skills"));
+    assert!(legacy_collision_dir.join("SKILL.md").is_file());
+
+    let retire_collision_install = Command::new(bin())
+        .env("HOME", &collision_home)
+        .env("SKILLSPEC_HOME", &collision_skillspec_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--retire-existing")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&retire_collision_install);
+    let retire_collision_install = json_stdout(&retire_collision_install);
+    let review_package = retire_collision_install["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "code-review")
+        .unwrap();
+    let public_name_retirement = &review_package["targets"][0]["retired_public_name_collisions"][0];
+    let backup_path = PathBuf::from(public_name_retirement["backup_path"].as_str().unwrap());
+    assert!(backup_path.join("SKILL.md").is_file());
+    assert!(!legacy_collision_dir.exists());
+    assert!(collision_home
+        .join(".agents/skills/skills--code-review/SKILL.md")
+        .is_file());
 
     let home = dir.path().join("home");
     fs::create_dir_all(home.join(".agents/skills")).unwrap();
@@ -872,6 +1025,12 @@ Read `../coding-standards/SKILL.md`.
     assert!(home
         .join(".agents/skills/skills--code-review/skill.spec.yml")
         .is_file());
+    assert!(home
+        .join(".agents/skills/skills--code-review/source/SKILL_md.old")
+        .is_file());
+    assert!(home
+        .join(".agents/skills/skills--code-review/.skillspec/source-map/source-map.json")
+        .is_file());
     let support_visibility =
         fs::read_to_string(home.join(".agents/skills/skills--coding-standards/agents/openai.yaml"))
             .unwrap();
@@ -889,7 +1048,7 @@ Read `../coding-standards/SKILL.md`.
     assert!(install_manifest.contains("\"target\": \"manual-only\""));
 }
 
-fn promote_all_workspace_scaffolds(build: &std::path::Path) {
+fn promote_workspace_scaffolds_with_per_package_proof(build: &std::path::Path) {
     promote_all_workspace_scaffolds_without_proof(build);
     write_workspace_promotion_proofs_for_all(build);
 }
@@ -913,6 +1072,48 @@ fn write_workspace_promotion_proofs_for_all(build: &std::path::Path) {
     );
     for spec_path in specs {
         write_workspace_promotion_proof(spec_path.parent().unwrap());
+    }
+}
+
+fn write_workspace_promotion_proofs_without_coverage_for_all(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        write_workspace_promotion_proof_without_coverage(spec_path.parent().unwrap());
+    }
+}
+
+fn write_workspace_promotion_proofs_with_route_only_coverage_for_all(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        write_workspace_promotion_proof_with_route_only_coverage(spec_path.parent().unwrap());
+    }
+}
+
+fn write_workspace_promotion_proofs_without_review_session_for_all(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        let out = spec_path.parent().unwrap();
+        write_workspace_promotion_proof(out);
+        let proof_path = out.join(".skillspec/workspace-promotion.json");
+        let mut proof: Value =
+            serde_json::from_str(&fs::read_to_string(&proof_path).unwrap()).unwrap();
+        proof.as_object_mut().unwrap().remove("review_session");
+        write_file(
+            &proof_path,
+            &format!("{}\n", serde_json::to_string_pretty(&proof).unwrap()),
+        );
     }
 }
 
@@ -1001,6 +1202,18 @@ rules:
         - {title}
     prefer: execute
     reason: Reviewed package route is source-backed.
+
+resources:
+  source_map_review:
+    path: ".skillspec/source-map/source-map.json"
+    role: reference
+    used_by:
+      - kind: route
+        id: execute
+
+metadata:
+  source_preserved_as_evidence: source/SKILL_md.old
+  source_map_preserved_as_evidence: ".skillspec/source-map/source-map.json"
 "#
         ),
     );
@@ -1096,6 +1309,26 @@ dependency_count = 0
 }
 
 fn write_workspace_promotion_proof(out: &std::path::Path) {
+    write_workspace_promotion_proof_with_coverage(out, true);
+}
+
+fn write_workspace_promotion_proof_without_coverage(out: &std::path::Path) {
+    write_workspace_promotion_proof_with_coverage(out, false);
+}
+
+fn write_workspace_promotion_proof_with_route_only_coverage(out: &std::path::Path) {
+    write_workspace_promotion_proof_with_coverage_kind(out, true, true);
+}
+
+fn write_workspace_promotion_proof_with_coverage(out: &std::path::Path, include_coverage: bool) {
+    write_workspace_promotion_proof_with_coverage_kind(out, include_coverage, false);
+}
+
+fn write_workspace_promotion_proof_with_coverage_kind(
+    out: &std::path::Path,
+    include_coverage: bool,
+    route_only_coverage: bool,
+) {
     let evidence_path = out.join(".skillspec/workspace-import.json");
     let evidence: Value = serde_json::from_str(&fs::read_to_string(&evidence_path).unwrap())
         .expect("workspace import evidence should be valid JSON");
@@ -1117,29 +1350,223 @@ fn write_workspace_promotion_proof(out: &std::path::Path) {
             .as_str()
             .expect("package evidence should include source_map_path"),
     );
+    let source_map_sha256 = file_hash(&source_map_path);
+    let source_sha256 = package_source_hash(&source_path);
+    let source_obligation_coverage = include_coverage.then(|| {
+        let source_map: Value =
+            serde_json::from_str(&fs::read_to_string(&source_map_path).unwrap()).unwrap();
+        let obligations = if route_only_coverage {
+            route_only_source_obligation_entries(&source_map)
+        } else {
+            source_obligation_entries(&source_map)
+        };
+        let promoted = obligations
+            .iter()
+            .filter(|entry| entry["disposition"] == "promoted")
+            .count();
+        let not_applicable = obligations
+            .iter()
+            .filter(|entry| entry["disposition"] == "not_applicable")
+            .count();
+        json!({
+            "schema": "skillspec/source-obligation-coverage/v0",
+            "total": obligations.len(),
+            "promoted": promoted,
+            "not_applicable": not_applicable,
+            "unresolved": 0,
+            "obligations": obligations
+        })
+    });
+    let mut proof = json!({
+        "schema": "skillspec/workspace-promotion/v0",
+        "package_id": package_id,
+        "status": "reviewed",
+        "source_sha256": source_sha256,
+        "spec_sha256": file_hash(&spec_path),
+        "source_map_sha256": source_map_sha256,
+        "review_session": {
+            "package_id": package_id,
+            "package_index": evidence["package_index"].as_u64().expect("package evidence should include package_index"),
+            "package_count": evidence["package_count"].as_u64().expect("package evidence should include package_count"),
+            "remaining_after": evidence["remaining_after"].as_u64().expect("package evidence should include remaining_after"),
+            "reviewed_source": "SKILL.md",
+            "source_sha256": source_sha256
+        },
+        "review": {
+            "activation_reviewed": true,
+            "routes_reviewed": true,
+            "rules_reviewed": true,
+            "dependencies_reviewed": true,
+            "checks_or_tests_reviewed": true,
+            "proof_reviewed": true
+        }
+    });
+    if let Some(coverage) = source_obligation_coverage {
+        proof["source_obligation_coverage"] = coverage;
+    }
     write_file(
         &out.join(".skillspec/workspace-promotion.json"),
-        &format!(
-            "{}\n",
-            serde_json::to_string_pretty(&json!({
-                "schema": "skillspec/workspace-promotion/v0",
-                "package_id": package_id,
-                "status": "reviewed",
-                "source_sha256": package_source_hash(&source_path),
-                "spec_sha256": file_hash(&spec_path),
-                "source_map_sha256": file_hash(&source_map_path),
-                "review": {
-                    "activation_reviewed": true,
-                    "routes_reviewed": true,
-                    "rules_reviewed": true,
-                    "dependencies_reviewed": true,
-                    "checks_or_tests_reviewed": true,
-                    "proof_reviewed": true
-                }
-            }))
-            .unwrap()
-        ),
+        &format!("{}\n", serde_json::to_string_pretty(&proof).unwrap()),
     );
+}
+
+fn source_obligation_entries(source_map: &Value) -> Vec<Value> {
+    let mut obligations = Vec::new();
+    let mut classified_targets = BTreeSet::new();
+    for classification in source_map["classifications"].as_array().unwrap() {
+        let status = classification["coverage_status"]
+            .as_str()
+            .unwrap_or_default();
+        if matches!(status, "review_required" | "blocked") {
+            let target = classification["target"].as_str().unwrap_or_default();
+            let entry = source_obligation_entry(
+                classification["id"].as_str().unwrap(),
+                node_hash(source_map, target),
+                classification_targets(classification),
+            );
+            obligations.push(entry);
+            if !target.is_empty() {
+                classified_targets.insert(target.to_owned());
+            }
+        }
+    }
+
+    for reference in source_map["references"].as_array().unwrap() {
+        let target_kind = reference["target_kind"].as_str().unwrap_or_default();
+        if matches!(target_kind, "local_file" | "external_uri") {
+            obligations.push(source_obligation_entry(
+                reference["id"].as_str().unwrap(),
+                node_hash(source_map, reference["source"].as_str().unwrap_or_default()),
+                Some(vec![json!({
+                    "kind": "resource",
+                    "id": "source_map_review"
+                })]),
+            ));
+        }
+    }
+
+    for node in source_map["nodes"].as_array().unwrap() {
+        let id = node["id"].as_str().unwrap();
+        if classified_targets.contains(id) {
+            continue;
+        }
+        let kind = node["kind"].as_str().unwrap_or_default();
+        if matches!(kind, "root" | "frontmatter") {
+            continue;
+        }
+        if node["coverage_status"].as_str() == Some("not_applicable") {
+            continue;
+        }
+        let has_text = node["title"]
+            .as_str()
+            .or_else(|| node["text_preview"].as_str())
+            .is_some_and(|text| !text.trim().is_empty());
+        if has_text {
+            obligations.push(source_obligation_entry(
+                id,
+                node["hash"].as_str().map(str::to_owned),
+                Some(vec![json!({
+                    "kind": "route",
+                    "id": "execute"
+                })]),
+            ));
+        }
+    }
+
+    obligations.sort_by(|left, right| {
+        left["source"]
+            .as_str()
+            .unwrap()
+            .cmp(right["source"].as_str().unwrap())
+    });
+    obligations
+}
+
+fn route_only_source_obligation_entries(source_map: &Value) -> Vec<Value> {
+    source_obligation_entries(source_map)
+        .into_iter()
+        .map(|mut entry| {
+            if entry["disposition"] == "promoted" {
+                entry["targets"] = json!([
+                    {
+                        "kind": "route",
+                        "id": "execute"
+                    }
+                ]);
+            }
+            entry
+        })
+        .collect()
+}
+
+fn source_obligation_entry(
+    source: &str,
+    source_hash: Option<String>,
+    targets: Option<Vec<Value>>,
+) -> Value {
+    match targets {
+        Some(targets) => {
+            let mut entry = json!({
+                "source": source,
+                "disposition": "promoted",
+                "targets": targets
+            });
+            if let Some(source_hash) = source_hash {
+                entry["source_hash"] = json!(source_hash);
+            }
+            entry
+        }
+        None => {
+            let mut entry = json!({
+                "source": source,
+                "disposition": "not_applicable",
+                "reason": "reviewed source lens block; dependency mention has no external package requirement in this fixture"
+            });
+            if let Some(source_hash) = source_hash {
+                entry["source_hash"] = json!(source_hash);
+            }
+            entry
+        }
+    }
+}
+
+fn classification_targets(classification: &Value) -> Option<Vec<Value>> {
+    let kind = classification["kind"].as_str().unwrap_or_default();
+    let suggested = classification["suggested_constructs"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str())
+        .collect::<BTreeSet<_>>();
+    if kind == "dependency_mention" || suggested.contains("dependency") {
+        return None;
+    }
+    if kind == "modal_obligation" || kind == "forbid_candidate" || suggested.contains("rule") {
+        return Some(vec![json!({
+            "kind": "rule",
+            "id": "route_by_package_name"
+        })]);
+    }
+    if kind == "code_block" || suggested.contains("code") || suggested.contains("resource") {
+        return Some(vec![json!({
+            "kind": "resource",
+            "id": "source_map_review"
+        })]);
+    }
+    Some(vec![json!({
+        "kind": "route",
+        "id": "execute"
+    })])
+}
+
+fn node_hash(source_map: &Value, node_id: &str) -> Option<String> {
+    source_map["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"].as_str() == Some(node_id))
+        .and_then(|node| node["hash"].as_str())
+        .map(str::to_owned)
 }
 
 fn sanitize_skill_id(value: &str) -> String {

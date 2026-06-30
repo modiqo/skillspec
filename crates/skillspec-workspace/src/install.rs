@@ -27,6 +27,7 @@ pub struct WorkspaceInstallReport {
     pub package_count: usize,
     pub targets: Vec<String>,
     pub install_slug_policy: WorkspaceInstallSlugPolicy,
+    pub source_shape: super::WorkspaceSourceShape,
     pub installed: Vec<String>,
     pub planned: Vec<String>,
     pub failed: Vec<String>,
@@ -132,9 +133,19 @@ pub struct WorkspaceInstallTargetReport {
     pub retired_existing: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backup_path: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub public_name_collisions: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub retired_public_name_collisions: Vec<WorkspacePublicNameCollisionRetirement>,
     pub status: WorkspaceInstallTargetStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct WorkspacePublicNameCollisionRetirement {
+    pub path: String,
+    pub backup_path: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -163,6 +174,7 @@ struct WorkspaceInstalledManifest {
     manifest_path: String,
     build_root: String,
     install_slug_policy: WorkspaceInstallSlugPolicy,
+    source_shape: super::WorkspaceSourceShape,
     targets: Vec<String>,
     packages: Vec<WorkspaceInstalledPackage>,
 }
@@ -187,6 +199,8 @@ struct WorkspaceInstalledTarget {
     retired_existing: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     backup_path: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    retired_public_name_collisions: Vec<WorkspacePublicNameCollisionRetirement>,
 }
 
 pub struct WorkspaceInstallRequest<'a> {
@@ -207,6 +221,7 @@ struct PreflightContext<'a> {
     targets: &'a [HarnessTarget],
     all_detected: bool,
     retire_existing: bool,
+    collision_backup_root: Option<PathBuf>,
     roots: &'a [HarnessRoot],
     duplicate_public_names: &'a BTreeMap<String, Vec<String>>,
     visibility_policy: WorkspaceVisibilityPolicy,
@@ -256,11 +271,17 @@ pub fn install_workspace(request: WorkspaceInstallRequest<'_>) -> Result<Workspa
     }
 
     let duplicate_public_names = duplicate_public_names(&manifest);
+    let collision_backup_root = if request.retire_existing {
+        Some(install::retired_skill_backup_root()?)
+    } else {
+        None
+    };
     let preflight_context = PreflightContext {
         build_root: request.build_root,
         targets: request.targets,
         all_detected: request.all_detected,
         retire_existing: request.retire_existing,
+        collision_backup_root,
         roots: &roots,
         duplicate_public_names: &duplicate_public_names,
         visibility_policy: request.visibility_policy,
@@ -326,6 +347,14 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
     output.push_str(&format!(
         "- install_slug_policy: {}\n",
         report.install_slug_policy.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_shape: {}\n",
+        report.source_shape.kind.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_skill_files: {}\n",
+        report.source_shape.skill_files
     ));
     output.push_str(&format!(
         "- visibility_policy: {}\n",
@@ -395,6 +424,15 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
                 output.push_str(&format!(" backup={backup_path}"));
             }
             output.push('\n');
+            for collision in &target.public_name_collisions {
+                output.push_str(&format!("    public_name_collision: {collision}\n"));
+            }
+            for retirement in &target.retired_public_name_collisions {
+                output.push_str(&format!(
+                    "    retired_public_name_collision: {} backup={}\n",
+                    retirement.path, retirement.backup_path
+                ));
+            }
             if let Some(message) = &target.message {
                 output.push_str(&format!("    message: {message}\n"));
             }
@@ -462,7 +500,7 @@ pub fn render_install_report(report: &WorkspaceInstallReport) -> String {
             output.push_str(&format!("- {next}\n"));
         }
     } else {
-        output.push_str("- fix missing compiled loaders, folder collisions, or public-name collisions, then rerun workspace install with --dry-run before installing\n");
+        output.push_str("- fix missing compiled loaders, folder collisions, or public-name collisions, or rerun with --retire-existing after reviewing backup behavior; then rerun workspace install with --dry-run before installing\n");
     }
     output
 }
@@ -540,7 +578,7 @@ fn preflight_one_package(
         }
     };
     if let Some(gate) = review_gate.filter(|gate| gate.is_blocked()) {
-        return blocked_package_report(package, &source_dir, context.roots, gate.message());
+        return blocked_package_report(package, context.build_root, context.roots, gate.message());
     }
 
     let dry_run = install::install_skill_without_router_hook(
@@ -563,6 +601,8 @@ fn preflight_one_package(
                 existed: target.existed,
                 retired_existing: target.retired_existing,
                 backup_path: target.backup_path.as_ref().map(|path| path_to_string(path)),
+                public_name_collisions: Vec::new(),
+                retired_public_name_collisions: Vec::new(),
                 status: WorkspaceInstallTargetStatus::Planned,
                 message: None,
             })
@@ -581,6 +621,7 @@ fn preflight_one_package(
         ));
     }
 
+    let mut collision_backup_paths_by_identity = BTreeMap::new();
     for target in &mut target_reports {
         let install_dir = PathBuf::from(&target.path);
         if target.existed && !context.retire_existing {
@@ -601,18 +642,37 @@ fn preflight_one_package(
         else {
             continue;
         };
-        match public_name_collision(&root.path, &install_dir, &package.public_name) {
-            Ok(Some(collision_path)) => {
+        match public_name_collisions(&root.path, &install_dir, &package.public_name) {
+            Ok(collision_paths) if !collision_paths.is_empty() => {
+                target.public_name_collisions = collision_paths
+                    .iter()
+                    .map(|path| path_to_string(path))
+                    .collect();
+                if context.retire_existing {
+                    let backup_root = context
+                        .collision_backup_root
+                        .as_ref()
+                        .expect("retire_existing preflight has backup root");
+                    target.retired_public_name_collisions =
+                        planned_public_name_collision_retirements(
+                            &collision_paths,
+                            backup_root,
+                            target.target,
+                            &package.public_name,
+                            &mut collision_backup_paths_by_identity,
+                        );
+                    continue;
+                }
                 let message = format!(
-                    "public_name {:?} already exists at {}",
+                    "public_name {:?} already exists at {}; rerun with --retire-existing only after reviewing backup behavior",
                     package.public_name,
-                    collision_path.display()
+                    target.public_name_collisions.join(", ")
                 );
                 target.status = WorkspaceInstallTargetStatus::Blocked;
                 target.message = Some(message.clone());
                 blockers.push(message);
             }
-            Ok(None) => {}
+            Ok(_) => {}
             Err(error) => {
                 let message = format!(
                     "could not inspect existing skills for public_name collisions under {}: {}",
@@ -654,6 +714,7 @@ fn install_packages(
     mut package_reports: Vec<WorkspaceInstallPackageReport>,
 ) -> Result<Vec<WorkspaceInstallPackageReport>> {
     let mut statuses = BTreeMap::<String, WorkspaceInstallStatus>::new();
+    let mut retired_public_name_collision_identities = BTreeSet::new();
     for package_report in &mut package_reports {
         let package = manifest
             .packages
@@ -682,6 +743,12 @@ fn install_packages(
         }
 
         let source_dir = output_package_dir(package, build_root)?;
+        retire_planned_public_name_collisions(
+            package_report,
+            &mut retired_public_name_collision_identities,
+        )?;
+        let public_name_collision_fields =
+            planned_public_name_collision_fields(&package_report.targets);
         match install::install_skill_without_router_hook(
             &source_dir,
             targets,
@@ -696,18 +763,31 @@ fn install_packages(
                 package_report.targets = report
                     .installs
                     .into_iter()
-                    .map(|target| WorkspaceInstallTargetReport {
-                        target: target.target,
-                        id: target.id.to_owned(),
-                        path: path_to_string(&target.path),
-                        existed: target.existed,
-                        retired_existing: target.retired_existing,
-                        backup_path: target.backup_path.as_ref().map(|path| path_to_string(path)),
-                        status: match target.status {
-                            InstallStatus::Planned => WorkspaceInstallTargetStatus::Planned,
-                            InstallStatus::Installed => WorkspaceInstallTargetStatus::Installed,
-                        },
-                        message: None,
+                    .map(|target| {
+                        let path = path_to_string(&target.path);
+                        let (public_name_collisions, retired_public_name_collisions) =
+                            public_name_collision_fields
+                                .get(&(target.id.to_owned(), path.clone()))
+                                .cloned()
+                                .unwrap_or_default();
+                        WorkspaceInstallTargetReport {
+                            target: target.target,
+                            id: target.id.to_owned(),
+                            path,
+                            existed: target.existed,
+                            retired_existing: target.retired_existing,
+                            backup_path: target
+                                .backup_path
+                                .as_ref()
+                                .map(|path| path_to_string(path)),
+                            public_name_collisions,
+                            retired_public_name_collisions,
+                            status: match target.status {
+                                InstallStatus::Planned => WorkspaceInstallTargetStatus::Planned,
+                                InstallStatus::Installed => WorkspaceInstallTargetStatus::Installed,
+                            },
+                            message: None,
+                        }
                     })
                     .collect();
                 package_report.message = None;
@@ -724,6 +804,44 @@ fn install_packages(
         statuses.insert(package.package_id.clone(), package_report.status.clone());
     }
     Ok(package_reports)
+}
+
+type PublicNameCollisionFields = (Vec<String>, Vec<WorkspacePublicNameCollisionRetirement>);
+
+fn planned_public_name_collision_fields(
+    targets: &[WorkspaceInstallTargetReport],
+) -> BTreeMap<(String, String), PublicNameCollisionFields> {
+    targets
+        .iter()
+        .map(|target| {
+            (
+                (target.id.clone(), target.path.clone()),
+                (
+                    target.public_name_collisions.clone(),
+                    target.retired_public_name_collisions.clone(),
+                ),
+            )
+        })
+        .collect()
+}
+
+fn retire_planned_public_name_collisions(
+    package_report: &WorkspaceInstallPackageReport,
+    retired_identities: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
+    for target in &package_report.targets {
+        for retirement in &target.retired_public_name_collisions {
+            let collision_path = PathBuf::from(&retirement.path);
+            let collision_identity = install::install_dir_identity(&collision_path);
+            if retired_identities.insert(collision_identity) {
+                install::retire_existing_skill_dir(
+                    &collision_path,
+                    &PathBuf::from(&retirement.backup_path),
+                )?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn install_report(
@@ -771,6 +889,7 @@ fn install_report(
             .map(|root| root.id.to_owned())
             .collect(),
         install_slug_policy: context.manifest.install_slug_policy,
+        source_shape: context.manifest.source_shape.clone(),
         installed,
         planned,
         failed,
@@ -805,7 +924,7 @@ fn install_next_steps(
 ) -> Vec<String> {
     if !ok {
         return vec![
-            "fix missing compiled loaders, folder collisions, public-name collisions, failed packages, blocked dependencies, or complete scaffold promotion for unreviewed packages; rerun workspace converge and compile, then rerun workspace install --dry-run".to_owned(),
+            "fix missing compiled loaders, folder collisions, public-name collisions, failed packages, blocked dependencies, or complete scaffold promotion for unreviewed packages; for approved replacements rerun with --retire-existing, then rerun workspace converge and compile followed by workspace install --dry-run".to_owned(),
         ];
     }
     if dry_run {
@@ -846,6 +965,7 @@ fn write_install_manifest(
         manifest_path: report.manifest_path.clone(),
         build_root: report.build_root.clone(),
         install_slug_policy: report.install_slug_policy,
+        source_shape: report.source_shape.clone(),
         targets: report.targets.clone(),
         packages: report
             .packages
@@ -872,6 +992,9 @@ fn write_install_manifest(
                         path: target.path.clone(),
                         retired_existing: target.retired_existing,
                         backup_path: target.backup_path.clone(),
+                        retired_public_name_collisions: target
+                            .retired_public_name_collisions
+                            .clone(),
                     })
                     .collect(),
             })
@@ -1094,6 +1217,8 @@ fn target_reports_for_roots(
                 path: path_to_string(&path),
                 retired_existing: false,
                 backup_path: None,
+                public_name_collisions: Vec::new(),
+                retired_public_name_collisions: Vec::new(),
                 status: status.clone(),
                 message: None,
             }
@@ -1101,14 +1226,15 @@ fn target_reports_for_roots(
         .collect()
 }
 
-fn public_name_collision(
+fn public_name_collisions(
     root: &Path,
     install_dir: &Path,
     public_name: &str,
-) -> Result<Option<PathBuf>> {
+) -> Result<Vec<PathBuf>> {
     if !root.is_dir() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
+    let mut collisions = Vec::new();
     for entry in fs::read_dir(root).map_err(|source| Error::Read {
         path: root.to_path_buf(),
         source,
@@ -1122,10 +1248,49 @@ fn public_name_collision(
             continue;
         }
         if installed_public_name(&path)?.as_deref() == Some(public_name) {
-            return Ok(Some(path));
+            collisions.push(path);
         }
     }
-    Ok(None)
+    collisions.sort();
+    Ok(collisions)
+}
+
+fn planned_public_name_collision_retirements(
+    collisions: &[PathBuf],
+    backup_root: &Path,
+    target: HarnessTarget,
+    public_name: &str,
+    backup_paths_by_identity: &mut BTreeMap<PathBuf, PathBuf>,
+) -> Vec<WorkspacePublicNameCollisionRetirement> {
+    collisions
+        .iter()
+        .map(|collision_path| {
+            let identity = install::install_dir_identity(collision_path);
+            let backup_path = backup_paths_by_identity
+                .entry(identity)
+                .or_insert_with(|| {
+                    install::retired_skill_backup_path(
+                        backup_root,
+                        target,
+                        collision_backup_name(collision_path, public_name).as_ref(),
+                    )
+                })
+                .clone();
+            WorkspacePublicNameCollisionRetirement {
+                path: path_to_string(collision_path),
+                backup_path: path_to_string(&backup_path),
+            }
+        })
+        .collect()
+}
+
+fn collision_backup_name(collision_path: &Path, public_name: &str) -> String {
+    collision_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(public_name)
+        .to_owned()
 }
 
 fn installed_public_name(skill_dir: &Path) -> Result<Option<String>> {

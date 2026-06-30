@@ -31,11 +31,52 @@ pub struct WorkspaceManifest {
     pub source_root: String,
     pub workspace_slug: String,
     #[serde(default)]
+    pub source_shape: WorkspaceSourceShape,
+    #[serde(default)]
     pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub output_root: String,
     pub packages: BTreeMap<String, WorkspacePackage>,
     #[serde(default)]
     pub references: Vec<WorkspaceReference>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkspaceSourceShape {
+    #[serde(default)]
+    pub kind: WorkspaceSourceShapeKind,
+    #[serde(default)]
+    pub skill_files: usize,
+    #[serde(default)]
+    pub plugin_roots: Vec<WorkspacePluginRoot>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceSourceShapeKind {
+    #[default]
+    Unknown,
+    SingleSkill,
+    MultiSkillWorkspace,
+    PluginWorkspace,
+}
+
+impl WorkspaceSourceShapeKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::SingleSkill => "single_skill",
+            Self::MultiSkillWorkspace => "multi_skill_workspace",
+            Self::PluginWorkspace => "plugin_workspace",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkspacePluginRoot {
+    pub path: String,
+    pub namespace: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -129,6 +170,7 @@ pub struct WorkspaceMapReport {
     pub report_path: String,
     pub source_root: String,
     pub workspace_slug: String,
+    pub source_shape: WorkspaceSourceShape,
     pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub plugin_namespaces: Vec<WorkspacePluginNamespaceReport>,
     pub package_count: usize,
@@ -186,6 +228,13 @@ struct PluginRoot {
     namespace: String,
 }
 
+#[derive(Debug)]
+struct WorkspaceDiscovery {
+    packages: Vec<SkillPackageSource>,
+    plugin_roots: Vec<PluginRoot>,
+    skill_file_count: usize,
+}
+
 pub fn guard_single_skill_source(path: &Path, command_name: &str) -> Result<()> {
     let source_root = source_root(path);
     let skill_files = discover_skill_files(&source_root)?;
@@ -210,8 +259,8 @@ pub fn map_workspace(
     install_slug_policy: WorkspaceInstallSlugPolicy,
 ) -> Result<WorkspaceMapReport> {
     let source_root = normalize_source_root(source_root)?;
-    let packages = discover_packages(&source_root)?;
-    if packages.is_empty() {
+    let discovery = discover_workspace(&source_root)?;
+    if discovery.packages.is_empty() {
         return Err(Error::InvalidInput {
             message: format!(
                 "workspace map expected at least one SKILL.md under {}",
@@ -220,10 +269,11 @@ pub fn map_workspace(
         });
     }
 
+    let source_shape = source_shape(&discovery);
     let workspace_slug = workspace_slug(&source_root);
     let output_root = default_output_root(&source_root);
     let mut package_map = BTreeMap::new();
-    for package in packages {
+    for package in discovery.packages {
         let install_slug = install_slug_for_policy(&workspace_slug, &package, install_slug_policy);
         let kind = infer_package_kind(&package);
         package_map.insert(
@@ -246,6 +296,7 @@ pub fn map_workspace(
         schema: WORKSPACE_SCHEMA.to_owned(),
         source_root: path_to_string(&source_root),
         workspace_slug,
+        source_shape,
         install_slug_policy,
         output_root: path_to_string(&output_root),
         packages: package_map,
@@ -286,6 +337,14 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
     output.push_str(&format!(
         "- install_slug_policy: {}\n",
         report.install_slug_policy.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_shape: {}\n",
+        manifest.source_shape.kind.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_skill_files: {}\n",
+        manifest.source_shape.skill_files
     ));
     output.push_str(&format!("- packages: {}\n", report.package_count));
     output.push_str(&format!("- manifest: {}\n", report.manifest_path));
@@ -452,6 +511,14 @@ pub fn render_map_summary(report: &WorkspaceMapReport, elapsed: Duration) -> Str
         output.push_str(&format!(
             "- install_slug_policy: {}\n",
             report.install_slug_policy.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_shape: {}\n",
+            report.source_shape.kind.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_skill_files: {}\n",
+            report.source_shape.skill_files
         ));
         output.push_str(&format!("- packages: {}\n", report.package_count));
         output.push_str(&format!(
@@ -657,6 +724,14 @@ pub fn render_install_summary(report: &WorkspaceInstallReport, elapsed: Duration
             "- install_slug_policy: {}\n",
             report.install_slug_policy.as_str()
         ));
+        output.push_str(&format!(
+            "- source_shape: {}\n",
+            report.source_shape.kind.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_skill_files: {}\n",
+            report.source_shape.skill_files
+        ));
         output.push_str(&format!("- installed: {}\n", report.installed.len()));
         output.push_str(&format!("- planned: {}\n", report.planned.len()));
         output.push_str(&format!("- failed: {}\n", report.failed.len()));
@@ -815,6 +890,13 @@ pub(crate) fn validate_manifest(
             manifest.schema
         ));
     }
+    if manifest.source_shape.kind == WorkspaceSourceShapeKind::PluginWorkspace
+        && manifest.install_slug_policy == WorkspaceInstallSlugPolicy::LocalName
+    {
+        errors.push(
+            "plugin-shaped workspaces must preserve plugin/package shape; install_slug_policy local-name flattens plugin-local names. Use workspace-path or a native plugin install/export path.".to_owned(),
+        );
+    }
 
     let source_root = PathBuf::from(&manifest.source_root);
     if !source_root.is_dir() {
@@ -950,14 +1032,42 @@ pub(crate) fn validate_manifest(
     }
 }
 
-fn discover_packages(source_root: &Path) -> Result<Vec<SkillPackageSource>> {
+fn discover_workspace(source_root: &Path) -> Result<WorkspaceDiscovery> {
     let plugin_roots = discover_plugin_roots(source_root)?;
     let mut skill_files = discover_skill_files(source_root)?;
     skill_files.sort();
-    skill_files
+    let skill_file_count = skill_files.len();
+    let packages = skill_files
         .into_iter()
         .map(|skill_path| package_from_skill_file(source_root, &skill_path, &plugin_roots))
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+    Ok(WorkspaceDiscovery {
+        packages,
+        plugin_roots,
+        skill_file_count,
+    })
+}
+
+fn source_shape(discovery: &WorkspaceDiscovery) -> WorkspaceSourceShape {
+    let kind = if !discovery.plugin_roots.is_empty() {
+        WorkspaceSourceShapeKind::PluginWorkspace
+    } else if discovery.skill_file_count > 1 {
+        WorkspaceSourceShapeKind::MultiSkillWorkspace
+    } else {
+        WorkspaceSourceShapeKind::SingleSkill
+    };
+    WorkspaceSourceShape {
+        kind,
+        skill_files: discovery.skill_file_count,
+        plugin_roots: discovery
+            .plugin_roots
+            .iter()
+            .map(|root| WorkspacePluginRoot {
+                path: path_to_string(&root.path),
+                namespace: root.namespace.clone(),
+            })
+            .collect(),
+    }
 }
 
 fn package_from_skill_file(
@@ -1355,6 +1465,7 @@ fn map_report(
         report_path: path_to_string(report_path),
         source_root: manifest.source_root.clone(),
         workspace_slug: manifest.workspace_slug.clone(),
+        source_shape: manifest.source_shape.clone(),
         install_slug_policy: manifest.install_slug_policy,
         plugin_namespaces: plugin_namespace_reports(manifest),
         package_count: manifest.packages.len(),

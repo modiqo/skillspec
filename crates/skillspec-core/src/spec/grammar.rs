@@ -356,6 +356,11 @@ fn progressive_sequence() -> Vec<CommandStep> {
             proves: "the harness sees the source structure and exact handles before opening detailed spans",
         },
         CommandStep {
+            phase: "review source lens",
+            command: "skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1",
+            proves: "the harness reviews one parsed Markdown block at a time with countdown, source hash, classifications, references, and required target kinds",
+        },
+        CommandStep {
             phase: "review source obligations",
             command: "skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary",
             proves: "dependency mentions and imported package signals are visible before proof or install",

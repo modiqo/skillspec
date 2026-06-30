@@ -203,6 +203,18 @@ pub fn render_source_query(value: &serde_json::Value) -> String {
     source_map::render_query(value)
 }
 
+pub fn source_lens(
+    map: &Path,
+    cursor: usize,
+    limit: usize,
+) -> error::Result<source_map::SourceLensReport> {
+    source_map::lens(map, cursor, limit)
+}
+
+pub fn render_source_lens(report: &source_map::SourceLensReport) -> String {
+    source_map::render_lens(report)
+}
+
 pub fn source_coverage(map: &Path) -> error::Result<source_map::SourceCoverage> {
     Ok(source_map::load(map)?.coverage)
 }

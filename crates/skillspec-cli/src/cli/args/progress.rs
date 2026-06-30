@@ -168,4 +168,51 @@ pub(in crate::cli) enum ProgressCommand {
         #[arg(long)]
         json: bool,
     },
+    #[command(
+        about = "Checkpoint routine progress events from typed arguments",
+        long_about = "Append routine successful progress/proof events to execution.jsonl in one checkpoint without hand-authoring an evidence JSONL file. Repeat flags as needed. Use PHASE/REQUIREMENT=KIND:REF for requirement rows and TARGET=KIND:REF for target rows."
+    )]
+    Checkpoint {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Requirement proof as PHASE/REQUIREMENT=KIND:REF. Repeat for several requirements.
+        #[arg(
+            long = "requirement-satisfied",
+            value_name = "PHASE/REQUIREMENT=KIND:REF"
+        )]
+        requirement_satisfied: Vec<String>,
+        /// Phase completion proof as PHASE=KIND:REF. Repeat for several phases.
+        #[arg(long = "phase-completed", value_name = "PHASE=KIND:REF")]
+        phase_completed: Vec<String>,
+        /// Route fulfillment proof as ROUTE=KIND:REF. Repeat for several routes.
+        #[arg(long = "route-fulfilled", value_name = "ROUTE=KIND:REF")]
+        route_fulfilled: Vec<String>,
+        /// Route check proof as CHECK=KIND:REF. Repeat for several checks.
+        #[arg(long = "route-check-completed", value_name = "CHECK=KIND:REF")]
+        route_check_completed: Vec<String>,
+        /// After-success closure proof as CLOSURE=KIND:REF. Repeat for several closures.
+        #[arg(long = "after-success-completed", value_name = "CLOSURE=KIND:REF")]
+        after_success_completed: Vec<String>,
+        /// Obligation proof as OBLIGATION=KIND:REF. Repeat for several obligations.
+        #[arg(long = "obligation-satisfied", value_name = "OBLIGATION=KIND:REF")]
+        obligation_satisfied: Vec<String>,
+        /// Elicitation proof as ELICITATION=KIND:REF. Repeat for several elicitations.
+        #[arg(long = "elicitation-answered", value_name = "ELICITATION=KIND:REF")]
+        elicitation_answered: Vec<String>,
+        /// Attach extra evidence as KIND:REF. Repeat for several evidence items.
+        #[arg(long = "evidence-attached", value_name = "KIND:REF")]
+        evidence_attached: Vec<String>,
+        /// Label printed in compact summary output.
+        #[arg(long)]
+        checkpoint: Option<String>,
+        /// Emit compact checkpoint output instead of event counts.
+        #[arg(long)]
+        summary: bool,
+        /// Suppress stdout after successfully appending the checkpoint.
+        #[arg(long)]
+        quiet: bool,
+        /// Emit JSON for the checkpoint report.
+        #[arg(long)]
+        json: bool,
+    },
 }

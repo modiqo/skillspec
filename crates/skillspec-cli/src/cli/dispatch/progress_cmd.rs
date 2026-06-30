@@ -139,6 +139,41 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
                 report::text(&evidence::render_batch_report(&report, summary))?;
             }
         }
+        ProgressCommand::Checkpoint {
+            run,
+            requirement_satisfied,
+            phase_completed,
+            route_fulfilled,
+            route_check_completed,
+            after_success_completed,
+            obligation_satisfied,
+            elicitation_answered,
+            evidence_attached,
+            checkpoint,
+            summary,
+            quiet,
+            json,
+        } => {
+            let report = evidence::record_checkpoint(evidence::CheckpointRecordOptions {
+                run_dir: run,
+                requirement_satisfied,
+                phase_completed,
+                route_fulfilled,
+                route_check_completed,
+                after_success_completed,
+                obligation_satisfied,
+                elicitation_answered,
+                evidence_attached,
+                checkpoint,
+            })?;
+            if json {
+                report::json(&report)?;
+            } else if quiet {
+                // Successful quiet checkpoints intentionally produce no output.
+            } else {
+                report::text(&evidence::render_batch_report(&report, summary))?;
+            }
+        }
     }
 
     Ok(())

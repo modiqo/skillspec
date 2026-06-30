@@ -9,6 +9,9 @@ use std::io::{self, IsTerminal, Write};
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const SOURCE_PRESERVED_AS_EVIDENCE_KEY: &str = "source_preserved_as_evidence";
+const SOURCE_MAP_PRESERVED_AS_EVIDENCE_KEY: &str = "source_map_preserved_as_evidence";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum HarnessTarget {
@@ -331,6 +334,10 @@ fn install_identity(install_dir: &Path) -> PathBuf {
         .unwrap_or_else(|_| install_dir.to_path_buf())
 }
 
+pub fn install_dir_identity(install_dir: &Path) -> PathBuf {
+    install_identity(install_dir)
+}
+
 fn retire_existing_install(install_dir: &Path, backup_path: &Path) -> Result<()> {
     if let Some(parent) = backup_path.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Write {
@@ -357,6 +364,10 @@ fn retire_existing_install(install_dir: &Path, backup_path: &Path) -> Result<()>
             Ok(())
         }
     }
+}
+
+pub fn retire_existing_skill_dir(install_dir: &Path, backup_path: &Path) -> Result<()> {
+    retire_existing_install(install_dir, backup_path)
 }
 
 fn copy_dir_all(source: &Path, destination: &Path) -> Result<()> {
@@ -396,8 +407,16 @@ fn retired_backup_root() -> Result<PathBuf> {
         .join(format!("retire-{}-{}", now_unix(), std::process::id())))
 }
 
+pub fn retired_skill_backup_root() -> Result<PathBuf> {
+    retired_backup_root()
+}
+
 fn retired_backup_path(root: &Path, target: HarnessTarget, skill_name: &str) -> PathBuf {
     root.join(target.id()).join(skill_name)
+}
+
+pub fn retired_skill_backup_path(root: &Path, target: HarnessTarget, skill_name: &str) -> PathBuf {
+    retired_backup_path(root, target, skill_name)
 }
 
 fn skillspec_home() -> Result<PathBuf> {
@@ -532,7 +551,20 @@ fn declared_package_files(skill_folder: &Path, spec: &SkillSpec) -> Result<BTree
         }
     }
 
+    for key in [
+        SOURCE_PRESERVED_AS_EVIDENCE_KEY,
+        SOURCE_MAP_PRESERVED_AS_EVIDENCE_KEY,
+    ] {
+        if let Some(path) = metadata_string(spec, key) {
+            insert_declared_package_file(skill_folder, &mut paths, Path::new(path))?;
+        }
+    }
+
     Ok(paths)
+}
+
+fn metadata_string<'a>(spec: &'a SkillSpec, key: &str) -> Option<&'a str> {
+    spec.metadata.get(key)?.as_str()
 }
 
 fn insert_declared_package_file(

@@ -71,6 +71,7 @@ For local source packages or public GitHub skill URIs:
 ```bash
 skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>
@@ -90,6 +91,10 @@ The agent learns the source in parts:
 - `source map` records files, headings, code blocks, references, hashes, and
   classifications.
 - `source coverage` tells the agent where review is still needed.
+- `source lens` gives a one-block cursor with source hash, countdown,
+  classifications, references, and required target kinds so promotion can
+  proceed block by block. Conditional language is classified as a rule
+  obligation.
 - `source query` exposes exact handles instead of broad file reads.
 - `source stale` proves the mapped source still matches before import.
 - `import-skill --source-map` binds the generated draft to that source evidence.
@@ -154,8 +159,9 @@ skillspec progress record <run_dir> requirement-satisfied <phase> <requirement> 
   --evidence-kind <kind> \
   --evidence-ref <path-or-id>
 
-skillspec progress batch <run_dir> \
-  --file <run_dir>/evidence-batch.jsonl \
+skillspec progress checkpoint <run_dir> \
+  --requirement-satisfied <phase>/<requirement>=<kind>:<path-or-id> \
+  --phase-completed <phase>=trace:execution.jsonl \
   --checkpoint "checkpointing evidence" \
   --quiet
 
@@ -163,10 +169,10 @@ skillspec progress show <skill.spec.yml> --run <run_dir> --quiet
 ```
 
 Use `progress record` for a single exceptional row or a user-relevant failure.
-Use `progress batch --quiet` when several successful routine proof rows are
-ready at the same boundary. The command still completes synchronously, but the
-transcript should stay focused on plain-language status while `execution.jsonl`
-receives every granular event.
+Use `progress checkpoint --quiet` when several successful routine proof rows
+are ready at the same boundary. The command still completes synchronously, but
+the transcript should stay focused on plain-language status while
+`execution.jsonl` receives every granular event.
 
 The run directory becomes the durable working memory:
 

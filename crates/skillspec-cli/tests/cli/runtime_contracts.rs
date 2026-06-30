@@ -1491,6 +1491,45 @@ fn progress_batch_quiet_records_without_stdout() {
 }
 
 #[test]
+fn progress_checkpoint_records_typed_events_without_batch_file() {
+    let dir = TempDir::new("progress-checkpoint");
+    let run_dir = dir.path().join("run-progress-checkpoint");
+    fs::create_dir_all(&run_dir).unwrap();
+
+    let progress_checkpoint = Command::new(bin())
+        .arg("progress")
+        .arg("checkpoint")
+        .arg(&run_dir)
+        .arg("--requirement-satisfied")
+        .arg("plan/dry_run=command:dry-run.log")
+        .arg("--requirement-satisfied")
+        .arg("plan/auth_research=file:auth.md")
+        .arg("--phase-completed")
+        .arg("plan=trace:execution.jsonl")
+        .arg("--route-fulfilled")
+        .arg("create_adapter=trace:alignment.json")
+        .arg("--checkpoint")
+        .arg("checkpointing evidence")
+        .arg("--summary")
+        .output()
+        .unwrap();
+    assert_success(&progress_checkpoint);
+    let text = stdout(&progress_checkpoint);
+    assert!(text.contains("[checkpointing evidence...]"));
+    assert!(text.contains("records: 4"));
+    assert!(text.contains("requirements: auth_research, dry_run"));
+
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert_eq!(ledger.lines().count(), 4);
+    assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
+    assert!(ledger.contains("\"phase\":\"plan\""));
+    assert!(ledger.contains("\"requirement\":\"dry_run\""));
+    assert!(ledger.contains("\"event\":\"phase_completed\""));
+    assert!(ledger.contains("\"event\":\"route_fulfilled\""));
+    assert!(!run_dir.join("evidence-batch.jsonl").exists());
+}
+
+#[test]
 fn trace_align_uses_execution_ledger_without_leaking_command_args() {
     let dir = TempDir::new("align-execution");
     let spec = dir.path().join("skill.spec.yml");

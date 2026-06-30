@@ -1,6 +1,7 @@
 use super::{
     dependency_edges, load_manifest, manifest_relative_path, output_package_dir, path_to_string,
-    validate_workspace, write_text, WorkspaceDependencyEdge, WorkspaceManifest, WorkspacePackage,
+    topological_package_order, validate_workspace, write_text, WorkspaceDependencyEdge,
+    WorkspaceManifest, WorkspacePackage,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -40,6 +41,9 @@ pub struct WorkspaceImportReport {
 #[derive(Clone, Debug, Serialize)]
 pub struct WorkspaceImportPackageReport {
     pub package_id: String,
+    pub package_index: usize,
+    pub package_count: usize,
+    pub remaining_after: usize,
     pub status: WorkspaceImportStatus,
     pub source_path: String,
     pub output_dir: String,
@@ -81,6 +85,9 @@ impl WorkspaceImportStatus {
 #[derive(Clone, Debug, Serialize)]
 struct PackageEvidenceReport {
     package_id: String,
+    package_index: usize,
+    package_count: usize,
+    remaining_after: usize,
     status: WorkspaceImportStatus,
     source_path: String,
     output_dir: String,
@@ -284,9 +291,12 @@ pub fn render_import_report(report: &WorkspaceImportReport) -> String {
     output.push_str("\n## Packages\n\n");
     for package in &report.packages {
         output.push_str(&format!(
-            "- {}: {} -> {}\n",
+            "- {}: {} review={}/{} remaining_after={} -> {}\n",
             package.package_id,
             package.status.as_str(),
+            package.package_index,
+            package.package_count,
+            package.remaining_after,
             package.output_dir
         ));
         if let Some(message) = &package.message {
@@ -478,6 +488,12 @@ fn package_report(
 
     WorkspaceImportPackageReport {
         package_id: package.package_id.clone(),
+        package_index: package_index(manifest, package),
+        package_count: manifest.packages.len(),
+        remaining_after: manifest
+            .packages
+            .len()
+            .saturating_sub(package_index(manifest, package)),
         status,
         source_path: path_to_string(&source_path),
         output_dir: path_to_string(&output_dir),
@@ -490,10 +506,21 @@ fn package_report(
     }
 }
 
+fn package_index(manifest: &WorkspaceManifest, package: &WorkspacePackage) -> usize {
+    topological_package_order(manifest)
+        .iter()
+        .position(|package_id| package_id == &package.package_id)
+        .map(|index| index + 1)
+        .unwrap_or(1)
+}
+
 fn write_package_report(report: &WorkspaceImportPackageReport) -> Result<()> {
     let path = PathBuf::from(&report.package_report_path);
     let evidence = PackageEvidenceReport {
         package_id: report.package_id.clone(),
+        package_index: report.package_index,
+        package_count: report.package_count,
+        remaining_after: report.remaining_after,
         status: report.status.clone(),
         source_path: report.source_path.clone(),
         output_dir: report.output_dir.clone(),
@@ -716,6 +743,7 @@ mod tests {
             schema: super::super::WORKSPACE_SCHEMA.to_owned(),
             source_root: "/tmp/skills".to_owned(),
             workspace_slug: "skills".to_owned(),
+            source_shape: Default::default(),
             install_slug_policy: super::super::WorkspaceInstallSlugPolicy::WorkspacePath,
             output_root: "/tmp/skills/.skillspec/workspace-build".to_owned(),
             packages: BTreeMap::from([

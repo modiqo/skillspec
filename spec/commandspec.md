@@ -405,6 +405,31 @@ Use `--view index` to inspect structural headings and code blocks, `--view
 summary` to inspect compact classifications with line ranges and previews, and
 `--view full` on a specific node handle to recover the exact source span.
 
+### `source lens`
+
+```text
+skillspec source lens <MAP> [--cursor <N>] [--limit <N>]
+```
+
+Arguments:
+
+- `<MAP>`: path to `source-map.json`.
+
+Options:
+
+- `--cursor <N>`: 1-based review unit cursor. Defaults to `1`.
+- `--limit <N>`: number of units to show. Defaults to `1` so promotion
+  proceeds block by block.
+- `--json`: emit JSON instead of a concise human report.
+
+The lens is the progressive porting view over the Markdown parser output. Each
+unit contains a countdown position, source block hash, line range, preview,
+classifications, references, suggested constructs, and required target kinds.
+Conditional workflow language is classified as `conditional_rule_candidate` and
+requires a structural `rule` target. Promotion proof must preserve the unit hash
+and point promoted blocks at matching SkillSpec constructs rather than a generic
+route.
+
 ## `workspace`
 
 ```text
@@ -789,8 +814,9 @@ Options:
   output. Use this for normal agent execution.
 - `--proof-digest <PROOF_DIGEST>`: write a grouped missing-proof digest for
   one-shot final proof batching. Use this with `--quiet` during completion
-  audits, then build `<run-dir>/final-proof.jsonl` from the digest and run
-  `skillspec progress batch` once before the final alignment rerun.
+  audits, then record any real captured proof with `skillspec progress
+  checkpoint` or an existing JSONL proof artifact with `skillspec progress
+  batch` once before the final alignment rerun.
 - `--json`: emit JSON instead of a concise human report.
 
 Current alignment compares deterministic decision-trace facts. Default human
@@ -800,7 +826,7 @@ inspection. Normal agent execution should use `--quiet`; the full report is alwa
 `<DECISION_TRACE>/alignment.json`. `--proof-digest` writes a sidecar JSON file
 that groups missing phase requirements, route fulfillment, route checks,
 forbid/no-violation rows, elicitations, and after-success closures by the event
-shape needed for `progress batch`.
+shape needed for `progress checkpoint` or file-based `progress batch`.
 The full human report includes the selected route, route-selection basis,
 matched rules, pass/fail/unproven counts for deterministic checks, and
 pass/fail/unproven counts for execution obligations.
@@ -904,6 +930,27 @@ Options:
 - `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
+### `progress checkpoint`
+
+```text
+skillspec progress checkpoint <RUN>
+  [--requirement-satisfied <PHASE>/<REQUIREMENT>=<KIND>:<REF>]...
+  [--phase-completed <PHASE>=<KIND>:<REF>]...
+  [--route-fulfilled <ROUTE>=<KIND>:<REF>]...
+  [--route-check-completed <CHECK>=<KIND>:<REF>]...
+  [--after-success-completed <CLOSURE>=<KIND>:<REF>]...
+  [--obligation-satisfied <OBLIGATION>=<KIND>:<REF>]...
+  [--elicitation-answered <ELICITATION>=<KIND>:<REF>]...
+  [--evidence-attached <KIND>:<REF>]...
+  [--checkpoint <LABEL>] [--quiet] [--summary] [--json]
+```
+
+`progress checkpoint` records routine successful proof rows in one checkpoint
+without requiring an agent to hand-author an event JSONL file. Use it at
+natural phase boundaries when the evidence already exists and the event shape
+is one of the common success rows above. It appends the same `execution.jsonl`
+ledger shape as `progress record` and `progress batch`.
+
 ### `progress batch`
 
 ```text
@@ -931,14 +978,13 @@ Options:
   inspection, not routine agent execution.
 - `--json`: emit JSON for the compact batch report.
 
-`progress batch` records several proof events in one checkpoint. Use it at
-natural boundaries that would otherwise create a visible progress parade: after
-dry-run and planning, after create or mutation, after probe or verification,
-before route fulfillment, and before final alignment. Successful routine ledger
-writes should use `--quiet`; failures, blocked requirements, or user-relevant
-proof gaps should still be surfaced individually. The command preserves the
-same granular `execution.jsonl` ledger shape as `progress record`; it only
-keeps bookkeeping out of the normal user log.
+`progress batch` records several proof events from an existing JSONL or JSON
+array artifact in one checkpoint. Prefer `progress checkpoint` for routine
+successful rows so agents do not hand-author event files. Successful routine
+ledger writes should use `--quiet`; failures, blocked requirements, or
+user-relevant proof gaps should still be surfaced individually. The command
+preserves the same granular `execution.jsonl` ledger shape as `progress
+record`; it only keeps bookkeeping out of the normal user log.
 
 ### `progress stats`
 

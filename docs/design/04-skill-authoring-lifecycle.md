@@ -77,6 +77,7 @@ commands:
 # Local source path or public GitHub skill URI:
 skillspec source map <path-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <path>

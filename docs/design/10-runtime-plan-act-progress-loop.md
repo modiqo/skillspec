@@ -207,14 +207,15 @@ Progress events should be recorded after actual work, not before. A progress
 event is a proof claim. If the work did not happen or the evidence is missing,
 the event should not claim success.
 
-### `progress batch`
+### `progress checkpoint`
 
-`progress batch` appends many structured execution events from one JSONL file or
-JSON array:
+`progress checkpoint` appends many routine successful execution events from
+typed flags without an intermediate event file:
 
 ```sh
-skillspec progress batch .skillspec/traces/<run-id> \
-  --file .skillspec/traces/<run-id>/final-proof.jsonl \
+skillspec progress checkpoint .skillspec/traces/<run-id> \
+  --requirement-satisfied qa_and_proof/validate_spec=command:validate.log \
+  --phase-completed qa_and_proof=trace:execution.jsonl \
   --checkpoint "checkpointing evidence" \
   --quiet
 ```
@@ -226,12 +227,16 @@ while avoiding a visible progress parade. Use the same synchronous quiet
 checkpoint shape at natural boundaries after dry-run/planning, after mutation,
 after verification, before route fulfillment, and before final alignment. The
 user-facing update should be a plain-language gate note only when useful;
-individual successful proof rows should stay in the JSONL batch and ledger, not
-the transcript.
+individual successful proof rows should stay in the ledger, not the transcript.
 
-Each JSONL row is the same execution event shape used by `progress record`. The
-CLI fills missing `schema`, `run_id`, and timestamp fields and normalizes event
-names from hyphen form to underscore form.
+The resulting ledger rows use the same execution event shape as `progress
+record`.
+
+### `progress batch`
+
+`progress batch` remains available for existing JSONL or JSON array proof
+artifacts. Prefer `progress checkpoint` for routine successful rows so agents
+do not hand-author event files.
 
 ### `progress show`
 
@@ -414,10 +419,12 @@ skillspec trace align ./skill.spec.yml \
 ```
 
 Use the digest to avoid a visible re-alignment loop. If alignment reports
-several missing route, route-check, requirement, elicitation, forbid/no-violation,
-or closure proof rows, create `.skillspec/traces/<run-id>/final-proof.jsonl`,
-append it once with `skillspec progress batch`, then rerun alignment once. Do
-not rerun alignment after each individual proof row.
+several missing route, route-check, requirement, elicitation,
+forbid/no-violation, or closure proof rows and the evidence was already
+captured during the work, record the real rows once with `skillspec progress
+checkpoint` or append an existing JSONL proof artifact with `skillspec progress
+batch`, then rerun alignment once. Do not rerun alignment after each individual
+proof row.
 
 The final response should include:
 

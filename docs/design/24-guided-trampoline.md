@@ -203,13 +203,12 @@ progress_to_record:
 when_to_advance:
 ```
 
-`progress_to_record` is a batch-event checklist, not a list of foreground
+`progress_to_record` is a typed checkpoint checklist, not a list of foreground
 commands. Agent-facing guide output must not ask the harness to run one
 `skillspec progress record` command per routine proof row. Successful routine
-proof is staged into a JSONL file and checkpointed once with
-`skillspec progress batch ... --quiet`. Individual `progress record` commands
-are reserved for failures, blockers, debugging, or explicit user requests for
-proof details.
+proof is checkpointed once with `skillspec progress checkpoint ... --quiet`.
+Individual `progress record` commands are reserved for failures, blockers,
+debugging, or explicit user requests for proof details.
 
 ### End Anchor
 
@@ -377,7 +376,7 @@ DO NOT
 NEXT COMMANDS
 - skillspec source stage <uri> --out <staging-root> --json
 - skillspec doctor <selected_source_path>
-- skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint "checkpointing evidence" --quiet
+- skillspec progress checkpoint <run_dir> --requirement-satisfied <phase>/<requirement>=<kind>:<ref> --phase-completed <phase>=<kind>:<ref> --checkpoint "checkpointing evidence" --quiet
 
 END
 - done_when: source shape classified; route obligations complete or explicitly partial; final-response evidence recorded; alignment artifacts generated quietly
@@ -559,7 +558,7 @@ Proposed schema:
     ],
     "allowed_commands": [
       "skillspec doctor <source>",
-      "skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --quiet"
+      "skillspec progress checkpoint <run_dir> --requirement-satisfied <phase>/<requirement>=<kind>:<ref> --phase-completed <phase>=<kind>:<ref> --checkpoint \"checkpointing evidence\" --quiet"
     ],
     "recommended_queries": [],
     "progress_to_record": [

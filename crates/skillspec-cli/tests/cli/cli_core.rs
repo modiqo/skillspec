@@ -114,10 +114,12 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     assert!(allowed_commands.iter().all(|command| command
         .as_str()
         .is_some_and(|command| !command.contains("skillspec act"))));
-    assert!(allowed_commands.iter().any(|command| command
-        .as_str()
-        .is_some_and(|command| command.contains("progress batch")
-            && command.contains("evidence-batch.jsonl")
+    assert!(allowed_commands
+        .iter()
+        .any(|command| command.as_str().is_some_and(|command| command
+            .contains("progress checkpoint")
+            && command.contains("--requirement-satisfied")
+            && command.contains("--phase-completed")
             && command.contains("--quiet"))));
     assert!(allowed_commands.iter().any(|command| command
         .as_str()
@@ -164,8 +166,10 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
         .iter()
         .all(|hint| hint["command"]
             .as_str()
-            .is_some_and(|command| command.starts_with('{')
-                && command.contains("\"event\"")
+            .is_some_and(|command| !command.starts_with('{')
+                && !command.contains("\"event\"")
+                && (command.contains("--requirement-satisfied")
+                    || command.contains("--phase-completed"))
                 && !command.contains("skillspec progress record"))));
 
     let run_dir = PathBuf::from(
@@ -286,17 +290,23 @@ commands:
     let proof_commands = proof_report["current_gate"]["allowed_commands"]
         .as_array()
         .ok_or_else(|| invalid_json_shape("missing proof allowed commands"))?;
-    assert!(proof_commands.iter().any(|command| command
-        .as_str()
-        .is_some_and(|command| command.contains("progress batch") && command.contains("--quiet"))));
+    assert!(proof_commands
+        .iter()
+        .any(|command| command.as_str().is_some_and(|command| command
+            .contains("progress checkpoint")
+            && command.contains("--quiet"))));
     let proof_hints = proof_report["current_gate"]["progress_to_record"]
         .as_array()
         .ok_or_else(|| invalid_json_shape("missing proof progress hints"))?;
-    assert!(proof_hints.iter().all(|hint| hint["command"]
-        .as_str()
-        .is_some_and(|command| command.starts_with('{')
-            && command.contains("\"event\"")
-            && !command.contains("skillspec progress record"))));
+    assert!(proof_hints
+        .iter()
+        .all(|hint| hint["command"]
+            .as_str()
+            .is_some_and(|command| !command.starts_with('{')
+                && !command.contains("\"event\"")
+                && (command.contains("--requirement-satisfied")
+                    || command.contains("--phase-completed"))
+                && !command.contains("skillspec progress record"))));
     Ok(())
 }
 

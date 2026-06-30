@@ -432,9 +432,8 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
         } else {
             for requirement in &inputs.progress.open_requirements {
                 let command = format!(
-                    "{{\"event\":\"requirement-satisfied\",\"phase\":\"{}\",\"requirement\":\"{}\",\"status\":\"pass\",\"evidence\":{{\"kind\":\"<kind>\",\"ref\":\"<ref>\"}}}}",
-                    phase.id,
-                    requirement
+                    "--requirement-satisfied {}/{}=<kind>:<ref>",
+                    phase.id, requirement
                 );
                 progress_to_record.push(ProgressRecordHint {
                     event: "requirement_satisfied".to_owned(),
@@ -443,10 +442,7 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                     command: command.clone(),
                 });
             }
-            let phase_completed = format!(
-                "{{\"event\":\"phase-completed\",\"phase\":\"{}\",\"status\":\"pass\",\"evidence\":{{\"kind\":\"<kind>\",\"ref\":\"<ref>\"}}}}",
-                phase.id
-            );
+            let phase_completed = format!("--phase-completed {}=<kind>:<ref>", phase.id);
             progress_to_record.push(ProgressRecordHint {
                 event: "phase_completed".to_owned(),
                 phase: Some(phase.id.clone()),
@@ -454,16 +450,15 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                 command: phase_completed.clone(),
             });
             allowed_commands.push(format!(
-                "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --quiet",
-                shell_arg(inputs.run_dir),
+                "skillspec progress checkpoint {} --requirement-satisfied <phase>/<requirement>=<kind>:<ref> --phase-completed <phase>=<kind>:<ref> --checkpoint \"checkpointing evidence\" --quiet",
                 shell_arg(inputs.run_dir)
             ));
             do_now.push(
-                "stage routine successful proof rows in evidence-batch.jsonl without showing the rows, then checkpoint them quietly once"
+                "checkpoint routine successful proof rows with typed progress checkpoint flags without showing raw ledger data"
                     .to_owned(),
             );
             when_to_advance.push(
-                "checkpoint routine successful evidence with one quiet progress batch, then mark the phase completed or blocked"
+                "checkpoint routine successful evidence with one quiet progress checkpoint, then mark the phase completed or blocked"
                     .to_owned(),
             );
         }
