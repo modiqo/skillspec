@@ -498,15 +498,66 @@ routes:
             - compile_or_install_during_workspace_import
         - id: report_workspace_import
           owner_skill: skillspec
-          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next converge command.
+          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next scaffold-promotion batch plan.
           requires:
             - choose_execution_strategy
             - preserve_compact_evidence
             - report_workspace_import
+  - id: workspace_promote_scaffolds
+    label: Complete workspace scaffolds
+    rank: 5
+    description: Use after workspace fanout import has produced generated package drafts that must be semantically promoted from scaffold shape into real SkillSpecs before converge, compile, or install.
+    execution_plan:
+      mode: ordered
+      reason: Mechanical fanout import preserves source evidence; it does not create finished skills. Promotion must run in bounded dependency-ready batches so each package gets real activation, routes, rules, dependency decisions, tests, and proof before the graph can converge.
+      phases:
+        - id: classify_scaffold_outputs
+          owner_skill: skillspec
+          description: Inspect generated package drafts and classify every package as mechanical_scaffold, reviewed_ready, failed, or blocked by dependency order.
+          requires:
+            - classify_workspace_scaffolds
+            - produce_workspace_promotion_plan
+          forbid:
+            - compile_or_install_during_workspace_import
+            - install_generated_scaffold
+        - id: promote_scaffold_batches
+          owner_skill: skillspec
+          description: Promote independent package scaffolds in dependency-ready batches, keeping each package review isolated while batching package-local reads, edits, validation, deps checks, and tests.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - local_skill_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - choose_execution_strategy
+            - promote_workspace_scaffold_batches
+            - produce_workspace_promotion_report
+          forbid:
+            - install_generated_scaffold
+            - claim_scaffold_as_finished_skill
+            - compile_or_install_during_workspace_import
+        - id: validate_promoted_workspace_packages
+          owner_skill: skillspec
+          description: Validate every promoted package and keep unresolved packages blocked instead of deleting review notes or weakening dependencies.
+          requires:
+            - validate_promoted_package_specs
+            - deps_check_promoted_packages
+            - test_promoted_packages
+          forbid:
+            - delete_dependency_evidence_to_pass_qa
+            - clear_review_required_without_source_backed_decision
+        - id: report_workspace_promotion
+          owner_skill: skillspec
+          description: Report promoted, still-scaffolded, failed, and blocked packages plus the next converge command only when all installable packages are reviewed.
+          requires:
+            - preserve_compact_evidence
+            - report_workspace_promotion
   - id: workspace_converge
     label: Converge workspace build
-    rank: 5
-    description: Use when generated workspace package drafts should be checked against the validated workspace graph before compile or install.
+    rank: 6
+    description: Use when reviewed workspace package drafts should be checked against the validated workspace graph before compile or install.
     execution_plan:
       mode: ordered
       reason: Converge is the graph-level proof gate after fanout import; it must verify generated specs and dependency readiness without compiling or installing.
@@ -541,7 +592,7 @@ routes:
             - report_workspace_converge
   - id: workspace_compile
     label: Compile workspace build
-    rank: 6
+    rank: 7
     description: Use when converged workspace package drafts should be compiled into harness-ready SKILL.md loaders under the mirrored build root.
     execution_plan:
       mode: ordered
@@ -579,7 +630,7 @@ routes:
             - report_workspace_compile
   - id: workspace_install
     label: Install workspace build
-    rank: 7
+    rank: 8
     description: Use when compiled workspace packages should be dry-run planned or installed into harness roots using manifest install_slug folders, with explicit workspace visibility policy planning.
     execution_plan:
       mode: ordered
@@ -1223,7 +1274,28 @@ rules:
       - compile_or_install_during_workspace_import
     after_success:
       - report_workspace_import
-    reason: Fanout import starts from a validated workspace manifest and writes one generated package draft per atomic skill; it must not compile, install, or refresh router indexes.
+      - promote_workspace_scaffold_batches
+    reason: Fanout import starts from a validated workspace manifest and writes one generated mechanical draft per atomic skill; it must not compile, install, refresh router indexes, or call the drafts finished before scaffold promotion.
+  - id: route_workspace_scaffolds_to_batch_promotion
+    when:
+      user_says_any:
+        - complete workspace scaffolds
+        - promote workspace scaffolds
+        - finish workspace package drafts
+        - complete generated package drafts
+        - semantically promote workspace
+        - batch promote skills
+        - batch semantic promotion
+        - scaffold promotion
+        - generated mechanical scaffold
+    prefer: workspace_promote_scaffolds
+    forbid:
+      - install_generated_scaffold
+      - claim_scaffold_as_finished_skill
+      - compile_or_install_during_workspace_import
+    after_success:
+      - report_workspace_promotion
+    reason: Workspace import produces mechanical scaffolds; each package must be completed from source evidence in dependency-ready batches before converge, compile, or install.
   - id: route_workspace_converge_to_proof
     when:
       user_says_any:
@@ -2085,7 +2157,7 @@ artifacts:
   workspace_import_report:
     kind: report
     path: workspace-build/workspace-import.report.md
-    description: Fanout import report naming built, failed, skipped, and blocked packages, per-package evidence paths, and the next converge command.
+    description: Fanout import report naming built, failed, skipped, and blocked mechanical package drafts, per-package evidence paths, and the next scaffold-promotion batch plan.
     produced_by:
       - kind: command
         id: workspace_import_packages
@@ -2095,17 +2167,29 @@ artifacts:
   workspace_package_drafts:
     kind: file
     path: workspace-build/<package>/skill.spec.yml
-    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import.
+    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import; not compile- or install-ready until semantic promotion completes.
     produced_by:
       - kind: command
         id: workspace_import_packages
     consumed_by:
       - kind: recipe
         id: workspace_import_loop
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
       - kind: command
         id: workspace_converge_build
       - kind: command
         id: workspace_compile_build
+  workspace_promotion_report:
+    kind: report
+    path: workspace-build/workspace-promotion.report.md
+    description: Batch semantic-promotion report naming promoted, still-scaffolded, failed, blocked, and next-batch workspace packages before converge.
+    produced_by:
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
+    consumed_by:
+      - kind: recipe
+        id: workspace_converge_loop
   workspace_converge_report:
     kind: report
     path: workspace-build/workspace-converge.report.md
@@ -2465,28 +2549,28 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_import_packages:
-    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
+    description: Run fanout import from a validated workspace manifest, writing one generated mechanical package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. These drafts are scaffolds and must be semantically promoted before converge, compile, install, or alignment-as-complete. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
     template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_converge_build:
-    description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install. Use summary mode to report compact readiness counts plus metrics.
+    description: Verify a workspace build root against the validated manifest, checking reviewed package specs, package-local imports/resources, explicit failures, dependency readiness, and mechanical-scaffold blockers before compile or install. Use summary mode to report compact readiness counts plus metrics.
     template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_compile_build:
-    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Use summary mode to report compact compile counts plus metrics.
+    description: Compile a converged reviewed workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Mechanical scaffolds must remain blocked. Use summary mode to report compact compile counts plus metrics.
     template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_dry_run:
-    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
+    description: Preflight a compiled reviewed workspace install into harness roots, showing every planned write, default entry-implicit visibility target, scaffold blocker, and collision blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
     safety: local_read
     requires:
@@ -2500,14 +2584,14 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_install_packages:
-    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Use summary mode to report compact install counts plus metrics.
+    description: Install compiled reviewed workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Mechanical scaffolds are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_apply_visibility:
-    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Use summary mode to report compact install counts plus metrics while preserving full install proof.
+    description: Install compiled reviewed workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Mechanical scaffolds are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics while preserving full install proof.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility --summary
     safety: local_write
     requires:
@@ -3049,8 +3133,32 @@ recipes:
       - note: Prefer the compact import summary in chat. Open per-package reports, source maps, or full generated specs only for failed packages, review, or exact proof.
       - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
       - note: Report built, cached, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
+      - note: Generated package drafts are scaffolds, not finished ports. The next phase is workspace_scaffold_promotion_loop; do not converge, compile, install, align as complete, or report success until promotion is done.
+  workspace_scaffold_promotion_loop:
+    description: "Phase 5 workspace scaffold completion: classify generated package drafts, split dependency-ready packages into bounded parallel batches, promote each scaffold into a reviewed SkillSpec from source evidence, and report remaining blockers before converge."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_package_drafts
+        - workspace_promotion_report
+    steps:
+      - run_command: workspace_converge_build
+      - note: "Use converge as a classifier: generated mechanical scaffolds must report blocked until promoted. A package with id imported.skill, Imported SkillSpec scaffold description, empty routes, importer review_required notes, source/SKILL_md.old, or deps.toml review_required=true is not ready."
+      - note: Build dependency-ready batches from skillspec.workspace.yml. Process only packages whose depends_on packages are already promoted or absent. Keep phase boundaries sequential, but process independent package reviews in parallel batch increments.
+      - note: Use bounded batches instead of one unbounded swarm. Default to 3 to 5 independent packages per batch; shrink the batch when packages are long, code-heavy, or share confusing references.
+      - note: For each package in a batch, read only its package-local source/SKILL_md.old, source-map summary, doctor report, deps.toml, and referenced package summaries needed by its declared dependencies.
+      - note: Promote real behavior into activation, routes, rules, elicitations, dependencies, imports, resources, code, artifacts, recipes, states, commands, closures, tests, and review_required. Do not auto-fill from vibes.
+      - note: A promoted package must have at least one source-backed route or be explicitly classified as support/manual-only with a dependency/use relationship; empty-route entry skills remain blocked.
+      - note: Preserve dependency evidence. Do not delete deps.toml entries or review_required notes just to pass QA; clear a review note only when the package has an evidence-backed replacement.
+      - note: For each promoted package run validate, imports check, deps check, and scenario tests or record the exact blocker. Keep package failures isolated and block dependents.
+      - note: After each batch, write a compact promotion checkpoint naming promoted, still_scaffolded, failed, blocked, and next_batch package ids. Do not print full package specs in chat.
+      - produce_artifact: workspace_promotion_report
+      - note: Run workspace converge only after all installable packages are promoted or intentionally blocked. Converge blocking on a scaffold is a correct stop, not a failure to work around.
   workspace_converge_loop:
-    description: "Phase 5 workspace converge: verify generated package drafts and dependency readiness against the workspace graph before compile or install."
+    description: "Phase 6 workspace converge: verify reviewed package drafts and dependency readiness against the workspace graph before compile or install."
     ordered: true
     requires:
       dependencies:
@@ -3380,7 +3488,7 @@ code:
     language: text
     kind: validator
     source:
-      inline: "Guide the promotion pass; do not auto-fill the scaffold. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep the pass short and deliberate: choose real activation/routes, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Artifact produced_by/consumed_by entries are executable refs only: command, code, or recipe; never route or rule. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
+      inline: "Guide the promotion pass; do not auto-fill the scaffold. For workspace fanout, split packages into dependency-ready batches from skillspec.workspace.yml and process only independent packages in bounded parallel increments, normally 3 to 5 packages per batch. For each package, use its own source/SKILL_md.old, source map, doctor report, deps.toml, and declared dependency summaries; keep edits and proof package-local. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep each package pass short and deliberate: choose real activation/routes or explicitly classify the package as support/manual-only, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once per package. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Artifact produced_by/consumed_by entries are executable refs only: command, code, or recipe; never route or rule. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass. After each batch, report promoted, still_scaffolded, failed, blocked, and next_batch package ids; do not converge, compile, install, or align the workspace as complete while any installable package remains a mechanical scaffold."
     provenance:
       resource: source_skill_md
       heading: Creation Procedure
@@ -3535,6 +3643,14 @@ closures:
     description: Run workspace fanout import and write a report that names built, failed, skipped, and blocked packages plus per-package evidence paths.
     commands:
       - workspace_import_packages
+  promote_workspace_scaffold_batches:
+    description: Complete generated workspace package scaffolds in dependency-ready bounded batches before converge, compile, or install.
+    code:
+      - review_and_promote_draft
+  produce_workspace_promotion_report:
+    description: Write a compact promotion report naming promoted, still-scaffolded, failed, blocked, and next-batch package ids.
+    code:
+      - review_and_promote_draft
   produce_workspace_converge_report:
     description: Run workspace converge and write a graph-level proof report that names ready, failed, blocked, and missing package drafts, dependency-readiness status, validation warnings, and cross-package reference counts.
     commands:
@@ -3561,9 +3677,13 @@ closures:
       - workspace_install_packages
       - workspace_install_apply_visibility
   report_workspace_import:
-    description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
+    description: Summarize the workspace import result, generated mechanical package drafts, package-level failures, blocked dependents, and the next scaffold-promotion batch plan without converging, compiling, or installing anything.
     commands:
       - workspace_import_packages
+  report_workspace_promotion:
+    description: Summarize batch scaffold promotion results, including promoted, still-scaffolded, failed, blocked, and next-batch package ids before converge.
+    code:
+      - review_and_promote_draft
   report_workspace_converge:
     description: Summarize the workspace converge result, generated spec readiness, dependency blockers, missing package drafts, validation warnings, and Phase 6 or per-package compile next steps without compiling or installing anything.
     commands:
@@ -3868,9 +3988,22 @@ tests:
         - route_workspace_import_to_fanout
       after_success:
         - report_workspace_import
+        - promote_workspace_scaffold_batches
       forbid:
         - use_router_index_for_authoring_recon
         - import_workspace_root_as_single_skill
+        - compile_or_install_during_workspace_import
+  - name: workspace scaffolds promote before converge
+    input: /skillspec complete workspace scaffolds in ./workspace-build
+    expect:
+      route: workspace_promote_scaffolds
+      matched_rules:
+        - route_workspace_scaffolds_to_batch_promotion
+      after_success:
+        - report_workspace_promotion
+      forbid:
+        - install_generated_scaffold
+        - claim_scaffold_as_finished_skill
         - compile_or_install_during_workspace_import
   - name: workspace package drafts converge before compile
     input: /skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build

@@ -12,6 +12,7 @@ mod compile;
 mod converge;
 mod import;
 mod install;
+mod readiness;
 
 pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileReport};
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};

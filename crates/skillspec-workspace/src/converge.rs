@@ -128,9 +128,21 @@ pub fn converge_workspace(
     let blocked = package_ids_by_status(&package_reports, WorkspaceConvergeStatus::Blocked);
     let missing = package_ids_by_status(&package_reports, WorkspaceConvergeStatus::Missing);
     let report_path = build_root.join("workspace-converge.report.md");
+    let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
+    let next = if ok {
+        vec![format!(
+            "skillspec workspace compile {} --build-root {} --target <target>",
+            manifest_path.display(),
+            build_root.display()
+        )]
+    } else {
+        vec![
+            "complete scaffold promotion for blocked packages, fix failed or missing package drafts, then rerun workspace converge".to_owned(),
+        ]
+    };
 
     let report = WorkspaceConvergeReport {
-        ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
+        ok,
         manifest_path: path_to_string(manifest_path),
         build_root: path_to_string(build_root),
         report_path: path_to_string(&report_path),
@@ -143,11 +155,7 @@ pub fn converge_workspace(
         cross_package_references,
         dependency_edges: dependency_edges(&manifest),
         packages: package_reports,
-        next: vec![format!(
-            "skillspec workspace compile {} --build-root {} --target <target>",
-            manifest_path.display(),
-            build_root.display()
-        )],
+        next,
     };
     write_text(&report_path, &render_converge_report(&report))?;
     Ok(report)
@@ -257,7 +265,14 @@ fn converge_one_package(
                 )
             } else {
                 match parser::load_spec(&spec_path) {
-                    Ok(_) => (WorkspaceConvergeStatus::Ready, None),
+                    Ok(spec) => {
+                        let gate = super::readiness::review_gate(&output_dir, &spec)?;
+                        if gate.is_blocked() {
+                            (WorkspaceConvergeStatus::Blocked, Some(gate.message()))
+                        } else {
+                            (WorkspaceConvergeStatus::Ready, None)
+                        }
+                    }
                     Err(error) => (WorkspaceConvergeStatus::Failed, Some(error.to_string())),
                 }
             }

@@ -167,9 +167,20 @@ pub fn compile_workspace(
     let missing = package_ids_by_status(&package_reports, WorkspaceCompileStatus::Missing);
     let skipped = package_ids_by_status(&package_reports, WorkspaceCompileStatus::Skipped);
     let report_path = build_root.join("workspace-compile.report.md");
+    let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
+    let next = if ok {
+        vec![
+            "review compiled package loaders before install; workspace install is Phase 7"
+                .to_owned(),
+        ]
+    } else {
+        vec![
+            "fix failed, blocked, or missing packages; complete scaffold promotion when applicable; rerun workspace converge, then rerun workspace compile".to_owned(),
+        ]
+    };
 
     let report = WorkspaceCompileReport {
-        ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
+        ok,
         manifest_path: path_to_string(manifest_path),
         build_root: path_to_string(build_root),
         report_path: path_to_string(&report_path),
@@ -184,10 +195,7 @@ pub fn compile_workspace(
         cross_package_references,
         dependency_edges: dependency_edges(&manifest),
         packages: package_reports,
-        next: vec![
-            "review compiled package loaders before install; workspace install is Phase 7"
-                .to_owned(),
-        ],
+        next,
     };
     write_text(&report_path, &render_compile_report(&report))?;
     Ok(report)
@@ -260,12 +268,8 @@ pub fn render_compile_report(report: &WorkspaceCompileReport) -> String {
     }
 
     output.push_str("\n## Next\n\n");
-    if report.ok {
-        for next in &report.next {
-            output.push_str(&format!("- {next}\n"));
-        }
-    } else {
-        output.push_str("- fix failed, blocked, or missing packages, rerun workspace converge, then rerun workspace compile\n");
+    for next in &report.next {
+        output.push_str(&format!("- {next}\n"));
     }
     output
 }

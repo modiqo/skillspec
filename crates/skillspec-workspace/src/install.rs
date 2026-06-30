@@ -6,6 +6,7 @@ use super::{
 use serde::Serialize;
 use skillspec_authoring::git_context;
 use skillspec_core::error::{Error, Result};
+use skillspec_core::parser;
 use skillspec_harness::install::{self, HarnessRoot, HarnessTarget, InstallStatus};
 use skillspec_harness::router::Visibility;
 use skillspec_harness::visibility;
@@ -527,6 +528,21 @@ fn preflight_one_package(
         );
     }
 
+    let review_gate = match parser::load_spec(&spec_path) {
+        Ok(spec) => Some(super::readiness::review_gate(&source_dir, &spec)?),
+        Err(error) => {
+            return failed_package_report(
+                package,
+                &source_dir,
+                context.roots,
+                format!("compiled package spec is invalid: {error}"),
+            );
+        }
+    };
+    if let Some(gate) = review_gate.filter(|gate| gate.is_blocked()) {
+        return blocked_package_report(package, &source_dir, context.roots, gate.message());
+    }
+
     let dry_run = install::install_skill_without_router_hook(
         &source_dir,
         context.targets,
@@ -723,6 +739,7 @@ fn install_report(
     let failed = package_ids_by_status(&packages, WorkspaceInstallStatus::Failed);
     let blocked = package_ids_by_status(&packages, WorkspaceInstallStatus::Blocked);
     let missing = package_ids_by_status(&packages, WorkspaceInstallStatus::Missing);
+    let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
     let visibility = visibility_reports(
         &packages,
         context.visibility_policy,
@@ -732,8 +749,16 @@ fn install_report(
         .then(|| visibility_manifest_path(context.build_root, context.visibility_manifest))
         .flatten();
     let router_refresh_recommended = !context.dry_run && !installed.is_empty();
+    let next = install_next_steps(
+        ok,
+        context.dry_run,
+        context.visibility_policy,
+        context.apply_visibility,
+        &context.manifest.source_root,
+        context.build_root,
+    );
     WorkspaceInstallReport {
-        ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
+        ok,
         dry_run: context.dry_run,
         manifest_path: path_to_string(context.manifest_path),
         build_root: path_to_string(context.build_root),
@@ -766,23 +791,23 @@ fn install_report(
         ),
         dependency_edges: dependency_edges(context.manifest),
         packages,
-        next: install_next_steps(
-            context.dry_run,
-            context.visibility_policy,
-            context.apply_visibility,
-            &context.manifest.source_root,
-            context.build_root,
-        ),
+        next,
     }
 }
 
 fn install_next_steps(
+    ok: bool,
     dry_run: bool,
     visibility_policy: WorkspaceVisibilityPolicy,
     apply_visibility: bool,
     source_root: &str,
     build_root: &Path,
 ) -> Vec<String> {
+    if !ok {
+        return vec![
+            "fix missing compiled loaders, folder collisions, public-name collisions, failed packages, blocked dependencies, or complete scaffold promotion for unreviewed packages; rerun workspace converge and compile, then rerun workspace install --dry-run".to_owned(),
+        ];
+    }
     if dry_run {
         return vec![
             "rerun the same command without --dry-run after reviewing planned writes and visibility targets".to_owned(),

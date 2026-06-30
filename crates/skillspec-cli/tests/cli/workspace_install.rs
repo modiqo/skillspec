@@ -328,6 +328,8 @@ description: Privacy use-case triage.
         .unwrap();
     assert_success(&import);
 
+    promote_all_workspace_scaffolds(&build);
+
     let compile = Command::new(bin())
         .arg("workspace")
         .arg("compile")
@@ -538,6 +540,82 @@ Read `../coding-standards/SKILL.md`.
         .output()
         .unwrap();
     assert_success(&validate_review);
+
+    let scaffold_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&scaffold_converge);
+    let scaffold_converge_report = json_stdout(&scaffold_converge);
+    assert_eq!(scaffold_converge_report["ok"], false);
+    assert!(scaffold_converge_report["ready"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        scaffold_converge_report["blocked"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let scaffold_message = scaffold_converge_report["packages"][0]["message"]
+        .as_str()
+        .unwrap();
+    assert!(scaffold_message.contains("generated mechanical scaffold"));
+    assert!(scaffold_message.contains("semantic promotion"));
+    assert!(scaffold_converge_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("complete scaffold promotion"));
+    assert!(!scaffold_converge_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("workspace compile"));
+
+    write_placeholder_loaders_for_all_workspace_specs(&build);
+    let scaffold_install = Command::new(bin())
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("agents")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&scaffold_install);
+    let scaffold_install_report = json_stdout(&scaffold_install);
+    assert_eq!(scaffold_install_report["ok"], false);
+    assert!(scaffold_install_report["planned"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        scaffold_install_report["blocked"].as_array().unwrap().len(),
+        2
+    );
+    assert!(scaffold_install_report["packages"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("generated mechanical scaffold"));
+    assert!(scaffold_install_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("complete scaffold promotion"));
+    assert!(!scaffold_install_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("without --dry-run"));
+
+    promote_all_workspace_scaffolds(&build);
 
     let converge = Command::new(bin())
         .arg("workspace")
@@ -760,6 +838,115 @@ Read `../coding-standards/SKILL.md`.
     assert!(install_manifest.contains("\"target\": \"manual-only\""));
 }
 
+fn promote_all_workspace_scaffolds(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        promote_workspace_scaffold(build, &spec_path);
+    }
+}
+
+fn write_placeholder_loaders_for_all_workspace_specs(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        write_file(&spec_path.parent().unwrap().join("SKILL.md"), "# Loader\n");
+    }
+}
+
+fn workspace_package_specs(build: &std::path::Path) -> Vec<std::path::PathBuf> {
+    fn visit(dir: &std::path::Path, specs: &mut Vec<std::path::PathBuf>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                visit(&path, specs);
+            } else if path.file_name().and_then(|name| name.to_str()) == Some("skill.spec.yml") {
+                specs.push(path);
+            }
+        }
+    }
+
+    let mut specs = Vec::new();
+    visit(build, &mut specs);
+    specs.sort();
+    specs
+}
+
+fn promote_workspace_scaffold(build: &std::path::Path, spec_path: &std::path::Path) {
+    let out = spec_path.parent().unwrap();
+    let package_key = out
+        .strip_prefix(build)
+        .unwrap()
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(value) => value.to_str(),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("_");
+    let route_token = sanitize_skill_id(&package_key);
+    let title = format!("Reviewed Workspace Package {route_token}");
+    write_file(
+        spec_path,
+        &format!(
+            r#"schema: skillspec/v0
+id: reviewed.{route_token}
+title: {title}
+description: Reviewed workspace package promoted from mechanical import.
+
+routes:
+  - id: execute
+    label: Execute {title}
+    rank: 1
+
+rules:
+  - id: route_by_package_name
+    when:
+      user_says_any:
+        - {route_token}
+        - {title}
+    prefer: execute
+    reason: Reviewed package route is source-backed.
+"#
+        ),
+    );
+    write_file(
+        &out.join("deps.toml"),
+        r#"# Reviewed dependency ledger.
+schema_version = 1
+generated_by = "manual semantic promotion"
+review_required = false
+dependency_count = 0
+"#,
+    );
+}
+
+fn sanitize_skill_id(value: &str) -> String {
+    let mut output = String::new();
+    let mut last_was_separator = false;
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            output.push(ch.to_ascii_lowercase());
+            last_was_separator = false;
+        } else if !last_was_separator {
+            output.push('_');
+            last_was_separator = true;
+        }
+    }
+    let trimmed = output.trim_matches('_').to_owned();
+    if trimmed.is_empty() {
+        "package".to_owned()
+    } else {
+        trimmed
+    }
+}
+
 #[test]
 fn workspace_import_preserves_successes_and_blocks_dependents() {
     let dir = TempDir::new("workspace-import-failure");
@@ -841,11 +1028,7 @@ Read `../bad/SKILL.md`.
     assert_failure(&converge);
     let converge_report = json_stdout(&converge);
     assert_eq!(converge_report["ok"], false);
-    assert!(converge_report["ready"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|id| id == "good"));
+    assert!(converge_report["ready"].as_array().unwrap().is_empty());
     assert!(converge_report["failed"]
         .as_array()
         .unwrap()
@@ -855,7 +1038,22 @@ Read `../bad/SKILL.md`.
         .as_array()
         .unwrap()
         .iter()
+        .any(|id| id == "good"));
+    assert!(converge_report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
         .any(|id| id == "uses-bad"));
+    let good_converge = converge_report["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "good")
+        .unwrap();
+    assert!(good_converge["message"]
+        .as_str()
+        .unwrap()
+        .contains("generated mechanical scaffold"));
     assert!(build.join("workspace-converge.report.md").is_file());
 
     let compile = Command::new(bin())
@@ -872,11 +1070,7 @@ Read `../bad/SKILL.md`.
     assert_failure(&compile);
     let compile_report = json_stdout(&compile);
     assert_eq!(compile_report["ok"], false);
-    assert!(compile_report["compiled"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|id| id == "good"));
+    assert!(compile_report["compiled"].as_array().unwrap().is_empty());
     assert!(compile_report["failed"]
         .as_array()
         .unwrap()
@@ -886,9 +1080,14 @@ Read `../bad/SKILL.md`.
         .as_array()
         .unwrap()
         .iter()
+        .any(|id| id == "good"));
+    assert!(compile_report["blocked"]
+        .as_array()
+        .unwrap()
+        .iter()
         .any(|id| id == "uses-bad"));
     assert!(build.join("workspace-compile.report.md").is_file());
-    assert!(build.join("good").join("SKILL.md").is_file());
+    assert!(!build.join("good").join("SKILL.md").is_file());
     assert!(!build.join("uses-bad").join("SKILL.md").is_file());
 }
 
