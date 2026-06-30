@@ -751,7 +751,7 @@ skillspec trace <COMMAND>
 Subcommands:
 
 - `compact <run-dir>`
-- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--summary] [--proof-digest <path>] [--json]`
+- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--quiet] [--summary] [--proof-digest <path>] [--json]`
 
 ### `trace compact`
 
@@ -782,16 +782,18 @@ Options:
   action evidence. Repeat for multiple ledgers.
 - `--summary`: emit only the completion-facing alignment summary, token usage
   block, and `alignment.json` path while still writing the full report to disk.
+- `--quiet`: write `alignment.json` and any proof digest without terminal
+  output. Use this for normal agent execution.
 - `--proof-digest <PROOF_DIGEST>`: write a grouped missing-proof digest for
-  one-shot final proof batching. Use this with `--summary` during completion
+  one-shot final proof batching. Use this with `--quiet` during completion
   audits, then build `<run-dir>/final-proof.jsonl` from the digest and run
   `skillspec progress batch` once before the final alignment rerun.
 - `--json`: emit JSON instead of a concise human report.
 
 Current alignment compares deterministic decision-trace facts. Default human
 output includes a summary before the detailed check list. `--summary` suppresses
-the detailed checks, proof rows, and obligation list for normal harness
-completion display. The full report is always written to
+the detailed checks, proof rows, and obligation list for explicit completion
+inspection. Normal agent execution should use `--quiet`; the full report is always written to
 `<DECISION_TRACE>/alignment.json`. `--proof-digest` writes a sidecar JSON file
 that groups missing phase requirements, route fulfillment, route checks,
 forbid/no-violation rows, elicitations, and after-success closures by the event
@@ -855,11 +857,14 @@ Options:
 
 - `--run <RUN>`: trace run directory produced by `plan`, `decide`, or
   `explain` with `--trace-dir`.
+- `--quiet`: write `progress.json` without terminal output. Use this for
+  normal agent gate checks.
 - `--json`: emit JSON instead of a concise human report.
 
 `progress show` reads the decision trace and the run's `execution.jsonl`,
 then writes a derived `progress.json`. It reports completed, current, blocked,
-and remaining phases plus open requirements for the current phase.
+and remaining phases plus open requirements for the current phase unless
+`--quiet` is supplied.
 
 ### `progress record`
 
@@ -893,12 +898,13 @@ Options:
   trace id, or relative file path.
 - `--source-skill <SOURCE_SKILL>`: skill that emitted this progress event.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
 ### `progress batch`
 
 ```text
-skillspec progress batch <RUN> --file <EVIDENCE_BATCH> [--checkpoint <LABEL>] [--summary]
+skillspec progress batch <RUN> --file <EVIDENCE_BATCH> [--checkpoint <LABEL>] [--quiet] [--summary]
 ```
 
 Arguments:
@@ -913,19 +919,23 @@ Options:
   Event names may use hyphens or underscores.
 - `--checkpoint <LABEL>`: label for compact checkpoint output. Defaults to
   `checkpointing evidence`.
+- `--quiet`: append the batch without foreground output. Use this for normal
+  agent execution so proof bookkeeping does not become user-visible command
+  chatter.
 - `--summary`: emit the compact foreground checkpoint summary:
   `[checkpointing evidence...]`, `status`, `records`, `requirements`, and
-  `trace`.
+  `trace`. Use this for debugging, failure triage, or explicit proof
+  inspection, not routine agent execution.
 - `--json`: emit JSON for the compact batch report.
 
-`progress batch` records several proof events in one foreground checkpoint. Use
-it at natural boundaries that would otherwise create a visible progress parade:
-after dry-run and planning, after create or mutation, after probe or
-verification, before route fulfillment, and before final alignment. Successful
-routine ledger writes should use `--summary`; failures, blocked requirements,
-or user-relevant proof gaps should still be surfaced individually. The command
-preserves the same granular `execution.jsonl` ledger shape as `progress record`;
-it only reduces command chatter.
+`progress batch` records several proof events in one checkpoint. Use it at
+natural boundaries that would otherwise create a visible progress parade: after
+dry-run and planning, after create or mutation, after probe or verification,
+before route fulfillment, and before final alignment. Successful routine ledger
+writes should use `--quiet`; failures, blocked requirements, or user-relevant
+proof gaps should still be surfaced individually. The command preserves the
+same granular `execution.jsonl` ledger shape as `progress record`; it only
+keeps bookkeeping out of the normal user log.
 
 ### `progress stats`
 
@@ -970,10 +980,11 @@ Options:
   `estimated` for direct-run summary metrics or `measured` for
   harness-provided exact counts.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
 `progress stats` appends a machine-readable `stats_collected` event to
-`<RUN>/execution.jsonl` so `trace align --summary` can report numeric token
+`<RUN>/execution.jsonl` so `trace align` can report numeric token
 consumption and savings. It understands the current durable workspace stats JSON shape, including
 `metrics.total_tokens`, `metrics.context_tokens`,
 `token_savings.source_tokens`, `token_savings.result_tokens`, and
@@ -986,14 +997,15 @@ also appends matching `requirement_satisfied` events so phase completion
 summaries can prove the stats requirements without manual JSONL edits.
 
 For direct workspace runs, copy the metrics from the command's `--summary`
-block into `progress stats` before running `trace align --summary`:
+block into `progress stats --quiet` before running quiet alignment:
 
 ```bash
 skillspec progress stats .skillspec/traces/<run-id> \
   --agent-visible-tokens 190 \
   --artifact-tokens-preserved 96190 \
   --avoided-tokens 96000 \
-  --metrics-source estimated
+  --metrics-source estimated \
+  --quiet
 ```
 
 ### `progress final-response`
@@ -1010,20 +1022,21 @@ Options:
 
 - `--result`: final response includes the direct result.
 - `--evidence`: final response includes evidence handles or files.
-- `--alignment`: final response includes the alignment summary.
+- `--alignment`: final response includes the alignment status or report path.
 - `--token-savings`: final response includes token usage and token savings.
 - `--phase <PHASE>`: phase id whose requirement(s) this final response event
   satisfies.
 - `--requirement <REQUIREMENT>`: requirement id satisfied by this final
   response event. Repeat for multiple requirements. Requires `--phase`.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
 `progress final-response` appends the `final_response_sent` event shape that
 `trace align` uses to prove the final report included evidence, alignment, and
-token-savings sections. Run it after drafting those sections and before the
-final answer, then rerun `trace align --summary` and report the rerun alignment
-summary.
+token-savings sections. Run it with `--quiet` after drafting those sections and
+before the final answer, then rerun `trace align --quiet` and report only the
+final result in plain language.
 When `--phase` and `--requirement` are supplied, it also appends matching
 `requirement_satisfied` events so completion summaries can prove the final
 report closure requirements.

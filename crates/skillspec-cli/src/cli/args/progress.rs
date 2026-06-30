@@ -14,6 +14,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after writing progress.json.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append one structured execution/progress event to a run ledger")]
     Record {
@@ -47,6 +50,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append a stats_collected token/workspace metrics event to a run ledger")]
     Stats {
@@ -103,6 +109,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append final_response_sent report-section proof to a run ledger")]
     FinalResponse {
@@ -120,7 +129,7 @@ pub(in crate::cli) enum ProgressCommand {
         /// Final response includes evidence handles or files.
         #[arg(long)]
         evidence: bool,
-        /// Final response includes the alignment summary.
+        /// Final response includes the alignment status or report path.
         #[arg(long)]
         alignment: bool,
         /// Final response includes token usage and token savings.
@@ -132,10 +141,13 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(
         about = "Checkpoint multiple structured progress events from JSONL or JSON array",
-        long_about = "Append several structured progress/proof events to execution.jsonl in one foreground checkpoint. Use --file with a JSONL batch and --summary for compact agent-facing output. The legacy --events alias is still accepted."
+        long_about = "Append several structured progress/proof events to execution.jsonl in one checkpoint. Use --file with a JSONL batch, --quiet for background agent execution, or --summary for compact debug output. The legacy --events alias is still accepted."
     )]
     Batch {
         /// Trace run directory containing execution.jsonl.
@@ -149,6 +161,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit compact checkpoint output instead of event counts.
         #[arg(long)]
         summary: bool,
+        /// Suppress stdout after successfully appending the batch.
+        #[arg(long)]
+        quiet: bool,
         /// Emit JSON for the batch report.
         #[arg(long)]
         json: bool,

@@ -592,7 +592,7 @@ skillspec progress final-response .skillspec/traces/<run-id> \
 skillspec progress batch .skillspec/traces/<run-id> \
   --file .skillspec/traces/<run-id>/final-proof.jsonl \
   --checkpoint "checkpointing evidence" \
-  --summary
+  --quiet
 skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```

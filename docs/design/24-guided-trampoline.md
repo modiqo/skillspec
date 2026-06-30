@@ -207,7 +207,7 @@ when_to_advance:
 commands. Agent-facing guide output must not ask the harness to run one
 `skillspec progress record` command per routine proof row. Successful routine
 proof is staged into a JSONL file and checkpointed once with
-`skillspec progress batch ... --summary`. Individual `progress record` commands
+`skillspec progress batch ... --quiet`. Individual `progress record` commands
 are reserved for failures, blockers, debugging, or explicit user requests for
 proof details.
 
@@ -375,16 +375,12 @@ DO NOT
 NEXT COMMANDS
 - skillspec source stage <uri> --out <staging-root> --json
 - skillspec doctor <selected_source_path>
-- skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint "checkpointing evidence" --summary
-
-LOAD MORE ONLY IF NEEDED
-- skillspec query ./skill.spec.yml route:remote_skill_port --view summary
-- skillspec refs ./skill.spec.yml route:remote_skill_port --view summary
+- skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint "checkpointing evidence" --quiet
 
 END
-- done_when: source shape classified; route obligations complete or explicitly partial; final-response evidence recorded; compact alignment summary generated
-- final_progress: skillspec progress final-response <run_dir> --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings
-- align: skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --summary --proof-digest <run_dir>/proof-digest.json
+- done_when: source shape classified; route obligations complete or explicitly partial; final-response evidence recorded; alignment artifacts generated quietly
+- final_progress: skillspec progress final-response <run_dir> --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings --quiet
+- align: skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --proof-digest <run_dir>/proof-digest.json --quiet
 
 RESUME
 - skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent
@@ -560,11 +556,9 @@ Proposed schema:
     ],
     "allowed_commands": [
       "skillspec doctor <source>",
-      "skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary"
+      "skillspec progress batch <run_dir> --file <run_dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --quiet"
     ],
-    "recommended_queries": [
-      "skillspec query ./skill.spec.yml route:remote_skill_port --view summary"
-    ],
+    "recommended_queries": [],
     "progress_to_record": [
       {
         "event": "requirement_satisfied",
@@ -582,11 +576,11 @@ Proposed schema:
       "required checks passed or gaps reported",
       "progress evidence recorded",
       "final-response evidence recorded",
-      "compact alignment summary generated"
+      "alignment artifacts generated quietly"
     ],
     "route_fulfillment_event": "route_fulfilled",
-    "final_progress_command": "skillspec progress final-response <run_dir> ...",
-    "alignment_command": "skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --summary --proof-digest <run_dir>/proof-digest.json",
+    "final_progress_command": "skillspec progress final-response <run_dir> ... --quiet",
+    "alignment_command": "skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --execution-trace <run_dir>/execution.jsonl --proof-digest <run_dir>/proof-digest.json --quiet",
     "final_response_must_include": [
       "result",
       "evidence",
@@ -952,8 +946,8 @@ Existing commands must keep working:
 skillspec run-loop ./skill.spec.yml --input '<task>' --view index
 skillspec plan ./skill.spec.yml --input '<task>'
 skillspec act ./skill.spec.yml --input '<task>' --run <run_dir> --phase <phase>
-skillspec progress show ./skill.spec.yml --run <run_dir>
-skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --summary
+skillspec progress show ./skill.spec.yml --run <run_dir> --quiet
+skillspec trace align ./skill.spec.yml --decision-trace <run_dir> --quiet
 ```
 
 `--guide agent` is additive.

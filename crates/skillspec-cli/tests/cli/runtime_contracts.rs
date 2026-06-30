@@ -822,6 +822,20 @@ fn progress_records_phase_completion_and_lists_remaining_work() {
     assert_eq!(report["execution_proof"]["event_count"], 2);
     assert!(run_dir.join("execution.jsonl").exists());
     assert!(run_dir.join("progress.json").exists());
+
+    let quiet_show = Command::new(bin())
+        .arg("progress")
+        .arg("show")
+        .arg(&spec)
+        .arg("--run")
+        .arg(&run_dir)
+        .arg("--quiet")
+        .output()
+        .unwrap();
+    assert_success(&quiet_show);
+    assert_eq!(stdout(&quiet_show), "");
+    assert_eq!(stderr(&quiet_show), "");
+    assert!(run_dir.join("progress.json").exists());
 }
 
 #[test]
@@ -1017,6 +1031,26 @@ trace:
     assert!(digest["groups"].as_array().unwrap().iter().any(|group| {
         group["kind"] == "route_fulfillment" && group["recommended_event"] == "route_fulfilled"
     }));
+
+    let quiet_proof_digest = run_dir.join("quiet-proof-digest.json");
+    let align_quiet = Command::new(bin())
+        .arg("trace")
+        .arg("align")
+        .arg(&spec)
+        .arg("--decision-trace")
+        .arg(&run_dir)
+        .arg("--execution-trace")
+        .arg(&execution_trace)
+        .arg("--proof-digest")
+        .arg(&quiet_proof_digest)
+        .arg("--quiet")
+        .output()
+        .unwrap();
+    assert_success(&align_quiet);
+    assert_eq!(stdout(&align_quiet), "");
+    assert_eq!(stderr(&align_quiet), "");
+    assert!(alignment_json.exists());
+    assert!(quiet_proof_digest.exists());
 }
 
 #[test]
@@ -1312,6 +1346,29 @@ fn progress_final_response_records_report_section_proof() {
     assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
     assert!(ledger.contains("\"requirement\":\"record_final_response_sent_event\""));
     assert!(ledger.contains("\"requirement\":\"report_workspace_evidence_and_token_math\""));
+
+    let quiet_run_dir = dir.path().join("run-final-response-quiet");
+    fs::create_dir_all(&quiet_run_dir).unwrap();
+    let quiet_final = Command::new(bin())
+        .arg("progress")
+        .arg("final-response")
+        .arg(&quiet_run_dir)
+        .arg("--phase")
+        .arg("durable_closure")
+        .arg("--requirement")
+        .arg("record_final_response_sent_event")
+        .arg("--result")
+        .arg("--evidence")
+        .arg("--alignment")
+        .arg("--token-savings")
+        .arg("--quiet")
+        .output()
+        .unwrap();
+    assert_success(&quiet_final);
+    assert_eq!(stdout(&quiet_final), "");
+    assert_eq!(stderr(&quiet_final), "");
+    let quiet_ledger = fs::read_to_string(quiet_run_dir.join("execution.jsonl")).unwrap();
+    assert!(quiet_ledger.contains("\"event\":\"final_response_sent\""));
 }
 
 #[test]
@@ -1400,6 +1457,37 @@ fn progress_batch_summary_checkpoints_evidence_with_file_alias() {
     assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
     assert!(ledger.contains("\"requirement\":\"dry_run\""));
     assert!(ledger.contains("\"event\":\"route_fulfilled\""));
+}
+
+#[test]
+fn progress_batch_quiet_records_without_stdout() {
+    let dir = TempDir::new("progress-batch-quiet");
+    let run_dir = dir.path().join("run-progress-batch-quiet");
+    fs::create_dir_all(&run_dir).unwrap();
+    let events = dir.path().join("evidence-batch.jsonl");
+    write_file(
+        &events,
+        r#"{"event":"requirement-satisfied","phase":"plan","requirement":"dry_run","status":"pass","evidence":{"kind":"command","ref":"dry-run.log"}}
+{"event":"phase-completed","phase":"plan","status":"pass","evidence":{"kind":"trace","ref":"execution.jsonl"}}
+"#,
+    );
+
+    let progress_batch = Command::new(bin())
+        .arg("progress")
+        .arg("batch")
+        .arg(&run_dir)
+        .arg("--file")
+        .arg(&events)
+        .arg("--quiet")
+        .output()
+        .unwrap();
+    assert_success(&progress_batch);
+    assert_eq!(stdout(&progress_batch), "");
+
+    let ledger = fs::read_to_string(run_dir.join("execution.jsonl")).unwrap();
+    assert_eq!(ledger.lines().count(), 2);
+    assert!(ledger.contains("\"event\":\"requirement_satisfied\""));
+    assert!(ledger.contains("\"event\":\"phase_completed\""));
 }
 
 #[test]

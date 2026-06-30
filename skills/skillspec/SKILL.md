@@ -20,13 +20,13 @@ Resume an existing guided run:
 
 Follow the printed current gate. The selected route, matched rules, forbids, allowed commands, open requirements, resume command, and end proof from the CLI guide are authoritative.
 
-Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.
+Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, evidence-batch JSONL rows, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.
 
 Use `skillspec query` and `skillspec refs` only for handles named by the guide. Do not read the full spec unless the guide, a blocker, or the user asks for it.
 
 For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
 
-For proof-bearing execution routes, batch routine successful evidence into a JSONL file and run one compact `skillspec progress batch ... --summary` checkpoint at natural phase boundaries. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor in the background, then report result, evidence paths, compact alignment status, token usage when recorded, selected route, and run directory.
+For proof-bearing execution routes, batch routine successful evidence into a JSONL file without displaying the rows and run one quiet `skillspec progress batch ... --quiet` checkpoint at natural phase boundaries. Do not run `skillspec progress ... --help` or query `command:progress_*` during normal execution; the guide provides the needed JSONL shape. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor with quiet progress/alignment commands, then report result, evidence paths, alignment status or report path, token usage when recorded, selected route, and run directory.
 
 If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:
 

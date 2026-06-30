@@ -363,10 +363,10 @@ pub fn build_proof_digest(report: &AlignReport, alignment_report: &Path) -> Alig
         suggested_batch_file,
         missing_count,
         recommended_loop: vec![
-            "Run trace align once with --summary --proof-digest.".to_owned(),
+            "Run trace align once with --quiet --proof-digest.".to_owned(),
             "Read this digest and create final-proof.jsonl with real evidence for every batchable item.".to_owned(),
-            "Run skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl --checkpoint \"checkpointing evidence\" --summary once in the foreground.".to_owned(),
-            "Run trace align --summary once more and report only the compact final summary.".to_owned(),
+            "Run skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl --checkpoint \"checkpointing evidence\" --quiet once in the background.".to_owned(),
+            "Run trace align --quiet once more, then report only the final result in plain language.".to_owned(),
             "Do not rerun alignment after each individual proof row.".to_owned(),
         ],
         groups,

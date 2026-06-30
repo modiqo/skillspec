@@ -2289,7 +2289,7 @@ artifacts:
   alignment_report:
     kind: file
     path: .skillspec/traces/<run-id>/alignment.json
-    description: Full trace alignment report written by trace_align while chat receives only the compact completion summary.
+    description: Full trace alignment report written by quiet trace_align; inspect only for debugging, blockers, failures, or explicit proof requests.
     produced_by:
       - kind: command
         id: trace_align
@@ -2416,7 +2416,7 @@ commands:
       dependencies:
         - skillspec_cli
   source_map_nodes:
-    description: Inspect structural source handles before opening detailed spans.
+    description: Inspect structural source handles before opening detailed spans. Use the bounded index view; do not run `nodes --view summary` or `nodes --view full` in chat unless the user explicitly asks for exhaustive source-map output.
     template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
     safety: local_read
     requires:
@@ -2593,30 +2593,30 @@ commands:
       dependencies:
         - skillspec_cli
   progress_batch:
-    description: Append routine proof events from one JSONL file as a compact background checkpoint so phase checkpoints and final alignment proof do not become a visible progress parade.
-    template: skillspec progress batch <trace-dir> --file <trace-dir>/<evidence-batch>.jsonl --checkpoint "checkpointing evidence" --summary
+    description: Append routine proof events from one JSONL file as a quiet background checkpoint so phase checkpoints and final alignment proof do not become a visible progress parade. Use --summary only for debugging or when the user asks to inspect proof recording.
+    template: skillspec progress batch <trace-dir> --file <trace-dir>/<evidence-batch>.jsonl --checkpoint "checkpointing evidence" --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_stats_durable_workspace:
-    description: Append measured durable-executor workspace token stats to execution.jsonl so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
-    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
+    description: Append measured durable-executor workspace token stats to execution.jsonl quietly so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
+    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id> --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
         - rote_cli
   progress_stats_summary_metrics:
-    description: Append direct-run summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
-    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
+    description: Append direct-run summary metrics to execution.jsonl quietly so trace align can report estimated output economy instead of not recorded.
+    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_show:
-    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
-    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
+    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json without transcript output. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
+    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir> --quiet
     safety: local_write
     requires:
       dependencies:
@@ -2944,8 +2944,8 @@ commands:
       dependencies:
         - skillspec_cli
   trace_align:
-    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json while printing only the compact completion-facing summary.
-    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary --proof-digest <trace-dir>/proof-digest.json
+    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json without transcript output. Use --summary only for debugging or explicit proof inspection.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --proof-digest <trace-dir>/proof-digest.json --quiet
     safety: read_only
     requires:
       dependencies:
@@ -3475,15 +3475,17 @@ snippets:
   compact_evidence_shape:
     text: |
       Token economy SOP:
-      - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
+      - Prefer compact workspace summaries, quiet trace_align artifacts, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
       - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
-      - Keep SkillSpec implementation details in the background: do not narrate ledger writes, raw progress commands, trace plumbing, or alignment internals as user-visible progress.
+      - Keep SkillSpec implementation details in the background: do not narrate ledger writes, raw progress commands, trace plumbing, evidence-batch JSONL rows, or alignment internals as user-visible progress.
       - For Doctor/source-shape diagnostic routes, answer from the doctor report and stop; do not create source maps, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
+      - Do not run `skillspec progress batch --help`, `skillspec progress record --help`, or `skillspec query ... command:progress_*` during normal execution; the guide emits the JSONL row shape and the quiet batch command.
+      - For source maps, use `nodes --view index` and exact handles for full text. Do not run collection-level `nodes --view summary` or `nodes --view full` in chat.
       - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
       - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
-      - Stage successful routine evidence rows in a JSONL batch and run one compact progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
-      - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
+      - Stage successful routine evidence rows in a JSONL batch without displaying the rows and run one quiet progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
+      - Run one initial quiet trace_align with proof-digest, one quiet progress_batch for grouped final proof, and one final quiet trace_align; do not rerun alignment after each individual proof row.
       - Surface individual progress rows only for failures, blocked requirements, or proof gaps the user must understand.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:

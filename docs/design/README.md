@@ -41,7 +41,7 @@ directory listings.
 | 07 | [State Machines, Handoffs, And Jumps](07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
 | 08 | [Imports, Resources, Code, And Recipes](08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
 | 09 | [Phase Tool Boundaries](09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
-| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, `progress record`, internal `progress show` checks, compact `trace align --summary`, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
+| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, quiet progress checks, quiet trace alignment, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
 | 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
 | 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
 | 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
@@ -182,10 +182,10 @@ by `skillspec trace align --proof-digest`. It converts missing phase
 requirements, routes, route checks, forbids, elicitations, and closures into a
 batch-planning artifact for one `progress batch` call.
 
-`Completion summary` means the compact final status block from
-`skillspec trace align --summary`, including decision replay, phase order, requirement
-proof counts, missing proof rows, forbidden-action status, alignment status, and
-token usage.
+`Completion summary` means the compact final status shape available from
+`skillspec trace align --summary` when proof is explicitly inspected. Normal
+agent execution uses `skillspec trace align --quiet` and reports only the final
+result plus artifact paths unless details are requested or needed for a blocker.
 
 ## Documentation QA Gate
 

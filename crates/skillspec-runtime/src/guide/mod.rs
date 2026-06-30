@@ -283,6 +283,7 @@ fn assemble_report(inputs: AssembleInputs<'_>) -> Result<GuideReport> {
         run_dir: &run_dir,
         selected_route: selected_route.as_deref(),
         matched_rules: &matched_rules,
+        guide_mode: inputs.guide_mode,
         act: inputs.act,
         phase: current_phase_model,
         progress: inputs.progress,
@@ -327,6 +328,7 @@ struct CurrentGateInputs<'a> {
     run_dir: &'a str,
     selected_route: Option<&'a str>,
     matched_rules: &'a [String],
+    guide_mode: GuideMode,
     act: &'a ActReport,
     phase: Option<&'a ActPhase>,
     progress: &'a ProgressReport,
@@ -341,24 +343,27 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
     let mut progress_to_record = Vec::new();
     let mut when_to_advance = Vec::new();
 
-    if let Some(route) = inputs.selected_route {
-        recommended_queries.push(format!(
-            "skillspec query {} route:{} --view summary",
-            shell_arg(inputs.spec_path),
-            route
-        ));
-        recommended_queries.push(format!(
-            "skillspec refs {} route:{} --view summary",
-            shell_arg(inputs.spec_path),
-            route
-        ));
-    }
-    for rule in inputs.matched_rules.iter().take(3) {
-        recommended_queries.push(format!(
-            "skillspec query {} rule:{} --view summary",
-            shell_arg(inputs.spec_path),
-            rule
-        ));
+    let expose_debug_queries = inputs.guide_mode == GuideMode::Full;
+    if expose_debug_queries {
+        if let Some(route) = inputs.selected_route {
+            recommended_queries.push(format!(
+                "skillspec query {} route:{} --view summary",
+                shell_arg(inputs.spec_path),
+                route
+            ));
+            recommended_queries.push(format!(
+                "skillspec refs {} route:{} --view summary",
+                shell_arg(inputs.spec_path),
+                route
+            ));
+        }
+        for rule in inputs.matched_rules.iter().take(3) {
+            recommended_queries.push(format!(
+                "skillspec query {} rule:{} --view summary",
+                shell_arg(inputs.spec_path),
+                rule
+            ));
+        }
     }
 
     if let Some(phase) = inputs.phase {
@@ -387,16 +392,18 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                     "declared command {}: {}",
                     command_id, command.template
                 ));
-                allowed_commands.push(format!(
-                    "skillspec deps check {} --command {}",
-                    shell_arg(inputs.spec_path),
-                    command_id
-                ));
-                recommended_queries.push(format!(
-                    "skillspec query {} command:{} --view summary",
-                    shell_arg(inputs.spec_path),
-                    command_id
-                ));
+                if expose_debug_queries {
+                    allowed_commands.push(format!(
+                        "skillspec deps check {} --command {}",
+                        shell_arg(inputs.spec_path),
+                        command_id
+                    ));
+                    recommended_queries.push(format!(
+                        "skillspec query {} command:{} --view summary",
+                        shell_arg(inputs.spec_path),
+                        command_id
+                    ));
+                }
             }
         }
         if !inputs.act.elicitations.is_empty() {
@@ -423,10 +430,9 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
         } else {
             for requirement in &inputs.progress.open_requirements {
                 let command = format!(
-                    "batch event requirement-satisfied phase={} requirement={} evidence_kind=<kind> evidence_ref=<ref> into {}/evidence-batch.jsonl",
+                    "{{\"event\":\"requirement-satisfied\",\"phase\":\"{}\",\"requirement\":\"{}\",\"status\":\"pass\",\"evidence\":{{\"kind\":\"<kind>\",\"ref\":\"<ref>\"}}}}",
                     phase.id,
-                    requirement,
-                    shell_arg(inputs.run_dir)
+                    requirement
                 );
                 progress_to_record.push(ProgressRecordHint {
                     event: "requirement_satisfied".to_owned(),
@@ -436,9 +442,8 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                 });
             }
             let phase_completed = format!(
-                "batch event phase-completed phase={} evidence_kind=<kind> evidence_ref=<ref> into {}/evidence-batch.jsonl",
-                phase.id,
-                shell_arg(inputs.run_dir)
+                "{{\"event\":\"phase-completed\",\"phase\":\"{}\",\"status\":\"pass\",\"evidence\":{{\"kind\":\"<kind>\",\"ref\":\"<ref>\"}}}}",
+                phase.id
             );
             progress_to_record.push(ProgressRecordHint {
                 event: "phase_completed".to_owned(),
@@ -447,16 +452,16 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                 command: phase_completed.clone(),
             });
             allowed_commands.push(format!(
-                "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary",
+                "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --quiet",
                 shell_arg(inputs.run_dir),
                 shell_arg(inputs.run_dir)
             ));
             do_now.push(
-                "stage routine successful proof rows in evidence-batch.jsonl and checkpoint them once"
+                "stage routine successful proof rows in evidence-batch.jsonl without showing the rows, then checkpoint them quietly once"
                     .to_owned(),
             );
             when_to_advance.push(
-                "checkpoint routine successful evidence with one progress batch, then mark the phase completed or blocked"
+                "checkpoint routine successful evidence with one quiet progress batch, then mark the phase completed or blocked"
                     .to_owned(),
             );
         }
@@ -476,7 +481,7 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
     }
     if !inputs.proof_suppressed {
         allowed_commands.push(format!(
-            "skillspec progress show {} --run {}",
+            "skillspec progress show {} --run {} --quiet",
             shell_arg(inputs.spec_path),
             shell_arg(inputs.run_dir)
         ));
@@ -546,15 +551,15 @@ fn build_end_anchor(
             "required checks passed or proof gaps are named".to_owned(),
             "progress evidence is recorded in execution.jsonl".to_owned(),
             "final-response evidence is recorded".to_owned(),
-            "compact alignment summary is generated".to_owned(),
+            "alignment artifacts are generated quietly".to_owned(),
         ],
         route_fulfillment_event: "route-fulfilled".to_owned(),
         final_progress_command: format!(
-            "skillspec progress final-response {} --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings",
+            "skillspec progress final-response {} --phase <phase-id> --requirement <requirement-id> --result --evidence --alignment --token-savings --quiet",
             shell_arg(run_dir)
         ),
         alignment_command: format!(
-            "skillspec trace align {} --decision-trace {} --execution-trace {}/execution.jsonl --summary --proof-digest {}/proof-digest.json",
+            "skillspec trace align {} --decision-trace {} --execution-trace {}/execution.jsonl --proof-digest {}/proof-digest.json --quiet",
             shell_arg(spec_path),
             shell_arg(run_dir),
             shell_arg(run_dir),
@@ -563,7 +568,7 @@ fn build_end_anchor(
         final_response_must_include: vec![
             "result".to_owned(),
             "evidence paths".to_owned(),
-            "alignment summary".to_owned(),
+            "alignment status or alignment report path".to_owned(),
             "token usage or not recorded".to_owned(),
             "selected route".to_owned(),
             "run directory".to_owned(),

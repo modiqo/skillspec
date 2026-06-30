@@ -8,6 +8,7 @@ mod builder;
 use std::path::{Path, PathBuf};
 
 const SOURCE_MAP_SCHEMA: &str = "skillspec-source-map/v0";
+const SOURCE_QUERY_SUMMARY_LIMIT: usize = 12;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SourceMap {
@@ -377,16 +378,21 @@ pub fn render_coverage(coverage: &SourceCoverage) -> String {
 fn nodes_for_view(map: &SourceMap, view: SourceView) -> Value {
     match view {
         SourceView::Full => json!(map.nodes),
-        SourceView::Index => json!(map
-            .nodes
-            .iter()
-            .filter(|node| matches!(
-                node.kind.as_str(),
-                "frontmatter" | "root" | "heading" | "code" | "html"
-            ))
-            .map(node_summary)
-            .collect::<Vec<_>>()),
-        SourceView::Summary => json!(map.nodes.iter().map(node_summary).collect::<Vec<_>>()),
+        SourceView::Index => limited_items(
+            map.nodes
+                .iter()
+                .filter(|node| {
+                    matches!(
+                        node.kind.as_str(),
+                        "frontmatter" | "root" | "heading" | "code" | "html"
+                    )
+                })
+                .map(node_summary)
+                .collect::<Vec<_>>(),
+        ),
+        SourceView::Summary => {
+            limited_items(map.nodes.iter().map(node_summary).collect::<Vec<_>>())
+        }
     }
 }
 
@@ -425,11 +431,12 @@ fn node_for_view(map: &SourceMap, node: &SourceNodeRecord, view: SourceView) -> 
 fn classifications_for_view(map: &SourceMap, view: SourceView) -> Value {
     match view {
         SourceView::Full => json!(map.classifications),
-        SourceView::Index | SourceView::Summary => json!(map
-            .classifications
-            .iter()
-            .map(|classification| classification_summary(map, classification))
-            .collect::<Vec<_>>()),
+        SourceView::Index | SourceView::Summary => limited_items(
+            map.classifications
+                .iter()
+                .map(|classification| classification_summary(map, classification))
+                .collect::<Vec<_>>(),
+        ),
     }
 }
 
@@ -445,11 +452,29 @@ fn classifications_by_kind(
         .collect::<Vec<_>>();
     match view {
         SourceView::Full => json!(classifications),
-        SourceView::Index | SourceView::Summary => json!(classifications
-            .iter()
-            .map(|classification| classification_summary(map, classification))
-            .collect::<Vec<_>>()),
+        SourceView::Index | SourceView::Summary => limited_items(
+            classifications
+                .iter()
+                .map(|classification| classification_summary(map, classification))
+                .collect::<Vec<_>>(),
+        ),
     }
+}
+
+fn limited_items(items: Vec<Value>) -> Value {
+    let total = items.len();
+    let shown_items = items
+        .into_iter()
+        .take(SOURCE_QUERY_SUMMARY_LIMIT)
+        .collect::<Vec<_>>();
+    let shown = shown_items.len();
+    json!({
+        "total": total,
+        "shown": shown,
+        "omitted": total.saturating_sub(shown),
+        "items": shown_items,
+        "next": "query an exact handle with --view full for source text"
+    })
 }
 
 fn classification_summary(map: &SourceMap, classification: &SourceClassificationRecord) -> Value {

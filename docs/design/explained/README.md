@@ -27,7 +27,7 @@ the picture.
 | Order | Explainer | Use It To Explain |
 | --- | --- | --- |
 | 01 | [Import To Release](01-import-to-release.md) | How a prose skill becomes a reviewed, tested, releasable SkillSpec-backed skill without loading the entire source or spec into context. |
-| 02 | [Runtime Trampoline And Alignment](02-runtime-trampoline-and-alignment.md) | How the thin `SKILL.md` loader keeps the agent inside `skill.spec.yml`, then uses `plan`, `act`, progress evidence, compact `trace align --summary`, and proof-digest batching as an OODA loop. |
+| 02 | [Runtime Trampoline And Alignment](02-runtime-trampoline-and-alignment.md) | How the thin `SKILL.md` loader keeps the agent inside `skill.spec.yml`, then uses `plan`, `act`, progress evidence, quiet trace alignment, and proof-digest batching as an OODA loop. |
 | 03 | [Router Mode](03-router-mode.md) | How router mode controls skill explosion with an implicit router, explicit-only routed skills, read-only status, reversible enable/disable switches, and a rebuilt index. |
 | 04 | [Durable Executor](04-durable-executor.md) | How durable-executor acts as the optional first-hop for tool-backed work, preserving evidence, token stats, reusable workspace history, and local capability seeds. |
 

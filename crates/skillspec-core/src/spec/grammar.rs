@@ -412,7 +412,7 @@ fn progressive_sequence() -> Vec<CommandStep> {
         },
         CommandStep {
             phase: "align proof",
-            command: "skillspec trace align <draft>/skill.spec.yml --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json",
+            command: "skillspec trace align <draft>/skill.spec.yml --decision-trace <run_dir> --proof-digest <run_dir>/proof-digest.json --quiet",
             proves: "decision replay is stable and remaining execution evidence gaps are grouped for one final proof batch",
         },
     ]

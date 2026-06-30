@@ -88,10 +88,10 @@ fn write_loader_skill(output: &mut String, spec: &SkillSpec) {
         "`skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent`\n\n",
     );
     output.push_str("Follow the printed current gate. The selected route, matched rules, forbids, allowed commands, open requirements, resume command, and end proof from the CLI guide are authoritative.\n\n");
-    output.push_str("Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.\n\n");
+    output.push_str("Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, evidence-batch JSONL rows, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.\n\n");
     output.push_str("Use `skillspec query` and `skillspec refs` only for handles named by the guide. Do not read the full spec unless the guide, a blocker, or the user asks for it.\n\n");
     output.push_str("For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.\n\n");
-    output.push_str("For proof-bearing execution routes, batch routine successful evidence into a JSONL file and run one compact `skillspec progress batch ... --summary` checkpoint at natural phase boundaries. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor in the background, then report result, evidence paths, compact alignment status, token usage when recorded, selected route, and run directory.\n\n");
+    output.push_str("For proof-bearing execution routes, batch routine successful evidence into a JSONL file without displaying the rows and run one quiet `skillspec progress batch ... --quiet` checkpoint at natural phase boundaries. Do not run `skillspec progress ... --help` or query `command:progress_*` during normal execution; the guide provides the needed JSONL shape. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor with quiet progress/alignment commands, then report result, evidence paths, alignment status or report path, token usage when recorded, selected route, and run directory.\n\n");
     output.push_str("If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:\n\n");
     output.push_str("```bash\n");
     output.push_str(
@@ -980,23 +980,23 @@ fn write_runtime_commands(output: &mut String) {
     output.push_str(
         "skillspec act <skill-folder>/skill.spec.yml --input='<user task>' --run \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id>\n",
     );
-    output.push_str("# routine success evidence: append JSONL rows to evidence-batch.jsonl, then checkpoint once\n");
-    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --file \"${PWD}/.skillspec/traces/<run-id>/evidence-batch.jsonl\" --checkpoint \"checkpointing evidence\" --summary\n");
+    output.push_str("# routine success evidence: append JSONL rows to evidence-batch.jsonl, then checkpoint quietly once\n");
+    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --file \"${PWD}/.skillspec/traces/<run-id>/evidence-batch.jsonl\" --checkpoint \"checkpointing evidence\" --quiet\n");
     output.push_str("# troubleshooting/failures only: record an individual row when a blocker needs exact foreground evidence\n");
     output.push_str("skillspec progress record \"${PWD}/.skillspec/traces/<run-id>\" phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>\n");
-    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id>\n");
-    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>\n");
-    output.push_str("skillspec progress final-response \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings\n");
-    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --file \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\" --checkpoint \"checkpointing evidence\" --summary\n");
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --workspace <workspace> --workspace-stats-report \"${PWD}/.skillspec/traces/<run-id>/workspace-stats.txt\" --phase <phase-id> --requirement <stats-requirement-id> --quiet\n");
+    output.push_str("skillspec progress stats \"${PWD}/.skillspec/traces/<run-id>\" --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet\n");
+    output.push_str("skillspec progress final-response \"${PWD}/.skillspec/traces/<run-id>\" --phase <phase-id> --requirement <report-requirement-id> --result --evidence --alignment --token-savings --quiet\n");
+    output.push_str("skillspec progress batch \"${PWD}/.skillspec/traces/<run-id>\" --file \"${PWD}/.skillspec/traces/<run-id>/final-proof.jsonl\" --checkpoint \"checkpointing evidence\" --quiet\n");
     output.push_str(
-        "skillspec progress show <skill-folder>/skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\"\n",
+        "skillspec progress show <skill-folder>/skill.spec.yml --run \"${PWD}/.skillspec/traces/<run-id>\" --quiet\n",
     );
     output.push_str(
         "skillspec decide <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n",
     );
     output.push_str("skillspec explain <skill-folder>/skill.spec.yml --input='<user task>' --trace-dir \"${PWD}/.skillspec/traces\"\n");
     output.push_str("skillspec trace compact \"${PWD}/.skillspec/traces/<run-id>\"\n");
-    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\" --summary --proof-digest \"${PWD}/.skillspec/traces/<run-id>/proof-digest.json\"\n");
+    output.push_str("skillspec trace align <skill-folder>/skill.spec.yml --decision-trace \"${PWD}/.skillspec/traces/<run-id>\" --execution-trace \"${PWD}/.skillspec/traces/<run-id>/execution.jsonl\" --proof-digest \"${PWD}/.skillspec/traces/<run-id>/proof-digest.json\" --quiet\n");
     output.push_str("```\n");
 }
 
@@ -1240,7 +1240,7 @@ mod tests {
         assert!(output.contains("trace align"));
         assert!(output.contains("alignment summary"));
         assert!(output.contains("token usage"));
-        assert!(output.contains("trace align ... --summary"));
+        assert!(output.contains("quiet progress/alignment commands"));
         assert!(output.contains(
             "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh"
         ));

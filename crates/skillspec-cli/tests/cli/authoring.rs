@@ -209,7 +209,8 @@ import { chromium } from "playwright";
         .unwrap();
     assert_success(&nodes);
     let nodes = json_stdout(&nodes);
-    let nodes = nodes.as_array().unwrap();
+    assert!(nodes["total"].as_u64().unwrap() >= nodes["shown"].as_u64().unwrap());
+    let nodes = nodes["items"].as_array().unwrap();
     assert!(nodes
         .iter()
         .any(|node| node["id"] == "frontmatter:skill-md"));
@@ -232,13 +233,15 @@ import { chromium } from "playwright";
     assert!(deps_text.contains("pypdf"));
     assert!(deps_text.contains("reportlab"));
     assert!(deps_text.contains("playwright"));
-    assert!(
-        !deps.as_array().unwrap().iter().any(|entry| entry["signals"]
+    assert!(!deps["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry["signals"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|signal| signal == "json"))
-    );
+            .any(|signal| signal == "json")));
 
     let coverage = Command::new(bin())
         .arg("source")
@@ -387,7 +390,7 @@ import pypdf
         .unwrap();
     assert_success(&nodes);
     let nodes = json_stdout(&nodes);
-    let nodes = nodes.as_array().unwrap();
+    let nodes = nodes["items"].as_array().unwrap();
     assert!(nodes.iter().any(|node| node["kind"] == "paragraph_chunk"));
     assert!(nodes.iter().any(|node| node["kind"] == "code"));
 

@@ -289,7 +289,7 @@ into a safer default path.
 | `decide` | Decision logic used by start and resume. |
 | `plan` | Phase order logic used by path. |
 | `act` | Current-route/current-phase checklist used by current gate. |
-| `progress batch` | Records routine successful proof rows as one compact checkpoint before advancing. |
+| `progress batch` | Records routine successful proof rows as one quiet checkpoint before advancing. |
 | `progress record` | Low-level escape hatch for failures, blockers, debugging, or explicit proof-detail requests. |
 | `progress show` | Computes completed/current/blocked/remaining state. |
 | `query` | Loads exact handles named by the guide. |

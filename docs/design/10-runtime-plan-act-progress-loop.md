@@ -38,12 +38,12 @@ skillspec sensemake <spec> --view index
 skillspec plan <spec> --input '<task>' --trace-dir .skillspec/traces
 skillspec act <spec> --input '<task>' --run .skillspec/traces/<run-id> --phase <phase-id>
 skillspec progress record .skillspec/traces/<run-id> <event> [phase] [requirement]
-skillspec progress show <spec> --run .skillspec/traces/<run-id>
+skillspec progress show <spec> --run .skillspec/traces/<run-id> --quiet
 skillspec trace align <spec> \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json \
+  --quiet
 ```
 
 `plan`, `act`, and `progress` are not generic workflow execution commands.
@@ -216,18 +216,18 @@ JSON array:
 skillspec progress batch .skillspec/traces/<run-id> \
   --file .skillspec/traces/<run-id>/final-proof.jsonl \
   --checkpoint "checkpointing evidence" \
-  --summary
+  --quiet
 ```
 
 Use it near the end of a run when the agent needs to record several proof rows:
 route fulfillment, after-success closures, elicitation approvals, evidence
 attachments, and no-violation proof for forbids. This keeps the ledger exact
-while avoiding a visible progress parade. Use the same foreground checkpoint
-shape at natural boundaries after dry-run/planning, after mutation, after
-verification, before route fulfillment, and before final alignment. The
-user-facing update should be one gate-level note, such as
-`[checkpointing evidence...]`; individual successful proof rows should stay in
-the JSONL batch and ledger, not the transcript.
+while avoiding a visible progress parade. Use the same synchronous quiet
+checkpoint shape at natural boundaries after dry-run/planning, after mutation,
+after verification, before route fulfillment, and before final alignment. The
+user-facing update should be a plain-language gate note only when useful;
+individual successful proof rows should stay in the JSONL batch and ledger, not
+the transcript.
 
 Each JSONL row is the same execution event shape used by `progress record`. The
 CLI fills missing `schema`, `run_id`, and timestamp fields and normalizes event
@@ -240,7 +240,8 @@ derived `progress.json`:
 
 ```sh
 skillspec progress show ./skill.spec.yml \
-  --run .skillspec/traces/<run-id>
+  --run .skillspec/traces/<run-id> \
+  --quiet
 ```
 
 The output reports:
@@ -273,11 +274,12 @@ execution ledger:
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json \
+  --quiet
 ```
 
-The compact output separates two layers:
+The quiet command writes `alignment.json` and proof digest artifacts. The
+alignment report separates two layers:
 
 - decision replay;
 - execution proof.
@@ -292,8 +294,8 @@ Alignment writes:
 .skillspec/traces/<run-id>/alignment.json
 ```
 
-The final agent response should use the compact completion summary from this
-report instead of saying only `unproven`.
+The final agent response should use the alignment status or report path from
+this artifact instead of dumping the alignment report into the transcript.
 
 ## The Full Runtime Loop
 
@@ -407,8 +409,8 @@ the user-visible transcript unless it is needed for a decision.
 skillspec trace align ./skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace .skillspec/traces/<run-id>/execution.jsonl \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json \
+  --quiet
 ```
 
 Use the digest to avoid a visible re-alignment loop. If alignment reports
@@ -521,8 +523,8 @@ If the next tool is outside the phase boundary, stop and ask for permission.
 If a phase action happened but evidence was not captured, record only what can
 be proven. Do not mark the requirement satisfied.
 
-If `trace align --summary` returns incomplete execution proof, report the exact missing
-proof rows.
+If quiet alignment returns incomplete execution proof and those rows are already
+known from the proof digest, report the exact missing proof rows.
 
 ## Source Alignment
 

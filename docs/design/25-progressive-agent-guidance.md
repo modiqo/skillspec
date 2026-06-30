@@ -157,15 +157,16 @@ skillspec progress record <run_dir> requirement-satisfied <phase> <requirement> 
 skillspec progress batch <run_dir> \
   --file <run_dir>/evidence-batch.jsonl \
   --checkpoint "checkpointing evidence" \
-  --summary
+  --quiet
 
-skillspec progress show <skill.spec.yml> --run <run_dir>
+skillspec progress show <skill.spec.yml> --run <run_dir> --quiet
 ```
 
 Use `progress record` for a single exceptional row or a user-relevant failure.
-Use `progress batch --summary` when several successful routine proof rows are
-ready at the same boundary. The transcript should show one checkpoint while
-`execution.jsonl` still receives every granular event.
+Use `progress batch --quiet` when several successful routine proof rows are
+ready at the same boundary. The command still completes synchronously, but the
+transcript should stay focused on plain-language status while `execution.jsonl`
+receives every granular event.
 
 The run directory becomes the durable working memory:
 
@@ -191,29 +192,29 @@ See [10 Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md),
 ## Part 4: Completion Is A Gate, Not A Paragraph
 
 At completion, the agent should not narrate a long audit loop. It should run a
-compact alignment gate, batch missing proof rows if needed, then report the
-final compact summary:
+quiet alignment gate, batch missing proof rows if needed, then report the final
+result in plain language with artifact paths:
 
 ```bash
 skillspec trace align <skill.spec.yml> \
   --decision-trace <run_dir> \
   --execution-trace <run_dir>/execution.jsonl \
-  --summary \
-  --proof-digest <run_dir>/proof-digest.json
+  --proof-digest <run_dir>/proof-digest.json \
+  --quiet
 ```
 
 The final response should include the selected route, trace path, alignment
-summary, token usage, and evidence paths. It should not dump the full alignment
-report unless debugging, failure, or the user asks for it.
+status or report path, token usage, and evidence paths. It should not dump the
+alignment report unless debugging, failure, or the user asks for it.
 
 This prevents the "progress parade" failure mode: many small visible alignment
 reruns after each tiny proof row. The intended pattern is:
 
-1. Run one alignment pass with proof digest.
-2. Batch real missing proof rows.
-3. Record final-response evidence.
-4. Run one final compact alignment pass.
-5. Report only the compact completion summary and paths.
+1. Run one quiet alignment pass with proof digest.
+2. Batch real missing proof rows quietly.
+3. Record final-response evidence quietly.
+4. Run one final quiet alignment pass.
+5. Report only the final result and paths.
 
 See [13 Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md).
 
@@ -325,8 +326,8 @@ run-loop --guide agent
 progress record/batch/show
   guides what is complete and what remains
 
-trace align --summary
-  guides completion proof
+trace align --quiet
+  writes completion proof artifacts without transcript noise
 
 workspace --summary
   guides large package graphs without dumping reports
