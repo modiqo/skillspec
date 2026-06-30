@@ -110,7 +110,7 @@ print("hello")
     assert!(content.contains("reference:"));
     assert!(content.contains("import: reference"));
     assert!(content.contains("command_block_1"));
-    assert!(content.contains("python3"));
+    assert!(!content.contains("python3"));
     assert!(content.contains("dependency_ledger"));
     assert!(content.contains("path: source/SKILL_md.old"));
 
@@ -129,7 +129,8 @@ print("hello")
     let ledger_content = fs::read_to_string(&ledger).unwrap();
     assert!(ledger_content.contains("schema_version = 1"));
     assert!(ledger_content.contains("dependency_count = "));
-    assert!(ledger_content.contains("id = \"python3\""));
+    assert!(ledger_content.contains("id = \"echo\""));
+    assert!(!ledger_content.contains("id = \"python3\""));
 
     let deps_check = Command::new(bin())
         .arg("deps")

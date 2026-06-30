@@ -1,3 +1,4 @@
+use crate::DoctorShapeReport;
 use serde::Serialize;
 use skillspec_core::error::{Error, Result};
 use std::fs;
@@ -19,9 +20,25 @@ pub struct RemoteStageReport {
     pub branch: Option<String>,
     pub requested_path: Option<String>,
     pub checkout_dir: String,
+    pub staged_source_path: String,
+    pub source_shape: RemoteStageShapeReport,
     pub selected_source_path: Option<String>,
     pub candidates: Vec<RemoteStageCandidate>,
     pub next: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RemoteStageShapeReport {
+    pub kind: String,
+    pub skill_file_count: usize,
+    pub plugin_roots: Vec<RemoteStagePluginRootReport>,
+    pub recommended_command: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RemoteStagePluginRootReport {
+    pub namespace: String,
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -136,6 +153,9 @@ pub fn stage_remote_source(
     let checkout = clone_remote_persistent(&remote, out)?;
     let candidates = materialize_candidates(&remote, &checkout.checkout_dir, detect_candidates)?;
     let selected_source_path = (candidates.len() == 1).then(|| candidates[0].source_path.clone());
+    let scoped_source_path = staged_scope_path(&remote, &checkout.checkout_dir);
+    let source_shape =
+        RemoteStageShapeReport::from_shape(crate::classify_source_shape(&scoped_source_path)?);
     let mut next = Vec::new();
     match &selected_source_path {
         Some(path) => {
@@ -151,7 +171,15 @@ pub fn stage_remote_source(
             next.push("No SKILL.md candidates found; verify the URI points at a skill folder or skills repository.".to_owned());
         }
         None => {
-            next.push("Choose one candidate source_path, then run doctor/source map/import-skill against that local path.".to_owned());
+            let scope = path_to_string(&scoped_source_path);
+            next.push(format!("skillspec doctor {scope} --json"));
+            next.push(format!(
+                "skillspec workspace map {scope} --out <build>/skillspec.workspace.yml --summary"
+            ));
+            next.push(
+                "If the request was for one atomic skill instead of the staged workspace, choose a specific candidates[].source_path and rerun the single-skill flow."
+                    .to_owned(),
+            );
         }
     }
 
@@ -161,6 +189,8 @@ pub fn stage_remote_source(
         branch: remote.branch,
         requested_path: remote.path,
         checkout_dir: path_to_string(&checkout.checkout_dir),
+        staged_source_path: path_to_string(&scoped_source_path),
+        source_shape,
         selected_source_path,
         candidates,
         next,
@@ -241,6 +271,16 @@ pub fn render_stage_report(report: &RemoteStageReport) -> String {
         output.push_str(&format!("- requested_path: {path}\n"));
     }
     output.push_str(&format!("- checkout: {}\n", report.checkout_dir));
+    output.push_str(&format!(
+        "- staged_source_path: {}\n",
+        report.staged_source_path
+    ));
+    output.push_str(&format!(
+        "- source_shape: {} ({} SKILL.md, {} plugin roots)\n",
+        report.source_shape.kind,
+        report.source_shape.skill_file_count,
+        report.source_shape.plugin_roots.len()
+    ));
     match &report.selected_source_path {
         Some(path) => output.push_str(&format!("- selected_source_path: {path}\n")),
         None => output.push_str("- selected_source_path: choose from candidates\n"),
@@ -262,6 +302,24 @@ pub fn render_stage_report(report: &RemoteStageReport) -> String {
         }
     }
     output
+}
+
+impl RemoteStageShapeReport {
+    fn from_shape(shape: DoctorShapeReport) -> Self {
+        Self {
+            kind: shape.kind,
+            skill_file_count: shape.skill_files.len(),
+            plugin_roots: shape
+                .plugin_roots
+                .into_iter()
+                .map(|plugin| RemoteStagePluginRootReport {
+                    namespace: plugin.namespace,
+                    path: plugin.path,
+                })
+                .collect(),
+            recommended_command: shape.recommended_command,
+        }
+    }
 }
 
 fn clone_remote_persistent(
@@ -311,8 +369,10 @@ fn clone_remote_into(remote: &RemoteSkillSource, root: &Path) -> Result<RemoteCh
         .arg("clone")
         .arg("--depth")
         .arg("1")
-        .arg("--filter=blob:none")
-        .arg("--sparse");
+        .arg("--filter=blob:none");
+    if remote.path.is_some() {
+        clone.arg("--sparse");
+    }
     if let Some(branch) = &remote.branch {
         clone.arg("--branch").arg(branch);
     }
@@ -347,27 +407,15 @@ fn materialize_candidates(
         return Ok(Vec::new());
     }
 
-    let tree_files = git_tree_files(checkout_dir)?;
-    let candidate_skill_paths = skill_paths_from_tree(&tree_files);
-    let sparse_paths = candidate_skill_paths
-        .iter()
-        .filter_map(|path| path.parent())
-        .map(path_to_slash)
-        .map(|path| {
-            if path.is_empty() {
-                ".".to_owned()
-            } else {
-                path
-            }
-        })
-        .collect::<Vec<_>>();
-    if !sparse_paths.is_empty() {
-        set_sparse_paths(checkout_dir, &sparse_paths)?;
-    }
-    Ok(candidate_skill_paths
-        .into_iter()
-        .map(|skill_path| candidate_from_skill_path(checkout_dir, &skill_path))
-        .collect())
+    find_materialized_candidates(checkout_dir, checkout_dir)
+}
+
+fn staged_scope_path(remote: &RemoteSkillSource, checkout_dir: &Path) -> PathBuf {
+    remote
+        .path
+        .as_deref()
+        .map(|path| checkout_dir.join(path))
+        .unwrap_or_else(|| checkout_dir.to_path_buf())
 }
 
 fn find_materialized_candidates(
@@ -406,20 +454,6 @@ fn collect_skill_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         collect_skill_files(&entry.path(), files)?;
     }
     Ok(())
-}
-
-fn skill_paths_from_tree(paths: &[PathBuf]) -> Vec<PathBuf> {
-    let mut skill_paths = paths
-        .iter()
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    skill_paths.sort();
-    skill_paths
 }
 
 fn candidate_from_skill_path(checkout_dir: &Path, skill_path: &Path) -> RemoteStageCandidate {
@@ -554,7 +588,12 @@ fn unique_nanos() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_target;
+    use super::{
+        clone_remote_into, materialize_candidates, parse_target, unique_nanos, RemoteSkillSource,
+    };
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
 
     #[test]
     fn parses_github_tree_skill_folder_url() {
@@ -629,5 +668,146 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("owner/repo or owner/repo/<skill-folder>"));
+    }
+
+    #[test]
+    fn repo_root_stage_materializes_plugin_metadata() {
+        let sandbox = test_sandbox("repo-root-stage");
+        let origin = sandbox.join("origin");
+        write_file(
+            &origin.join(".agent-plugin").join("marketplace.json"),
+            r#"{"name":"neutral-marketplace"}"#,
+        );
+        write_file(&origin.join("README.md"), "# Skills\n");
+        write_file(
+            &origin.join("skills").join("one").join("SKILL.md"),
+            "---\nname: one\ndescription: One.\n---\n# One\n",
+        );
+        write_file(
+            &origin.join("skills").join("two").join("SKILL.md"),
+            "---\nname: two\ndescription: Two.\n---\n# Two\n",
+        );
+        commit_repo(&origin);
+
+        let remote = RemoteSkillSource {
+            repo_url: origin.to_string_lossy().into_owned(),
+            branch: None,
+            path: None,
+        };
+        let checkout = clone_remote_into(&remote, &sandbox.join("stage")).unwrap();
+        let candidates = materialize_candidates(&remote, &checkout.checkout_dir, true).unwrap();
+
+        assert!(checkout
+            .checkout_dir
+            .join(".agent-plugin")
+            .join("marketplace.json")
+            .is_file());
+        assert!(checkout.checkout_dir.join("README.md").is_file());
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].skill_path, "skills/one/SKILL.md");
+        assert_eq!(candidates[1].skill_path, "skills/two/SKILL.md");
+        let _ = fs::remove_dir_all(sandbox);
+    }
+
+    #[test]
+    fn subfolder_stage_materializes_only_requested_scope() {
+        let sandbox = test_sandbox("subfolder-stage");
+        let origin = sandbox.join("origin");
+        write_file(
+            &origin.join(".agent-plugin").join("marketplace.json"),
+            r#"{"name":"repo-root"}"#,
+        );
+        write_file(
+            &origin
+                .join("packages")
+                .join("plugin")
+                .join(".agent-plugin")
+                .join("marketplace.json"),
+            r#"{"name":"scoped-plugin"}"#,
+        );
+        write_file(
+            &origin
+                .join("packages")
+                .join("plugin")
+                .join("skills")
+                .join("one")
+                .join("SKILL.md"),
+            "---\nname: one\ndescription: One.\n---\n# One\n",
+        );
+        write_file(
+            &origin.join("outside").join("SKILL.md"),
+            "---\nname: outside\ndescription: Outside.\n---\n# Outside\n",
+        );
+        commit_repo(&origin);
+
+        let remote = RemoteSkillSource {
+            repo_url: origin.to_string_lossy().into_owned(),
+            branch: None,
+            path: Some("packages/plugin".to_owned()),
+        };
+        let checkout = clone_remote_into(&remote, &sandbox.join("stage")).unwrap();
+        let candidates = materialize_candidates(&remote, &checkout.checkout_dir, true).unwrap();
+
+        assert!(!checkout
+            .checkout_dir
+            .join(".agent-plugin")
+            .join("marketplace.json")
+            .exists());
+        assert!(checkout
+            .checkout_dir
+            .join("packages")
+            .join("plugin")
+            .join(".agent-plugin")
+            .join("marketplace.json")
+            .is_file());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(
+            candidates[0].skill_path,
+            "packages/plugin/skills/one/SKILL.md"
+        );
+        assert!(!checkout
+            .checkout_dir
+            .join("outside")
+            .join("SKILL.md")
+            .exists());
+        let _ = fs::remove_dir_all(sandbox);
+    }
+
+    fn test_sandbox(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "skillspec-remote-source-{name}-{}-{}",
+            std::process::id(),
+            unique_nanos()
+        ))
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
+    fn commit_repo(path: &Path) {
+        fs::create_dir_all(path).unwrap();
+        run_git(path, &["init"]);
+        run_git(path, &["config", "user.email", "skillspec@example.invalid"]);
+        run_git(path, &["config", "user.name", "SkillSpec Test"]);
+        run_git(path, &["add", "."]);
+        run_git(path, &["commit", "-m", "initial"]);
+    }
+
+    fn run_git(path: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed\nstdout:\n{}\nstderr:\n{}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }

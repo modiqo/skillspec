@@ -111,19 +111,19 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap current-skill baseline; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; doctor can inspect public GitHub URIs directly, and source map can map public GitHub URIs by sparse-staging them internally; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps; after doctor, import the skill, read the alignment summary, optionally publish the proof artifacts, restart, and try the SkillSpec-backed skill normally"
+            "for source diagnostics or assess-skill requests, run doctor before import as a cheap current-skill baseline and stop after the report unless the user also asked to import or install; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; doctor can inspect public GitHub URIs directly, and source map can map public GitHub URIs by sparse-staging them internally; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps"
                 .to_owned(),
         );
     }
     if has_source_import(spec) {
         items.push(
-            "for URI imports, run source map on the GitHub URI and let SkillSpec perform the sparse staging; use the returned source_path for stale/import-skill, ask the user only when multiple candidates are reported; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/coverage/lens/query/stale before import-skill, use source lens to review one parsed block at a time, and pass the fresh source-map.json with --source-map"
+            "for import-skill requests, assess shape first, then import and semantically review the source; do not install by default, and after a successful import offer the dry-run install command as an optional next step; for URI imports, run source stage first when the target may be a repo/workspace, because repo-root staging preserves plugin metadata and shared folders while explicit subfolder staging stays scoped to that folder; treat source stage source_shape.kind as authoritative for the staged root, then run doctor/import checklist against staged_source_path; use workspace handling for multi_skill_workspace or plugin_workspace; ask the user to choose candidates.source_path only when the request is explicitly for one atomic skill; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/coverage/lens/query/stale before import-skill, use source lens to review one parsed block at a time, and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
     if has_workspace_authoring(spec) {
         items.push(
-            "for multi-skill or plugin-shaped source roots, run workspace map/validate before fanout import; use workspace converge before compile and workspace install dry-run before writing harness roots"
+            "for install-skill requests on raw sources, treat install as assess plus import plus semantic review plus compile plus dry-run plus approved install, not as direct harness copy; for multi-skill or plugin-shaped source roots, run doctor/import checklist first, then workspace map/validate before fanout import; use import checklist loop with --build-root for package-by-package promotion, workspace converge before compile, and workspace install dry-run before writing harness roots; if converge, compile, or install reports scaffolds, missing promotion proof, or an empty build root, follow its next command back to workspace import or import checklist loop and keep working until user approval, credentials, inaccessible source, a policy waiver, or another external state change is needed; multi-skill and plugin-shaped workspace install preserves the source parent folder, copies non-skill parent files from the reference source, replaces the source skill package subtree with compiled packages at the same relative paths, and must not flatten packages into top-level install folders"
                 .to_owned(),
         );
     }
@@ -385,6 +385,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             ),
         },
         NavigationHint {
+            intent: "generate guided execution checklist",
+            command: format!("skillspec run checklist {spec_path} --stage entry"),
+        },
+        NavigationHint {
             intent: "resume guided task execution",
             command: format!(
                 "skillspec run-loop {spec_path} --resume <run-dir> --guide agent --json"
@@ -585,9 +589,21 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 command: "skillspec doctor <source-skill-folder-or-repo-uri>".to_owned(),
             },
             NavigationHint {
+                intent: "generate shape-specific doctor checklist",
+                command:
+                    "skillspec doctor checklist <source-skill-folder-or-repo-uri> --stage entry"
+                        .to_owned(),
+            },
+            NavigationHint {
                 intent: "map import source",
                 command:
                     "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "generate source import checklist",
+                command:
+                    "skillspec import checklist <source-skill-folder-or-repo-uri> --stage entry"
                         .to_owned(),
             },
             NavigationHint {
@@ -639,6 +655,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 intent: "fanout import workspace packages",
                 command:
                     "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "review next workspace package import checklist",
+                command:
+                    "skillspec import checklist <build>/skillspec.workspace.yml --build-root <workspace-build> --stage loop"
                         .to_owned(),
             },
             NavigationHint {

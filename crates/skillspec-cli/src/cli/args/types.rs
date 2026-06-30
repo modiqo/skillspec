@@ -97,6 +97,13 @@ pub(in crate::cli) enum GuideModeArg {
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
+pub(in crate::cli) enum ChecklistStageArg {
+    Entry,
+    Loop,
+    Exit,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
 pub(in crate::cli) enum SourceViewArg {
     Index,
     Summary,

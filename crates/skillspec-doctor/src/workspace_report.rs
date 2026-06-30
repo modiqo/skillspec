@@ -5,10 +5,13 @@ use super::types::{
 use super::{
     basis, display_list, frontmatter, issue, metrics, path_to_slash, shape_root, slugify,
     with_location, DoctorIssue, DoctorReport, DoctorShapeReport, Error, Result,
-    ShapeClassification, SurfaceReport, LARGE_BODY_LINES, LARGE_BODY_TOKENS,
+    ShapeClassification, SurfaceReport, WorkspaceFrontmatterNameRefReport, WorkspaceIdentityReport,
+    WorkspaceNamespaceIdentityReport, WorkspaceSourceContentRefReport, LARGE_BODY_LINES,
+    LARGE_BODY_TOKENS,
 };
 use super::{risk, severity_rank};
 use crate::remote_source;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -66,13 +69,18 @@ fn report_from_skill_texts(
 ) -> DoctorReport {
     let shape = classification.shape;
     let counts = classification.counts;
-    let mut package_reports = Vec::new();
-    for (skill_path, content) in skill_texts {
-        package_reports.push(package_report(&shape, &skill_path, &content));
-    }
+    let package_reports = skill_texts
+        .iter()
+        .map(|(skill_path, content)| package_report(&shape, skill_path, content))
+        .collect::<Vec<_>>();
+    let workspace_identity = workspace_identity(&shape, &counts, &package_reports, &skill_texts);
 
     let mut issues = super::shape_issues(&shape, &counts);
-    issues.extend(workspace_issues(&shape, &package_reports));
+    issues.extend(workspace_issues(
+        &shape,
+        &package_reports,
+        &workspace_identity,
+    ));
     issues.sort_by_key(|issue| severity_rank(&issue.severity));
     let penalty = issues
         .iter()
@@ -111,6 +119,7 @@ fn report_from_skill_texts(
         raw_activation_risk: None,
         contract_mitigation: None,
         workspace_agent_drift_risk: Some(workspace_agent_drift_risk),
+        workspace_identity: Some(workspace_identity),
         packages: package_reports,
         basis,
         suggested_next_steps,
@@ -212,10 +221,50 @@ fn workspace_surface(packages: &[DoctorPackageRiskReport]) -> SurfaceReport {
 fn workspace_issues(
     shape: &DoctorShapeReport,
     packages: &[DoctorPackageRiskReport],
+    identity: &WorkspaceIdentityReport,
 ) -> Vec<DoctorIssue> {
     let mut issues = Vec::new();
     if let Some(issue) = name_collision_issue(shape, packages) {
         issues.push(issue);
+    }
+    if identity.repeated_skill_content_groups > 0 {
+        issues.push(with_location(
+            issue(
+                "workspace_repeated_skill_content",
+                "medium",
+                "Repeated skill content should be referentiable",
+                format!(
+                    "{} namespaced skill package file(s) contain {} unique byte-identical SKILL.md content item(s); {} repeated occurrence(s) across {} group(s) account for approximately {} repeated source token(s).",
+                    identity.skill_file_count,
+                    identity.unique_skill_content_count,
+                    identity.repeated_skill_content_occurrences,
+                    identity.repeated_skill_content_groups,
+                    identity.repeated_skill_content_estimated_tokens
+                ),
+                vec!["skillspec_local_reliability_gap", "skillspec_local_contract_trace"],
+                "Preserve every namespace/path package identity, but store one canonical source-content artifact per SHA and make each repeated package refer to that content instead of copying bytes as independent source.",
+                8,
+            ),
+            shape.root.clone(),
+        ));
+    }
+    if identity.same_frontmatter_name_groups > 0 {
+        issues.push(with_location(
+            issue(
+                "workspace_reused_frontmatter_names",
+                "medium",
+                "Frontmatter names repeat across distinct package identities",
+                format!(
+                    "{} frontmatter name group(s) repeat across {} extra package occurrence(s). This is valid when namespace/path is the identity, but it is load-bearing for agents unless displayed explicitly.",
+                    identity.same_frontmatter_name_groups,
+                    identity.same_frontmatter_name_occurrences
+                ),
+                vec!["claude_skill_frontmatter_discovery", "skillspec_local_reliability_gap"],
+                "Use namespace/path identity in workspace maps and show repeated names as referentiable aliases rather than duplicate package errors.",
+                6,
+            ),
+            shape.root.clone(),
+        ));
     }
     if !shape.referenced_skill_paths.is_empty() {
         issues.push(with_location(
@@ -235,6 +284,153 @@ fn workspace_issues(
         ));
     }
     issues
+}
+
+fn workspace_identity(
+    shape: &DoctorShapeReport,
+    counts: &super::DoctorCounts,
+    packages: &[DoctorPackageRiskReport],
+    skill_texts: &[(String, String)],
+) -> WorkspaceIdentityReport {
+    let namespaces = namespace_identity(packages);
+    let source_content_refs = source_content_refs(skill_texts);
+    let frontmatter_name_refs = frontmatter_name_refs(packages);
+    let unique_skill_content_estimated_tokens = source_content_refs
+        .iter()
+        .map(|content| content.estimated_tokens)
+        .sum::<usize>();
+    let total_skill_content_estimated_tokens = skill_texts
+        .iter()
+        .map(|(_, content)| metrics::estimate_tokens(content))
+        .sum::<usize>();
+    let repeated_skill_content_estimated_tokens = source_content_refs
+        .iter()
+        .map(|content| content.repeated_estimated_tokens)
+        .sum::<usize>();
+    let repeated_skill_content_groups = source_content_refs
+        .iter()
+        .filter(|content| content.occurrence_count > 1)
+        .count();
+    let repeated_skill_content_occurrences = source_content_refs
+        .iter()
+        .map(|content| content.repeated_occurrence_count)
+        .sum::<usize>();
+    let same_frontmatter_name_groups = frontmatter_name_refs.len();
+    let same_frontmatter_name_occurrences = frontmatter_name_refs
+        .iter()
+        .map(|item| item.occurrence_count.saturating_sub(1))
+        .sum::<usize>();
+    WorkspaceIdentityReport {
+        source_file_count: counts.total_files,
+        skill_file_count: shape.skill_files.len(),
+        namespaced_package_count: packages.len(),
+        namespace_count: namespaces.len(),
+        namespaces,
+        unique_skill_content_count: source_content_refs.len(),
+        repeated_skill_content_groups,
+        repeated_skill_content_occurrences,
+        total_skill_content_estimated_tokens,
+        unique_skill_content_estimated_tokens,
+        repeated_skill_content_estimated_tokens,
+        source_content_refs,
+        same_frontmatter_name_groups,
+        same_frontmatter_name_occurrences,
+        frontmatter_name_refs,
+        recommendation: "Keep namespace/path as package identity and make repeated byte-identical SKILL.md content referentiable through source_content_ref aliases instead of copying the same bytes as independent source material.".to_owned(),
+    }
+}
+
+fn namespace_identity(
+    packages: &[DoctorPackageRiskReport],
+) -> Vec<WorkspaceNamespaceIdentityReport> {
+    let mut by_namespace = BTreeMap::<String, Vec<String>>::new();
+    for package in packages {
+        by_namespace
+            .entry(
+                package
+                    .plugin_name
+                    .clone()
+                    .unwrap_or_else(|| "workspace".to_owned()),
+            )
+            .or_default()
+            .push(package.path.clone());
+    }
+    by_namespace
+        .into_iter()
+        .map(|(namespace, mut paths)| {
+            paths.sort();
+            let skill_file_count = paths.len();
+            WorkspaceNamespaceIdentityReport {
+                namespace,
+                skill_file_count,
+                sample_paths: paths.into_iter().take(8).collect(),
+            }
+        })
+        .collect()
+}
+
+fn source_content_refs(skill_texts: &[(String, String)]) -> Vec<WorkspaceSourceContentRefReport> {
+    let mut by_sha = BTreeMap::<String, Vec<(String, usize, usize)>>::new();
+    for (path, content) in skill_texts {
+        let sha = format!("{:x}", Sha256::digest(content.as_bytes()));
+        by_sha.entry(sha).or_default().push((
+            path.clone(),
+            content.len(),
+            metrics::estimate_tokens(content),
+        ));
+    }
+    by_sha
+        .into_iter()
+        .map(|(sha256, mut items)| {
+            items.sort_by(|left, right| left.0.cmp(&right.0));
+            let occurrence_count = items.len();
+            let canonical_path = items[0].0.clone();
+            let content_bytes = items[0].1;
+            let estimated_tokens = items[0].2;
+            let aliases = items
+                .iter()
+                .skip(1)
+                .map(|(path, _, _)| path.clone())
+                .collect::<Vec<_>>();
+            WorkspaceSourceContentRefReport {
+                sha256,
+                canonical_path,
+                aliases,
+                occurrence_count,
+                content_bytes,
+                estimated_tokens,
+                repeated_occurrence_count: occurrence_count.saturating_sub(1),
+                repeated_estimated_tokens: estimated_tokens
+                    .saturating_mul(occurrence_count.saturating_sub(1)),
+            }
+        })
+        .collect()
+}
+
+fn frontmatter_name_refs(
+    packages: &[DoctorPackageRiskReport],
+) -> Vec<WorkspaceFrontmatterNameRefReport> {
+    let mut by_name = BTreeMap::<String, Vec<String>>::new();
+    for package in packages {
+        by_name
+            .entry(package.public_name.clone())
+            .or_default()
+            .push(package.path.clone());
+    }
+    by_name
+        .into_iter()
+        .filter_map(|(public_name, mut paths)| {
+            if paths.len() < 2 {
+                return None;
+            }
+            paths.sort();
+            Some(WorkspaceFrontmatterNameRefReport {
+                public_name,
+                occurrence_count: paths.len(),
+                paths,
+            })
+        })
+        .collect()
 }
 
 fn name_collision_issue(

@@ -168,16 +168,16 @@ pub fn compile_workspace(
     let skipped = package_ids_by_status(&package_reports, WorkspaceCompileStatus::Skipped);
     let report_path = build_root.join("workspace-compile.report.md");
     let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
-    let next = if ok {
-        vec![
-            "review compiled package loaders before install; workspace install is Phase 7"
-                .to_owned(),
-        ]
-    } else {
-        vec![
-            "fix failed, blocked, or missing packages; complete scaffold promotion when applicable; rerun workspace converge, then rerun workspace compile".to_owned(),
-        ]
-    };
+    let next = compile_next_steps(
+        ok,
+        manifest_path,
+        build_root,
+        target,
+        manifest.packages.len(),
+        failed.len(),
+        blocked.len(),
+        missing.len(),
+    );
 
     let report = WorkspaceCompileReport {
         ok,
@@ -366,6 +366,70 @@ fn blocked_package_report(
     })
 }
 
+fn compile_next_steps(
+    ok: bool,
+    manifest_path: &Path,
+    build_root: &Path,
+    target: Target,
+    package_count: usize,
+    failed_count: usize,
+    blocked_count: usize,
+    missing_count: usize,
+) -> Vec<String> {
+    if ok {
+        return vec![format!(
+            "skillspec workspace install {} --build-root {} --target {} --dry-run --summary",
+            manifest_path.display(),
+            build_root.display(),
+            install_target_for_loader(target)
+        )];
+    }
+    if package_count > 0 && missing_count == package_count {
+        return vec![
+            format!(
+                "skillspec workspace import {} --out {} --summary",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            format!(
+                "skillspec import checklist {} --build-root {} --stage loop --json",
+                manifest_path.display(),
+                build_root.display()
+            ),
+        ];
+    }
+    if blocked_count > 0 {
+        return vec![
+            format!(
+                "skillspec import checklist {} --build-root {} --stage loop --json",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            "continue package promotion until the checklist reports complete; scaffold blockers are recoverable work, not terminal final-response blockers".to_owned(),
+        ];
+    }
+    if failed_count > 0 || missing_count > 0 {
+        return vec![
+            format!(
+                "repair only the failed or missing package drafts, then run `skillspec workspace converge {} --build-root {} --summary`",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            format!(
+                "skillspec workspace compile {} --build-root {} --target {} --summary",
+                manifest_path.display(),
+                build_root.display(),
+                target_name(target)
+            ),
+        ];
+    }
+    vec![format!(
+        "skillspec workspace converge {} --build-root {} --summary",
+        manifest_path.display(),
+        build_root.display()
+    )]
+}
+
 fn package_ids_by_status(
     packages: &[WorkspaceCompilePackageReport],
     status: WorkspaceCompileStatus,
@@ -393,6 +457,14 @@ fn target_name(target: Target) -> &'static str {
         Target::CodexSkill => "codex-skill",
         Target::ClaudeSkill => "claude-skill",
         Target::Markdown => "markdown",
+    }
+}
+
+fn install_target_for_loader(target: Target) -> &'static str {
+    match target {
+        Target::CodexSkill => "codex",
+        Target::ClaudeSkill => "claude",
+        Target::Markdown => "<target>",
     }
 }
 

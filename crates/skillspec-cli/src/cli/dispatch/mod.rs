@@ -1,6 +1,7 @@
 use super::args::Command;
 mod authoring_cmd;
 mod capability_cmd;
+mod checklist_cmd;
 mod deps_cmd;
 mod doctor_cmd;
 mod durable_cmd;
@@ -100,13 +101,17 @@ pub(super) fn run(command: Command) -> Result<()> {
             runtime_cmd::refs(path, handle, view, json)?;
         }
         Command::Doctor {
+            command,
             path,
             json,
             html,
             markdown,
-        } => {
-            doctor_cmd::run(path, json, html, markdown)?;
-        }
+        } => match command {
+            Some(command) => checklist_cmd::doctor(command)?,
+            None => doctor_cmd::run(path, json, html, markdown)?,
+        },
+        Command::Import { command } => checklist_cmd::import(command)?,
+        Command::Run { command } => checklist_cmd::run(command)?,
         Command::Status { roots, json } => {
             status_cmd::run(roots, json)?;
         }

@@ -4,3 +4,4 @@
 .skillspec/traces/
 **/.skillspec/cache/
 **/.skillspec/workspace-cache.json
+.claude/skills/

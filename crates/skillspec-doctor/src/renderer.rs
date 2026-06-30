@@ -1,6 +1,16 @@
+mod shape_contract;
+mod workspace_identity;
+
 use super::types::RiskLevel;
 use super::{
     ContractMitigationReport, DoctorIssue, DoctorPackageRiskReport, DoctorReport, SurfaceReport,
+    WorkspaceIdentityReport,
+};
+use shape_contract::{
+    render_shape_contract, render_shape_contract_html, render_shape_contract_markdown,
+};
+use workspace_identity::{
+    render_workspace_identity, render_workspace_identity_html, render_workspace_identity_markdown,
 };
 
 pub fn render(report: &DoctorReport) -> String {
@@ -65,6 +75,10 @@ pub fn render(report: &DoctorReport) -> String {
         ));
     }
 
+    output.push_str("\nShape Contract\n");
+    output.push_str("--------------\n");
+    output.push_str(&render_shape_contract(report));
+
     output.push_str("\nSurface\n");
     output.push_str("-------\n");
     output.push_str(&render_surface(
@@ -112,6 +126,12 @@ pub fn render(report: &DoctorReport) -> String {
                 output.push_str(&format!("- {signal}\n"));
             }
         }
+    }
+
+    if let Some(identity) = &report.workspace_identity {
+        output.push_str("\nWorkspace Identity\n");
+        output.push_str("------------------\n");
+        output.push_str(&render_workspace_identity(identity));
     }
 
     if !report.packages.is_empty() {
@@ -266,6 +286,9 @@ pub fn render_markdown(report: &DoctorReport) -> String {
         ));
     }
 
+    output.push_str("\n## Shape Contract\n\n");
+    output.push_str(&render_shape_contract_markdown(report));
+
     output.push_str("\n## Surface\n\n");
     output.push_str(&format!(
         "- **Activation body:** `{}` line(s), `{}` byte(s), approximately `{}` token(s)\n",
@@ -331,6 +354,11 @@ pub fn render_markdown(report: &DoctorReport) -> String {
                 output.push_str(&format!("- {}\n", markdown_text(signal)));
             }
         }
+    }
+
+    if let Some(identity) = &report.workspace_identity {
+        output.push_str("\n## Workspace Identity\n\n");
+        output.push_str(&render_workspace_identity_markdown(identity));
     }
 
     if !report.packages.is_empty() {
@@ -478,6 +506,8 @@ pub fn render_html(report: &DoctorReport) -> String {
     output.push_str("<p class=\"muted\">This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness. Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.</p>");
     output.push_str("</section>\n");
 
+    output.push_str(&render_shape_contract_html(report));
+
     output.push_str("<section class=\"panel-grid\">\n");
     output.push_str("<article class=\"panel\"><h2>Surface</h2>");
     output.push_str("<dl class=\"pairs\">");
@@ -547,6 +577,10 @@ pub fn render_html(report: &DoctorReport) -> String {
         output.push_str(&pair("Dependencies", &mitigation.dependencies.to_string()));
         output.push_str(&pair("Tests", &mitigation.tests.to_string()));
         output.push_str("</dl></section>\n");
+    }
+
+    if let Some(identity) = &report.workspace_identity {
+        output.push_str(&render_workspace_identity_html(identity));
     }
 
     if !report.packages.is_empty() {

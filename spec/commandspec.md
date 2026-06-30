@@ -25,12 +25,14 @@ skillspec <COMMAND>
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
 | `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and current-gate control data in one spec load; with `--guide agent --json`, emit machine-readable start/current/end anchors and persisted resume state. |
+| `run <COMMAND>` | Generate read-only execution checklists for specs or guided run directories. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
-| `doctor <target> [--html] [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk. Defaults to a formatted user report; use `--html` for a self-contained review page and `--json` for machines. |
+| `doctor <target> [--html] [--json]` or `doctor checklist <source>` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk; or generate a read-only shape-specific doctor checklist. |
+| `import <COMMAND>` | Generate read-only import checklists for sources or workspace manifests. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
@@ -52,6 +54,23 @@ skillspec <COMMAND>
 | `capability <COMMAND>` | Manage local capability seeds for durable bootstrap. |
 
 All commands support `-h, --help` through clap.
+
+## Agent Intent Defaults
+
+Low-level CLI commands remain explicit, but the SkillSpec harness route treats
+common user intents as composed workflows:
+
+- `assess skill`: run `doctor` or `doctor checklist` only, print the report, and
+  stop without source maps, imports, progress proof, compile, dry-run, or install.
+- `import skill`: run assessment first, then import through the correct
+  single-skill, multi-skill, entry-with-subskills, or plugin-shaped path. Stop
+  after reviewed import/build artifacts and offer the dry-run install command as
+  an optional next step.
+- `install skill`: if the input is raw prose, a local folder, or a public URI,
+  run assessment, import/promotion, validation, compile, dry-run install, target
+  approval, and retirement approval before mutating harness roots. If the input
+  is already a reviewed generated package or compiled workspace build, skip
+  re-import but still validate/readiness-check and dry-run before install.
 
 ## `validate`
 
@@ -159,6 +178,40 @@ With `--guide agent`, `run-loop` also writes:
 Use `--resume <run-dir> --guide agent` after compaction or interruption. Resume
 recovers the original input from the decision trace, verifies fingerprints,
 replays the decision, reads `execution.jsonl`, and prints the current gate.
+
+## `run`
+
+```text
+skillspec run <COMMAND>
+```
+
+Subcommands:
+
+- `checklist <skill.spec.yml-or-run-dir> [--stage <entry|loop|exit>] [--json]`
+
+### `run checklist`
+
+```text
+skillspec run checklist <TARGET> [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<TARGET>`: either a `skill.spec.yml` file or a guided run directory
+  containing `guide-state.json`.
+
+Options:
+
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `loop`.
+- `--json`: emit JSON instead of a concise human report.
+
+`run checklist` is read-only. For a spec file, it emits the `run-loop` command
+needed to start a guided task. For a run directory, it reads persisted guide
+state and emits the selected-route execution checklist for the requested stage:
+current phase, open requirements, allowed commands, forbids, repeat-until
+condition, and exit proof commands. It exits non-zero when a run directory is
+missing guide state or when exit is requested before remaining phases are done.
 
 ## `act`
 
@@ -286,8 +339,9 @@ Arguments:
 
 Options:
 
-- default output: emit a formatted human report with assessment, surface,
-  packages, findings, next actions, and basis summary.
+- default output: emit a formatted human report with assessment, shape
+  contract, surface, workspace identity, packages, findings, next actions, and
+  basis summary.
 - `--html`: emit a self-contained HTML report suitable for redirecting to a
   file and sharing in review.
 - `--json`: emit the full machine-readable report. This is mutually exclusive
@@ -308,13 +362,31 @@ these shapes:
 - `multi_skill_workspace`: multiple `SKILL.md` packages without a plugin
   namespace marker. Doctor reports `analysis_status: workspace`, aggregate
   workspace risk, and one package report per `SKILL.md`.
-- `plugin_workspace`: a plugin-shaped root with `skills/` plus
-  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`. Doctor reports
-  `analysis_status: workspace`, preserves plugin namespaces in package ids, and
-  emits one package report per plugin skill.
+- `plugin_workspace`: a plugin-shaped root with `skills/` plus harness-neutral
+  plugin metadata, such as `.agent-plugin/marketplace.json`,
+  `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or other
+  plugin-named metadata folders with a supported manifest. Compatibility
+  markers such as `.mcp.json` and `CLAUDE.md` are also recognized. Doctor
+  reports `analysis_status: workspace`, preserves plugin namespaces in package
+  ids, and emits one package report per plugin skill.
 - `non_skill_repository`: no `SKILL.md` was found. Doctor stops before
   source-map parsing and reports code/manifest signals instead of wasting time
   on a normal code repo.
+
+Workspace reports include `workspace_identity`: total source files, namespaced
+package count, namespace count, `SKILL.md` count, unique byte-identical
+`SKILL.md` content count, repeated content groups/occurrences, estimated token
+load if copied byte-for-byte, repeated frontmatter names, and
+`source_content_refs` with one canonical path plus aliases for repeated source
+bodies. These are identity and load-bearing risk facts, not duplicate-package
+errors: namespace/path remains the package identity while repeated bytes should
+be made referentiable during import/install work.
+
+All formatted report modes include a Shape Contract section that restates the
+detected kind, kind-specific handling rule, analysis status, skill-file count,
+package count, namespace count, plugin-root count, primary skill when present,
+plugin-root details when present, referenced skill paths when present, and the
+next command implied by the shape gate.
 
 For public GitHub targets, `doctor` performs a temporary partial sparse checkout
 and removes it after the report. Supported remote forms include
@@ -332,6 +404,31 @@ workspace name collisions.
 
 The verdict is about context and reliability burden, not observed runtime
 failure. Dynamic behavior remains `unproven` until a trace can be aligned.
+
+### `doctor checklist`
+
+```text
+skillspec doctor checklist <SOURCE> [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<SOURCE>`: local `SKILL.md` file, local folder, public GitHub skill folder,
+  public GitHub repo URL, or GitHub shorthand to inspect.
+
+Options:
+
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `entry`.
+- `--json`: emit JSON instead of a concise human report.
+
+`doctor checklist` runs the same shape inspection as `doctor`, then emits a
+concrete checklist for the detected source shape. Single-skill, multi-skill,
+entry-with-subskills, and plugin-shaped roots get different activation policy,
+command, repeat-until, evidence, and forbid guidance. Non-skill repositories
+return a blocked checklist and exit non-zero. The command does not stage a
+workspace manifest, import drafts, promote semantics, compile, install, or write
+proof files.
 
 ## `source`
 
@@ -370,16 +467,25 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 The generated map records files, hashes, Markdown nodes, frontmatter, byte and
-line ranges, local/external references, code blocks, dependency mentions, modal
+line ranges, local/external references, code blocks, dependency signals, modal
 obligation language, and review-required classifications. It preserves
 frontmatter as a first-class node instead of treating it as Markdown prose.
 
 For public GitHub sources, `source map` stages the source with SkillSpec's
-sparse checkout logic, maps the selected local source, and reports the local
+URI staging logic, maps the selected local source, and reports the local
 `source_path` for later `source stale` and `import-skill` commands. If a repo
 URI resolves to multiple `SKILL.md` candidates, the command refuses to guess and
-prints candidate source paths. Use `source stage` directly only when candidate
-discovery or explicit staging is the task.
+prints candidate source paths. Use `source stage` directly when candidate
+discovery, workspace shape preservation, or explicit staging is the task.
+
+`source stage` preserves the selected source shape and emits it directly as
+`source_shape.kind` alongside `staged_source_path`. Repo-root targets are cloned
+as the source root so plugin metadata, shared files, and folder structure remain
+available to `doctor`, `import checklist`, and `workspace map`. Explicit
+subfolder targets are sparse-staged only within that requested subfolder. When
+the selected root contains multiple `SKILL.md` packages, stage output points to
+workspace-map next steps; treat `source_shape.kind` as authoritative and choose
+`candidates[].source_path` only for an explicitly single-skill import.
 
 ### `source query`
 
@@ -479,18 +585,23 @@ and invocation visibility, assigns package ids, assigns deterministic install
 slugs, scans Markdown for cross-package references, and writes a markdown report
 beside the manifest.
 
-The default `workspace-path` policy prefixes install folders with the workspace
-slug and relative package path. This is safest for side-by-side publication and
-plugin-shaped workspaces because it avoids flattening packages with repeated
-local names. Use `local-name` for replacement/upgrade flows where the generated
-package must retire an existing canonical folder such as `rote-setup`.
-Validation rejects duplicate `install_slug` values before install.
+The default `workspace-path` policy preserves multi-skill and plugin-shaped
+source identity. Single-package workspaces may install by manifest slug, but
+multi-skill and plugin installs keep the source parent folder and write compiled
+packages back at their original relative paths. Use `local-name` only for
+single-package replacement/upgrade flows where the generated package must retire
+an existing canonical folder such as `rote-setup`. Validation rejects
+`local-name` for multi-skill and plugin-shaped manifests before install.
+Validation also rejects duplicate `install_slug` values before install.
 
 When the source has plugin-shaped folders, the mapper preserves those boundaries
-as namespaces instead of flattening names. A folder with `skills/` plus
-`.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` is treated as a plugin
-root. Its `plugin.json` name, or the folder slug when no plugin name exists, is
-used to create skill-safe public names such as
+as namespaces instead of flattening names. A folder with `skills/` plus a
+plugin-named metadata folder containing a supported manifest, such as
+`.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, or
+`.claude-plugin/plugin.json`, is treated as a plugin root. Compatibility markers
+such as `.mcp.json` and `CLAUDE.md` are also recognized. The manifest name/id, or
+the folder slug when no plugin name exists, is used to create skill-safe public
+names such as
 `commercial-legal-cold-start-interview`. Same-plugin slash references such as
 `/cold-start-interview` resolve inside that namespace, while explicit references
 such as `/privacy-legal:use-case-triage` resolve across namespaces.
@@ -595,6 +706,19 @@ whose dependencies are not ready, and writes:
 
 It does not compile loaders, install skills, or refresh router indexes.
 
+When the build root has not been populated, the next step is `workspace import`,
+not compile or install. When packages are blocked only because they are still
+mechanical scaffolds or are missing promotion proof, the next step is the
+package loop:
+
+```text
+skillspec import checklist <MANIFEST> --build-root <BUILD_ROOT> --stage loop --json
+```
+
+That blocker is recoverable work. Treat it as terminal only when the loop needs
+user approval, credentials, inaccessible source, a policy waiver, or another
+external state change.
+
 ### `workspace compile`
 
 ```text
@@ -625,6 +749,11 @@ dependents whose dependencies did not compile and writes:
 - `<BUILD_ROOT>/<package>/SKILL.md`
 
 It does not install skills or refresh router indexes.
+
+If compile reports blocked scaffolds or missing promotion proof, return to the
+same `skillspec import checklist <MANIFEST> --build-root <BUILD_ROOT> --stage
+loop --json` package loop instead of ending the run. If every package is missing
+from the build root, run `workspace import` first.
 
 ### `workspace install`
 
@@ -662,10 +791,19 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace install` preflights the whole workspace before copying package
-folders. It uses the manifest `install_slug` for every installed folder, checks
-that compiled `SKILL.md` loaders and `skill.spec.yml` files exist, blocks folder
-collisions unless `--retire-existing` is selected, blocks public-name
-collisions, and blocks dependents whose dependencies are not install-ready.
+folders. Single-package workspaces use the manifest `install_slug`. Multi-skill
+and plugin-shaped workspaces use a harder shape-preserving path: the target is
+`<harness-skill-root>/<workspace-or-plugin-parent>/<original-package-path>`, and
+flattened per-package folders such as `<workspace>--skills--<skill>` or
+`<plugin-parent>--skills--<skill>` are not valid install targets. During actual
+install the command copies the original parent folder from the reference source,
+excludes the original skill package subtree, creates a fresh replacement subtree,
+and writes the compiled SkillSpec-backed package folders back at their original
+relative paths. It checks that compiled `SKILL.md` loaders and
+`skill.spec.yml` files exist, blocks parent folder collisions unless
+`--retire-existing` is selected, blocks public-name collisions, and blocks
+dependents whose dependencies are not install-ready. Plugin reports additionally
+record `plugin_parent` and `plugin_skill_path` for plugin-package auditability.
 
 On dry-run, no harness files are written. On install, packages are copied in
 dependency order and the command writes:
@@ -1151,6 +1289,46 @@ Options:
   - `claude-skill`
   - `markdown`
 
+## `import`
+
+```text
+skillspec import <COMMAND>
+```
+
+Subcommands:
+
+- `checklist <source-or-skillspec.workspace.yml> [--build-root <dir>] [--stage <entry|loop|exit>] [--json]`
+
+### `import checklist`
+
+```text
+skillspec import checklist <TARGET> [--build-root <BUILD_ROOT>] [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<TARGET>`: a source root/file/URI to inspect, or a
+  `skillspec.workspace.yml` manifest for workspace import checklists.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: mirrored workspace build root produced by
+  `workspace import`. Required for workspace loop and exit checklists.
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `entry`.
+- `--json`: emit JSON instead of a concise human report.
+
+`import checklist` is read-only. For source roots, it runs source-shape
+inspection and selects the matching single-skill, multi-skill, entry-skill, or
+plugin checklist template. For workspace manifests, entry checks validate and
+fan out the workspace, loop checks locate the next package without
+`.skillspec/workspace-promotion.json`, and exit checks name converge, compile,
+dry-run install, retirement, and install gates. The loop stage is intentionally
+package-specific: it points at the current package source map and requires
+source lens block review, structural rules for conditionals, dependency ledger
+review, tests, and promotion proof before advancing. It exits non-zero for
+blocked inputs, such as requesting loop or exit without `--build-root`.
+
 ## `import-skill`
 
 ```text
@@ -1182,9 +1360,15 @@ Notes:
   `source/SKILL.md` or another Markdown-looking `SKILL*.md` file, because
   harnesses and scanners may discover or rank Markdown skill-looking files.
 - The command writes a scaffolded `deps.toml` beside the generated
-  `skill.spec.yml`, declares it as a file dependency/artifact, and infers simple
-  CLI plus fenced-code package dependencies from Python and JavaScript/TypeScript
-  imports.
+  `skill.spec.yml` and declares it as a file dependency/artifact. Dependency
+  extraction is evidence-based and typed: executable command evidence can create
+  `cli` entries, declared live services/APIs can be reviewed into service/api
+  entries, package-manager evidence can create package entries, and fenced-code
+  Python/JavaScript/TypeScript imports are reference/example evidence until
+  review promotes them. Accepted CLI dependency keys are normalized while the
+  executable command is preserved. Invalid prose-like candidates such as
+  `Optional.`, `TABLE`, HTTP methods like `GET`, placeholders, or private/source
+  variable names are quarantined instead of written as hard dependencies.
 - The generated ledger is review scaffolding. Before proof or install, complete
   it with package mentions from source prose, references, helper scripts,
   command examples, and manifests, preserving authority, local status, install
@@ -1228,7 +1412,7 @@ Choose the import path before running `port-one-shot`:
 | --- | --- |
 | Exactly one `SKILL.md` under the selected source root | `port-one-shot` |
 | Multiple `SKILL.md` files, shared standards packages, or cross-skill file references | `workspace map`, `workspace validate`, `workspace import`, then converge/compile |
-| Plugin-shaped source root with `skills/` and `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
+| Plugin-shaped source root with `skills/` and harness-neutral plugin metadata, such as `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or another supported plugin manifest | workspace flow with plugin namespace preservation |
 | Existing reviewed `skill.spec.yml` | revise the existing spec; do not re-import the folder |
 
 `port-one-shot` is the safe default for one atomic prose skill. It bundles:

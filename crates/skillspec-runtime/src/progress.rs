@@ -648,7 +648,10 @@ pub fn render(report: &ProgressReport) -> String {
                 ));
             }
         }
-        None => output.push_str("- none; all phases are completed or blocked\n"),
+        None if report.blocked_phases.is_empty() => {
+            output.push_str("- none; all phases are completed\n")
+        }
+        None => output.push_str("- none; blocked phases require resolution or user intervention\n"),
     }
 
     if !report.blocked_phases.is_empty() {

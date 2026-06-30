@@ -37,6 +37,7 @@ pub mod lifecycle {
 #[doc(hidden)]
 pub mod features {
     pub mod capability;
+    pub mod checklist;
     pub mod run_loop;
     pub mod sensemake;
 
@@ -48,7 +49,7 @@ pub mod features {
 }
 
 #[doc(hidden)]
-pub use features::{capability, git_context, run_loop, sensemake};
+pub use features::{capability, checklist, git_context, run_loop, sensemake};
 #[doc(hidden)]
 pub use lifecycle::{
     durable_lifecycle, install, router, router_lifecycle, router_policy, status, visibility,

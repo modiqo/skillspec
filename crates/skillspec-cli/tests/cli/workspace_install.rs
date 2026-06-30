@@ -134,6 +134,122 @@ Run `/coding-standards` before the wrapper.
 }
 
 #[test]
+fn workspace_gates_point_to_import_or_package_loop_instead_of_terminal_blocker() {
+    let dir = TempDir::new("workspace-goal-seeking-next");
+    let root = dir.path().join("skills");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+    let home = dir.path().join("home");
+    fs::create_dir_all(&build).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    write_file(
+        &root.join("alpha").join("SKILL.md"),
+        r#"---
+name: alpha
+description: Alpha skill.
+---
+# Alpha
+
+If alpha applies, run alpha.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    let empty_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&empty_converge);
+    let empty_converge_report = json_stdout(&empty_converge);
+    assert!(empty_converge_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("skillspec workspace import"));
+
+    let empty_compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&empty_compile);
+    let empty_compile_report = json_stdout(&empty_compile);
+    assert!(empty_compile_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("skillspec workspace import"));
+
+    let empty_install = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&empty_install);
+    let empty_install_report = json_stdout(&empty_install);
+    assert!(empty_install_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("skillspec workspace import"));
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let scaffold_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&scaffold_converge);
+    let scaffold_converge_report = json_stdout(&scaffold_converge);
+    assert!(scaffold_converge_report["next"][0]
+        .as_str()
+        .unwrap()
+        .contains("skillspec import checklist"));
+    assert!(scaffold_converge_report["next"][1]
+        .as_str()
+        .unwrap()
+        .contains("recoverable work"));
+}
+
+#[test]
 fn workspace_map_local_name_policy_handles_root_level_simple_skill() {
     let dir = TempDir::new("workspace-simple-local-name");
     let root = dir.path().join("source-skill");
@@ -382,6 +498,414 @@ description: Privacy use-case triage.
 }
 
 #[test]
+fn workspace_map_detects_generic_plugin_metadata() {
+    let dir = TempDir::new("workspace-generic-plugin-map");
+    let root = dir.path().join("skills-marketplace");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    write_file(
+        &root.join(".agent-plugin").join("marketplace.json"),
+        r#"{"name":"neutral-marketplace","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root.join("skills").join("triage").join("SKILL.md"),
+        r#"---
+name: triage
+description: Triage support requests.
+---
+# Triage
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["source_shape"]["kind"], "plugin_workspace");
+    assert_eq!(
+        map_report["source_shape"]["plugin_roots"][0]["namespace"],
+        "neutral-marketplace"
+    );
+    assert_eq!(map_report["source_shape"]["plugin_roots"][0]["path"], "");
+    let package = map_report["plugin_namespaces"][0]["packages"][0]
+        .as_str()
+        .unwrap();
+    assert_eq!(package, "skills.triage");
+    let manifest_yaml = fs::read_to_string(&manifest).unwrap();
+    assert!(manifest_yaml.contains("namespace: neutral-marketplace"));
+    assert!(manifest_yaml.contains("public_name: neutral-marketplace-triage"));
+}
+
+#[test]
+fn workspace_install_preserves_plugin_parent_shape() {
+    let dir = TempDir::new("workspace-plugin-install-shape");
+    let home = dir.path().join("home");
+    let root = dir.path().join("legal-builder-hub");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+    fs::create_dir_all(home.join(".codex/skills")).unwrap();
+    write_file(
+        &root.join(".claude-plugin").join("plugin.json"),
+        r#"{"name":"legal-builder-hub","version":"1.0.0"}"#,
+    );
+    write_file(&root.join("README.md"), "# Legal Builder Hub\n");
+    write_file(
+        &root.join("config").join("defaults.json"),
+        r#"{"mode":"legal"}"#,
+    );
+    write_file(
+        &root.join("skills").join("auto-updater").join("SKILL.md"),
+        r#"---
+name: auto-updater
+description: Update generated legal builder skills.
+---
+# Auto Updater
+
+If update is requested, inspect the plugin manifest.
+"#,
+    );
+    write_file(
+        &root.join("skills").join("uninstall").join("SKILL.md"),
+        r#"---
+name: uninstall
+description: Uninstall generated legal builder skills.
+---
+# Uninstall
+
+If uninstall is requested, preserve handoff rules.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["source_shape"]["kind"], "plugin_workspace");
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&import);
+    promote_workspace_scaffolds_with_per_package_proof(&build);
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&compile);
+
+    let dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let dry_run_report = json_stdout(&dry_run);
+    assert_eq!(dry_run_report["source_shape"]["kind"], "plugin_workspace");
+    let auto_package = dry_run_report["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "skills.auto-updater")
+        .unwrap();
+    assert_eq!(auto_package["plugin_parent"], "legal-builder-hub");
+    assert_eq!(auto_package["plugin_skill_path"], "auto-updater");
+    assert!(auto_package["targets"][0]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/.codex/skills/legal-builder-hub/skills/auto-updater"));
+    assert!(auto_package["targets"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("shape=preserve-plugin-parent"));
+
+    let blocked_home = dir.path().join("blocked-home");
+    fs::create_dir_all(blocked_home.join(".codex/skills/legal-builder-hub")).unwrap();
+    write_file(
+        &blocked_home.join(".codex/skills/legal-builder-hub/README.md"),
+        "# Existing plugin\n",
+    );
+    let blocked = Command::new(bin())
+        .env("HOME", &blocked_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&blocked);
+    let blocked_report = json_stdout(&blocked);
+    let blocked_messages = workspace_package_messages(&blocked_report);
+    assert!(
+        blocked_messages.contains("plugin_parent_shape_not_preserved"),
+        "messages:\n{blocked_messages}"
+    );
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+    let install_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(build.join("workspace-install.manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let installed_auto_package = install_manifest["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "skills.auto-updater")
+        .unwrap();
+    assert_eq!(installed_auto_package["plugin_parent"], "legal-builder-hub");
+    assert_eq!(installed_auto_package["plugin_skill_path"], "auto-updater");
+    let plugin_dir = home.join(".codex/skills/legal-builder-hub");
+    assert!(plugin_dir.join(".claude-plugin/plugin.json").is_file());
+    assert!(plugin_dir.join("README.md").is_file());
+    assert!(plugin_dir.join("config/defaults.json").is_file());
+    assert!(plugin_dir.join("skills/auto-updater/SKILL.md").is_file());
+    assert!(plugin_dir
+        .join("skills/auto-updater/skill.spec.yml")
+        .is_file());
+    assert!(plugin_dir.join("skills/uninstall/SKILL.md").is_file());
+    assert!(!home
+        .join(".codex/skills/legal-builder-hub--skills--auto-updater")
+        .exists());
+    assert!(!home
+        .join(".codex/skills/legal-builder-hub--skills--uninstall")
+        .exists());
+}
+
+#[test]
+fn workspace_install_preserves_multi_skill_parent_shape() {
+    let dir = TempDir::new("workspace-multi-install-shape");
+    let home = dir.path().join("home");
+    let root = dir.path().join("review-suite");
+    let manifest = dir.path().join("build").join("skillspec.workspace.yml");
+    let build = dir.path().join("workspace-build");
+    fs::create_dir_all(home.join(".codex/skills")).unwrap();
+    write_file(&root.join("README.md"), "# Review Suite\n");
+    write_file(
+        &root.join("config").join("defaults.json"),
+        r#"{"mode":"review"}"#,
+    );
+    write_file(
+        &root.join("skills").join("code-review").join("SKILL.md"),
+        r#"---
+name: code-review
+description: Review code changes.
+---
+# Code Review
+
+If review is requested, inspect the diff.
+"#,
+    );
+    write_file(
+        &root
+            .join("skills")
+            .join("coding-standards")
+            .join("SKILL.md"),
+        r#"---
+name: coding-standards
+description: Shared coding standards.
+---
+# Coding Standards
+
+Use when standards are requested.
+"#,
+    );
+
+    let map = Command::new(bin())
+        .arg("workspace")
+        .arg("map")
+        .arg(&root)
+        .arg("--out")
+        .arg(&manifest)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let map_report = json_stdout(&map);
+    assert_eq!(map_report["source_shape"]["kind"], "multi_skill_workspace");
+
+    let import = Command::new(bin())
+        .arg("workspace")
+        .arg("import")
+        .arg(&manifest)
+        .arg("--out")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&import);
+    promote_workspace_scaffolds_with_per_package_proof(&build);
+
+    let compile = Command::new(bin())
+        .arg("workspace")
+        .arg("compile")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex-skill")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&compile);
+
+    let dry_run = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&dry_run);
+    let dry_run_report = json_stdout(&dry_run);
+    assert_eq!(
+        dry_run_report["source_shape"]["kind"],
+        "multi_skill_workspace"
+    );
+    let review_package = dry_run_report["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "skills.code-review")
+        .unwrap();
+    assert!(review_package["targets"][0]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/.codex/skills/review-suite/skills/code-review"));
+    assert!(review_package["targets"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("shape=preserve-workspace-parent"));
+
+    let blocked_home = dir.path().join("blocked-home");
+    fs::create_dir_all(blocked_home.join(".codex/skills/review-suite")).unwrap();
+    write_file(
+        &blocked_home.join(".codex/skills/review-suite/README.md"),
+        "# Existing workspace\n",
+    );
+    let blocked = Command::new(bin())
+        .env("HOME", &blocked_home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--dry-run")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&blocked);
+    let blocked_report = json_stdout(&blocked);
+    let blocked_messages = workspace_package_messages(&blocked_report);
+    assert!(
+        blocked_messages.contains("workspace_parent_shape_not_preserved"),
+        "messages:\n{blocked_messages}"
+    );
+
+    let install = Command::new(bin())
+        .env("HOME", &home)
+        .arg("workspace")
+        .arg("install")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--target")
+        .arg("codex")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&install);
+    let install_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(build.join("workspace-install.manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let installed_review_package = install_manifest["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|package| package["package_id"] == "skills.code-review")
+        .unwrap();
+    assert!(installed_review_package["installs"][0]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/.codex/skills/review-suite/skills/code-review"));
+    let workspace_dir = home.join(".codex/skills/review-suite");
+    assert!(workspace_dir.join("README.md").is_file());
+    assert!(workspace_dir.join("config/defaults.json").is_file());
+    assert!(workspace_dir.join("skills/code-review/SKILL.md").is_file());
+    assert!(workspace_dir
+        .join("skills/code-review/skill.spec.yml")
+        .is_file());
+    assert!(workspace_dir
+        .join("skills/coding-standards/SKILL.md")
+        .is_file());
+    assert!(!home
+        .join(".codex/skills/review-suite--skills--code-review")
+        .exists());
+    assert!(!home
+        .join(".codex/skills/review-suite--skills--coding-standards")
+        .exists());
+}
+
+#[test]
 fn workspace_map_local_name_policy_reports_plugin_slug_collisions() {
     let dir = TempDir::new("workspace-plugin-local-name-collision");
     let root = dir.path().join("plugin-workspace");
@@ -442,9 +966,7 @@ fn workspace_map_local_name_policy_reports_plugin_slug_collisions() {
         .output()
         .unwrap();
     assert_failure(&validate);
-    assert!(
-        stdout(&validate).contains("plugin-shaped workspaces must preserve plugin/package shape")
-    );
+    assert!(stdout(&validate).contains("workspaces must preserve parent/package shape"));
     assert!(stdout(&validate).contains("duplicate install_slug \"review\""));
 }
 
@@ -601,7 +1123,7 @@ Read `../coding-standards/SKILL.md`.
     assert!(scaffold_converge_report["next"][0]
         .as_str()
         .unwrap()
-        .contains("complete scaffold promotion"));
+        .contains("skillspec import checklist"));
     assert!(!scaffold_converge_report["next"][0]
         .as_str()
         .unwrap()
@@ -639,7 +1161,7 @@ Read `../coding-standards/SKILL.md`.
     assert!(scaffold_install_report["next"][0]
         .as_str()
         .unwrap()
-        .contains("complete scaffold promotion"));
+        .contains("skillspec import checklist"));
     assert!(!scaffold_install_report["next"][0]
         .as_str()
         .unwrap()
@@ -799,17 +1321,10 @@ Read `../coding-standards/SKILL.md`.
     assert!(!loader.contains("## Runtime Contract"));
     assert!(!loader.contains("## Completion Report"));
 
-    let replacement_home = dir.path().join("replacement-home");
-    fs::create_dir_all(replacement_home.join(".agents/skills")).unwrap();
-    write_file(
-        &replacement_home
-            .join(".agents/skills")
-            .join("code-review")
-            .join("SKILL.md"),
-        "---\nname: code-review\ndescription: Old prose skill.\n---\n# Old\n",
-    );
-    let replacement_plan = Command::new(bin())
-        .env("HOME", &replacement_home)
+    let flatten_home = dir.path().join("flatten-home");
+    fs::create_dir_all(flatten_home.join(".agents/skills")).unwrap();
+    let flatten_plan = Command::new(bin())
+        .env("HOME", &flatten_home)
         .arg("workspace")
         .arg("install")
         .arg(&manifest)
@@ -824,26 +1339,9 @@ Read `../coding-standards/SKILL.md`.
         .arg("--json")
         .output()
         .unwrap();
-    assert_success(&replacement_plan);
-    let replacement_plan = json_stdout(&replacement_plan);
-    assert_eq!(replacement_plan["install_slug_policy"], "local-name");
-    let review_package = replacement_plan["packages"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|package| package["package_id"] == "code-review")
-        .unwrap();
-    assert_eq!(review_package["install_slug"], "code-review");
-    let review_target = &review_package["targets"][0];
-    assert!(review_target["path"]
-        .as_str()
-        .unwrap()
-        .ends_with("/.agents/skills/code-review"));
-    assert_eq!(review_target["existed"], true);
-    assert_eq!(review_target["retired_existing"], true);
-    assert!(!replacement_home
-        .join(".agents/skills/skills--code-review/SKILL.md")
-        .exists());
+    assert_failure(&flatten_plan);
+    assert!(stderr(&flatten_plan)
+        .contains("multi_skill_workspace workspaces must preserve parent/package shape"));
 
     let collision_home = dir.path().join("collision-home");
     let collision_skillspec_home = dir.path().join("collision-skillspec-home");
@@ -950,7 +1448,7 @@ Read `../coding-standards/SKILL.md`.
     assert!(backup_path.join("SKILL.md").is_file());
     assert!(!legacy_collision_dir.exists());
     assert!(collision_home
-        .join(".agents/skills/skills--code-review/SKILL.md")
+        .join(".agents/skills/skills/code-review/SKILL.md")
         .is_file());
 
     let install_dry_run = Command::new(bin())
@@ -1015,28 +1513,28 @@ Read `../coding-standards/SKILL.md`.
         .as_bool()
         .unwrap());
     assert!(home
-        .join(".agents/skills/skills--coding-standards/SKILL.md")
+        .join(".agents/skills/skills/coding-standards/SKILL.md")
         .is_file());
     assert!(home
-        .join(".agents/skills/skills--coding-standards/skill.spec.yml")
+        .join(".agents/skills/skills/coding-standards/skill.spec.yml")
         .is_file());
     assert!(home
-        .join(".agents/skills/skills--code-review/SKILL.md")
+        .join(".agents/skills/skills/code-review/SKILL.md")
         .is_file());
     assert!(home
-        .join(".agents/skills/skills--code-review/skill.spec.yml")
+        .join(".agents/skills/skills/code-review/skill.spec.yml")
         .is_file());
     assert!(home
-        .join(".agents/skills/skills--code-review/source/SKILL_md.old")
+        .join(".agents/skills/skills/code-review/source/SKILL_md.old")
         .is_file());
     assert!(home
-        .join(".agents/skills/skills--code-review/.skillspec/source-map/source-map.json")
+        .join(".agents/skills/skills/code-review/.skillspec/source-map/source-map.json")
         .is_file());
     let support_visibility =
-        fs::read_to_string(home.join(".agents/skills/skills--coding-standards/agents/openai.yaml"))
+        fs::read_to_string(home.join(".agents/skills/skills/coding-standards/agents/openai.yaml"))
             .unwrap();
     assert!(support_visibility.contains("allow_implicit_invocation: false"));
-    let entry_visibility = home.join(".agents/skills/skills--code-review/agents/openai.yaml");
+    let entry_visibility = home.join(".agents/skills/skills/code-review/agents/openai.yaml");
     assert!(
         !entry_visibility.exists(),
         "entry package should remain implicit without a disabling sidecar"
@@ -1914,12 +2412,17 @@ fn import_skill_scaffolds_dependency_ledger_from_code_imports() {
 import json
 import pypdf
 from reportlab.pdfgen import canvas
+import Optional. Defaults to false
+from TABLE import rows
+import _posthogChunkIds
 ```
 
 ```ts
 import { chromium } from "playwright";
 import fs from "fs";
 const helper = require("@scope/helper/path");
+import bogus from "Required.";
+import badScope from "@scope/";
 ```
 "#,
     );
@@ -1936,14 +2439,88 @@ const helper = require("@scope/helper/path");
     let ledger = out.parent().unwrap().join("deps.toml");
     assert!(ledger.is_file());
     let ledger_content = fs::read_to_string(&ledger).unwrap();
-    assert!(ledger_content.contains("id = \"python3\""));
-    assert!(ledger_content.contains("id = \"deno\""));
+    assert!(!ledger_content.contains("id = \"python3\""));
+    assert!(!ledger_content.contains("id = \"deno\""));
     assert!(ledger_content.contains("id = \"pypdf\""));
     assert!(ledger_content.contains("id = \"reportlab\""));
     assert!(ledger_content.contains("id = \"playwright\""));
     assert!(ledger_content.contains("id = \"@scope/helper\""));
+    assert!(ledger_content.contains("authority = \"reference_import\""));
+    assert!(ledger_content.contains("required_for = [\"skill_code_1\", \"reference_example\"]"));
+    assert!(ledger_content.contains("degraded_without = false"));
+    assert!(ledger_content.contains("[[quarantined_dependency]]"));
+    assert!(ledger_content.contains("id = \"Optional\""));
+    assert!(ledger_content.contains("id = \"TABLE\""));
+    assert!(ledger_content.contains("id = \"_posthogChunkIds\""));
+    assert!(ledger_content.contains("id = \"Required.\""));
+    assert!(ledger_content.contains("id = \"@scope/\""));
     assert!(!ledger_content.contains("id = \"json\""));
     assert!(!ledger_content.contains("id = \"fs\""));
+    assert!(!ledger_content.contains("id = \"Optional.\""));
+}
+
+#[test]
+fn import_skill_quarantines_prose_like_command_dependency_candidates() {
+    let dir = TempDir::new("import-command-deps-quarantine");
+    let skill_dir = dir.path().join("source-skill");
+    let out = dir.path().join("draft").join("skill.spec.yml");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"# Command Dependencies
+
+```bash
+GET /api/projects/:id/events
+TABLE example output
+Optional. Defaults to false
+Custom property
+_posthogChunkIds
+the_client_ip_address_to_use
+python3 scripts/parse.py
+curl -X GET https://example.invalid
+posthog-cli flags list
+```
+"#,
+    );
+
+    let import = Command::new(bin())
+        .arg("import-skill")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&import);
+
+    let validate = Command::new(bin())
+        .arg("validate")
+        .arg(&out)
+        .output()
+        .unwrap();
+    assert_success(&validate);
+
+    let yaml = fs::read_to_string(&out).unwrap();
+    assert!(yaml.contains("  python3:"));
+    assert!(yaml.contains("  curl:"));
+    assert!(yaml.contains("  posthog_cli:"));
+    assert!(yaml.contains("command: posthog-cli"));
+    assert!(!yaml.contains("  GET:"));
+    assert!(!yaml.contains("  TABLE:"));
+    assert!(!yaml.contains("  Optional.:"));
+    assert!(!yaml.contains("  Custom:"));
+    assert!(!yaml.contains("  _posthogChunkIds:"));
+    assert!(!yaml.contains("  the_client_ip_address_to_use:"));
+
+    let ledger_content = fs::read_to_string(out.parent().unwrap().join("deps.toml")).unwrap();
+    assert!(ledger_content.contains("id = \"GET\""));
+    assert!(ledger_content.contains("id = \"TABLE\""));
+    assert!(ledger_content.contains("id = \"Optional.\""));
+    assert!(ledger_content.contains("id = \"Custom\""));
+    assert!(ledger_content.contains("id = \"_posthogChunkIds\""));
+    assert!(ledger_content.contains("id = \"the_client_ip_address_to_use\""));
+    assert!(ledger_content.contains("id = \"python3\""));
+    assert!(ledger_content.contains("id = \"curl\""));
+    assert!(ledger_content.contains("id = \"posthog-cli\""));
+    assert!(ledger_content.contains("[[quarantined_dependency]]"));
 }
 
 #[test]

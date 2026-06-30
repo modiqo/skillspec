@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub(in crate::cli) enum WorkspaceCommand {
     #[command(
         about = "Create a skillspec.workspace.yml graph from a folder with SKILL.md packages or plugin-shaped roots",
-        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It records source_shape, discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. The default workspace-path install slug policy is side-by-side and plugin safe; local-name is only for non-plugin replacement installs that must retire canonical existing skill folders. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
+        long_about = "Create a skillspec.workspace.yml graph from a local source root. This is authoring structure recon, not router indexing. It records source_shape, discovers atomic skill packages, plugin-shaped namespace roots, skill-safe public names, deterministic install slugs, cross-package references, inferred file dependencies, duplicate public names, and duplicate install slugs before fanout import. The default workspace-path install slug policy is side-by-side and shape-preserving for multi-skill and plugin workspaces; local-name is only for single-package replacement installs that must retire canonical existing skill folders. Plugin slash-command references are recorded as workflow links without becoming hard dependency edges."
     )]
     Map {
         /// Local source root containing one or more skill packages.
@@ -97,7 +97,7 @@ pub(in crate::cli) enum WorkspaceCommand {
     },
     #[command(
         about = "Install compiled workspace packages into harness roots",
-        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names or an explicit install slug policy override, blocks plugin-shaped workspaces from local-name flattening, blocks folder and public-name collisions unless explicitly retired, installs dependencies before dependents, reports workspace visibility policy, optionally applies native visibility metadata, writes workspace-install.report.md, and does not refresh router indexes."
+        long_about = "Install a compiled workspace build into one or more harness skill roots. This preflights every package first, uses manifest install_slug folder names for single-package workspaces, blocks multi-skill and plugin-shaped workspaces from local-name flattening, blocks folder and public-name collisions unless explicitly retired, installs dependencies before dependents, reports workspace visibility policy, optionally applies native visibility metadata, writes workspace-install.report.md, and does not refresh router indexes. For multi-skill and plugin-shaped workspaces, install preserves the source parent shape: it copies the original parent folder, replaces the source skill package subtree with compiled SkillSpec-backed packages at the same relative paths, and refuses flattened per-package folders such as <workspace>--skills--<skill>."
     )]
     Install {
         /// Path to skillspec.workspace.yml.

@@ -890,12 +890,15 @@ pub(crate) fn validate_manifest(
             manifest.schema
         ));
     }
-    if manifest.source_shape.kind == WorkspaceSourceShapeKind::PluginWorkspace
-        && manifest.install_slug_policy == WorkspaceInstallSlugPolicy::LocalName
+    if matches!(
+        manifest.source_shape.kind,
+        WorkspaceSourceShapeKind::PluginWorkspace | WorkspaceSourceShapeKind::MultiSkillWorkspace
+    ) && manifest.install_slug_policy == WorkspaceInstallSlugPolicy::LocalName
     {
-        errors.push(
-            "plugin-shaped workspaces must preserve plugin/package shape; install_slug_policy local-name flattens plugin-local names. Use workspace-path or a native plugin install/export path.".to_owned(),
-        );
+        errors.push(format!(
+            "{} workspaces must preserve parent/package shape; install_slug_policy local-name flattens source-local names. Use workspace-path.",
+            manifest.source_shape.kind.as_str()
+        ));
     }
 
     let source_root = PathBuf::from(&manifest.source_root);
@@ -1171,14 +1174,66 @@ fn collect_plugin_roots(source_root: &Path, dir: &Path, roots: &mut Vec<PluginRo
 }
 
 fn is_plugin_root(path: &Path) -> bool {
-    path.join("skills").is_dir()
-        && (path.join(".claude-plugin/plugin.json").is_file()
-            || path.join(".mcp.json").is_file()
-            || path.join("CLAUDE.md").is_file())
+    path.join("skills").is_dir() && has_plugin_metadata(path)
+}
+
+fn has_plugin_metadata(path: &Path) -> bool {
+    if path.join(".mcp.json").is_file() || path.join("CLAUDE.md").is_file() {
+        return true;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return false;
+    };
+    entries.filter_map(|entry| entry.ok()).any(|entry| {
+        let child = entry.path();
+        child.is_dir()
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_metadata_dir_name)
+            && plugin_metadata_dir_has_manifest(&child)
+    })
+}
+
+fn is_plugin_metadata_dir_name(name: &str) -> bool {
+    name.trim_start_matches('.')
+        .to_ascii_lowercase()
+        .contains("plugin")
+}
+
+fn plugin_metadata_dir_has_manifest(dir: &Path) -> bool {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return false;
+    };
+    entries.filter_map(|entry| entry.ok()).any(|entry| {
+        entry.path().is_file()
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_manifest_file_name)
+    })
+}
+
+fn is_plugin_manifest_file_name(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "plugin.json"
+            | "marketplace.json"
+            | "manifest.json"
+            | "package.json"
+            | "plugin.yml"
+            | "plugin.yaml"
+            | "marketplace.yml"
+            | "marketplace.yaml"
+            | "manifest.yml"
+            | "manifest.yaml"
+            | "plugin.toml"
+            | "manifest.toml"
+    )
 }
 
 fn plugin_namespace(plugin_root: &Path) -> String {
-    plugin_json_namespace(plugin_root)
+    plugin_manifest_namespace(plugin_root)
         .or_else(|| {
             plugin_root
                 .file_name()
@@ -1190,12 +1245,74 @@ fn plugin_namespace(plugin_root: &Path) -> String {
         .unwrap_or_else(|| "plugin".to_owned())
 }
 
-fn plugin_json_namespace(plugin_root: &Path) -> Option<String> {
-    let plugin_json = plugin_root.join(".claude-plugin/plugin.json");
-    let content = fs::read_to_string(plugin_json).ok()?;
-    let parsed = serde_json::from_str::<serde_json::Value>(&content).ok()?;
-    parsed
+fn plugin_manifest_namespace(plugin_root: &Path) -> Option<String> {
+    let mut candidates = Vec::new();
+    let entries = fs::read_dir(plugin_root).ok()?;
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let child = entry.path();
+        if !child.is_dir()
+            || !entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_metadata_dir_name)
+        {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(&child) else {
+            continue;
+        };
+        for file in files.filter_map(|file| file.ok()) {
+            if file.path().is_file()
+                && file
+                    .file_name()
+                    .to_str()
+                    .is_some_and(is_plugin_manifest_file_name)
+            {
+                candidates.push(file.path());
+            }
+        }
+    }
+    candidates.sort_by_key(|path| plugin_manifest_priority(path));
+    candidates
+        .into_iter()
+        .find_map(|path| namespace_from_manifest_file(&path))
+}
+
+fn plugin_manifest_priority(path: &Path) -> usize {
+    match path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("plugin.json") => 0,
+        Some("marketplace.json") => 1,
+        Some("manifest.json") => 2,
+        Some("package.json") => 3,
+        _ => 4,
+    }
+}
+
+fn namespace_from_manifest_file(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let value = if matches!(extension.as_str(), "yaml" | "yml") {
+        serde_yaml::from_str::<serde_yaml::Value>(&content).ok()
+    } else if extension == "json" {
+        serde_json::from_str::<serde_json::Value>(&content)
+            .ok()
+            .and_then(|value| serde_yaml::to_value(value).ok())
+    } else {
+        None
+    }?;
+    value
         .get("name")
+        .or_else(|| value.get("id"))
+        .or_else(|| value.get("title"))
         .and_then(|value| value.as_str())
         .map(str::trim)
         .filter(|value| !value.is_empty())

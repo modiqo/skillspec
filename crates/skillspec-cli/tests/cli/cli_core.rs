@@ -386,6 +386,87 @@ fn run_loop_guide_resume_advances_from_execution_ledger(
 }
 
 #[test]
+fn run_loop_guide_does_not_treat_blocked_phase_as_final_when_work_can_continue(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("run-loop-guide-blocked-not-final");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+
+    let start = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the app")
+        .arg("--trace-dir")
+        .arg(dir.path().join("traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&start);
+    let start_report = json_stdout(&start);
+    let run_dir = PathBuf::from(
+        start_report["start"]["run_dir"]
+            .as_str()
+            .ok_or_else(|| invalid_json_shape("missing run_dir"))?,
+    );
+
+    let complete_first = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("phase-completed")
+        .arg("collect_cli_evidence")
+        .arg("--evidence-kind")
+        .arg("command")
+        .arg("--evidence-ref")
+        .arg("guide-test")
+        .output()?;
+    assert_success(&complete_first);
+
+    let block_second = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("phase-blocked")
+        .arg("browser_handoff")
+        .arg("--evidence-kind")
+        .arg("report")
+        .arg("--evidence-ref")
+        .arg("needs-followup")
+        .output()?;
+    assert_success(&block_second);
+
+    let resume = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--resume")
+        .arg(&run_dir)
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&resume);
+    let resume_report = json_stdout(&resume);
+    let do_now = resume_report["current_gate"]["do_now"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing do_now"))?;
+    assert!(do_now.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("recoverable blockers"))));
+    assert!(!do_now.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("move to the end anchor"))));
+    let when_to_advance = resume_report["current_gate"]["when_to_advance"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing when_to_advance"))?;
+    assert!(when_to_advance.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("user intervention"))));
+    Ok(())
+}
+
+#[test]
 fn port_one_shot_runs_import_qa_compile_and_records_stats() {
     let dir = TempDir::new("port-one-shot");
     write_file(&dir.path().join(".git/HEAD"), "ref: refs/heads/main\n");

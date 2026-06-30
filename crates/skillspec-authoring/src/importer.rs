@@ -19,7 +19,8 @@ pub fn import_skill(path: &Path) -> Result<SkillSpec> {
 
 fn import_skill_from_source(path: &Path, source: &SkillSource) -> Result<SkillSpec> {
     let analysis = SkillAnalysis::from_source(source);
-    let mut dependencies = dependencies_from_analysis(&analysis);
+    let (mut dependencies, quarantined_dependency_candidates) =
+        dependencies_from_analysis(&analysis);
     dependencies.insert(
         import_dependency_ledger::DEPENDENCY_LEDGER_ID.to_owned(),
         import_dependency_ledger::dependency(
@@ -73,6 +74,12 @@ fn import_skill_from_source(path: &Path, source: &SkillSource) -> Result<SkillSp
         "strong_directive_count".to_owned(),
         serde_yaml::Value::Number(analysis.directives.len().into()),
     );
+    if !quarantined_dependency_candidates.is_empty() {
+        metadata.insert(
+            import_dependency_ledger::QUARANTINED_DEPENDENCY_METADATA_KEY.to_owned(),
+            quarantined_dependency_metadata(&quarantined_dependency_candidates),
+        );
+    }
 
     Ok(SkillSpec {
         schema: "skillspec/v0".to_owned(),
@@ -107,7 +114,7 @@ fn import_skill_from_source(path: &Path, source: &SkillSource) -> Result<SkillSp
                 .to_owned(),
             "Review inferred command dependencies and add permission/provision choices where needed."
                 .to_owned(),
-            "Review deps.toml and preserve required, optional, script import, and inferred dependency evidence before proof or install."
+            "Review deps.toml with typed evidence: executable commands, explicit APIs/services, package-manager evidence, and reference/example imports; quarantine prose-like or low-confidence candidates before proof or install."
                 .to_owned(),
             "Add scenario tests before trusting this structured skill.".to_owned(),
         ],
@@ -393,7 +400,7 @@ fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTe
         .iter()
         .enumerate()
         .map(|(index, block)| {
-            let dependencies = command_dependencies(block);
+            let dependencies = accepted_command_dependency_ids(block);
             (
                 format!("command_block_{}", index + 1),
                 CommandTemplate {
@@ -413,6 +420,25 @@ fn commands_from_blocks(command_blocks: &[String]) -> BTreeMap<String, CommandTe
             )
         })
         .collect()
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct CommandDependency {
+    id: String,
+    command: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct QuarantinedCommandDependency {
+    id: String,
+    source: String,
+    reason: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum CommandDependencyCandidate {
+    Accepted(CommandDependency),
+    Quarantined(QuarantinedCommandDependency),
 }
 
 fn imports_resources_and_code(
@@ -520,7 +546,7 @@ fn imports_resources_and_code(
                 }),
                 purpose: Some("Imported fenced code block; review before execution.".to_owned()),
                 requires: CodeRequires {
-                    dependencies: runtime_dependencies(&block.language),
+                    dependencies: code_block_dependencies(block),
                     imports: if import_document_ids.contains(&block.resource_id) {
                         vec![block.resource_id.clone()]
                     } else {
@@ -556,52 +582,57 @@ fn code_ids_by_resource(code_blocks: &[ImportedCodeBlock]) -> BTreeMap<String, V
 }
 
 fn classify_code(language: &str) -> CodeKind {
-    if is_command_language(language) || is_runnable_language(language) {
+    if is_command_language(language) {
         CodeKind::RunnableScript
     } else {
         CodeKind::Example
     }
 }
 
-fn is_runnable_language(language: &str) -> bool {
-    matches!(
-        language.trim().to_ascii_lowercase().as_str(),
-        "python" | "py"
-    )
-}
-
-fn dependencies_from_analysis(analysis: &SkillAnalysis) -> BTreeMap<String, Dependency> {
-    let command_dependencies = analysis
+fn dependencies_from_analysis(
+    analysis: &SkillAnalysis,
+) -> (
+    BTreeMap<String, Dependency>,
+    Vec<QuarantinedCommandDependency>,
+) {
+    let mut command_dependencies = BTreeSet::new();
+    let mut quarantined = BTreeSet::new();
+    for candidate in analysis
         .command_blocks
         .iter()
-        .flat_map(|block| command_dependencies(block))
-        .chain(
-            analysis
-                .code_blocks
-                .iter()
-                .flat_map(|block| runtime_dependencies(&block.language)),
-        )
-        .collect::<BTreeSet<_>>();
+        .flat_map(|block| command_dependency_candidates(block))
+    {
+        match candidate {
+            CommandDependencyCandidate::Accepted(dependency) => {
+                command_dependencies.insert(dependency);
+            }
+            CommandDependencyCandidate::Quarantined(candidate) => {
+                quarantined.insert(candidate);
+            }
+        }
+    }
 
-    command_dependencies
+    let dependencies = command_dependencies
         .into_iter()
-        .map(|command| dependency_for_command(&command))
-        .collect()
+        .map(|dependency| dependency_for_command(&dependency))
+        .collect();
+    (dependencies, quarantined.into_iter().collect())
 }
 
-fn dependency_for_command(command: &str) -> (String, Dependency) {
+fn dependency_for_command(dependency: &CommandDependency) -> (String, Dependency) {
     (
-        command.to_owned(),
+        dependency.id.clone(),
         Dependency {
             kind: DependencyKind::Cli,
             description: Some(format!(
-                "Inferred CLI dependency from imported skill material: {command}"
+                "Inferred CLI dependency from imported skill material: {}",
+                dependency.command
             )),
-            command: Some(command.to_owned()),
+            command: Some(dependency.command.clone()),
             path: None,
             env: None,
             check: Some(DependencyCheck {
-                command: Some(command.to_owned()),
+                command: Some(dependency.command.clone()),
                 path: None,
                 env: None,
             }),
@@ -611,25 +642,36 @@ fn dependency_for_command(command: &str) -> (String, Dependency) {
     )
 }
 
-fn runtime_dependencies(language: &str) -> Vec<String> {
-    match language.trim().to_ascii_lowercase().as_str() {
-        "python" | "py" => vec!["python3".to_owned()],
-        "javascript" | "js" => vec!["node".to_owned()],
-        "typescript" | "ts" => vec!["deno".to_owned()],
-        _ => Vec::new(),
+fn code_block_dependencies(block: &ImportedCodeBlock) -> Vec<String> {
+    if is_command_language(&block.language) {
+        accepted_command_dependency_ids(&block.text)
+    } else {
+        Vec::new()
     }
 }
 
-fn command_dependencies(block: &str) -> Vec<String> {
-    let mut commands = BTreeSet::new();
+fn accepted_command_dependency_ids(block: &str) -> Vec<String> {
+    command_dependency_candidates(block)
+        .into_iter()
+        .filter_map(|candidate| match candidate {
+            CommandDependencyCandidate::Accepted(dependency) => Some(dependency.id),
+            CommandDependencyCandidate::Quarantined(_) => None,
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn command_dependency_candidates(block: &str) -> Vec<CommandDependencyCandidate> {
+    let mut candidates = BTreeSet::new();
     for line in block.lines() {
         for segment in split_shell_segments(line) {
-            if let Some(command) = leading_command(segment) {
-                commands.insert(command);
+            if let Some(candidate) = leading_command(segment) {
+                candidates.insert(candidate);
             }
         }
     }
-    commands.into_iter().collect()
+    candidates.into_iter().collect()
 }
 
 fn split_shell_segments(line: &str) -> Vec<&str> {
@@ -641,7 +683,7 @@ fn split_shell_segments(line: &str) -> Vec<&str> {
         .collect()
 }
 
-fn leading_command(segment: &str) -> Option<String> {
+fn leading_command(segment: &str) -> Option<CommandDependencyCandidate> {
     let trimmed = segment
         .trim()
         .trim_start_matches('$')
@@ -668,8 +710,17 @@ fn leading_command(segment: &str) -> Option<String> {
             return None;
         }
         let command = token.rsplit('/').next().unwrap_or(token);
-        if valid_command_name(command) {
-            return Some(command.to_owned());
+        if let Some(dependency) = command_dependency(command) {
+            return Some(CommandDependencyCandidate::Accepted(dependency));
+        }
+        if should_quarantine_command_token(command) {
+            return Some(CommandDependencyCandidate::Quarantined(
+                QuarantinedCommandDependency {
+                    id: command.to_owned(),
+                    source: "command_block".to_owned(),
+                    reason: "Rejected command-like token from imported command block; preserve for review only.".to_owned(),
+                },
+            ));
         }
         tokens.peek()?;
     }
@@ -700,14 +751,130 @@ fn ignored_shell_word(token: &str) -> bool {
     )
 }
 
+fn command_dependency(command: &str) -> Option<CommandDependency> {
+    if !valid_command_name(command) {
+        return None;
+    }
+    let id = dependency_id_for_command(command)?;
+    Some(CommandDependency {
+        id,
+        command: command.to_owned(),
+    })
+}
+
 fn valid_command_name(command: &str) -> bool {
+    let command = command.trim();
+    if command.is_empty()
+        || command.len() > 80
+        || command.ends_with('.')
+        || command.contains('_')
+        || command.chars().any(|char| char.is_ascii_uppercase())
+    {
+        return false;
+    }
+    let lower = command.to_ascii_lowercase();
+    if rejected_command_word(&lower) {
+        return false;
+    }
     command
         .chars()
         .next()
-        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
-        && command
+        .is_some_and(|first| first.is_ascii_lowercase())
+        && command.chars().all(|char| {
+            char.is_ascii_lowercase() || char.is_ascii_digit() || matches!(char, '-' | '.' | '+')
+        })
+}
+
+fn dependency_id_for_command(command: &str) -> Option<String> {
+    let mut id = String::new();
+    let mut last_separator = false;
+    for char in command.chars() {
+        if char.is_ascii_lowercase() || char.is_ascii_digit() {
+            id.push(char);
+            last_separator = false;
+        } else if matches!(char, '-' | '.' | '+') && !last_separator {
+            id.push('_');
+            last_separator = true;
+        }
+    }
+    let id = id.trim_matches('_').to_owned();
+    if valid_dependency_identifier(&id) {
+        Some(id)
+    } else {
+        None
+    }
+}
+
+fn valid_dependency_identifier(id: &str) -> bool {
+    id.chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_lowercase())
+        && id
             .chars()
-            .all(|char| char.is_ascii_alphanumeric() || matches!(char, '_' | '-' | '.' | '+'))
+            .all(|char| char.is_ascii_lowercase() || char.is_ascii_digit() || char == '_')
+        && !rejected_command_word(id)
+}
+
+fn should_quarantine_command_token(command: &str) -> bool {
+    let command = command.trim();
+    !command.is_empty()
+        && command.chars().any(|char| char.is_ascii_alphanumeric())
+        && !matches!(command, "{" | "}" | "[" | "]")
+}
+
+fn rejected_command_word(lower: &str) -> bool {
+    matches!(
+        lower,
+        "optional"
+            | "required"
+            | "replace"
+            | "table"
+            | "default"
+            | "defaults"
+            | "false"
+            | "true"
+            | "custom"
+            | "chrome"
+            | "eof"
+            | "get"
+            | "post"
+            | "put"
+            | "patch"
+            | "delete"
+            | "head"
+            | "options"
+            | "trace"
+            | "connect"
+            | "have"
+            | "me"
+            | "quick"
+    )
+}
+
+fn quarantined_dependency_metadata(
+    candidates: &[QuarantinedCommandDependency],
+) -> serde_yaml::Value {
+    serde_yaml::Value::Sequence(
+        candidates
+            .iter()
+            .map(|candidate| {
+                let mut mapping = serde_yaml::Mapping::new();
+                mapping.insert(
+                    serde_yaml::Value::String("id".to_owned()),
+                    serde_yaml::Value::String(candidate.id.clone()),
+                );
+                mapping.insert(
+                    serde_yaml::Value::String("source".to_owned()),
+                    serde_yaml::Value::String(candidate.source.clone()),
+                );
+                mapping.insert(
+                    serde_yaml::Value::String("reason".to_owned()),
+                    serde_yaml::Value::String(candidate.reason.clone()),
+                );
+                serde_yaml::Value::Mapping(mapping)
+            })
+            .collect(),
+    )
 }
 
 #[derive(Debug)]

@@ -462,10 +462,24 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
                     .to_owned(),
             );
         }
+    } else if inputs.progress.current_phase.is_none() && !inputs.progress.blocked_phases.is_empty()
+    {
+        do_now.push(
+            "blocked phases remain; treat recoverable blockers as the next work queue, not as final-response permission"
+                .to_owned(),
+        );
+        do_now.push(
+            "continue from the first blocked phase with the route checklist or exact next command; ask the user only if the blocker requires approval, missing credentials, inaccessible source, or an external state change"
+                .to_owned(),
+        );
+        when_to_advance.push(
+            "advance after the blocked phase is resolved and checkpointed as completed, or after user intervention is explicitly requested"
+                .to_owned(),
+        );
     } else if inputs.progress.current_phase.is_none()
         && !inputs.progress.completed_phases.is_empty()
     {
-        do_now.push("all phases are completed or blocked; move to the end anchor".to_owned());
+        do_now.push("all phases are completed; move to the end anchor".to_owned());
         when_to_advance.push("run final proof and alignment from the end anchor".to_owned());
     } else {
         do_now.push("use the selected route as the active scope".to_owned());

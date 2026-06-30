@@ -1,6 +1,6 @@
 # Shape-Specific Checklist Generation
 
-Status: design target
+Status: implemented initial CLI surface
 Owner: SkillSpec
 Target reader: implementers, reviewers, agent operators, and harness authors
 
@@ -39,7 +39,7 @@ checklists that:
 
 ## Command Surface
 
-The proposed command family is:
+The implemented command family is:
 
 ```bash
 skillspec doctor checklist <source> [--stage entry|loop|exit] [--json]
@@ -112,7 +112,11 @@ The status values should be:
 
 - `ready`: the next command or directive can run.
 - `blocked`: the checklist found a condition that must be fixed before
-  advancing.
+  advancing. It is terminal only when the fix requires user approval,
+  credentials, inaccessible source, a policy waiver, or another external state
+  change. Mechanical scaffolds, missing promotion proof, unreviewed dependency
+  ledgers, and package-local QA failures are continuation gates; the agent must
+  return to the named loop command and keep working.
 - `complete`: the current stage has no remaining open steps.
 - `partial`: the user intentionally accepted a degraded or deferred proof state.
 
@@ -280,6 +284,10 @@ Directives:
 
 - Run validate, imports check, dependency check, and tests per package.
 - Run workspace converge before workspace compile.
+- If converge or compile reports unpromoted scaffolds, return to the generated
+  `skillspec import checklist <manifest> --build-root <workspace-build>
+  --stage loop --json` command and process the named package until the checklist
+  reports complete or a true user-intervention blocker is reached.
 - Run workspace compile before workspace install.
 - Run workspace install dry-run before mutation.
 - Use approved `--retire-existing` for replacement installs so old active
@@ -493,7 +501,7 @@ Exit checklist:
 {
   "step": "multi_skill_exit",
   "description": "Install the reviewed workspace after dry-run proof.",
-  "directive": "Converge, compile, dry-run install, review visibility and retirement, then install. Router refresh remains separate.",
+  "directive": "Converge, compile, dry-run install, review visibility and retirement, then install. The dry-run must preserve the source parent folder and write compiled packages back at their original relative paths instead of flattened top-level folders. Router refresh remains separate.",
   "commands": [
     "skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build> --summary",
     "skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill --summary",
@@ -504,7 +512,8 @@ Exit checklist:
     "unpromoted_package_scaffold",
     "missing_workspace_promotion_proof",
     "dependency_not_ready",
-    "install_target_collision_without_retirement_approval"
+    "install_target_collision_without_retirement_approval",
+    "flatten_workspace_shape"
   ]
 }
 ```
@@ -515,8 +524,11 @@ Shape id: `plugin_shape`
 
 Detection:
 
-- A plugin root marker is present, such as `.claude-plugin/plugin.json`,
-  `.mcp.json`, or another supported plugin manifest.
+- A plugin root marker is present: a plugin-named metadata folder with a
+  supported manifest, such as `.agent-plugin/marketplace.json`,
+  `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or another
+  supported plugin manifest. Compatibility markers such as `.mcp.json` and
+  `CLAUDE.md` are also recognized.
 - Skills live under the plugin's declared skill folder, normally `skills/`.
 - Repeated local skill names may be valid because the plugin namespace
   disambiguates them.
@@ -572,7 +584,7 @@ Loop checklist:
 {
   "step": "plugin_package_loop",
   "description": "Promote each plugin skill package without losing plugin semantics.",
-  "directive": "Review one plugin package at a time. Preserve frontmatter, slash-command behavior, resources, dependency mentions, state machines, handoff rules, and output templates. Treat plugin slash references as workflow references unless a hard file dependency is found.",
+  "directive": "Review one plugin package at a time. Preserve frontmatter, slash-command behavior, resources, dependency evidence, state machines, handoff rules, and output templates. Classify evidence before creating hard dependencies; treat plugin slash references as workflow references unless a hard file dependency is found.",
   "commands": [
     "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary",
     "skillspec source lens <workspace-build>/<plugin-package>/.skillspec/source-map/source-map.json --cursor <cursor>",
@@ -600,7 +612,7 @@ Exit checklist:
 {
   "step": "plugin_exit",
   "description": "Compile and install the plugin-shaped workspace without flattening activation.",
-  "directive": "Converge, compile, and dry-run install with plugin-compatible install slugs and visibility. The dry-run must show preserved namespace, plugin activation material, and retirement behavior for preexisting plugin skills.",
+  "directive": "Converge, compile, and dry-run install with plugin-compatible install slugs and visibility. The dry-run must show preserved namespace, plugin activation material, parent-folder preservation, and retirement behavior for preexisting plugin skills.",
   "commands": [
     "skillspec workspace converge <build>/skillspec.workspace.yml --build-root <workspace-build> --summary",
     "skillspec workspace compile <build>/skillspec.workspace.yml --build-root <workspace-build> --target codex-skill --summary",
@@ -773,7 +785,7 @@ The checklist should preserve plugin activation:
   "activation_policy": "preserve_plugin_activation",
   "plugin": {
     "root": "privacy-legal",
-    "manifest": ".claude-plugin/plugin.json",
+    "manifest": ".agent-plugin/marketplace.json",
     "namespace": "privacy-legal"
   },
   "packages": [
@@ -793,11 +805,15 @@ The checklist should preserve plugin activation:
     "namespace",
     "skill_frontmatter",
     "folder_shape",
-    "slash_command_bindings"
+    "slash_command_bindings",
+    "plugin_parent_non_skills_files",
+    "compiled_packages_replace_source_skills_tree"
   ],
   "forbid": [
     "flatten_plugin_shape",
-    "install_slug_policy_local_name_without_explicit_review"
+    "install_slug_policy_local_name_without_explicit_review",
+    "install_plugin_skills_as_top_level_flattened_folders",
+    "drop_plugin_parent_files_when_installing_compiled_skills"
   ]
 }
 ```
@@ -830,7 +846,12 @@ A checklist implementation is acceptable when these are true:
 - Conditional and state-machine source language is blocked unless represented
   structurally.
 - Dependency mentions cannot be deleted to make validation pass.
-- Plugin-shaped sources cannot be flattened into ordinary workspaces.
+- Multi-skill and plugin-shaped sources cannot be flattened into ordinary
+  top-level per-package install folders.
+- Multi-skill and plugin-shaped installs must preserve the parent folder, copy
+  non-skill source files from the reference parent, replace the source skill
+  package subtree with compiled SkillSpec-backed packages, and leave auditable
+  path evidence in the install dry-run/report.
 - Ordinary multi-skill folders produce one workspace activation path unless the
   source and user explicitly approve additional entrypoints.
 - Replacement installs retire preexisting active skills after approval instead
@@ -838,12 +859,11 @@ A checklist implementation is acceptable when these are true:
 
 ## Implementation Notes
 
-This document defines the desired contract. Until the checklist commands exist,
-the same logic must remain represented in route guidance, source-map lens
-output, workspace reports, and tests. Once implemented, the detailed cues should
-move out of the trampoline and into the checklist command output.
+This document defines the desired contract and the initial command surface now
+implemented in the CLI. Detailed cues should continue moving out of the
+trampoline and into generated checklist output as the checklist engine grows.
 
-Likely implementation surfaces:
+Implementation surfaces:
 
 - CLI args and dispatch for `doctor checklist`, `import checklist`, and
   `run checklist`;
