@@ -289,7 +289,8 @@ into a safer default path.
 | `decide` | Decision logic used by start and resume. |
 | `plan` | Phase order logic used by path. |
 | `act` | Current-route/current-phase checklist used by current gate. |
-| `progress record` | Records proof rows before advancing. |
+| `progress batch` | Records routine successful proof rows as one compact checkpoint before advancing. |
+| `progress record` | Low-level escape hatch for failures, blockers, debugging, or explicit proof-detail requests. |
 | `progress show` | Computes completed/current/blocked/remaining state. |
 | `query` | Loads exact handles named by the guide. |
 | `refs` | Loads relationship edges for active handles. |
@@ -300,6 +301,8 @@ The important policy is:
 ```text
 Use guided run-loop as the default agent-facing entry point.
 Use primitive commands for debugging, explicit inspection, and proof details.
+Keep ledger mechanics out of user-facing progress; users should see plain
+status, not one command per proof row.
 ```
 
 ## Why This Saves Tokens

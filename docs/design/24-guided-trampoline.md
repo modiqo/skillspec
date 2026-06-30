@@ -186,7 +186,7 @@ Here is what is open.
 Here is what is allowed now.
 Here is what is forbidden now.
 Here are the smallest commands to run next.
-Here is how to checkpoint progress evidence compactly.
+Here is how to checkpoint proof compactly when this route requires proof.
 ```
 
 Required current-gate fields:
@@ -203,6 +203,14 @@ progress_to_record:
 when_to_advance:
 ```
 
+`progress_to_record` is a batch-event checklist, not a list of foreground
+commands. Agent-facing guide output must not ask the harness to run one
+`skillspec progress record` command per routine proof row. Successful routine
+proof is staged into a JSONL file and checkpointed once with
+`skillspec progress batch ... --summary`. Individual `progress record` commands
+are reserved for failures, blockers, debugging, or explicit user requests for
+proof details.
+
 ### End Anchor
 
 The end is the completion contract for the selected route.
@@ -217,6 +225,12 @@ Final-response evidence is recorded.
 Alignment summary exists.
 Token usage or token economy is reported or explicitly not recorded.
 ```
+
+For diagnostic/read-only routes, such as Doctor/source-shape assessment, the
+end anchor is intentionally smaller: the diagnostic command completed, the
+result is answered in plain language, and no source-map, import, progress
+ledger, final-response proof, or alignment proof is run unless the user asked
+for proof.
 
 Required end fields:
 

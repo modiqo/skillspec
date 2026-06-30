@@ -124,6 +124,9 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     assert!(progress_hints
         .iter()
         .any(|hint| hint["event"] == "phase_completed"));
+    assert!(progress_hints.iter().all(|hint| hint["command"]
+        .as_str()
+        .is_some_and(|command| !command.contains("skillspec progress record"))));
 
     let run_dir = PathBuf::from(
         report["start"]["run_dir"]
@@ -132,6 +135,122 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     );
     assert!(run_dir.join("guide-state.json").is_file());
     assert!(run_dir.join("guide-summary.md").is_file());
+    Ok(())
+}
+
+#[test]
+fn run_loop_guide_suppresses_proof_plumbing_for_diagnostic_routes(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("run-loop-guide-diagnostic");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.diagnostic
+title: Diagnostic Spec
+description: Exercises quiet diagnostic guide behavior.
+activation:
+  summary: Diagnostic and proof routes.
+entry:
+  prompt: Decide before tools.
+  decision_required: true
+routes:
+  - id: diagnostic
+    label: Diagnostic
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: inspect
+          owner_skill: diagnostic
+          requires: [doctor]
+          forbid: [progress_batch, trace_align]
+  - id: proof
+    label: Proof
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: execute
+          owner_skill: proof
+          requires: [evidence]
+rules:
+  - id: doctor_rule
+    when:
+      user_says_any: [doctor]
+    prefer: diagnostic
+    forbid: [progress_batch, trace_align]
+  - id: proof_rule
+    when:
+      user_says_any: [execute]
+    prefer: proof
+trace:
+  mode: event_log
+  required: true
+  record: [input_received, rule_matched, route_selected]
+commands:
+  doctor:
+    template: echo doctor
+    safety: read_only
+  evidence:
+    template: echo evidence
+    safety: read_only
+"#,
+    );
+
+    let diagnostic = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("doctor this skill")
+        .arg("--trace-dir")
+        .arg(dir.path().join("diagnostic-traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&diagnostic);
+    let diagnostic_report = json_stdout(&diagnostic);
+    assert_eq!(diagnostic_report["start"]["selected_route"], "diagnostic");
+    let diagnostic_commands = diagnostic_report["current_gate"]["allowed_commands"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing diagnostic allowed commands"))?;
+    assert!(diagnostic_commands.iter().all(|command| command
+        .as_str()
+        .is_some_and(|command| !command.contains("progress"))));
+    assert!(diagnostic_report["current_gate"]["progress_to_record"]
+        .as_array()
+        .is_some_and(|hints| hints.is_empty()));
+    assert_eq!(
+        diagnostic_report["end"]["alignment_command"],
+        "not required for this diagnostic route"
+    );
+
+    let proof = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("execute this skill")
+        .arg("--trace-dir")
+        .arg(dir.path().join("proof-traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&proof);
+    let proof_report = json_stdout(&proof);
+    assert_eq!(proof_report["start"]["selected_route"], "proof");
+    let proof_commands = proof_report["current_gate"]["allowed_commands"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing proof allowed commands"))?;
+    assert!(proof_commands.iter().any(|command| command
+        .as_str()
+        .is_some_and(|command| command.contains("progress batch"))));
+    let proof_hints = proof_report["current_gate"]["progress_to_record"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing proof progress hints"))?;
+    assert!(proof_hints.iter().all(|hint| hint["command"]
+        .as_str()
+        .is_some_and(|command| !command.contains("skillspec progress record"))));
     Ok(())
 }
 

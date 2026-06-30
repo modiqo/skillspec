@@ -267,6 +267,16 @@ fn assemble_report(inputs: AssembleInputs<'_>) -> Result<GuideReport> {
         remaining_phases: inputs.progress.remaining_phases.clone(),
         required_transitions: inputs.act.required_transitions.clone(),
     };
+    let proof_suppressed = inputs
+        .act
+        .forbidden
+        .iter()
+        .any(|forbid| forbid == "trace_align")
+        && inputs
+            .act
+            .forbidden
+            .iter()
+            .any(|forbid| forbid == "progress_batch");
     let current_gate = build_current_gate(CurrentGateInputs {
         spec: inputs.spec,
         spec_path: &spec_path,
@@ -276,8 +286,14 @@ fn assemble_report(inputs: AssembleInputs<'_>) -> Result<GuideReport> {
         act: inputs.act,
         phase: current_phase_model,
         progress: inputs.progress,
+        proof_suppressed,
     });
-    let end = build_end_anchor(&spec_path, &run_dir, selected_route.as_deref());
+    let end = build_end_anchor(
+        &spec_path,
+        &run_dir,
+        selected_route.as_deref(),
+        proof_suppressed,
+    );
     let resume = ResumeAnchor {
         command: format!(
             "skillspec run-loop {} --resume {} --guide agent",
@@ -314,6 +330,7 @@ struct CurrentGateInputs<'a> {
     act: &'a ActReport,
     phase: Option<&'a ActPhase>,
     progress: &'a ProgressReport,
+    proof_suppressed: bool,
 }
 
 fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
@@ -394,42 +411,55 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
             shell_arg(inputs.run_dir),
             phase.id
         ));
-        for requirement in &inputs.progress.open_requirements {
-            let command = format!(
-                "skillspec progress record {} requirement-satisfied {} {} --evidence-kind <kind> --evidence-ref <ref>",
-                shell_arg(inputs.run_dir),
+        if inputs.proof_suppressed {
+            do_now.push(
+                "answer from the diagnostic output and stop; no progress ledger or alignment proof is required for this route"
+                    .to_owned(),
+            );
+            when_to_advance.push(
+                "advance after the diagnostic output is reported, unless the user explicitly asks for proof"
+                    .to_owned(),
+            );
+        } else {
+            for requirement in &inputs.progress.open_requirements {
+                let command = format!(
+                    "batch event requirement-satisfied phase={} requirement={} evidence_kind=<kind> evidence_ref=<ref> into {}/evidence-batch.jsonl",
+                    phase.id,
+                    requirement,
+                    shell_arg(inputs.run_dir)
+                );
+                progress_to_record.push(ProgressRecordHint {
+                    event: "requirement_satisfied".to_owned(),
+                    phase: Some(phase.id.clone()),
+                    requirement: Some(requirement.clone()),
+                    command: command.clone(),
+                });
+            }
+            let phase_completed = format!(
+                "batch event phase-completed phase={} evidence_kind=<kind> evidence_ref=<ref> into {}/evidence-batch.jsonl",
                 phase.id,
-                requirement
+                shell_arg(inputs.run_dir)
             );
             progress_to_record.push(ProgressRecordHint {
-                event: "requirement_satisfied".to_owned(),
+                event: "phase_completed".to_owned(),
                 phase: Some(phase.id.clone()),
-                requirement: Some(requirement.clone()),
-                command: command.clone(),
+                requirement: None,
+                command: phase_completed.clone(),
             });
+            allowed_commands.push(format!(
+                "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary",
+                shell_arg(inputs.run_dir),
+                shell_arg(inputs.run_dir)
+            ));
+            do_now.push(
+                "stage routine successful proof rows in evidence-batch.jsonl and checkpoint them once"
+                    .to_owned(),
+            );
+            when_to_advance.push(
+                "checkpoint routine successful evidence with one progress batch, then mark the phase completed or blocked"
+                    .to_owned(),
+            );
         }
-        let phase_completed = format!(
-            "skillspec progress record {} phase-completed {} --evidence-kind <kind> --evidence-ref <ref>",
-            shell_arg(inputs.run_dir),
-            phase.id
-        );
-        progress_to_record.push(ProgressRecordHint {
-            event: "phase_completed".to_owned(),
-            phase: Some(phase.id.clone()),
-            requirement: None,
-            command: phase_completed.clone(),
-        });
-        allowed_commands.push(format!(
-            "skillspec progress batch {} --file {}/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary",
-            shell_arg(inputs.run_dir),
-            shell_arg(inputs.run_dir)
-        ));
-        do_now.push(
-            "stage routine successful proof rows in evidence-batch.jsonl and checkpoint them once"
-                .to_owned(),
-        );
-        when_to_advance
-            .push("record required evidence, then mark the phase completed or blocked".to_owned());
     } else if inputs.progress.current_phase.is_none()
         && !inputs.progress.completed_phases.is_empty()
     {
@@ -444,11 +474,25 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
     if do_not.is_empty() {
         do_not.push("do not use unlisted tools, data sources, or execution substrates without explicit permission".to_owned());
     }
-    allowed_commands.push(format!(
-        "skillspec progress show {} --run {}",
-        shell_arg(inputs.spec_path),
-        shell_arg(inputs.run_dir)
-    ));
+    if !inputs.proof_suppressed {
+        allowed_commands.push(format!(
+            "skillspec progress show {} --run {}",
+            shell_arg(inputs.spec_path),
+            shell_arg(inputs.run_dir)
+        ));
+    }
+
+    let allowed_now = if inputs.proof_suppressed {
+        inputs
+            .act
+            .allowed_now
+            .iter()
+            .filter(|item| !item.contains("evidence for later alignment"))
+            .cloned()
+            .collect()
+    } else {
+        inputs.act.allowed_now.clone()
+    };
 
     CurrentGate {
         phase: inputs.phase.map(|phase| phase.id.clone()),
@@ -462,7 +506,7 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
             .unwrap_or_default(),
         do_now,
         do_not,
-        allowed_now: inputs.act.allowed_now.clone(),
+        allowed_now,
         allowed_commands,
         recommended_queries,
         progress_to_record,
@@ -470,8 +514,32 @@ fn build_current_gate(inputs: CurrentGateInputs<'_>) -> CurrentGate {
     }
 }
 
-fn build_end_anchor(spec_path: &str, run_dir: &str, selected_route: Option<&str>) -> EndAnchor {
+fn build_end_anchor(
+    spec_path: &str,
+    run_dir: &str,
+    selected_route: Option<&str>,
+    proof_suppressed: bool,
+) -> EndAnchor {
     let route_id = selected_route.unwrap_or("<route-id>");
+    if proof_suppressed {
+        return EndAnchor {
+            done_when: vec![
+                "diagnostic command completed or blocker is named".to_owned(),
+                "result is answered in plain language".to_owned(),
+                "no source-map, import, progress-ledger, or alignment proof is run unless explicitly requested"
+                    .to_owned(),
+            ],
+            route_fulfillment_event: "not_required_for_diagnostic_route".to_owned(),
+            final_progress_command: "not required for this diagnostic route".to_owned(),
+            alignment_command: "not required for this diagnostic route".to_owned(),
+            final_response_must_include: vec![
+                "result".to_owned(),
+                "key findings".to_owned(),
+                "recommended next command when applicable".to_owned(),
+            ],
+            proof_paths: Vec::new(),
+        };
+    }
     EndAnchor {
         done_when: vec![
             "selected route is fulfilled or intentionally partial".to_owned(),

@@ -22,9 +22,12 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert!(loader_out.contains("skillspec run-loop <skill_dir>/skill.spec.yml"));
     assert!(loader_out.contains("--guide agent"));
     assert!(loader_out.contains("--resume <run_dir>"));
+    assert!(loader_out.contains("Keep SkillSpec mechanics in the background"));
+    assert!(loader_out.contains("For read-only diagnostic routes"));
+    assert!(loader_out.contains("batch routine successful evidence"));
     assert!(loader_out.contains("cargo install skillspec"));
     assert!(loader_out.contains("skill.spec.yml"));
-    assert!(loader_out.lines().count() < 60);
+    assert!(loader_out.lines().count() < 70);
     assert!(!loader_out.contains("## Runtime Contract"));
     assert!(!loader_out.contains("## Completion Report"));
     assert!(!loader_out.contains("## Authoring And Revision Contract"));

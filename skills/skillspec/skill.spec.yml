@@ -226,7 +226,7 @@ routes:
     description: Use when the user asks what shape a skill, skill folder, repository, or URL has, or asks to run doctor without requesting import, port, compile, install, or proof.
     execution_plan:
       mode: ordered
-      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before import or mutation.
+      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before source-map, import, mutation, progress-ledger, or alignment proof work.
       phases:
         - id: run_shape_doctor
           owner_skill: skillspec
@@ -243,6 +243,16 @@ routes:
           requires:
             - doctor_source_shape
           forbid:
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
+            - progress_record_phase
+            - progress_record_requirement
+            - progress_batch
+            - trace_align
             - port_one_shot_or_manual_import
             - import_skill_draft
             - workspace_import_packages
@@ -258,6 +268,16 @@ routes:
           requires:
             - report_source_shape
           forbid:
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
+            - progress_record_phase
+            - progress_record_requirement
+            - progress_batch
+            - trace_align
             - port_one_shot_or_manual_import
             - import_skill_draft
             - workspace_import_packages
@@ -1321,9 +1341,23 @@ rules:
         - run doctor on this url
         - doctor on this repo
         - doctor on this url
+        - assess this skill
+        - assess skill with doctor
+        - doctor assessment
+        - skill assessment
         - diagnose source shape
     prefer: inspect_source_shape
     forbid:
+      - source_map_create
+      - source_map_coverage
+      - source_map_nodes
+      - source_map_dependencies
+      - source_map_code
+      - source_map_stale
+      - progress_record_phase
+      - progress_record_requirement
+      - progress_batch
+      - trace_align
       - port_one_shot_or_manual_import
       - import_skill_draft
       - workspace_import_packages
@@ -1335,7 +1369,7 @@ rules:
       - execute_imported_snippets_during_staging
     after_success:
       - report_source_shape
-    reason: Shape questions should run the static doctor shape gate and stop; they should not import, port, compile, install, or choose a remote candidate.
+    reason: Shape questions should run the static doctor shape gate and stop; they should not source-map, import, port, compile, install, choose a remote candidate, or create progress/alignment proof ledgers.
   - id: post_install_setup_routes_to_multiplexer
     when:
       user_says_any:
@@ -2361,9 +2395,9 @@ commands:
       dependencies:
         - skillspec_cli
   doctor_source_shape:
-    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
+    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Do not run source-map, import, progress, or alignment commands for this read-only diagnostic unless the user explicitly asks for proof. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
     template: skillspec doctor <source-skill-folder-or-repo-uri>
-    safety: local_write
+    safety: network_read
     requires:
       dependencies:
         - skillspec_cli
@@ -2545,22 +2579,22 @@ commands:
       dependencies:
         - skillspec_cli
   progress_record_phase:
-    description: Append structured evidence that a phase started, completed, or blocked.
+    description: Low-level troubleshooting command for one foreground phase progress row. Do not use for routine successful proof; stage routine events into a JSONL batch and run progress_batch once.
     template: skillspec progress record <trace-dir> phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_record_requirement:
-    description: Append structured evidence that a phase requirement was satisfied or failed.
+    description: Low-level troubleshooting command for one foreground requirement row. Do not use for routine successful proof; stage routine events into a JSONL batch and run progress_batch once.
     template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_batch:
-    description: Append several routine proof events from one JSONL file as a compact foreground checkpoint so final alignment proof and phase checkpoints do not become a visible progress parade.
-    template: skillspec progress batch <trace-dir> --file <trace-dir>/final-proof.jsonl --checkpoint "checkpointing evidence" --summary
+    description: Append routine proof events from one JSONL file as a compact background checkpoint so phase checkpoints and final alignment proof do not become a visible progress parade.
+    template: skillspec progress batch <trace-dir> --file <trace-dir>/<evidence-batch>.jsonl --checkpoint "checkpointing evidence" --summary
     safety: local_write
     requires:
       dependencies:
@@ -3132,8 +3166,7 @@ recipes:
       - run_command: compile_codex_skill
       - run_command: plan_phase_order
       - run_command: act_named_phase
-      - run_command: progress_record_requirement
-      - run_command: progress_record_phase
+      - note: Stage routine successful phase and requirement proof rows in <trace-dir>/evidence-batch.jsonl and run progress_batch once. Do not run progress_record_requirement or progress_record_phase for successful routine rows; those low-level commands are only for foreground blockers, failures, or debugging.
       - note: Run trace_align once to create <trace-dir>/proof-digest.json; if multiple missing proof rows remain, write <trace-dir>/final-proof.jsonl from that digest and real evidence, then run progress_batch once instead of showing one progress command per row.
       - run_command: progress_batch
       - run_command: progress_show
@@ -3445,9 +3478,11 @@ snippets:
       - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
       - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
+      - Keep SkillSpec implementation details in the background: do not narrate ledger writes, raw progress commands, trace plumbing, or alignment internals as user-visible progress.
+      - For Doctor/source-shape diagnostic routes, answer from the doctor report and stop; do not create source maps, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
       - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
       - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
-      - Stage successful routine evidence rows in a JSONL batch and run one foreground progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
+      - Stage successful routine evidence rows in a JSONL batch and run one compact progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
       - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
       - Surface individual progress rows only for failures, blocked requirements, or proof gaps the user must understand.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
@@ -3547,7 +3582,7 @@ closures:
       - workspace_map_source
       - workspace_validate_manifest
   report_source_shape:
-    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not import, port, compile, install, or choose a remote candidate during read-only inspection.
+    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not source-map, import, port, compile, install, choose a remote candidate, record progress proof, or run alignment during read-only inspection.
     commands:
       - doctor_source_shape
   produce_mechanical_draft:
@@ -3717,6 +3752,11 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_batch
+        - trace_align
         - port_one_shot_or_manual_import
         - import_skill_draft
         - workspace_import_packages
@@ -3734,10 +3774,37 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - source_map_coverage
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_batch
+        - trace_align
         - import_skill_draft
         - workspace_import_packages
         - workspace_install_packages
         - execute_imported_snippets_during_staging
+  - name: doctor assessment url does not enter source map or proof parade
+    input: assess this skill with doctor https://github.com/org/repo/tree/main/skills/example
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - source_map_create
+        - source_map_coverage
+        - source_map_nodes
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_batch
+        - trace_align
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_install_packages
   - name: shape of local skill runs doctor
     input: shape of skill /Users/me/tulving/skills
     expect:
@@ -3747,6 +3814,10 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - progress_record_phase
+        - progress_record_requirement
+        - trace_align
         - port_one_shot_or_manual_import
         - import_skill_draft
         - workspace_import_packages

@@ -1,13 +1,14 @@
 ---
 name: skillspec
-description: "Use for SkillSpec tasks: inspect skill/repo shape, run doctor, import or port SKILL.md skills, map/import/converge/compile/install workspaces, manage router or durable-executor lifecycle, revise specs, and prove value. Use for /skillspec, skillspec setup, shape of skill, run doctor on this repo/url, port skill, workspace map/import/converge/compile/install, status, router, and proof."
+description: "Multiplex SkillSpec post-install setup: inspect skill/repo shape with doctor, map multi-skill and plugin-shaped repositories before fanout import, import existing SKILL.md skills from local folders or public URIs, inspect installed status, install compiled workspaces with entry/support visibility planning, install/update/enable/disable router mode, optionally install/update/enable/disable/delete durable-executor, create specs from observed durable execution workspaces, revise SkillSpec YAML, and prove value before install or release. Use for skillspec, /skillspec, skillspec setup, post install setup, import SKILL.md, import existing skill, port skill, what is the shape of this skill, what is the shape of skill, shape of skill, skill shape and source shape. Use when the task needs to run SkillSpec post-install setup inside the harness prompt, inspect the shape of a skill, skill folder"
 ---
 
 # SkillSpec
 
+SkillSpec post-install setup and skill-authoring multiplexer for inspecting skill/repo shape with doctor, mapping multi-skill and plugin-shaped workspaces, importing existing prose skills, inspecting SkillSpec status, installing compiled workspaces with visibility planning, installing/updating/enabling/disabling router mode, installing/updating/enabling/disabling/deleting durable-executor, creating specs from observed durable execution workspaces, revising SkillSpecs, compiling reviewed skills, optional install, and value reporting.
+
 Use the directory that contains this loaded `SKILL.md` as `<skill_dir>`.
-The SkillSpec contract is `<skill_dir>/skill.spec.yml`; do not assume the
-user's current working directory contains the spec.
+The SkillSpec contract is `<skill_dir>/skill.spec.yml`; do not assume the user's current working directory contains the spec.
 
 Start the SkillSpec guide with the user's task:
 
@@ -17,20 +18,22 @@ Resume an existing guided run:
 
 `skillspec run-loop <skill_dir>/skill.spec.yml --resume <run_dir> --guide agent`
 
-Follow the printed current gate. The selected route, matched rules, forbids,
-allowed commands, open requirements, resume command, and end proof from the CLI
-guide are authoritative.
+Follow the printed current gate. The selected route, matched rules, forbids, allowed commands, open requirements, resume command, and end proof from the CLI guide are authoritative.
 
-Use `skillspec query` and `skillspec refs` only for handles named by the guide.
-Do not read the full spec unless the guide, a blocker, or the user asks for it.
+Keep SkillSpec mechanics in the background. Do not narrate ledger writes, raw progress commands, trace plumbing, or alignment internals as user-facing progress. Show simple intent-level updates only, such as what was assessed, what changed, what passed, and what remains blocked.
 
-Before the final response, follow the guide's end anchor: record final-response
-evidence, run the printed `skillspec trace align ... --summary` command as the
-completion summary source, and report result, evidence, alignment summary,
-token usage, selected route, and run directory.
+Use `skillspec query` and `skillspec refs` only for handles named by the guide. Do not read the full spec unless the guide, a blocker, or the user asks for it.
 
-If the `skillspec` CLI is not installed, report that the CLI is unavailable and
-ask the user to install it before continuing with SkillSpec-guided work. If the
-CLI exists but guide mode fails, read `<skill_dir>/skill.spec.yml` directly and
-manually follow the same route, rule, phase, dependency, forbid, proof, and
-completion contract. Report that CLI guidance was unavailable.
+For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
+
+For proof-bearing execution routes, batch routine successful evidence into a JSONL file and run one compact `skillspec progress batch ... --summary` checkpoint at natural phase boundaries. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor in the background, then report result, evidence paths, compact alignment status, token usage when recorded, selected route, and run directory.
+
+If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+# or, with Rust installed:
+cargo install skillspec
+```
+
+If the user declines or installation is impossible, read `<skill_dir>/skill.spec.yml` directly and manually follow the same route, rule, phase, dependency, forbid, proof, and completion contract. Report that CLI guidance was unavailable and alignment proof is partial.
