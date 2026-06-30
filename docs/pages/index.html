@@ -249,6 +249,42 @@
         </p>
       </section>
 
+      <section id="assess" class="request-panel" aria-labelledby="request-title">
+        <div>
+          <p class="eyebrow">Assessment</p>
+          <h2 id="request-title">
+            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
+          </h2>
+          <p>
+            Paste a public GitHub skill, plugin, or repo URL. SkillSpec will
+            report where execution can drift, overload context, collide in
+            discovery, or finish without proof.
+          </p>
+        </div>
+        <form id="doctor-form" class="request-form" novalidate>
+          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
+          <div class="input-row">
+            <input
+              id="target-url"
+              name="target-url"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="https://github.com/org/repo/tree/main/skills/example"
+              required
+            >
+            <button type="submit">Assess skill</button>
+          </div>
+          <p class="input-help">
+            Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
+            Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
+            This opens a public GitHub issue, so do not submit private repositories,
+            tokens, credentials, or sensitive internal paths.
+          </p>
+          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
       <section id="skillspec-now" class="operating-loop-section" aria-labelledby="operating-loop-title">
         <div class="section-heading">
           <div>
@@ -310,6 +346,45 @@
             changes.
           </span>
         </div>
+      </section>
+
+      <section class="private-note" aria-labelledby="install-title" id="install">
+        <div>
+          <p class="eyebrow">Install next</p>
+          <h2 id="install-title">
+            <a class="heading-link" href="#install">Make SkillSpec your default skill path.</a>
+          </h2>
+          <p>
+            Install the CLI, open your agent harness, and let SkillSpec guide
+            the first assessment from chat. From there, create, convert, route,
+            and run skills with the same verifier-executor loop you can publish
+            with your project.
+          </p>
+        </div>
+        <pre><code># Terminal: install the CLI.
+curl -fsSL https://skillspec.sh/install.sh | sh
+
+# Terminal: see the harness roots SkillSpec can install into.
+skillspec install targets
+
+# Terminal, later: install a SkillSpec-backed skill everywhere detected.
+# Targets include agents, codex, and claude-local when present.
+skillspec install skill ./my-skill --all-detected
+
+# Start your favorite harness: Claude, Codex, or both.
+# Ask the agent to assess the skill and explain what it finds.
+/skillspec run doctor on ./my-skill
+
+# Convert plain skill prose into a contract. Yes, SkillSpec runs on SkillSpec.
+/skillspec import ./my-skill
+
+# Make router mode the default first hop for future skill selection.
+/skillspec install router
+
+# Terminal: save a Doctor report when you need an artifact.
+# Works with a local SKILL.md, skill folder, GitHub folder, or repo.
+# Formats: default text, --markdown, --html, or --json.
+skillspec doctor ./my-skill --markdown</code></pre>
       </section>
 
       <section id="what-changes" class="contract-contrast" aria-labelledby="contrast-title">
@@ -403,81 +478,6 @@
             </ul>
           </article>
         </div>
-      </section>
-
-      <section id="assess" class="request-panel" aria-labelledby="request-title">
-        <div>
-          <p class="eyebrow">Assessment</p>
-          <h2 id="request-title">
-            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
-          </h2>
-          <p>
-            Paste a public GitHub skill, plugin, or repo URL. SkillSpec will
-            report where execution can drift, overload context, collide in
-            discovery, or finish without proof.
-          </p>
-        </div>
-        <form id="doctor-form" class="request-form" novalidate>
-          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
-          <div class="input-row">
-            <input
-              id="target-url"
-              name="target-url"
-              type="url"
-              inputmode="url"
-              autocomplete="url"
-              placeholder="https://github.com/org/repo/tree/main/skills/example"
-              required
-            >
-            <button type="submit">Assess skill</button>
-          </div>
-          <p class="input-help">
-            Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
-            Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
-            This opens a public GitHub issue, so do not submit private repositories,
-            tokens, credentials, or sensitive internal paths.
-          </p>
-          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <section class="private-note" aria-labelledby="install-title" id="install">
-        <div>
-          <p class="eyebrow">Install next</p>
-          <h2 id="install-title">
-            <a class="heading-link" href="#install">Make SkillSpec your default skill path.</a>
-          </h2>
-          <p>
-            Install the CLI, open your agent harness, and let SkillSpec guide
-            the first assessment from chat. From there, create, convert, route,
-            and run skills with the same verifier-executor loop you can publish
-            with your project.
-          </p>
-        </div>
-        <pre><code># Terminal: install the CLI.
-curl -fsSL https://skillspec.sh/install.sh | sh
-
-# Terminal: see the harness roots SkillSpec can install into.
-skillspec install targets
-
-# Terminal, later: install a SkillSpec-backed skill everywhere detected.
-# Targets include agents, codex, and claude-local when present.
-skillspec install skill ./my-skill --all-detected
-
-# Start your favorite harness: Claude, Codex, or both.
-# Ask the agent to assess the skill and explain what it finds.
-/skillspec run doctor on ./my-skill
-
-# Convert plain skill prose into a contract. Yes, SkillSpec runs on SkillSpec.
-/skillspec import ./my-skill
-
-# Make router mode the default first hop for future skill selection.
-/skillspec install router
-
-# Terminal: save a Doctor report when you need an artifact.
-# Works with a local SKILL.md, skill folder, GitHub folder, or repo.
-# Formats: default text, --markdown, --html, or --json.
-skillspec doctor ./my-skill --markdown</code></pre>
       </section>
 
       <section id="who-it-is-for" class="proof-path personas-section" aria-labelledby="personas-title">
