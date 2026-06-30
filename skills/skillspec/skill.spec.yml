@@ -2190,6 +2190,20 @@ artifacts:
     consumed_by:
       - kind: recipe
         id: workspace_converge_loop
+  workspace_promotion_proof:
+    kind: file
+    path: workspace-build/<package>/.skillspec/workspace-promotion.json
+    description: Package-local proof that a generated workspace draft was semantically promoted from its own source, with reviewed status, current source/spec/source-map hashes, and activation/routes/rules/dependencies/checks/proof review flags. Converge and install must block when this file is missing, stale, incomplete, or paired with a wrapper that delegates execution back to the original SKILL.md prose.
+    produced_by:
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
+    consumed_by:
+      - kind: command
+        id: workspace_converge_build
+      - kind: command
+        id: workspace_install_dry_run
+      - kind: command
+        id: workspace_install_packages
   workspace_converge_report:
     kind: report
     path: workspace-build/workspace-converge.report.md
@@ -2383,7 +2397,7 @@ artifacts:
   proof_digest:
     kind: file
     path: .skillspec/traces/<run-id>/proof-digest.json
-    description: Grouped missing-proof digest from trace_align, used to plan one final-proof batch instead of a repeated alignment loop.
+    description: Grouped missing-proof digest from trace_align, used to report partial alignment and plan real repair work. Do not use this digest to invent route, obligation, elicitation, or phase events after the fact.
     produced_by:
       - kind: command
         id: trace_align
@@ -2395,7 +2409,7 @@ artifacts:
   final_proof_batch:
     kind: file
     path: .skillspec/traces/<run-id>/final-proof.jsonl
-    description: Agent-authored proof events with real evidence refs, derived from proof-digest.json and appended once with progress_batch.
+    description: Optional troubleshooting-only batch for real evidence rows that were captured during the work but not yet appended. It must not be used to manufacture route fulfillment, obligations, elicitations, or phase proof after alignment reports missing evidence.
     produced_by:
       - kind: recipe
         id: local_porting_loop
@@ -2556,7 +2570,7 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_converge_build:
-    description: Verify a workspace build root against the validated manifest, checking reviewed package specs, package-local imports/resources, explicit failures, dependency readiness, and mechanical-scaffold blockers before compile or install. Use summary mode to report compact readiness counts plus metrics.
+    description: Verify a workspace build root against the validated manifest, checking reviewed package specs, package-local imports/resources, explicit failures, dependency readiness, source/spec-bound workspace-promotion proof, and mechanical-scaffold or prose-wrapper blockers before compile or install. Use summary mode to report compact readiness counts plus metrics.
     template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --summary
     safety: local_write
     requires:
@@ -2570,7 +2584,7 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_install_dry_run:
-    description: Preflight a compiled reviewed workspace install into harness roots, showing every planned write, default entry-implicit visibility target, scaffold blocker, and collision blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
+    description: Preflight a compiled reviewed workspace install into harness roots, showing every planned write, default entry-implicit visibility target, promotion-proof blocker, scaffold/prose-wrapper blocker, and collision blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
     safety: local_read
     requires:
@@ -2584,14 +2598,14 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_install_packages:
-    description: Install compiled reviewed workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Mechanical scaffolds are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics.
+    description: Install compiled reviewed workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Mechanical scaffolds, prose wrappers, and packages missing current workspace-promotion proof are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_apply_visibility:
-    description: Install compiled reviewed workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Mechanical scaffolds are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics while preserving full install proof.
+    description: Install compiled reviewed workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Mechanical scaffolds, prose wrappers, and packages missing current workspace-promotion proof are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics while preserving full install proof.
     template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility --summary
     safety: local_write
     requires:
@@ -3151,10 +3165,13 @@ recipes:
       - note: Use bounded batches instead of one unbounded swarm. Default to 3 to 5 independent packages per batch; shrink the batch when packages are long, code-heavy, or share confusing references.
       - note: For each package in a batch, read only its package-local source/SKILL_md.old, source-map summary, doctor report, deps.toml, and referenced package summaries needed by its declared dependencies.
       - note: Promote real behavior into activation, routes, rules, elicitations, dependencies, imports, resources, code, artifacts, recipes, states, commands, closures, tests, and review_required. Do not auto-fill from vibes.
+      - note: Do not create a wrapper that tells the harness to load the original SKILL.md as authoritative runtime instructions. The original prose may be preserved as evidence, but execution must be represented by source-backed routes, phase order, rules, tool boundaries, checks, dependencies, and proof obligations.
       - note: A promoted package must have at least one source-backed route or be explicitly classified as support/manual-only with a dependency/use relationship; empty-route entry skills remain blocked.
       - note: Preserve dependency evidence. Do not delete deps.toml entries or review_required notes just to pass QA; clear a review note only when the package has an evidence-backed replacement.
       - note: For each promoted package run validate, imports check, deps check, and scenario tests or record the exact blocker. Keep package failures isolated and block dependents.
+      - note: For each promoted package write .skillspec/workspace-promotion.json with schema skillspec/workspace-promotion/v0, status reviewed, package_id, current source_sha256, spec_sha256, optional source_map_sha256, and true review flags for activation, routes, rules, dependencies, checks/tests, and proof. This is package-local promotion proof, not final alignment proof.
       - note: After each batch, write a compact promotion checkpoint naming promoted, still_scaffolded, failed, blocked, and next_batch package ids. Do not print full package specs in chat.
+      - produce_artifact: workspace_promotion_proof
       - produce_artifact: workspace_promotion_report
       - note: Run workspace converge only after all installable packages are promoted or intentionally blocked. Converge blocking on a scaffold is a correct stop, not a failure to work around.
   workspace_converge_loop:
@@ -3275,7 +3292,7 @@ recipes:
       - run_command: plan_phase_order
       - run_command: act_named_phase
       - note: Stage routine successful phase and requirement proof rows in <trace-dir>/evidence-batch.jsonl and run progress_batch once. Do not run progress_record_requirement or progress_record_phase for successful routine rows; those low-level commands are only for foreground blockers, failures, or debugging.
-      - note: Run trace_align once to create <trace-dir>/proof-digest.json; if multiple missing proof rows remain, write <trace-dir>/final-proof.jsonl from that digest and real evidence, then run progress_batch once instead of showing one progress command per row.
+      - note: Run trace_align once to create <trace-dir>/proof-digest.json. If rows are missing, report partial alignment unless the evidence was captured when the work happened. Do not create route, obligation, elicitation, or phase proof rows after the fact just to make alignment pass.
       - run_command: progress_batch
       - run_command: progress_show
       - run_command: decide_demo

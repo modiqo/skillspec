@@ -364,10 +364,10 @@ pub fn build_proof_digest(report: &AlignReport, alignment_report: &Path) -> Alig
         missing_count,
         recommended_loop: vec![
             "Run trace align once with --quiet --proof-digest.".to_owned(),
-            "Read this digest and create final-proof.jsonl with real evidence for every batchable item.".to_owned(),
-            "Run skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl --checkpoint \"checkpointing evidence\" --quiet once in the background.".to_owned(),
-            "Run trace align --quiet once more, then report only the final result in plain language.".to_owned(),
-            "Do not rerun alignment after each individual proof row.".to_owned(),
+            "Treat missing proof as missing unless the evidence was captured when the work happened.".to_owned(),
+            "Do not backfill route, obligation, elicitation, or phase events after the fact just to make alignment pass.".to_owned(),
+            "Use progress batch only for evidence rows that were already captured at a natural phase boundary.".to_owned(),
+            "If proof was not captured, report partial alignment with the missing rows and continue only after repair work is actually performed.".to_owned(),
         ],
         groups,
     }

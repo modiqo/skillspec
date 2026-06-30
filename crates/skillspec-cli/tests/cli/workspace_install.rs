@@ -1,4 +1,5 @@
 use crate::support::*;
+use sha2::{Digest, Sha256};
 
 #[test]
 fn workspace_map_and_validate_reports_package_graph() {
@@ -615,7 +616,57 @@ Read `../coding-standards/SKILL.md`.
         .unwrap()
         .contains("without --dry-run"));
 
-    promote_all_workspace_scaffolds(&build);
+    write_prose_wrappers_for_all_workspace_specs(&build);
+    write_workspace_promotion_proofs_for_all(&build);
+    let wrapper_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&wrapper_converge);
+    let wrapper_converge_report = json_stdout(&wrapper_converge);
+    assert_eq!(wrapper_converge_report["ok"], false);
+    let wrapper_messages = workspace_package_messages(&wrapper_converge_report);
+    assert!(
+        wrapper_messages.contains("delegates execution to original prose instructions"),
+        "messages:\n{wrapper_messages}"
+    );
+    assert!(
+        wrapper_messages.contains("runtime source material"),
+        "messages:\n{wrapper_messages}"
+    );
+    remove_workspace_promotion_proofs_for_all(&build);
+
+    promote_all_workspace_scaffolds_without_proof(&build);
+    let unproven_converge = Command::new(bin())
+        .arg("workspace")
+        .arg("converge")
+        .arg(&manifest)
+        .arg("--build-root")
+        .arg(&build)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&unproven_converge);
+    let unproven_converge_report = json_stdout(&unproven_converge);
+    assert_eq!(unproven_converge_report["ok"], false);
+    assert_eq!(
+        unproven_converge_report["blocked"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(unproven_converge_report["packages"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("missing workspace promotion proof"));
+
+    write_workspace_promotion_proofs_for_all(&build);
 
     let converge = Command::new(bin())
         .arg("workspace")
@@ -839,6 +890,11 @@ Read `../coding-standards/SKILL.md`.
 }
 
 fn promote_all_workspace_scaffolds(build: &std::path::Path) {
+    promote_all_workspace_scaffolds_without_proof(build);
+    write_workspace_promotion_proofs_for_all(build);
+}
+
+fn promote_all_workspace_scaffolds_without_proof(build: &std::path::Path) {
     let specs = workspace_package_specs(build);
     assert!(
         !specs.is_empty(),
@@ -846,6 +902,28 @@ fn promote_all_workspace_scaffolds(build: &std::path::Path) {
     );
     for spec_path in specs {
         promote_workspace_scaffold(build, &spec_path);
+    }
+}
+
+fn write_workspace_promotion_proofs_for_all(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        write_workspace_promotion_proof(spec_path.parent().unwrap());
+    }
+}
+
+fn remove_workspace_promotion_proofs_for_all(build: &std::path::Path) {
+    for spec_path in workspace_package_specs(build) {
+        let _ = fs::remove_file(
+            spec_path
+                .parent()
+                .unwrap()
+                .join(".skillspec/workspace-promotion.json"),
+        );
     }
 }
 
@@ -858,6 +936,16 @@ fn write_placeholder_loaders_for_all_workspace_specs(build: &std::path::Path) {
     for spec_path in specs {
         write_file(&spec_path.parent().unwrap().join("SKILL.md"), "# Loader\n");
     }
+}
+
+fn workspace_package_messages(report: &Value) -> String {
+    report["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|package| package["message"].as_str())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn workspace_package_specs(build: &std::path::Path) -> Vec<std::path::PathBuf> {
@@ -927,6 +1015,133 @@ dependency_count = 0
     );
 }
 
+fn write_prose_wrappers_for_all_workspace_specs(build: &std::path::Path) {
+    let specs = workspace_package_specs(build);
+    assert!(
+        !specs.is_empty(),
+        "expected workspace build to contain package specs"
+    );
+    for spec_path in specs {
+        write_prose_wrapper_spec(build, &spec_path);
+    }
+}
+
+fn write_prose_wrapper_spec(build: &std::path::Path, spec_path: &std::path::Path) {
+    let out = spec_path.parent().unwrap();
+    let package_key = out
+        .strip_prefix(build)
+        .unwrap()
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(value) => value.to_str(),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("_");
+    let route_token = sanitize_skill_id(&package_key);
+    let title = format!("Wrapped Workspace Package {route_token}");
+    write_file(
+        spec_path,
+        &format!(
+            r#"schema: skillspec/v0
+id: wrapped.{route_token}
+title: {title}
+description: Wrapper around original prose instructions.
+entry:
+  prompt: Load the original instructions as authoritative runtime instructions.
+
+routes:
+  - id: execute
+    label: Execute {title}
+    rank: 1
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: load_source_instructions
+          owner_skill: wrapped.{route_token}
+          description: Load the promoted original instructions and follow them.
+
+rules:
+  - id: route_by_package_name
+    when:
+      user_says_any:
+        - {route_token}
+    prefer: execute
+    reason: Wrapper route delegates to source.
+
+resources:
+  skill_source:
+    path: resources/source/SKILL_source.txt
+    role: source_material
+    description: Promoted original instructions for runtime guidance.
+    used_by:
+      - kind: route
+        id: execute
+"#
+        ),
+    );
+    write_file(
+        &out.join("resources/source/SKILL_source.txt"),
+        "# Original instructions\n",
+    );
+    write_file(
+        &out.join("deps.toml"),
+        r#"# Reviewed dependency ledger.
+schema_version = 1
+generated_by = "manual semantic promotion"
+review_required = false
+dependency_count = 0
+"#,
+    );
+}
+
+fn write_workspace_promotion_proof(out: &std::path::Path) {
+    let evidence_path = out.join(".skillspec/workspace-import.json");
+    let evidence: Value = serde_json::from_str(&fs::read_to_string(&evidence_path).unwrap())
+        .expect("workspace import evidence should be valid JSON");
+    let package_id = evidence["package_id"]
+        .as_str()
+        .expect("package evidence should include package_id");
+    let source_path = PathBuf::from(
+        evidence["source_path"]
+            .as_str()
+            .expect("package evidence should include source_path"),
+    );
+    let spec_path = PathBuf::from(
+        evidence["spec_path"]
+            .as_str()
+            .expect("package evidence should include spec_path"),
+    );
+    let source_map_path = PathBuf::from(
+        evidence["source_map_path"]
+            .as_str()
+            .expect("package evidence should include source_map_path"),
+    );
+    write_file(
+        &out.join(".skillspec/workspace-promotion.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&json!({
+                "schema": "skillspec/workspace-promotion/v0",
+                "package_id": package_id,
+                "status": "reviewed",
+                "source_sha256": package_source_hash(&source_path),
+                "spec_sha256": file_hash(&spec_path),
+                "source_map_sha256": file_hash(&source_map_path),
+                "review": {
+                    "activation_reviewed": true,
+                    "routes_reviewed": true,
+                    "rules_reviewed": true,
+                    "dependencies_reviewed": true,
+                    "checks_or_tests_reviewed": true,
+                    "proof_reviewed": true
+                }
+            }))
+            .unwrap()
+        ),
+    );
+}
+
 fn sanitize_skill_id(value: &str) -> String {
     let mut output = String::new();
     let mut last_was_separator = false;
@@ -945,6 +1160,50 @@ fn sanitize_skill_id(value: &str) -> String {
     } else {
         trimmed
     }
+}
+
+fn package_source_hash(source: &Path) -> String {
+    let mut paths = Vec::new();
+    collect_hashable_files(source, &mut paths);
+    paths.sort();
+    let mut hasher = Sha256::new();
+    for path in paths {
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(file_hash(&path).as_bytes());
+        hasher.update([0]);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn collect_hashable_files(path: &Path, files: &mut Vec<PathBuf>) {
+    if should_skip_hash_path(path) {
+        return;
+    }
+    if path.is_file() {
+        files.push(path.to_path_buf());
+        return;
+    }
+    for entry in fs::read_dir(path).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            collect_hashable_files(&path, files);
+        } else if !should_skip_hash_path(&path) {
+            files.push(path);
+        }
+    }
+}
+
+fn should_skip_hash_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with('.') || matches!(name, "target" | "node_modules"))
+}
+
+fn file_hash(path: &Path) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(fs::read(path).unwrap());
+    format!("{:x}", hasher.finalize())
 }
 
 #[test]

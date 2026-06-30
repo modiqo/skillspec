@@ -28,6 +28,8 @@ For read-only diagnostic routes such as Doctor/source-shape assessment, run the 
 
 For proof-bearing execution routes, batch routine successful evidence into a JSONL file without displaying the rows and run one quiet `skillspec progress batch ... --quiet` checkpoint at natural phase boundaries. Do not run `skillspec progress ... --help` or query `command:progress_*` during normal execution; the guide provides the needed JSONL shape. Use individual `skillspec progress record` only for failures, blockers, or debugging. Before the final response, follow the guide's end anchor with quiet token-stats, final-progress, and alignment commands when metrics are available, then report result, evidence paths, alignment status or report path, token usage from alignment or why it was not recorded, selected route, and run directory.
 
+Missing alignment proof is not a prompt-writing task. Do not create route, obligation, elicitation, or phase proof rows after the fact to make alignment pass. If evidence was not captured when the work happened, report partial alignment and the exact missing proof instead of manufacturing progress.
+
 If the `skillspec` CLI is not installed, report that this skill requires SkillSpec and ask the user to install it before continuing:
 
 ```bash

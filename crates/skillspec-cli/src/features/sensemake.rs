@@ -92,6 +92,7 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
         "start with sensemake --view index only when unfamiliar".to_owned(),
         "for active task execution, prefer run-loop --guide agent --json so the CLI emits machine-readable current-gate control data and persists resume state".to_owned(),
         "when several routine proof rows are ready, stage them in <run-dir>/evidence-batch.jsonl and run progress batch --file ... --checkpoint \"checkpointing evidence\" --quiet instead of printing one progress record command per row".to_owned(),
+        "do not backfill missing route, obligation, elicitation, or phase proof after alignment; report partial alignment unless the evidence was captured when the work happened".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
         "escalate index -> summary -> full only when needed".to_owned(),

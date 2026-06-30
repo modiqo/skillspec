@@ -311,13 +311,16 @@ For an ordinary multi-skill workspace:
 2. `workspace validate` blocks broken paths, cycles, self-dependencies, and
    install slug collisions;
 3. `workspace import` creates one generated package folder per atomic source
-   skill;
+   skill. These are mechanical drafts, not finished ports;
 4. packages are processed in dependency order, so shared packages such as
    `coding-standards` are handled before dependents;
-5. `workspace converge` checks that all generated specs exist and that
-   dependents are not released while dependencies are missing or failed;
-6. `workspace compile` creates one harness loader per ready package;
-7. `workspace install` installs the grouped package set using manifest
+5. each generated package must be semantically promoted from its own source and
+   write package-local `.skillspec/workspace-promotion.json` proof;
+6. `workspace converge` checks that all generated specs exist, that promotion
+   proof is current, and that dependents are not released while dependencies are
+   missing or failed;
+7. `workspace compile` creates one harness loader per ready package;
+8. `workspace install` installs the grouped package set using manifest
    `install_slug` folders.
 
 For a plugin-shaped workspace:
@@ -359,7 +362,36 @@ skillspec workspace install <build>/skillspec.workspace.yml --build-root <worksp
 package per atomic skill. Dependency-ready packages in the same graph level may
 import in parallel, and unchanged packages with intact proof artifacts are
 reused from `<workspace-build>/.skillspec/workspace-cache.json` and reported as
-`cached`. `converge` checks generated drafts against the graph.
+`cached`.
+
+Between `import` and `converge`, each package needs real promotion work. The
+operator or agent must review that package's source, source map, doctor report,
+dependency ledger, and package references, then encode the behavior into
+activation, routes, rules, elicitations, dependencies, tool boundaries, checks,
+tests, and proof obligations. A wrapper that simply tells the harness to load
+the original `SKILL.md` as authoritative runtime instructions is still a
+scaffold.
+
+Every promoted workspace package writes:
+
+```text
+<workspace-build>/<package>/.skillspec/workspace-promotion.json
+```
+
+The proof file uses schema `skillspec/workspace-promotion/v0` and records:
+
+- `package_id`;
+- `status: reviewed`;
+- `source_sha256`, `spec_sha256`, and optional `source_map_sha256`;
+- review flags for activation, routes, rules, dependencies, checks/tests, and
+  proof.
+
+`converge` and `install` recompute the hashes and block packages when promotion
+proof is missing, stale, incomplete, or paired with a prose-wrapper contract.
+This is intentionally separate from trace alignment. Alignment proof cannot be
+used to declare that a generated workspace scaffold was promoted.
+
+`converge` checks generated drafts and promotion proof against the graph.
 `--summary` keeps agent-facing output compact by printing wall-clock and
 estimated token metrics while preserving full reports and package evidence on
 disk.

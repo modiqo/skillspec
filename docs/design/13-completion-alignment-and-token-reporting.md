@@ -257,8 +257,8 @@ A harness should:
 - preserve token stats in structured execution events;
 - preserve query-reduction stats separately from prompt consumption;
 - expose `alignment.json` as a durable artifact;
-- expose `proof-digest.json` when the first completion alignment finds missing
-  proof, so final evidence can be batched instead of chased one row at a time;
+- expose `proof-digest.json` when completion alignment finds missing proof, so
+  the final response can name the gap or a real repair can be planned;
 - fail or warn when a final answer omits the required alignment and token
   sections for a SkillSpec-backed run.
 
@@ -269,18 +269,19 @@ The model can render the report, but the harness should provide the data.
 Completion proof should use a bounded loop:
 
 1. Run `trace align --quiet --proof-digest <run-dir>/proof-digest.json`.
-2. If real proof exists for several missing rows, write one
-   `<run-dir>/final-proof.jsonl` file and append it with
-   `skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl
+2. If evidence was captured during the work but not yet appended, write one
+   `<run-dir>/evidence-batch.jsonl` file and append it with
+   `skillspec progress batch <run-dir> --file <run-dir>/evidence-batch.jsonl
    --checkpoint "checkpointing evidence" --quiet`.
 3. Record `progress final-response --quiet` once.
 4. Rerun `trace align --quiet` once and report the final result in plain language.
 
 Do not rerun alignment after each individual `progress record`. The checkpoint
 command remains synchronous, but normal agent execution should use `--quiet` so
-durable proof writes do not become transcript noise. If the final rerun is still
-partial, report the remaining missing proof rows unless there is one obvious
-additional batch to record from evidence already on disk.
+durable proof writes do not become transcript noise. Do not create route,
+obligation, elicitation, or phase rows after the fact just to make alignment
+pass. If the final rerun is still partial, report the remaining missing proof
+rows and treat that as the honest result until repair work is actually done.
 
 ## Report Examples
 
