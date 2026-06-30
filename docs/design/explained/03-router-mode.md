@@ -92,6 +92,11 @@ If the same logical skill is installed in several roots, route collapses those
 physical copies before matching. Harness/root context only chooses which copy to
 load after the logical skill has already won.
 
+Route also returns `execution_policy` when the selected work needs rote as the
+substrate: service/API work uses `rote_adapter`, local shell/tool work uses
+`rote_shell`, and browser/web work uses `rote_browse`. Missing substrate becomes
+a repairable bypass, not silent direct tool use.
+
 Prompt-hook guard owns freshness. When guard context says
 `first_hop_ready=true`, the ordinary router path is a single `skillspec route`
 query. It does not run index status, repair visibility, or read the full router
@@ -105,9 +110,13 @@ flowchart LR
     C --> E[decision]
     C --> F[candidates]
     C --> G[confidence]
+    C --> K[execution_policy]
     E --> H{use_skill?}
     H -->|yes| I[harness loads selected skill explicitly]
     H -->|bypass or ambiguous| J[normal agent behavior]
+    K --> L{rote substrate active?}
+    L -->|yes| I
+    L -->|no| J
 ```
 
 Grounded command:
@@ -127,6 +136,8 @@ Review check:
   skill's task.
 - A selected skill is loaded only for `decision: use_skill`; its SkillSpec or
   prose contract still owns the domain work.
+- If `execution_policy` is active, obey its substrate, forbids, and preferences
+  before using tools.
 - Duplicate physical installs of the same logical skill should not create
   `ambiguous`; true different skills still can.
 - Index status and repair are lifecycle operations, not part of ordinary

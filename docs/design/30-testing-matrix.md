@@ -243,6 +243,11 @@ For each test, capture:
 | Router route positive | Query clear skill intent. | `skillspec route` returns `use_skill` with selected skill. | Automatable | Covered |
 | Router route bypass | Query ordinary non-skill task. | `skillspec route` returns `bypass` or `ambiguous` and no selected skill. | Automatable | Covered |
 | Router route duplicates | Install the same logical skill in multiple detected roots, then query that skill intent. | Duplicate same-skill candidates are collapsed or resolved by deterministic root preference; duplicate roots alone must not cause `ambiguous_match`. | Harness-sim automatable | Covered |
+| Router route anchor gate | Query generic continuation/doc text that overlaps a broad rote skill. | Route returns `bypass` with `no_activation_anchor` instead of selecting broad rote skills such as `rote-adapter-create`. | Automatable | Covered |
+| Router execution policy | Query browser/web work with active durable-executor and rote-browse. | Route selects `rote-browse`, reports `execution_policy.kind=browse`, and forbids direct browser/search tooling. | Automatable | Covered |
+| Router execution policy | Query local shell/CLI work with active durable-executor and rote-shell. | Route selects `rote-shell` and reports `execution_policy.kind=local_action`. | Automatable | Covered |
+| Router execution policy | Query service/API work with active durable-executor and a service-specific rote skill. | Route prefers the service-specific rote skill and reports `execution_policy.kind=service_api`. | Automatable | Covered |
+| Router execution policy negative | Query policy-matched work without required durable/rote substrate. | Route returns `bypass` with `required_execution_substrate_unavailable` and repair guidance. | Automatable | Covered |
 | Router drift | Add out-of-band implicit skill after install. | Guard or index refresh detects and repairs explicit visibility. | Harness-sim automatable | Covered |
 | Router stale index | Modify skill roots after index. | Status reports stale/missing/index mismatch. | Automatable | Covered |
 | Router stale visibility refs | Visibility manifest references removed skills. | Guard reports stale references as cleanup/repairable drift without blocking ready roots. | Harness-sim automatable | Gap |

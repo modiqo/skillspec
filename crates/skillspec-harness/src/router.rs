@@ -131,9 +131,75 @@ pub struct RouteReport {
     pub candidates: Vec<RouteCandidate>,
     pub bypass_reason: Option<RouteBypassReason>,
     pub decision_reason: String,
+    pub execution_policy: Option<RouteExecutionPolicy>,
     pub elicitation: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
     pub index: PathBuf,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RouteExecutionPolicy {
+    pub kind: RouteExecutionKind,
+    pub substrate: RouteExecutionSubstrate,
+    pub availability: RouteExecutionAvailability,
+    pub reason: String,
+    pub required_skills: Vec<String>,
+    pub preferred_skill: String,
+    pub repair: Option<String>,
+    pub forbids: Vec<String>,
+    pub preferences: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteExecutionKind {
+    ServiceApi,
+    LocalAction,
+    Browse,
+}
+
+impl RouteExecutionKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ServiceApi => "service_api",
+            Self::LocalAction => "local_action",
+            Self::Browse => "browse",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteExecutionSubstrate {
+    RoteAdapter,
+    RoteShell,
+    RoteBrowse,
+}
+
+impl RouteExecutionSubstrate {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::RoteAdapter => "rote_adapter",
+            Self::RoteShell => "rote_shell",
+            Self::RoteBrowse => "rote_browse",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteExecutionAvailability {
+    Active,
+    Unavailable,
+}
+
+impl RouteExecutionAvailability {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Unavailable => "unavailable",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -178,6 +244,8 @@ pub enum RouteBypassReason {
     NoCandidates,
     LowConfidence,
     AmbiguousMatch,
+    NoActivationAnchor,
+    RequiredExecutionSubstrateUnavailable,
 }
 
 impl RouteBypassReason {
@@ -186,6 +254,10 @@ impl RouteBypassReason {
             Self::NoCandidates => "no_candidates",
             Self::LowConfidence => "low_confidence",
             Self::AmbiguousMatch => "ambiguous_match",
+            Self::NoActivationAnchor => "no_activation_anchor",
+            Self::RequiredExecutionSubstrateUnavailable => {
+                "required_execution_substrate_unavailable"
+            }
         }
     }
 }
@@ -447,14 +519,24 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         current_dir: std::env::current_dir().ok(),
     };
     let raw_candidates = score_candidates(&entries, &options.query, entries.len().max(options.top));
-    let candidates = collapse_duplicate_candidates(raw_candidates, &context, options.top);
-    let match_decision = decide_candidate_match(&candidates);
+    let all_candidates =
+        collapse_duplicate_candidates(raw_candidates, &context, entries.len().max(options.top));
+    let execution_policy = classify_execution_policy(&options.query, &entries, &all_candidates);
+    let mut candidates = all_candidates.clone();
+    candidates.truncate(options.top);
+    let match_decision =
+        apply_activation_anchor_gate(&options.query, decide_candidate_match(&candidates));
+    let match_decision = apply_execution_policy(match_decision, &execution_policy, &all_candidates);
     let selected = match_decision.selected;
-    let elicitation = if options.execution_mode.is_none() && selected.is_some() {
-        Some("execution_mode_direct_or_durable".to_owned())
-    } else {
-        None
-    };
+    let execution_policy_active = execution_policy
+        .as_ref()
+        .is_some_and(|policy| policy.availability == RouteExecutionAvailability::Active);
+    let elicitation =
+        if options.execution_mode.is_none() && selected.is_some() && !execution_policy_active {
+            Some("execution_mode_direct_or_durable".to_owned())
+        } else {
+            None
+        };
     Ok(RouteReport {
         query: options.query,
         decision: match_decision.decision,
@@ -462,6 +544,7 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         candidates,
         bypass_reason: match_decision.bypass_reason,
         decision_reason: match_decision.decision_reason,
+        execution_policy,
         elicitation,
         execution_mode: options.execution_mode,
         index,
@@ -661,6 +744,23 @@ pub fn render_route(report: &RouteReport) -> String {
     if let Some(elicitation) = &report.elicitation {
         output.push_str(&format!("Elicitation: {elicitation}\n"));
     }
+    if let Some(policy) = &report.execution_policy {
+        output.push_str(&format!(
+            "Execution policy: {} via {} ({})\n",
+            policy.kind.as_str(),
+            policy.substrate.as_str(),
+            policy.availability.as_str()
+        ));
+        output.push_str(&format!(
+            "Required skills: {}\n",
+            policy.required_skills.join(", ")
+        ));
+        output.push_str(&format!("Preferred skill: {}\n", policy.preferred_skill));
+        output.push_str(&format!("Policy reason: {}\n", policy.reason));
+        if let Some(repair) = &policy.repair {
+            output.push_str(&format!("Repair: {repair}\n"));
+        }
+    }
     if !report.candidates.is_empty() {
         output.push_str("\nCandidates:\n");
         for candidate in &report.candidates {
@@ -717,6 +817,322 @@ fn decide_candidate_match(candidates: &[RouteCandidate]) -> MatchDecision {
         decision_reason: "best candidate did not pass the automatic match gate".to_owned(),
     }
 }
+
+fn apply_activation_anchor_gate(query: &str, decision: MatchDecision) -> MatchDecision {
+    let Some(selected) = &decision.selected else {
+        return decision;
+    };
+    if activation_anchor_matches(query, selected) {
+        return decision;
+    }
+    MatchDecision {
+        decision: RouteDecision::Bypass,
+        selected: None,
+        bypass_reason: Some(RouteBypassReason::NoActivationAnchor),
+        decision_reason: format!(
+            "top candidate {} did not match an activation anchor in the request",
+            selected.name
+        ),
+    }
+}
+
+fn apply_execution_policy(
+    decision: MatchDecision,
+    policy: &Option<RouteExecutionPolicy>,
+    candidates: &[RouteCandidate],
+) -> MatchDecision {
+    let Some(policy) = policy else {
+        return decision;
+    };
+    if policy.availability == RouteExecutionAvailability::Unavailable {
+        return MatchDecision {
+            decision: RouteDecision::Bypass,
+            selected: None,
+            bypass_reason: Some(RouteBypassReason::RequiredExecutionSubstrateUnavailable),
+            decision_reason: format!(
+                "execution policy requires {} but the required SkillSpec/rote path is unavailable",
+                policy.preferred_skill
+            ),
+        };
+    }
+    let Some(selected) = candidates
+        .iter()
+        .find(|candidate| candidate.name == policy.preferred_skill)
+        .cloned()
+    else {
+        return MatchDecision {
+            decision: RouteDecision::Bypass,
+            selected: None,
+            bypass_reason: Some(RouteBypassReason::RequiredExecutionSubstrateUnavailable),
+            decision_reason: format!(
+                "execution policy selected {} but it was not present in route candidates",
+                policy.preferred_skill
+            ),
+        };
+    };
+    MatchDecision {
+        decision: RouteDecision::UseSkill,
+        selected: Some(selected),
+        bypass_reason: None,
+        decision_reason: format!(
+            "execution policy selected {} for {}",
+            policy.preferred_skill,
+            policy.kind.as_str()
+        ),
+    }
+}
+
+fn classify_execution_policy(
+    query: &str,
+    entries: &[SkillEntry],
+    candidates: &[RouteCandidate],
+) -> Option<RouteExecutionPolicy> {
+    let normalized = normalize_query(query);
+    if is_browse_query(&normalized) {
+        return Some(execution_policy(
+            RouteExecutionKind::Browse,
+            RouteExecutionSubstrate::RoteBrowse,
+            entries,
+            "rote-browse",
+            "browser or web interaction should run through rote-browse",
+            vec![
+                "direct_browser_tool".to_owned(),
+                "direct_chrome_or_playwright".to_owned(),
+                "repljs_browser_control".to_owned(),
+                "direct_web_search".to_owned(),
+            ],
+            vec![
+                "attach to the current authenticated browser session first".to_owned(),
+                "use headless browser only when no active session is available".to_owned(),
+            ],
+        ));
+    }
+    if is_local_action_query(&normalized) {
+        return Some(execution_policy(
+            RouteExecutionKind::LocalAction,
+            RouteExecutionSubstrate::RoteShell,
+            entries,
+            "rote-shell",
+            "local tool, shell, file, build, test, or package action should be recorded through rote exec",
+            vec![
+                "direct_shell_without_rote_exec".to_owned(),
+                "direct_cli_without_rote_exec".to_owned(),
+            ],
+            vec!["capture stdout, stderr, files, and workspace evidence".to_owned()],
+        ));
+    }
+    if is_service_api_query(&normalized) {
+        let preferred = preferred_service_skill(candidates).unwrap_or("rote".to_owned());
+        return Some(execution_policy(
+            RouteExecutionKind::ServiceApi,
+            RouteExecutionSubstrate::RoteAdapter,
+            entries,
+            &preferred,
+            "service, vendor, SaaS, or API access should run through rote adapter execution",
+            vec![
+                "direct_http_without_rote_adapter".to_owned(),
+                "direct_sdk_without_rote_adapter".to_owned(),
+            ],
+            vec!["prefer an existing service-specific rote skill or adapter before creating a new adapter".to_owned()],
+        ));
+    }
+    None
+}
+
+fn execution_policy(
+    kind: RouteExecutionKind,
+    substrate: RouteExecutionSubstrate,
+    entries: &[SkillEntry],
+    preferred_skill: &str,
+    reason: &str,
+    forbids: Vec<String>,
+    preferences: Vec<String>,
+) -> RouteExecutionPolicy {
+    let mut required_skills = vec!["durable-executor".to_owned(), preferred_skill.to_owned()];
+    required_skills.sort();
+    required_skills.dedup();
+    let durable_active = skill_is_active(entries, "durable-executor", true);
+    let preferred_active = skill_is_active(entries, preferred_skill, false);
+    let availability = if durable_active && preferred_active {
+        RouteExecutionAvailability::Active
+    } else {
+        RouteExecutionAvailability::Unavailable
+    };
+    let missing = required_skills
+        .iter()
+        .filter(|skill| {
+            if skill.as_str() == "durable-executor" {
+                !durable_active
+            } else {
+                !preferred_active
+            }
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let repair = if missing.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "install or enable required execution skills: {}",
+            missing.join(", ")
+        ))
+    };
+    RouteExecutionPolicy {
+        kind,
+        substrate,
+        availability,
+        reason: reason.to_owned(),
+        required_skills,
+        preferred_skill: preferred_skill.to_owned(),
+        repair,
+        forbids,
+        preferences,
+    }
+}
+
+fn skill_is_active(entries: &[SkillEntry], name: &str, require_implicit: bool) -> bool {
+    entries.iter().any(|entry| {
+        entry.name == name
+            && entry.visibility != Visibility::Off
+            && (!require_implicit || entry.visibility == Visibility::Implicit)
+    })
+}
+
+fn preferred_service_skill(candidates: &[RouteCandidate]) -> Option<String> {
+    candidates
+        .iter()
+        .find(|candidate| {
+            candidate.name.starts_with("rote-")
+                && !matches!(
+                    candidate.name.as_str(),
+                    "rote-adapter-create"
+                        | "rote-adapter-config"
+                        | "rote-browse"
+                        | "rote-registry"
+                        | "rote-setup"
+                        | "rote-shell"
+                        | "rote-update"
+                )
+        })
+        .map(|candidate| candidate.name.clone())
+        .or_else(|| {
+            candidates
+                .iter()
+                .find(|candidate| candidate.name == "rote-using-adapters")
+                .map(|candidate| candidate.name.clone())
+        })
+}
+
+fn activation_anchor_matches(query: &str, candidate: &RouteCandidate) -> bool {
+    let query_terms = tokenize(&normalize_query(query));
+    let query_text = normalize_query(query);
+    if query_text.contains(&candidate.name.replace('-', " "))
+        || query_text.contains(&candidate.name)
+    {
+        return true;
+    }
+    candidate
+        .name
+        .split(['-', '_', ' '])
+        .filter(|term| !ROUTER_GENERIC_ANCHOR_TERMS.contains(term))
+        .any(|term| term.len() >= 4 && query_terms.iter().any(|query_term| query_term == term))
+}
+
+fn normalize_query(query: &str) -> String {
+    query
+        .to_ascii_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn is_browse_query(query: &str) -> bool {
+    contains_any_phrase(
+        query,
+        &[
+            "browse",
+            "browser",
+            "current browser",
+            "headless",
+            "open url",
+            "open website",
+            "web page",
+            "website",
+            "dashboard",
+            "login",
+            "authenticated",
+            "click",
+            "navigate",
+            "search the web",
+            "web search",
+        ],
+    ) || query.contains("http://")
+        || query.contains("https://")
+}
+
+fn is_local_action_query(query: &str) -> bool {
+    contains_any_phrase(
+        query,
+        &[
+            "run local",
+            "shell command",
+            "terminal command",
+            "execute command",
+            "run command",
+            "cli command",
+            "run script",
+            "npm ",
+            "pnpm ",
+            "cargo ",
+            "git ",
+            "build",
+            "test",
+            "install package",
+            "write file",
+            "edit file",
+            "modify file",
+        ],
+    )
+}
+
+fn is_service_api_query(query: &str) -> bool {
+    contains_any_phrase(
+        query,
+        &["connect to", "fetch from", "fetch information from"],
+    ) || has_any_token(
+        query,
+        &[
+            "api",
+            "saas",
+            "vendor",
+            "linear",
+            "stripe",
+            "notion",
+            "github",
+            "jira",
+            "salesforce",
+            "slack",
+            "datadog",
+            "hubspot",
+        ],
+    )
+}
+
+fn contains_any_phrase(text: &str, phrases: &[&str]) -> bool {
+    phrases.iter().any(|phrase| text.contains(phrase))
+}
+
+fn has_any_token(text: &str, tokens: &[&str]) -> bool {
+    let query_terms = tokenize(text);
+    tokens
+        .iter()
+        .any(|token| query_terms.iter().any(|term| term == token))
+}
+
+const ROUTER_GENERIC_ANCHOR_TERMS: &[&str] = &[
+    "create", "docs", "document", "executor", "find", "router", "rote", "setup", "skill", "skills",
+    "update",
+];
 
 pub(crate) fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Result<Vec<SkillEntry>> {
     let mut entries = Vec::new();
@@ -1907,6 +2323,129 @@ disable-model-invocation: true
         );
     }
 
+    #[test]
+    fn activation_anchor_blocks_generic_docs_prompt_false_positive() {
+        let candidate = route_candidate("rote-adapter-create", 9.0, Confidence::High);
+
+        let decision = apply_activation_anchor_gate(
+            "ok - lets do this and document it in docs/design",
+            decide_candidate_match(&[candidate]),
+        );
+
+        assert_eq!(decision.decision, RouteDecision::Bypass);
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::NoActivationAnchor)
+        );
+    }
+
+    #[test]
+    fn browse_policy_selects_rote_browse_when_active() {
+        let entries = vec![
+            test_entry("durable-executor", Visibility::Implicit),
+            test_entry("rote-browse", Visibility::ManualOnly),
+        ];
+        let candidates = vec![
+            route_candidate("durable-executor", 5.0, Confidence::Medium),
+            route_candidate("rote-browse", 4.5, Confidence::Medium),
+        ];
+        let policy =
+            classify_execution_policy("browse authenticated dashboard", &entries, &candidates);
+        let decision =
+            apply_execution_policy(decide_candidate_match(&candidates), &policy, &candidates);
+
+        assert_eq!(policy.as_ref().unwrap().kind, RouteExecutionKind::Browse);
+        assert_eq!(
+            policy.as_ref().unwrap().substrate,
+            RouteExecutionSubstrate::RoteBrowse
+        );
+        assert_eq!(decision.decision, RouteDecision::UseSkill);
+        assert_eq!(decision.selected.unwrap().name, "rote-browse");
+        assert!(policy
+            .as_ref()
+            .unwrap()
+            .forbids
+            .iter()
+            .any(|forbid| forbid == "direct_chrome_or_playwright"));
+    }
+
+    #[test]
+    fn local_action_policy_selects_rote_shell_when_active() {
+        let entries = vec![
+            test_entry("durable-executor", Visibility::Implicit),
+            test_entry("rote-shell", Visibility::ManualOnly),
+        ];
+        let candidates = vec![
+            route_candidate("durable-executor", 11.0, Confidence::Medium),
+            route_candidate("rote-shell", 10.9, Confidence::Medium),
+        ];
+        let policy =
+            classify_execution_policy("run local shell command with proof", &entries, &candidates);
+        let decision =
+            apply_execution_policy(decide_candidate_match(&candidates), &policy, &candidates);
+
+        assert_eq!(
+            policy.as_ref().unwrap().kind,
+            RouteExecutionKind::LocalAction
+        );
+        assert_eq!(
+            policy.as_ref().unwrap().substrate,
+            RouteExecutionSubstrate::RoteShell
+        );
+        assert_eq!(decision.decision, RouteDecision::UseSkill);
+        assert_eq!(decision.selected.unwrap().name, "rote-shell");
+    }
+
+    #[test]
+    fn service_api_policy_prefers_service_specific_rote_skill() {
+        let entries = vec![
+            test_entry("durable-executor", Visibility::Implicit),
+            test_entry("rote-linear", Visibility::ManualOnly),
+            test_entry("rote-adapter-create", Visibility::ManualOnly),
+        ];
+        let candidates = vec![
+            route_candidate("rote-adapter-create", 20.0, Confidence::High),
+            route_candidate("rote-linear", 8.0, Confidence::High),
+        ];
+        let policy =
+            classify_execution_policy("fetch information from Linear API", &entries, &candidates);
+        let decision =
+            apply_execution_policy(decide_candidate_match(&candidates), &policy, &candidates);
+
+        assert_eq!(
+            policy.as_ref().unwrap().kind,
+            RouteExecutionKind::ServiceApi
+        );
+        assert_eq!(
+            policy.as_ref().unwrap().substrate,
+            RouteExecutionSubstrate::RoteAdapter
+        );
+        assert_eq!(policy.as_ref().unwrap().preferred_skill, "rote-linear");
+        assert_eq!(decision.decision, RouteDecision::UseSkill);
+        assert_eq!(decision.selected.unwrap().name, "rote-linear");
+    }
+
+    #[test]
+    fn execution_policy_bypasses_when_required_substrate_is_unavailable() {
+        let entries = vec![test_entry("rote-browse", Visibility::ManualOnly)];
+        let candidates = vec![route_candidate("rote-browse", 7.0, Confidence::Medium)];
+        let policy =
+            classify_execution_policy("browse authenticated dashboard", &entries, &candidates);
+        let decision =
+            apply_execution_policy(decide_candidate_match(&candidates), &policy, &candidates);
+
+        assert_eq!(
+            policy.as_ref().unwrap().availability,
+            RouteExecutionAvailability::Unavailable
+        );
+        assert_eq!(decision.decision, RouteDecision::Bypass);
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::RequiredExecutionSubstrateUnavailable)
+        );
+    }
+
     fn route_candidate(name: &str, score: f64, confidence: Confidence) -> RouteCandidate {
         let path = PathBuf::from(format!("/tmp/{name}/SKILL.md"));
         let skill_dir = path.parent().unwrap().to_path_buf();
@@ -1966,6 +2505,25 @@ disable-model-invocation: true
             triggers: Vec::new(),
             negative_triggers: Vec::new(),
             text: "durable executor first hop".to_owned(),
+        }
+    }
+
+    fn test_entry(name: &str, visibility: Visibility) -> SkillEntry {
+        SkillEntry {
+            id: name.to_owned(),
+            name: name.to_owned(),
+            path: PathBuf::from(format!("/tmp/{name}/SKILL.md")),
+            skill_dir: PathBuf::from(format!("/tmp/{name}")),
+            description: format!("Use {name} for routing tests."),
+            short_description: None,
+            source: "root-0:/tmp".to_owned(),
+            visibility,
+            has_skill_spec: name == "durable-executor",
+            checksum: "sha256:test".to_owned(),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            negative_triggers: Vec::new(),
+            text: name.replace('-', " "),
         }
     }
 }

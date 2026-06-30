@@ -142,7 +142,7 @@ pub fn duplicate_root_candidates_collapse_to_one_logical_selection(
 
     let run = simulate_prompt(
         &fixture,
-        "use durable-executor to run a shell command and preserve proof",
+        "use durable-executor to preserve proof for this workflow",
     );
     assert_eq!(run.route["decision"], "use_skill");
     let loaded = run

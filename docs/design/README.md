@@ -64,6 +64,7 @@ directory listings.
 | 30 | [Testing Matrix](30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
 | 31 | [Controlled Harness Lab](31-controlled-harness-lab.md) | Proposal for no-Docker sandbox harness simulation using isolated homes, fake harness roots, pseudo-harness traces, and optional real harness smoke runs. |
 | 32 | [Router Duplicate Root Selection](32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
+| 33 | [Router Execution Policy Gate](33-router-execution-policy-gate.md) | How route separates skill discovery from durable rote substrate selection for service/API, local action, and browser work. |
 
 ## Visual Explainers
 
@@ -107,7 +108,7 @@ Every design claim should be grounded in one or more of these sources:
 | Thin loader generation | `crates/skillspec-authoring/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-runtime/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
-| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/`, `docs/design/32-router-duplicate-root-selection.md` |
+| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/`, `docs/design/32-router-duplicate-root-selection.md`, `docs/design/33-router-execution-policy-gate.md` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `crates/skillspec-runtime/src/align/ledger.rs`, `crates/skillspec-runtime/src/align/types.rs` |
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
 | Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |

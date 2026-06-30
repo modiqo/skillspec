@@ -55,7 +55,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, include current harness/root context when available, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. Duplicate physical roots collapse to one logical skill before matching; harness/root context only chooses the installed copy. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, include current harness/root context when available, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. Duplicate physical roots collapse to one logical skill before matching; harness/root context only chooses the installed copy. Inspect execution_policy before acting; service/API work uses rote adapter execution, local shell/tool work uses rote-shell, and browser/web work uses rote-browse when the required durable/rote skills are active. If required substrate is unavailable, bypass with repair guidance rather than using direct tools. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -81,12 +81,12 @@ routes:
       phases:
         - id: route_query
           owner_skill: skill-router
-          description: Query the router index once, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
+          description: Query the router index once, inspect decision, selected, bypass_reason, execution_policy, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
         - id: match_gate
           owner_skill: skill-router
-          description: If decision is use_skill and selected is non-null, load that selected skill explicitly. If decision is bypass, continue normal agent behavior. If decision is ambiguous, do not silently load a candidate; ask only when the user explicitly wanted skill selection, otherwise continue normal behavior.
+          description: If decision is use_skill and selected is non-null, load that selected skill explicitly and obey execution_policy forbids/preferences. If decision is bypass, continue normal agent behavior unless execution_policy reports unavailable required substrate, in which case report repair guidance. If decision is ambiguous, do not silently load a candidate; ask only when the user explicitly wanted skill selection, otherwise continue normal behavior.
           requires:
             - apply_route_decision
         - id: execution_mode_elicitation
@@ -204,13 +204,13 @@ commands:
     safety: local_read
 
   run_route_query:
-    description: Route the user request to candidate skills from the index. Duplicate physical roots collapse to one logical skill before matching; optional current harness/root context only chooses the installed copy. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate.
+    description: Route the user request to candidate skills from the index. Duplicate physical roots collapse to one logical skill before matching; optional current harness/root context only chooses the installed copy. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate. execution_policy is the step ladder from selected skill to rote substrate; service_api uses rote_adapter, local_action uses rote_shell, and browse uses rote_browse when active.
     template: "skillspec route --index {{index}} --query {{query}} [--current-harness {{current_harness}}] [--current-root {{current_root}}] --top 5 --json"
     safety: local_read
 
   apply_route_decision:
-    description: Apply route JSON without inventing a match. Load selected only for decision use_skill. For bypass, continue normal agent behavior. For ambiguous, ask only when the user explicitly requested skill choice; otherwise continue normal behavior.
-    template: "inspect route JSON fields: decision, selected, bypass_reason, candidates"
+    description: Apply route JSON without inventing a match. Load selected only for decision use_skill. For bypass, continue normal agent behavior unless execution_policy is unavailable and supplies repair. For ambiguous, ask only when the user explicitly requested skill choice; otherwise continue normal behavior. When execution_policy is active, obey its substrate, forbids, and preferences.
+    template: "inspect route JSON fields: decision, selected, bypass_reason, execution_policy, candidates"
     safety: local_read
 
   show_router_lifecycle_plan:
