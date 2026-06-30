@@ -66,6 +66,7 @@ directory listings.
 | 32 | [Router Duplicate Root Selection](32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
 | 33 | [Router Provider Neutrality](33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
 | 34 | [Router Policy Profiles And Passthrough](34-router-policy-profiles-and-passthrough.md) | Proposed provider-neutral router policy layer for ordered preferences, soft and hard rule modes, temporary passthrough profiles, scheduler control, and auditable route explanations. |
+| 35 | [Shape-Specific Checklist Generation](35-shape-specific-checklists.md) | Proposed generated checklist contracts for doctor, import, and run workflows, with common invariants plus single-skill, multi-skill, and plugin-shaped source templates. |
 
 ## Visual Explainers
 
@@ -105,6 +106,7 @@ Every design claim should be grounded in one or more of these sources:
 | Workspace authoring graph | `crates/skillspec-workspace/src/lib.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
 | Doctor agent drift risk | `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
 | Guided run-loop and trampoline dogfood | `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/24-guided-trampoline.md` |
+| Shape-specific checklist generation | `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/35-shape-specific-checklists.md` |
 | Performance and token economy | `crates/skillspec-authoring/src/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-workspace/src/import.rs`, `docs/design/20-performance-token-speed.md` |
 | Thin loader generation | `crates/skillspec-authoring/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-runtime/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
