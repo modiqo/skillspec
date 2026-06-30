@@ -1238,10 +1238,12 @@ mod tests {
         assert!(output.contains("--guide agent --json"));
         assert!(output.contains("--trace-dir"));
         assert!(output.contains("--resume <run_dir>"));
-        assert!(output.contains("trace align"));
-        assert!(output.contains("alignment summary"));
-        assert!(output.contains("token usage"));
-        assert!(output.contains("quiet progress/alignment commands"));
+        assert!(output.contains("Use the JSON current gate as internal control data"));
+        assert!(output.contains("Do not run `skillspec act`"));
+        assert!(output.contains("guide's end anchor"));
+        assert!(output.contains("quiet token-stats, final-progress, and alignment commands"));
+        assert!(output.contains("alignment status or report path"));
+        assert!(output.contains("token usage from alignment or why it was not recorded"));
         assert!(output.contains(
             "curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh"
         ));
