@@ -105,7 +105,7 @@ routes:
       phases:
         - id: route_query
           owner_skill: {router_skill}
-          description: Query the router index once, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
+          description: Query the router index once, including any active SQLite router policy profile, inspect decision, selected, bypass_reason, policy, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
         - id: match_gate

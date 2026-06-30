@@ -301,6 +301,33 @@ import { chromium } from "playwright";
 }
 
 #[test]
+fn source_map_prefers_existing_local_path_over_github_shorthand() {
+    let dir = TempDir::new("source-map-local-shorthand");
+    let skill_dir = dir.path().join("owner").join("repo");
+    let map_dir = dir.path().join("source-map");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        "# Local Skill\n\nAlways treat existing owner/repo paths as local.\n",
+    );
+
+    let map = Command::new(bin())
+        .current_dir(dir.path())
+        .arg("source")
+        .arg("map")
+        .arg("owner/repo")
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let report = json_stdout(&map);
+    assert_eq!(report["files"], 1);
+    assert!(report.get("staged_from").is_none());
+    assert!(map_dir.join("source-map.json").is_file());
+}
+
+#[test]
 fn source_map_chunks_oversized_markdown_without_full_ast() {
     let dir = TempDir::new("source-map-chunked");
     let skill_dir = dir.path().join("source-skill");

@@ -720,9 +720,51 @@ routes:
           description: Report enabled state, harness_hooks installed/removed status, visibility change count, index rebuild/preparedness for enable, and restart warning.
           requires:
             - verify_router_updated
+  - id: manage_router_policy
+    label: Manage router preference policy
+    rank: 6
+    description: Use when the user wants to create, inspect, tune, activate, or explain SQLite-backed router policy profiles and preference rules.
+    execution_plan:
+      mode: ordered
+      reason: Router policy is local SQLite state inside the router index. Agents must inspect existing policy before replacing a rule, then set the complete desired profile or rule, get it back, and explain a representative route decision before reporting success.
+      phases:
+        - id: inspect_router_policy_surface
+          owner_skill: skillspec
+          description: Verify policy/profile commands exist and inspect current policy state before changing it.
+          requires:
+            - router_policy_help
+            - router_profile_help
+            - router_policy_list_or_show
+          forbid:
+            - overwrite_policy_without_readback
+        - id: write_router_policy
+          owner_skill: skillspec
+          description: Create or update a provider-neutral policy profile and preference rule using explicit query predicates and targets.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_router_index
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_policy_set_profile
+            - router_policy_set_rule
+            - router_policy_get
+          forbid:
+            - hardcode_provider_policy_in_router_code
+            - write_policy_without_index
+        - id: prove_router_policy
+          owner_skill: skillspec
+          description: Explain a representative policy-influenced route decision and optionally switch the active profile through the profile command.
+          requires:
+            - router_policy_explain
+            - router_profile_apply_or_clear
+            - verify_router_policy
   - id: inspect_skillspec_status
     label: Inspect SkillSpec status
-    rank: 6
+    rank: 7
     description: Use when the user wants a read-only report of installed SkillSpec lifecycle state, supported roots, router index status, and SkillSpec-backed versus legacy prose skills.
     execution_plan:
       mode: ordered
@@ -1347,6 +1389,23 @@ rules:
     after_success:
       - verify_router_installed
     reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_router_policy_to_policy_management
+    when:
+      user_says_any:
+        - router policy
+        - router preference
+        - preference policy
+        - policy profile
+        - policy rule
+        - set router policy
+        - get router policy
+        - explain router policy
+        - passthrough profile
+        - soft passthrough
+    prefer: manage_router_policy
+    after_success:
+      - verify_router_policy
+    reason: Router preference policy is SQLite-backed operator state in the router index; inspect with get/show before replacing rules, then explain a representative route decision.
   - id: route_router_switch_to_lifecycle
     when:
       user_says_any:
@@ -2309,8 +2368,8 @@ commands:
       dependencies:
         - skillspec_cli
   source_map_create:
-    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span.
-    template: skillspec source map <source-skill-folder> --out <draft-dir>/.skillspec/source-map
+    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span. The source may be a local skill folder or a public GitHub skill URI; URI sources are staged by SkillSpec's sparse checkout path, and the returned source_path must be used for stale/import-skill.
+    template: skillspec source map <source-skill-folder-or-github-uri> --out <draft-dir>/.skillspec/source-map
     safety: local_write
     requires:
       dependencies:
@@ -2429,7 +2488,7 @@ commands:
     template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
     safety: local_write
   stage_remote_folder:
-    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser; use the returned selected_source_path or candidates.source_path for doctor, source map, import-skill, workspace map, or port-one-shot. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
+    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser for candidate discovery or explicit persistent staging; use the returned selected_source_path or candidates.source_path for doctor, import-skill, workspace map, or port-one-shot. For source-map evidence, `skillspec source map <github-uri>` can stage and map directly. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
     template: skillspec source stage <github-skill-uri> --out <staging-root> --json
     safety: network_read
     requires:
@@ -2623,6 +2682,20 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  router_policy_help:
+    description: Verify that the installed CLI exposes the router policy command surface.
+    template: skillspec router policy --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_profile_help:
+    description: Verify that the installed CLI exposes the router profile command surface.
+    template: skillspec router profile --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
   durable_help:
     description: Verify that the installed CLI exposes the durable-executor lifecycle command surface.
     template: skillspec durable-executor --help
@@ -2689,6 +2762,48 @@ commands:
   router_index_refresh:
     description: Refresh an installed router index through the router lifecycle; prefer this over direct skillspec index because refresh also reapplies router-managed visibility and checks preparedness.
     template: skillspec router index refresh --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_list_or_show:
+    description: Inspect SQLite-backed router policy profiles and rules before editing policy state.
+    template: skillspec router policy show --index <router-index> --profile <profile> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_get:
+    description: Get one router policy profile or rule by id before editing it, preserving existing predicates, priority, anchor, and targets.
+    template: skillspec router policy get <profile-or-rule-id> --index <router-index> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_set_profile:
+    description: Create or update a SQLite-backed router policy profile in the router index; use route for normal routing and soft-passthrough for focus/code modes that bypass unless policy explicitly selects a skill.
+    template: skillspec router policy set-profile <profile> --index <router-index> --mode route|soft-passthrough|native-passthrough --active --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_set_rule:
+    description: Add or replace a provider-neutral router policy rule using query phrases and generic targets such as skill:<name>, tag:<tag>, source:<root>, or has_skill_spec:true. Read existing policy with router_policy_get or router_policy_list_or_show before replacing a rule.
+    template: skillspec router policy set-rule <rule-id> --index <router-index> --profile <profile> --priority <n> --anchor none|policy --when-any <phrase> --prefer skill:<name> --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_explain:
+    description: Explain how the active or named router policy profile changes a route decision, including base score, policy score, matched rules, and policy passthrough bypass.
+    template: skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_profile_apply_or_clear:
+    description: Switch the active SQLite-backed router policy profile or clear it without changing the router install.
+    template: skillspec router profile apply <profile> --index <router-index> --json
     safety: local_write
     requires:
       dependencies:
@@ -3047,7 +3162,7 @@ recipes:
       - run_command: stage_remote_folder
       - note: If source stage returns selected_source_path, use that local folder as the source and do not run additional remote discovery. If it returns multiple candidates, ask choose_candidate_skill using candidates.source_path. If it returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
       - ask: choose_candidate_skill
-      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the authoritative URI-to-local-source gate.
+      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the explicit candidate-discovery gate, and source map owns direct URI sparse staging for source-map evidence.
       - branch:
           if: candidate selected or exactly one candidate exists
           then: local_porting_loop
@@ -3124,6 +3239,23 @@ recipes:
       - run_command: verify_router_install
       - note: For enable, report index rebuild, preparedness, harness_hooks installed status, and that the router becomes the first hop when managed hooks are loaded. For disable, report harness_hooks removed/missing status, that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
       - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
+  router_policy_loop:
+    description: Read-before-write router preference policy setup through SQLite-backed policy/profile commands.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_policy_help
+      - run_command: router_profile_help
+      - run_command: router_policy_list_or_show
+      - note: Before changing an existing rule or profile, run router_policy_get for the target id and preserve existing priority, anchor, predicates, and targets unless the user asks to replace them.
+      - run_command: router_policy_set_profile
+      - run_command: router_policy_set_rule
+      - run_command: router_policy_get
+      - run_command: router_policy_explain
+      - run_command: router_profile_apply_or_clear
+      - note: Report the active profile, matched policy rule, selected or bypass decision, base score, policy score, and whether policy_passthrough applied.
   status_inspection_loop:
     description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.
     ordered: true
@@ -3461,6 +3593,11 @@ closures:
     description: Report the router update backup path, updated recorded roots, preparedness state, durable-executor status, and harness restart warning.
     commands:
       - router_update
+  verify_router_policy:
+    description: Report the active router policy profile, stored profile/rule readback, representative explain output, selected skill or policy passthrough bypass, base score, policy score, and matched rule.
+    commands:
+      - router_policy_get
+      - router_policy_explain
   report_skillspec_status:
     description: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index exists/stale/updated data, and SkillSpec-backed versus legacy skill counts and names.
     commands:
@@ -4066,7 +4203,7 @@ tests:
 review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
-  - Remote import/port requests must use `skillspec source stage <uri> --json` before doctor, source map, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after the staging command fails and the user approves.
+  - Remote source-map requests should use `skillspec source map <uri> --out <draft>/.skillspec/source-map`, which performs SkillSpec-owned sparse staging and reports the local source_path. Remote import/port requests use `skillspec source stage <uri> --json` when candidate discovery or explicit persistent staging is required before doctor, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after SkillSpec staging fails and the user approves.
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an explicit local durable-executor source folder, and remote sources must be staged before lifecycle install.
   - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
@@ -4089,12 +4226,12 @@ metadata:
     note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
   extracted_value_targets:
     activation_triggers: 12
-    routes: 12
-    rules: 23
+    routes: 21
+    rules: 33
     dependency_checks: 5
-    command_templates: 55
-    recipes: 13
-    closures: 23
+    command_templates: 88
+    recipes: 21
+    closures: 36
     tests: 24
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%

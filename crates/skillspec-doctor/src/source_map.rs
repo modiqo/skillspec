@@ -164,6 +164,12 @@ pub struct SourceMapWriteReport {
     pub files: usize,
     pub nodes: usize,
     pub classifications: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staged_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staged_checkout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -203,6 +209,9 @@ pub fn create_source_map(source: &Path, out_dir: &Path) -> Result<SourceMapWrite
         files: map.files.len(),
         nodes: map.nodes.len(),
         classifications: map.classifications.len(),
+        staged_from: None,
+        staged_checkout: None,
+        source_path: None,
     })
 }
 
@@ -306,7 +315,7 @@ pub fn render_query(value: &Value) -> String {
 }
 
 pub fn render_write_report(report: &SourceMapWriteReport) -> String {
-    format!(
+    let mut output = format!(
         "ok: wrote source map {}\nview: {}\nfiles: {}\nnodes: {}\nclassifications: {}\nnext: run `skillspec source coverage {}` before import\nnext: query exact handles with `skillspec source query {} <handle> --view full`",
         report.source_map,
         report.markdown_view,
@@ -315,7 +324,18 @@ pub fn render_write_report(report: &SourceMapWriteReport) -> String {
         report.classifications,
         report.source_map,
         report.source_map
-    )
+    );
+    if let Some(staged_from) = &report.staged_from {
+        output.push_str(&format!("\nstaged_from: {staged_from}"));
+    }
+    if let Some(source_path) = &report.source_path {
+        output.push_str(&format!("\nsource_path: {source_path}"));
+        output.push_str(&format!(
+            "\nnext: run `skillspec import-skill {source_path} --out <draft-dir>/skill.spec.yml --source-map {}`",
+            report.source_map
+        ));
+    }
+    output
 }
 
 pub fn render_stale(report: &SourceStaleReport) -> String {

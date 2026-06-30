@@ -110,13 +110,13 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap current-skill baseline; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps; after doctor, import the skill, read the alignment summary, optionally publish the proof artifacts, restart, and try the SkillSpec-backed skill normally"
+            "for source diagnostics, run doctor before import as a cheap current-skill baseline; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; doctor can inspect public GitHub URIs directly, and source map can map public GitHub URIs by sparse-staging them internally; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps; after doctor, import the skill, read the alignment summary, optionally publish the proof artifacts, restart, and try the SkillSpec-backed skill normally"
                 .to_owned(),
         );
     }
     if has_source_import(spec) {
         items.push(
-            "for URI imports, first run source stage and use the returned selected_source_path/candidates; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for URI imports, run source map on the GitHub URI and let SkillSpec perform the sparse staging; use the returned source_path for stale/import-skill, ask the user only when multiple candidates are reported; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
@@ -512,6 +512,38 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             },
         ]);
     }
+    if has_router_policy(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "create or activate router policy profile",
+                command:
+                    "skillspec router policy set-profile <profile> --index <router-index> --mode route --active --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "create router preference rule",
+                command:
+                    "skillspec router policy set-rule <rule-id> --index <router-index> --profile <profile> --when-any <phrase> --prefer skill:<name> --anchor policy --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "get router policy profile or rule",
+                command: "skillspec router policy get <id> --index <router-index> --json"
+                    .to_owned(),
+            },
+            NavigationHint {
+                intent: "explain policy-influenced route decision",
+                command:
+                    "skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "apply active router policy profile",
+                command: "skillspec router profile apply <profile> --index <router-index> --json"
+                    .to_owned(),
+            },
+        ]);
+    }
     if has_durable_lifecycle(spec) {
         hints.extend([
             NavigationHint {
@@ -541,7 +573,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_source_import(spec) {
         hints.extend([
             NavigationHint {
-                intent: "stage remote source URI before import",
+                intent: "stage remote source URI for candidate discovery",
                 command: "skillspec source stage <github-skill-uri> --out <staging-root> --json"
                     .to_owned(),
             },
@@ -552,7 +584,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
             NavigationHint {
                 intent: "map import source",
                 command:
-                    "skillspec source map <source-skill> --out <draft>/.skillspec/source-map"
+                    "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map"
                         .to_owned(),
             },
             NavigationHint {
@@ -685,6 +717,16 @@ fn has_router_lifecycle(spec: &SkillSpec) -> bool {
             command.template.contains("router enable")
                 || command.template.contains("router guard")
                 || command.template.contains("skillspec status")
+        })
+}
+
+fn has_router_policy(spec: &SkillSpec) -> bool {
+    spec.commands
+        .keys()
+        .any(|id| id.starts_with("router_policy_") || id.starts_with("router_profile_"))
+        || spec.commands.values().any(|command| {
+            command.template.contains("router policy")
+                || command.template.contains("router profile")
         })
 }
 

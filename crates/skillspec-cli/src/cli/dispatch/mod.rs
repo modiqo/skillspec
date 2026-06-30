@@ -191,20 +191,22 @@ pub(super) fn run(command: Command) -> Result<()> {
             index,
             query,
             top,
+            profile,
             execution_mode,
             current_harness,
             current_root,
             json,
         } => {
-            authoring_cmd::route(
+            authoring_cmd::route(authoring_cmd::RouteCommandOptions {
                 index,
                 query,
                 top,
+                profile,
                 execution_mode,
                 current_harness,
                 current_root,
                 json,
-            )?;
+            })?;
         }
         Command::Skills { command } => skills_cmd::run(command)?,
         Command::Visibility { command } => visibility_cmd::run(command)?,

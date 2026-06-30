@@ -338,7 +338,7 @@ skillspec source <COMMAND>
 
 Subcommands:
 
-- `map <path> --out <dir> [--json]`
+- `map <source> --out <dir> [--json]`
 - `query <source-map.json> <handle> [--view <index|summary|full>] [--json]`
 - `coverage <source-map.json> [--json]`
 - `stale <source-map.json> [--root <path>] [--json]`
@@ -353,12 +353,13 @@ and exact spans instead of loading the entire source into model context.
 ### `source map`
 
 ```text
-skillspec source map <PATH> --out <OUT>
+skillspec source map <SOURCE> --out <OUT>
 ```
 
 Arguments:
 
-- `<PATH>`: local `SKILL.md` file or skill folder to map.
+- `<SOURCE>`: local `SKILL.md` file, local skill folder, public GitHub skill
+  folder/repo URI, or GitHub owner/repo shorthand to map.
 
 Options:
 
@@ -369,6 +370,13 @@ The generated map records files, hashes, Markdown nodes, frontmatter, byte and
 line ranges, local/external references, code blocks, dependency mentions, modal
 obligation language, and review-required classifications. It preserves
 frontmatter as a first-class node instead of treating it as Markdown prose.
+
+For public GitHub sources, `source map` stages the source with SkillSpec's
+sparse checkout logic, maps the selected local source, and reports the local
+`source_path` for later `source stale` and `import-skill` commands. If a repo
+URI resolves to multiple `SKILL.md` candidates, the command refuses to guess and
+prints candidate source paths. Use `source stage` directly only when candidate
+discovery or explicit staging is the task.
 
 ### `source query`
 
@@ -1287,14 +1295,28 @@ Options:
   `skill-index.sqlite`.
 - `--query <QUERY>`: user task text to route.
 - `--top <TOP>`: number of candidates to return. Defaults to 5.
+- `--profile <PROFILE>`: apply this router policy profile instead of the
+  active profile stored in the index.
 - `--execution-mode <direct|durable>`: execution mode already selected by the
   user or caller.
+- `--current-harness <agents|codex|claude-local>`: current harness context used
+  only to choose the physical copy when duplicate logical skills exist.
+- `--current-root <PATH>`: current harness-visible root used only to choose the
+  physical copy when duplicate logical skills exist.
 - `--json`: emit JSON instead of a concise human report.
 
 The route result includes selected skill, candidates, scores, confidence,
 visibility, SkillSpec-backed status, and an
 `execution_mode_direct_or_durable` elicitation hint when no execution mode was
 supplied and a candidate was selected.
+
+When a router policy profile is active in `skill-index.sqlite`, or `--profile`
+names one, route applies matching preference rules before the final match gate.
+Policy remains provider-neutral: rule targets are `skill:<name>`, `tag:<tag>`,
+`source:<source>`, and `has_skill_spec:<true|false>`. Route output preserves
+`base_score`, `policy_score`, `policy_reason`, and a `policy` report with
+matched rules. Soft-passthrough profiles return `bypass` with
+`policy_passthrough` unless a matching rule allows or prefers a candidate.
 
 ## `skills`
 
@@ -1368,6 +1390,17 @@ Subcommands:
 - `uninstall` or `delete` `[--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
 - `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 - `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
+- `policy init --index <index-file-or-router-dir> [--json]`
+- `policy list --index <index-file-or-router-dir> [--json]`
+- `policy show --index <index-file-or-router-dir> [--profile <name>] [--json]`
+- `policy get <id> --index <index-file-or-router-dir> [--json]`
+- `policy set-profile <name> --index <index-file-or-router-dir> [--mode route|soft-passthrough|native-passthrough] [--active] [--strict] [--description <text>] [--json]`
+- `policy set-rule <id> --index <index-file-or-router-dir> --profile <name> [--priority <n>] [--mode soft|hard] [--anchor none|policy] [--enabled true|false] [--when-any <phrase>]... [--when-all <phrase>]... [--when-none <phrase>]... [--prefer <target>]... [--allow <target>]... [--suppress <target>]... [--forbid <target>]... [--json]`
+- `policy remove-rule <id> --index <index-file-or-router-dir> [--json]`
+- `policy explain --index <index-file-or-router-dir> --query <text> [--profile <name>] [--top <n>] [--json]`
+- `profile status --index <index-file-or-router-dir> [--json]`
+- `profile apply <profile> --index <index-file-or-router-dir> [--dry-run] [--json]`
+- `profile clear --index <index-file-or-router-dir> [--dry-run] [--json]`
 
 `router install` writes a SkillSpec-backed `skill-router` skill into every
 configured `--roots` path, a visibility manifest, a SQLite index, and a router
@@ -1416,6 +1449,20 @@ index, and runs the preparedness check. When router config is disabled, refresh
 rebuilds the index without re-enabling router visibility. SkillSpec-backed
 additions are indexed directly; prose-only additions are also indexed, with
 conversion advice retained in the report.
+
+Router policy commands store operator preferences in normalized SQLite tables
+inside the same `skill-index.sqlite` database used by `skillspec route`. A
+profile chooses the operating mode. `route` keeps normal routing with policy
+score adjustments; `soft-passthrough` bypasses by default unless a matching rule
+selects a skill; `native-passthrough` records the intended high-throughput mode,
+but route-time behavior is soft passthrough until native lifecycle visibility
+mutation is implemented. Rules match query phrases and apply ordered effects:
+`prefer`, `allow`, `suppress`, or `forbid`. Use `policy get <id>` or
+`policy show --profile <name>` before editing an existing preference policy, so
+agents preserve stored predicates, order, and targets. `policy explain` runs the
+same route path with a selected profile and returns the route report with policy
+details. `router profile` commands switch the active SQLite profile without
+editing generated router files.
 
 ## `durable-executor`
 

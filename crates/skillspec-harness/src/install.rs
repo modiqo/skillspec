@@ -73,11 +73,19 @@ pub enum InstallStatus {
 pub fn detect_targets() -> Result<Vec<HarnessRoot>> {
     let home = home_dir()?;
     let mut roots = vec![
-        root(HarnessTarget::Agents, home.join(".agents/skills")),
-        root(HarnessTarget::Codex, home.join(".codex/skills")),
+        root(
+            HarnessTarget::Agents,
+            home.join(".agents"),
+            home.join(".agents/skills"),
+        ),
+        root(
+            HarnessTarget::Codex,
+            home.join(".codex"),
+            home.join(".codex/skills"),
+        ),
     ];
     if let Some(claude_root) = find_claude_skills_root()? {
-        roots.push(root(HarnessTarget::ClaudeLocal, claude_root));
+        roots.push(claude_root);
     }
     Ok(roots)
 }
@@ -599,12 +607,12 @@ fn copy_relative_file(skill_folder: &Path, install_dir: &Path, relative_path: &P
     Ok(())
 }
 
-fn root(target: HarnessTarget, path: PathBuf) -> HarnessRoot {
+fn root(target: HarnessTarget, detection_path: PathBuf, path: PathBuf) -> HarnessRoot {
     HarnessRoot {
         target,
         id: target.id(),
         label: target.label(),
-        detected: path.is_dir(),
+        detected: detection_path.is_dir(),
         path,
     }
 }
@@ -617,7 +625,7 @@ fn home_dir() -> Result<PathBuf> {
         })
 }
 
-fn find_claude_skills_root() -> Result<Option<PathBuf>> {
+fn find_claude_skills_root() -> Result<Option<HarnessRoot>> {
     let current_dir = env::current_dir().map_err(|source| Error::Read {
         path: PathBuf::from("."),
         source,
@@ -625,7 +633,11 @@ fn find_claude_skills_root() -> Result<Option<PathBuf>> {
     for ancestor in current_dir.ancestors() {
         let claude_dir = ancestor.join(".claude");
         if claude_dir.is_dir() {
-            return Ok(Some(claude_dir.join("skills")));
+            return Ok(Some(root(
+                HarnessTarget::ClaudeLocal,
+                claude_dir.clone(),
+                claude_dir.join("skills"),
+            )));
         }
     }
     Ok(None)

@@ -1,4 +1,6 @@
-use crate::{durable_lifecycle, error, install, router, router_lifecycle, status, visibility};
+use crate::{
+    durable_lifecycle, error, install, router, router_lifecycle, router_policy, status, visibility,
+};
 use std::path::{Path, PathBuf};
 
 pub use durable_lifecycle::{
@@ -9,6 +11,11 @@ pub use router::{IndexStatusOptions, Visibility};
 pub use router_lifecycle::{
     RouterGuardOptions, RouterInstallOptions, RouterModeOptions, RouterRefreshOptions,
     RouterUninstallOptions, RouterUpdateOptions,
+};
+pub use router_policy::{
+    PolicyGetOptions, PolicyInitOptions, PolicyListOptions, PolicyRemoveRuleOptions,
+    PolicySetProfileOptions, PolicySetRuleOptions, PolicyShowOptions, ProfileApplyOptions,
+    ProfileClearOptions, ProfileStatusOptions,
 };
 pub use status::StatusOptions;
 pub use visibility::{
@@ -136,6 +143,106 @@ pub fn render_router_guard_hook_json(
 
 pub fn render_router_refresh(report: &router_lifecycle::RouterRefreshReport) -> String {
     router_lifecycle::render_refresh(report)
+}
+
+pub fn router_policy_init(
+    options: PolicyInitOptions,
+) -> error::Result<router_policy::PolicyInitReport> {
+    router_policy::init(options)
+}
+
+pub fn router_policy_list(
+    options: PolicyListOptions,
+) -> error::Result<router_policy::PolicyListReport> {
+    router_policy::list(options)
+}
+
+pub fn router_policy_show(
+    options: PolicyShowOptions,
+) -> error::Result<router_policy::PolicyShowReport> {
+    router_policy::show(options)
+}
+
+pub fn router_policy_get(
+    options: PolicyGetOptions,
+) -> error::Result<router_policy::PolicyGetReport> {
+    router_policy::get(options)
+}
+
+pub fn router_policy_set_profile(
+    options: PolicySetProfileOptions,
+) -> error::Result<router_policy::PolicySetProfileReport> {
+    router_policy::set_profile(options)
+}
+
+pub fn router_policy_set_rule(
+    options: PolicySetRuleOptions,
+) -> error::Result<router_policy::PolicySetRuleReport> {
+    router_policy::set_rule(options)
+}
+
+pub fn router_policy_remove_rule(
+    options: PolicyRemoveRuleOptions,
+) -> error::Result<router_policy::PolicyRemoveRuleReport> {
+    router_policy::remove_rule(options)
+}
+
+pub fn router_profile_status(
+    options: ProfileStatusOptions,
+) -> error::Result<router_policy::ProfileStatusReport> {
+    router_policy::profile_status(options)
+}
+
+pub fn router_profile_apply(
+    options: ProfileApplyOptions,
+) -> error::Result<router_policy::ProfileApplyReport> {
+    router_policy::profile_apply(options)
+}
+
+pub fn router_profile_clear(
+    options: ProfileClearOptions,
+) -> error::Result<router_policy::ProfileClearReport> {
+    router_policy::profile_clear(options)
+}
+
+pub fn render_router_policy_init(report: &router_policy::PolicyInitReport) -> String {
+    router_policy::render_init(report)
+}
+
+pub fn render_router_policy_list(report: &router_policy::PolicyListReport) -> String {
+    router_policy::render_list(report)
+}
+
+pub fn render_router_policy_show(report: &router_policy::PolicyShowReport) -> String {
+    router_policy::render_show(report)
+}
+
+pub fn render_router_policy_get(report: &router_policy::PolicyGetReport) -> String {
+    router_policy::render_get(report)
+}
+
+pub fn render_router_policy_set_profile(report: &router_policy::PolicySetProfileReport) -> String {
+    router_policy::render_set_profile(report)
+}
+
+pub fn render_router_policy_set_rule(report: &router_policy::PolicySetRuleReport) -> String {
+    router_policy::render_set_rule(report)
+}
+
+pub fn render_router_policy_remove_rule(report: &router_policy::PolicyRemoveRuleReport) -> String {
+    router_policy::render_remove_rule(report)
+}
+
+pub fn render_router_profile_status(report: &router_policy::ProfileStatusReport) -> String {
+    router_policy::render_profile_status(report)
+}
+
+pub fn render_router_profile_apply(report: &router_policy::ProfileApplyReport) -> String {
+    router_policy::render_profile_apply(report)
+}
+
+pub fn render_router_profile_clear(report: &router_policy::ProfileClearReport) -> String {
+    router_policy::render_profile_clear(report)
 }
 
 pub fn plan_visibility(

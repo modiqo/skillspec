@@ -192,6 +192,338 @@ description: Helps with notes.
 }
 
 #[test]
+fn router_policy_profile_can_select_skill_and_passthrough() {
+    let dir = TempDir::new("router-policy");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("router").join("skill-index.sqlite");
+
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Organize personal notes and summaries. Do not use for PDF extraction.
+metadata:
+  routing:
+    tags: [knowledge]
+---
+# Notes
+"#,
+    );
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Extract text and tables from PDF documents. Do not use for personal notes.
+metadata:
+  routing:
+    tags: [documents]
+---
+# PDF
+"#,
+    );
+
+    let index_output = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&index_output);
+
+    let set_default = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-profile")
+        .arg("default")
+        .arg("--index")
+        .arg(&index)
+        .arg("--active")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&set_default);
+    let set_default_report = json_stdout(&set_default);
+    assert_eq!(set_default_report["active_profile"], "default");
+
+    let set_rule = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-rule")
+        .arg("hidden_knowledge")
+        .arg("--index")
+        .arg(&index)
+        .arg("--profile")
+        .arg("default")
+        .arg("--priority")
+        .arg("100")
+        .arg("--mode")
+        .arg("hard")
+        .arg("--anchor")
+        .arg("policy")
+        .arg("--when-any")
+        .arg("hidden workflow")
+        .arg("--prefer")
+        .arg("skill:notes")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&set_rule);
+
+    let policy_route = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("please handle the hidden workflow")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&policy_route);
+    let policy_route_report = json_stdout(&policy_route);
+    assert_eq!(policy_route_report["decision"], "use_skill");
+    assert_eq!(policy_route_report["selected"]["name"], "notes");
+    assert_eq!(policy_route_report["selected"]["base_score"], 0.0);
+    assert!(
+        policy_route_report["selected"]["policy_score"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+    assert_eq!(
+        policy_route_report["policy"]["matched_rules"][0]["id"],
+        "hidden_knowledge"
+    );
+
+    let get_rule = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("get")
+        .arg("hidden_knowledge")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&get_rule);
+    let get_rule_report = json_stdout(&get_rule);
+    assert_eq!(get_rule_report["id"], "hidden_knowledge");
+    assert_eq!(get_rule_report["rules"][0]["id"], "hidden_knowledge");
+
+    let set_code = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-profile")
+        .arg("code")
+        .arg("--index")
+        .arg(&index)
+        .arg("--mode")
+        .arg("soft-passthrough")
+        .arg("--active")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&set_code);
+
+    let passthrough = Command::new(bin())
+        .arg("route")
+        .arg("--index")
+        .arg(&index)
+        .arg("--query")
+        .arg("extract pdf text")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&passthrough);
+    let passthrough_report = json_stdout(&passthrough);
+    assert_eq!(passthrough_report["decision"], "bypass");
+    assert_eq!(passthrough_report["bypass_reason"], "policy_passthrough");
+    assert_eq!(passthrough_report["policy"]["profile"], "code");
+
+    let explain_default = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("explain")
+        .arg("--index")
+        .arg(&index)
+        .arg("--profile")
+        .arg("default")
+        .arg("--query")
+        .arg("please handle the hidden workflow")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&explain_default);
+    let explain_default_report = json_stdout(&explain_default);
+    assert_eq!(explain_default_report["decision"], "use_skill");
+    assert_eq!(explain_default_report["policy"]["profile"], "default");
+}
+
+#[test]
+fn router_profile_apply_status_and_clear_active_policy() {
+    let dir = TempDir::new("router-profile");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("skill-index.sqlite");
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Organize personal notes. Do not use for PDF extraction.
+---
+# Notes
+"#,
+    );
+
+    let index_output = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&index_output);
+
+    let init = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("init")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&init);
+
+    let set_profile = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-profile")
+        .arg("focus")
+        .arg("--index")
+        .arg(&index)
+        .arg("--mode")
+        .arg("soft-passthrough")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&set_profile);
+
+    let apply = Command::new(bin())
+        .arg("router")
+        .arg("profile")
+        .arg("apply")
+        .arg("focus")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&apply);
+    let apply_report = json_stdout(&apply);
+    assert_eq!(apply_report["applied"], true);
+
+    let status = Command::new(bin())
+        .arg("router")
+        .arg("profile")
+        .arg("status")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&status);
+    let status_report = json_stdout(&status);
+    assert_eq!(status_report["active_profile"]["name"], "focus");
+
+    let clear = Command::new(bin())
+        .arg("router")
+        .arg("profile")
+        .arg("clear")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&clear);
+
+    let status_after_clear = Command::new(bin())
+        .arg("router")
+        .arg("profile")
+        .arg("status")
+        .arg("--index")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&status_after_clear);
+    let status_after_clear_report = json_stdout(&status_after_clear);
+    assert_eq!(status_after_clear_report["active_profile"], Value::Null);
+}
+
+#[test]
+fn router_policy_strict_profile_rejects_unknown_skill_target() {
+    let dir = TempDir::new("router-policy-strict");
+    let root = dir.path().join("skills");
+    let index = dir.path().join("skill-index.sqlite");
+    write_file(
+        &root.join("notes/SKILL.md"),
+        r#"---
+name: notes
+description: Organize personal notes. Do not use for PDF extraction.
+---
+# Notes
+"#,
+    );
+
+    let index_output = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&index_output);
+
+    let set_profile = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-profile")
+        .arg("strict")
+        .arg("--index")
+        .arg(&index)
+        .arg("--strict")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&set_profile);
+
+    let bad_rule = Command::new(bin())
+        .arg("router")
+        .arg("policy")
+        .arg("set-rule")
+        .arg("missing")
+        .arg("--index")
+        .arg(&index)
+        .arg("--profile")
+        .arg("strict")
+        .arg("--when-any")
+        .arg("missing")
+        .arg("--prefer")
+        .arg("skill:missing")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&bad_rule);
+    assert!(stderr(&bad_rule).contains("unknown skill target missing"));
+}
+
+#[test]
 fn direct_index_warns_about_router_scope_and_disabled_router_mode() {
     let dir = TempDir::new("direct-index-warning");
     let home = dir.path().join("home");
@@ -268,6 +600,90 @@ description: Use when organizing personal notes. Do not use for PDF extraction.
     assert!(disabled_warnings.iter().any(|warning| warning
         .as_str()
         .is_some_and(|text| text.contains("will not affect implicit skill selection"))));
+}
+
+#[test]
+fn install_targets_detect_existing_harness_dirs_and_create_missing_skill_roots() {
+    let dir = TempDir::new("install-missing-skill-roots");
+    let home = dir.path().join("home");
+    let repo = dir.path().join("repo");
+    let source = dir.path().join("source-skill");
+    fs::create_dir_all(home.join(".agents")).unwrap();
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::create_dir_all(repo.join(".claude")).unwrap();
+    write_file(
+        &source.join("SKILL.md"),
+        r#"---
+name: clean-harness
+description: Use when testing clean harness installs.
+---
+# Clean Harness
+"#,
+    );
+    write_file(
+        &source.join("skill.spec.yml"),
+        r#"
+schema: skillspec/v0
+id: clean.harness
+title: Clean Harness
+description: Clean harness fixture.
+routes:
+  - id: default
+    label: Default
+"#,
+    );
+
+    let targets = Command::new(bin())
+        .current_dir(&repo)
+        .env("HOME", &home)
+        .arg("install")
+        .arg("targets")
+        .output()
+        .unwrap();
+    assert_success(&targets);
+    let targets = json_stdout(&targets);
+    let targets = targets.as_array().unwrap();
+    for id in ["agents", "codex", "claude-local"] {
+        let target = targets
+            .iter()
+            .find(|target| target["id"] == id)
+            .unwrap_or_else(|| panic!("missing target {id}"));
+        assert_eq!(target["detected"], true, "{id} should be detected");
+        assert!(
+            target["path"].as_str().unwrap().ends_with(match id {
+                "agents" => ".agents/skills",
+                "codex" => ".codex/skills",
+                "claude-local" => ".claude/skills",
+                _ => unreachable!(),
+            }),
+            "{id} should still install into the skills subfolder"
+        );
+    }
+
+    let install = Command::new(bin())
+        .current_dir(&repo)
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", dir.path().join(".skillspec"))
+        .arg("install")
+        .arg("skill")
+        .arg(&source)
+        .arg("--all-detected")
+        .arg("--name")
+        .arg("clean-harness")
+        .output()
+        .unwrap();
+    assert_success(&install);
+    let report = json_stdout(&install);
+    assert_eq!(report["installs"].as_array().unwrap().len(), 3);
+    assert!(home
+        .join(".agents/skills/clean-harness/skill.spec.yml")
+        .is_file());
+    assert!(home
+        .join(".codex/skills/clean-harness/skill.spec.yml")
+        .is_file());
+    assert!(repo
+        .join(".claude/skills/clean-harness/skill.spec.yml")
+        .is_file());
 }
 
 #[test]

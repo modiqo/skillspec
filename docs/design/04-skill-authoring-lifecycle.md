@@ -74,17 +74,19 @@ When debugging one gate or building a custom import flow, use the lower-level
 commands:
 
 ```sh
-# URI sources only:
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-
-# Local source path or selected_source_path from source stage:
-skillspec source map <path> --out <draft>/.skillspec/source-map
+# Local source path or public GitHub skill URI:
+skillspec source map <path-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <path>
 skillspec import-skill <path> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
+
+For GitHub sources, `source map` stages the public repository through
+SkillSpec's sparse checkout logic and reports the selected local `source_path`.
+Use that `source_path` for stale checks and import. Run `source stage`
+separately only when you need candidate discovery before mapping.
 
 The source-map step lets the agent inspect structure, dependencies, code blocks,
 references, and exact source spans before importing. The current importer reads

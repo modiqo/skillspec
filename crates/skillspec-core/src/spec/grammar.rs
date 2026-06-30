@@ -347,7 +347,7 @@ fn progressive_sequence() -> Vec<CommandStep> {
         },
         CommandStep {
             phase: "map source package",
-            command: "skillspec source map <source-skill> --out <draft>/.skillspec/source-map",
+            command: "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map",
             proves: "Markdown files, frontmatter, byte ranges, line ranges, references, code blocks, dependencies, and review-required spans were indexed without loading the full source into model context",
         },
         CommandStep {

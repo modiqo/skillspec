@@ -1089,6 +1089,10 @@ For ordinary user requests, do not read `./skill.spec.yml` and do not run
 skillspec route --index {index_arg} --query '<user task>'{route_context_args} --top 5 --json
 ```
 
+The route command automatically applies the active SQLite router policy profile,
+when one is configured in the index. Policy content is not embedded in this
+skill; the JSON route report is the source of truth.
+
 Load a domain skill only when route JSON returns `decision: "use_skill"` and a
 non-null `selected` skill. If the decision is `bypass` or `ambiguous`, do not
 load any candidate skill; continue with the normal agent path for the user

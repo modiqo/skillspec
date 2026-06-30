@@ -39,7 +39,7 @@ flowchart LR
 Grounded commands:
 
 ```sh
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary

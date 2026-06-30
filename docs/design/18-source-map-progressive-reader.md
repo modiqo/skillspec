@@ -27,11 +27,8 @@ That works for small files, but it is brittle for real skills:
 For imports, the expected flow is:
 
 ```bash
-# URI sources only:
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-
-# Local source path or selected_source_path from source stage:
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+# Local source path or public GitHub skill URI:
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
@@ -40,11 +37,16 @@ skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <sou
 skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
 
-For URI imports, `source stage` is the authoritative URI-to-local-source gate.
-Agents should use its `selected_source_path` when there is one candidate, or ask
-the user to choose from `candidates[].source_path`. Web search, raw GitHub
-fetches, and ad hoc sparse-checkout probing are troubleshooting paths only after
-`source stage` fails and the user approves.
+For URI imports, `source map` owns the normal sparse checkout path. It stages
+the public GitHub source through the same parser used by `source stage`, maps
+the selected local source, and reports `source_path` for the later `stale` and
+`import-skill` commands. When a repo URI contains multiple `SKILL.md`
+candidates, the command refuses to guess and prints the candidate source paths.
+Use `source stage` explicitly when the task is candidate discovery, when the
+user wants a persistent checkout before mapping, or when staging needs
+troubleshooting. Web search, raw GitHub fetches, and ad hoc sparse-checkout
+probing remain troubleshooting paths only after SkillSpec staging fails and the
+user approves.
 
 Agents should query exact handles with `--view full` when they need the source
 span for a heading, code block, dependency mention, local reference, or modal

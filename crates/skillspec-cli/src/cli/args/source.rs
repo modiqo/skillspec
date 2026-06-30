@@ -5,8 +5,8 @@ use std::path::PathBuf;
 #[derive(Debug, Subcommand)]
 pub(in crate::cli) enum SourceCommand {
     #[command(
-        about = "Stage a public GitHub skill URI locally before doctor, source map, or import",
-        long_about = "Stage a public GitHub repository, tree URL, blob-style folder URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, source map, import-skill, workspace map, or port-one-shot. Use this for import/port prompts that contain a URI; do not use web search or raw GitHub fallback to locate the same source."
+        about = "Stage a public GitHub skill URI locally for candidate discovery",
+        long_about = "Stage a public GitHub repository, tree URL, blob-style folder URL, owner/repo shorthand, or owner/repo/path shorthand into a local sparse checkout for candidate discovery or explicit persistent staging. The command parses the URI into repo, branch, and path, materializes the requested skill folder or SKILL.md candidates, and prints the exact local source path to pass to doctor, import-skill, workspace map, or port-one-shot. Normal source-map work can call `skillspec source map <github-uri>` directly; it uses the same sparse staging code and reports the mapped source_path. Do not use web search or raw GitHub fallback to locate the same source."
     )]
     Stage {
         /// Public GitHub repo URI, tree URI, blob-style folder URI, owner/repo shorthand, or owner/repo/path shorthand.
@@ -22,11 +22,12 @@ pub(in crate::cli) enum SourceCommand {
         json: bool,
     },
     #[command(
-        about = "Create source-map.json and source-map.md from a SKILL.md file or skill folder"
+        about = "Create source-map.json and source-map.md from a local source or public GitHub skill URI",
+        long_about = "Create source-map.json and source-map.md from a local SKILL.md file, skill folder, public GitHub repo/tree URL, or owner/repo shorthand. Public GitHub sources are staged with SkillSpec's sparse checkout logic, then mapped from the selected local source path. If a repo URI contains multiple SKILL.md candidates, the command refuses to guess and prints candidate source paths."
     )]
     Map {
-        /// Source SKILL.md file or skill folder to map.
-        path: PathBuf,
+        /// Source SKILL.md file, skill folder, public GitHub skill URI, or owner/repo shorthand to map.
+        source: String,
         /// Output directory for source-map.json and source-map.md.
         #[arg(long)]
         out: PathBuf,

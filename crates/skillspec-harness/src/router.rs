@@ -1,3 +1,4 @@
+use crate::router_policy::{self, RoutePolicyReport};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -25,6 +26,7 @@ pub struct RouteOptions {
     pub index: PathBuf,
     pub query: String,
     pub top: usize,
+    pub profile: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
     pub current_harness: Option<RouteHarness>,
     pub current_root: Option<PathBuf>,
@@ -133,6 +135,7 @@ pub struct RouteReport {
     pub decision_reason: String,
     pub elicitation: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
+    pub policy: Option<RoutePolicyReport>,
     pub index: PathBuf,
 }
 
@@ -142,16 +145,25 @@ pub struct RouteCandidate {
     pub name: String,
     pub path: PathBuf,
     pub score: f64,
+    pub base_score: f64,
+    pub policy_score: f64,
     pub confidence: Confidence,
     pub reason: String,
+    pub policy_reason: Option<String>,
     pub visibility: Visibility,
     pub has_skill_spec: bool,
     #[serde(skip_serializing)]
-    logical_key: String,
+    pub(crate) logical_key: String,
     #[serde(skip_serializing)]
-    skill_dir: PathBuf,
+    pub(crate) skill_dir: PathBuf,
     #[serde(skip_serializing)]
-    source: String,
+    pub(crate) source: String,
+    #[serde(skip_serializing)]
+    pub(crate) tags: Vec<String>,
+    #[serde(skip_serializing)]
+    pub(crate) policy_anchor: bool,
+    #[serde(skip_serializing)]
+    pub(crate) policy_forbidden: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -179,6 +191,7 @@ pub enum RouteBypassReason {
     LowConfidence,
     AmbiguousMatch,
     NoActivationAnchor,
+    PolicyPassthrough,
 }
 
 impl RouteBypassReason {
@@ -188,6 +201,7 @@ impl RouteBypassReason {
             Self::LowConfidence => "low_confidence",
             Self::AmbiguousMatch => "ambiguous_match",
             Self::NoActivationAnchor => "no_activation_anchor",
+            Self::PolicyPassthrough => "policy_passthrough",
         }
     }
 }
@@ -449,12 +463,28 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         current_dir: std::env::current_dir().ok(),
     };
     let raw_candidates = score_candidates(&entries, &options.query, entries.len().max(options.top));
-    let all_candidates =
+    let mut all_candidates =
         collapse_duplicate_candidates(raw_candidates, &context, entries.len().max(options.top));
+    let policy_application = router_policy::apply_to_candidates(
+        &conn,
+        options.profile.as_deref(),
+        &options.query,
+        &mut all_candidates,
+    )?;
+    all_candidates.retain(|candidate| candidate.score > 0.0);
+    assign_confidence(&mut all_candidates);
     let mut candidates = all_candidates.clone();
     candidates.truncate(options.top);
-    let match_decision =
-        apply_activation_anchor_gate(&options.query, decide_candidate_match(&candidates));
+    let match_decision = if let Some(policy_bypass) = policy_application.forced_bypass {
+        MatchDecision {
+            decision: RouteDecision::Bypass,
+            selected: None,
+            bypass_reason: Some(policy_bypass.reason),
+            decision_reason: policy_bypass.decision_reason,
+        }
+    } else {
+        apply_activation_anchor_gate(&options.query, decide_candidate_match(&candidates))
+    };
     let selected = match_decision.selected;
     let elicitation = if options.execution_mode.is_none() && selected.is_some() {
         Some("execution_mode_direct_or_durable".to_owned())
@@ -470,6 +500,7 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         decision_reason: match_decision.decision_reason,
         elicitation,
         execution_mode: options.execution_mode,
+        policy: policy_application.report,
         index,
     })
 }
@@ -653,14 +684,30 @@ pub fn render_route(report: &RouteReport) -> String {
     if let Some(reason) = report.bypass_reason {
         output.push_str(&format!("Bypass reason: {}\n", reason.as_str()));
     }
+    if let Some(policy) = &report.policy {
+        output.push_str(&format!(
+            "Policy: {} ({})\n",
+            policy.profile,
+            policy.mode.as_str()
+        ));
+    }
     if let Some(selected) = &report.selected {
         output.push_str(&format!(
             "Selected: {} ({:.3})\n",
             selected.name, selected.score
         ));
+        if selected.policy_score != 0.0 {
+            output.push_str(&format!(
+                "Score: base {:.3}, policy {:+.3}\n",
+                selected.base_score, selected.policy_score
+            ));
+        }
         output.push_str(&format!("Path: {}\n", selected.path.display()));
         output.push_str(&format!("Confidence: {:?}\n", selected.confidence).to_lowercase());
         output.push_str(&format!("Reason: {}\n", selected.reason));
+        if let Some(policy_reason) = &selected.policy_reason {
+            output.push_str(&format!("Policy reason: {policy_reason}\n"));
+        }
     } else {
         output.push_str("Selected: none\n");
     }
@@ -671,9 +718,11 @@ pub fn render_route(report: &RouteReport) -> String {
         output.push_str("\nCandidates:\n");
         for candidate in &report.candidates {
             output.push_str(&format!(
-                "- {} {:.3}: {}\n",
+                "- {} {:.3} (base {:.3}, policy {:+.3}): {}\n",
                 candidate.name,
                 candidate.score,
+                candidate.base_score,
+                candidate.policy_score,
                 candidate.path.display()
             ));
         }
@@ -743,6 +792,9 @@ fn apply_activation_anchor_gate(query: &str, decision: MatchDecision) -> MatchDe
 }
 
 fn activation_anchor_matches(query: &str, candidate: &RouteCandidate) -> bool {
+    if candidate.policy_anchor {
+        return true;
+    }
     let query_terms = tokenize(&normalize_query(query));
     let query_text = normalize_query(query);
     if query_text.contains(&candidate.name.replace('-', " "))
@@ -1199,6 +1251,7 @@ fn create_schema(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS skills_name_idx ON skills(name);
         ",
     )?;
+    router_policy::create_schema(conn)?;
     Ok(())
 }
 
@@ -1364,16 +1417,21 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
                 name: entry.name.clone(),
                 path: entry.path.clone(),
                 score,
+                base_score: score,
+                policy_score: 0.0,
                 confidence: Confidence::Low,
                 reason,
+                policy_reason: None,
                 visibility: entry.visibility,
                 has_skill_spec: entry.has_skill_spec,
                 logical_key: logical_candidate_key(entry),
                 skill_dir: entry.skill_dir.clone(),
                 source: entry.source.clone(),
+                tags: entry.tags.clone(),
+                policy_anchor: false,
+                policy_forbidden: false,
             }
         })
-        .filter(|candidate| candidate.score > 0.0)
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| {
         right
@@ -1984,13 +2042,19 @@ disable-model-invocation: true
             name: name.to_owned(),
             path,
             score,
+            base_score: score,
+            policy_score: 0.0,
             confidence,
             reason: "test".to_owned(),
+            policy_reason: None,
             visibility: Visibility::Implicit,
             has_skill_spec: false,
             logical_key: format!("skill:{name}:test"),
             skill_dir,
             source: "root-0:/tmp".to_owned(),
+            tags: Vec::new(),
+            policy_anchor: false,
+            policy_forbidden: false,
         }
     }
 
@@ -2007,13 +2071,19 @@ disable-model-invocation: true
             name: name.to_owned(),
             path,
             score: 9.0,
+            base_score: 9.0,
+            policy_score: 0.0,
             confidence: Confidence::Medium,
             reason: "test".to_owned(),
+            policy_reason: None,
             visibility: Visibility::Implicit,
             has_skill_spec: logical_key.starts_with("spec:"),
             logical_key: logical_key.to_owned(),
             skill_dir,
             source: source.to_owned(),
+            tags: Vec::new(),
+            policy_anchor: false,
+            policy_forbidden: false,
         }
     }
 

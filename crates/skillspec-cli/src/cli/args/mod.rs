@@ -20,7 +20,9 @@ pub(in crate::cli) use grammar::GrammarCommand;
 pub(in crate::cli) use imports::ImportsCommand;
 pub(in crate::cli) use install::InstallCommand;
 pub(in crate::cli) use progress::ProgressCommand;
-pub(in crate::cli) use router::{RouterCommand, RouterIndexCommand};
+pub(in crate::cli) use router::{
+    RouterCommand, RouterIndexCommand, RouterPolicyCommand, RouterProfileCommand,
+};
 pub(in crate::cli) use skills::SkillsCommand;
 pub(in crate::cli) use source::SourceCommand;
 pub(in crate::cli) use trace::TraceCommand;
@@ -367,6 +369,9 @@ pub(super) enum Command {
         /// Number of candidates to return.
         #[arg(long, default_value_t = 5)]
         top: usize,
+        /// Router policy profile to apply instead of the active profile.
+        #[arg(long)]
+        profile: Option<String>,
         /// Execution mode already selected by user or caller.
         #[arg(long, value_enum)]
         execution_mode: Option<RouterExecutionModeArg>,

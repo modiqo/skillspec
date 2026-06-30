@@ -30,7 +30,7 @@ pub mod execution {
 #[doc(hidden)]
 pub mod lifecycle {
     pub use skillspec_harness::{
-        durable_lifecycle, install, router, router_lifecycle, status, visibility,
+        durable_lifecycle, install, router, router_lifecycle, router_policy, status, visibility,
     };
 }
 
@@ -50,7 +50,9 @@ pub mod features {
 #[doc(hidden)]
 pub use features::{capability, git_context, run_loop, sensemake};
 #[doc(hidden)]
-pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
+pub use lifecycle::{
+    durable_lifecycle, install, router, router_lifecycle, router_policy, status, visibility,
+};
 #[doc(hidden)]
 pub use skillspec_authoring::{compiler, importer, metrics, port_one_shot, workspace_synthesizer};
 #[doc(hidden)]

@@ -66,27 +66,24 @@ When SkillSpec analyzes a `SKILL.md` package for import, it should not ask the
 agent to read the whole skill first. The import path starts with staging and
 mapping.
 
-For URI sources:
+For local source packages or public GitHub skill URIs:
 
 ```bash
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-```
-
-The staging command parses GitHub repository, branch, and path shape, then
-returns a local `selected_source_path` or candidate `source_path` values. This
-prevents agents from drifting into web search, raw GitHub URLs, or ad hoc sparse
-checkout loops for normal imports.
-
-For local source packages, or the local path returned by `source stage`:
-
-```bash
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>
 skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
+
+When the source is a GitHub URI, `source map` stages the repository through
+SkillSpec's sparse checkout path and prints the selected local `source_path`.
+Use that path for `source stale` and `import-skill`. If the URI resolves to
+multiple `SKILL.md` packages, the command reports candidates instead of
+guessing; the agent should ask the user which candidate to map. This prevents
+agents from drifting into web search, raw GitHub URLs, or ad hoc sparse checkout
+loops for normal imports.
 
 The agent learns the source in parts:
 
