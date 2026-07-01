@@ -1,6 +1,6 @@
 [package]
 name = "skillspec"
-version = "0.1.5"
+version = "0.1.7"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -21,12 +21,12 @@ include = [
 ]
 
 [dependencies]
-skillspec-authoring = { version = "0.1.5", path = "../skillspec-authoring" }
-skillspec-core = { version = "0.1.5", path = "../skillspec-core" }
-skillspec-doctor = { version = "0.1.5", path = "../skillspec-doctor" }
-skillspec-harness = { version = "0.1.5", path = "../skillspec-harness" }
-skillspec-runtime = { version = "0.1.5", path = "../skillspec-runtime" }
-skillspec-workspace = { version = "0.1.5", path = "../skillspec-workspace" }
+skillspec-authoring = { version = "0.1.7", path = "../skillspec-authoring" }
+skillspec-core = { version = "0.1.7", path = "../skillspec-core" }
+skillspec-doctor = { version = "0.1.7", path = "../skillspec-doctor" }
+skillspec-harness = { version = "0.1.7", path = "../skillspec-harness" }
+skillspec-runtime = { version = "0.1.7", path = "../skillspec-runtime" }
+skillspec-workspace = { version = "0.1.7", path = "../skillspec-workspace" }
 clap = { version = "4.5.40", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

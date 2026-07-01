@@ -113,6 +113,7 @@ jobs:
       - name: Publish crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATES_IO_USER_AGENT: modiqo-skillspec-release/${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -120,6 +121,37 @@ jobs:
             echo "CARGO_REGISTRY_TOKEN is required to publish to crates.io" >&2
             exit 1
           fi
+
+          crate_version_status() {
+            local package="$1"
+            local version="$2"
+            local body="${RUNNER_TEMP:-/tmp}/crates-${package}-${version}.json"
+            curl -sS -L \
+              -H "User-Agent: ${CRATES_IO_USER_AGENT}" \
+              -o "${body}" \
+              -w "%{http_code}" \
+              "https://crates.io/api/v1/crates/${package}/${version}"
+          }
+
+          publish_crate() {
+            local package="$1"
+            local version="$2"
+            local log="${RUNNER_TEMP:-/tmp}/cargo-publish-${package}-${version}.log"
+
+            if cargo publish --locked -p "${package}" 2>&1 | tee "${log}"; then
+              return 0
+            fi
+
+            if grep -Eqi 'Too Many Requests|rate.?limit' "${log}"; then
+              echo "crates.io rate limited ${package} ${version}; waiting 15 minutes before one retry" >&2
+              sleep 900
+              cargo publish --locked -p "${package}"
+              return 0
+            fi
+
+            return 1
+          }
+
           for package in \
             skillspec-core \
             skillspec-runtime \
@@ -134,10 +166,21 @@ jobs:
             if [ "${version}" = "${pkgid}" ]; then
               version="${pkgid##*#}"
             fi
-            if curl -fsSL "https://crates.io/api/v1/crates/${package}/${version}" > /dev/null; then
-              echo "${package} ${version} already exists on crates.io; skipping"
-              continue
-            fi
-            cargo publish --locked -p "${package}"
-            sleep 30
+
+            status="$(crate_version_status "${package}" "${version}")"
+            case "${status}" in
+              200)
+                echo "${package} ${version} already exists on crates.io; skipping"
+                continue
+                ;;
+              404)
+                ;;
+              *)
+                echo "Unexpected crates.io response for ${package} ${version}: HTTP ${status}" >&2
+                exit 1
+                ;;
+            esac
+
+            publish_crate "${package}" "${version}"
+            sleep 90
           done

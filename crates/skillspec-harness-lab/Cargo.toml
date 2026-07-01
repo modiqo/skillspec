@@ -1,6 +1,6 @@
 [package]
 name = "skillspec-harness-lab"
-version = "0.1.5"
+version = "0.1.7"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

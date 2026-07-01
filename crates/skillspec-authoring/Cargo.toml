@@ -1,15 +1,15 @@
 [package]
 name = "skillspec-authoring"
-version = "0.1.5"
+version = "0.1.7"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Internal authoring and import modules for the SkillSpec CLI"
 
 [dependencies]
-skillspec-core = { version = "0.1.5", path = "../skillspec-core" }
-skillspec-doctor = { version = "0.1.5", path = "../skillspec-doctor" }
-skillspec-runtime = { version = "0.1.5", path = "../skillspec-runtime" }
+skillspec-core = { version = "0.1.7", path = "../skillspec-core" }
+skillspec-doctor = { version = "0.1.7", path = "../skillspec-doctor" }
+skillspec-runtime = { version = "0.1.7", path = "../skillspec-runtime" }
 regex = "1.12.4"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

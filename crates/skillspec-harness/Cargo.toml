@@ -1,14 +1,14 @@
 [package]
 name = "skillspec-harness"
-version = "0.1.5"
+version = "0.1.7"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Internal harness lifecycle modules for the SkillSpec CLI"
 
 [dependencies]
-skillspec-core = { version = "0.1.5", path = "../skillspec-core" }
-skillspec-runtime = { version = "0.1.5", path = "../skillspec-runtime" }
+skillspec-core = { version = "0.1.7", path = "../skillspec-core" }
+skillspec-runtime = { version = "0.1.7", path = "../skillspec-runtime" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
