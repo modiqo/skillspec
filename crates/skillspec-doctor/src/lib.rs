@@ -212,6 +212,17 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
         return Ok(report);
     }
 
+    if looks_like_explicit_local_target(target) {
+        let cwd = std::env::current_dir()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| "<unknown>".to_owned());
+        return Err(Error::InvalidInput {
+            message: format!(
+                "doctor target {target:?} does not exist locally from {cwd}; local paths must exist before doctor runs. Use ./<path>, ../<path>, or an absolute path for local folders. Use an explicit GitHub URL or owner/repo shorthand without a trailing slash for remote sources."
+            ),
+        });
+    }
+
     let Some(remote) = remote_source::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
@@ -238,6 +249,15 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
 
 pub fn inspect(path: &Path) -> Result<DoctorReport> {
     inspect_local_target(path)
+}
+
+fn looks_like_explicit_local_target(target: &str) -> bool {
+    let trimmed = target.trim();
+    trimmed.starts_with('.')
+        || trimmed.starts_with('/')
+        || trimmed.starts_with('~')
+        || trimmed.ends_with('/')
+        || trimmed.ends_with('\\')
 }
 
 fn inspect_local_target(path: &Path) -> Result<DoctorReport> {
@@ -2035,11 +2055,23 @@ fn next_steps(
 #[cfg(test)]
 mod tests {
     use super::{
-        rewrite_remote_error, rewrite_remote_locations, DoctorCounts, DoctorReport,
+        inspect_target, rewrite_remote_error, rewrite_remote_locations, DoctorCounts, DoctorReport,
         DoctorShapeReport, SurfaceReport,
     };
     use skillspec_core::error::Error;
     use std::path::Path;
+
+    #[test]
+    fn doctor_does_not_treat_trailing_slash_local_path_as_github_shorthand() {
+        let error = inspect_target("definitely-missing-local-skill-dir/skillspec/")
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("does not exist locally"));
+        assert!(error.contains("without a trailing slash"));
+        assert!(!error.contains("git failed during clone remote skill repository"));
+        assert!(!error.contains("github.com/definitely-missing-local-skill-dir/skillspec"));
+    }
 
     #[test]
     fn rewrites_remote_error_locations() {
