@@ -1919,7 +1919,7 @@ h3 {
   right: 0;
   left: 0;
   height: 4px;
-  background: #2563eb;
+  background: #b76b12;
   content: "";
 }
 
@@ -1946,8 +1946,8 @@ h3 {
   height: 42px;
   border: 1px solid rgba(37, 33, 28, 0.22);
   border-radius: 999px;
-  background: #edf5ff;
-  color: #1d4ed8;
+  background: #fff7ed;
+  color: #9a3412;
   font-family: var(--font-display);
   font-size: 1rem;
   line-height: 1;
