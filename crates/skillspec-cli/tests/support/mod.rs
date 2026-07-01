@@ -179,8 +179,10 @@ pub(crate) fn stderr(output: &Output) -> String {
 pub(crate) fn json_stdout(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
-            "failed to parse stdout as JSON: {error}\nstdout:\n{}",
-            stdout(output)
+            "failed to parse stdout as JSON: {error}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout(output),
+            stderr(output)
         )
     })
 }

@@ -649,8 +649,9 @@ routes:
             .find(|target| target["id"] == id)
             .unwrap_or_else(|| panic!("missing target {id}"));
         assert_eq!(target["detected"], true, "{id} should be detected");
+        let target_path = target["path"].as_str().unwrap().replace('\\', "/");
         assert!(
-            target["path"].as_str().unwrap().ends_with(match id {
+            target_path.ends_with(match id {
                 "agents" => ".agents/skills",
                 "codex" => ".codex/skills",
                 "claude-local" => ".claude/skills",
