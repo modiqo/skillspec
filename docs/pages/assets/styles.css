@@ -1491,25 +1491,38 @@ h3 {
 .boom-tax-section {
   margin-bottom: 30px;
   border: 2px solid var(--line);
-  background: rgba(238, 230, 216, 0.42);
-  padding: 34px 38px;
+  background: rgba(251, 248, 240, 0.78);
+  padding: 0;
+  overflow: hidden;
 }
 
 .boom-tax-section .section-heading {
   align-items: end;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--line);
-  padding-bottom: 20px;
+  margin: 0;
+  border-bottom: 0;
+  padding: 36px 38px 8px;
+  background: var(--ink);
 }
 
 .boom-tax-section h2 {
   max-width: 980px;
+  color: var(--paper-soft);
+}
+
+.boom-tax-section .eyebrow {
+  color: #34d399;
+}
+
+.boom-tax-section .heading-link::after {
+  color: #34d399;
 }
 
 .boom-tax-lede {
-  max-width: 1080px;
-  margin: 0 0 24px;
-  color: #4f4942;
+  max-width: none;
+  margin: 0;
+  padding: 0 38px 34px;
+  background: var(--ink);
+  color: rgba(251, 248, 240, 0.74);
   font-size: 1.18rem;
   line-height: 1.72;
 }
@@ -1517,22 +1530,21 @@ h3 {
 .boom-metric-grid {
   display: grid;
   grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr));
-  margin-top: 28px;
-  border-top: 1px solid var(--line-soft);
-  border-left: 1px solid var(--line-soft);
+  gap: 12px;
+  margin: 20px 22px 0;
 }
 
 .boom-metric {
   display: grid;
   align-content: space-between;
   min-height: 214px;
-  border-right: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
+  border: 1px solid var(--line-soft);
   padding: 22px;
-  background: rgba(251, 248, 240, 0.64);
+  background: #ffffff;
 }
 
 .boom-metric-primary {
+  border-color: var(--ink);
   background: var(--ink);
   color: var(--paper-soft);
 }
@@ -1580,9 +1592,8 @@ h3 {
 .tax-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 28px;
-  border-top: 1px solid var(--line-soft);
-  border-left: 1px solid var(--line-soft);
+  gap: 12px;
+  margin: 14px 22px 0;
 }
 
 .tax-card {
@@ -1590,10 +1601,15 @@ h3 {
   grid-template-rows: auto 1fr auto;
   gap: 18px;
   min-width: 0;
-  border-right: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
+  border: 1px solid var(--line-soft);
   padding: 24px;
-  background: rgba(255, 255, 255, 0.42);
+  background: #ffffff;
+}
+
+.tax-card:nth-child(2) {
+  border-color: var(--ink);
+  background: #111827;
+  color: #f8fafc;
 }
 
 .tax-card-header {
@@ -1617,9 +1633,18 @@ h3 {
   line-height: 1;
 }
 
+.tax-card:nth-child(2) .tax-card-header span {
+  border-color: rgba(248, 250, 252, 0.32);
+  color: #93c5fd;
+}
+
 .tax-card h3 {
   margin: 0;
   font-size: 1.28rem;
+}
+
+.tax-card:nth-child(2) h3 {
+  color: #ffffff;
 }
 
 .tax-card p {
@@ -1628,9 +1653,19 @@ h3 {
   line-height: 1.68;
 }
 
+.tax-card:nth-child(2) p {
+  color: rgba(248, 250, 252, 0.72);
+}
+
 .tax-evidence {
-  border-left: 2px solid var(--line);
-  padding-left: 14px;
+  border: 1px solid var(--line-soft);
+  padding: 14px;
+  background: rgba(246, 241, 232, 0.62);
+}
+
+.tax-card:nth-child(2) .tax-evidence {
+  border-color: rgba(248, 250, 252, 0.24);
+  background: rgba(248, 250, 252, 0.08);
 }
 
 .tax-evidence strong {
@@ -1642,16 +1677,25 @@ h3 {
   text-transform: uppercase;
 }
 
+.tax-card:nth-child(2) .tax-evidence strong {
+  color: #bfdbfe;
+}
+
 .tax-evidence span {
   display: block;
   color: #5a534b;
   line-height: 1.48;
 }
 
+.tax-card:nth-child(2) .tax-evidence span {
+  color: rgba(248, 250, 252, 0.78);
+}
+
 .boom-sources {
-  margin-top: 24px;
-  border-top: 2px solid var(--line);
-  padding-top: 18px;
+  margin: 18px 22px 22px;
+  border: 1px solid var(--line-soft);
+  padding: 18px;
+  background: rgba(238, 230, 216, 0.42);
 }
 
 .boom-sources h3 {
@@ -1683,6 +1727,52 @@ h3 {
   font-weight: 760;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .boom-tax-section {
+    padding: 0;
+  }
+
+  .boom-tax-section .section-heading {
+    padding: 28px 22px 8px;
+  }
+
+  .boom-tax-lede {
+    padding: 0 22px 28px;
+    font-size: 1.08rem;
+  }
+
+  .boom-metric-grid,
+  .tax-grid {
+    margin: 14px;
+  }
+
+  .tax-card,
+  .boom-metric {
+    padding: 20px;
+  }
+
+  .boom-sources {
+    margin: 14px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .boom-tax-section .section-heading {
+    padding: 24px 18px 6px;
+  }
+
+  .boom-tax-lede {
+    padding: 0 18px 24px;
+  }
+
+  .boom-metric-grid,
+  .tax-grid,
+  .boom-sources {
+    margin: 10px;
+  }
 }
 
 .load-bearing-section {
@@ -3612,7 +3702,6 @@ pre code {
 
   .request-panel,
   .private-note,
-  .boom-tax-section,
   .load-bearing-section,
   .operating-loop-section,
   .contract-contrast,
@@ -3785,7 +3874,6 @@ pre code {
 
   .request-panel,
   .private-note,
-  .boom-tax-section,
   .load-bearing-section,
   .operating-loop-section,
   .contract-contrast,
