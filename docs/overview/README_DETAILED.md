@@ -845,12 +845,12 @@ fixtures/   sample skills and expected outputs
 
 Useful examples:
 
-- [examples/rote-computer/skill.spec.yml](../examples/rote-computer/skill.spec.yml)
-- [examples/durable-executor/skill.spec.yml](../examples/durable-executor/skill.spec.yml)
-- [examples/generic-skill-creator/skill.spec.yml](../examples/generic-skill-creator/skill.spec.yml)
-- [examples/local-csv-report/skill.spec.yml](../examples/local-csv-report/skill.spec.yml)
-- [examples/pdf-processing/skill.spec.yml](../examples/pdf-processing/skill.spec.yml)
-- [examples/before-after/](../examples/before-after/) shows a prose skill before
+- [examples/rote-computer/skill.spec.yml](../../examples/rote-computer/skill.spec.yml)
+- [examples/durable-executor/skill.spec.yml](../../examples/durable-executor/skill.spec.yml)
+- [examples/generic-skill-creator/skill.spec.yml](../../examples/generic-skill-creator/skill.spec.yml)
+- [examples/local-csv-report/skill.spec.yml](../../examples/local-csv-report/skill.spec.yml)
+- [examples/pdf-processing/skill.spec.yml](../../examples/pdf-processing/skill.spec.yml)
+- [examples/before-after/](../../examples/before-after/) shows a prose skill before
   and after a SkillSpec-backed port.
 
 Installable examples are folder-shaped and include a generated `SKILL.md`
@@ -904,22 +904,22 @@ skillspec deps check skill.spec.yml
 
 ## Community And RFC
 
-- [docs/03-rfc-v0.md](03-rfc-v0.md) is the RFC-style announcement draft.
-- [docs/01-why-skillspec.md](01-why-skillspec.md) explains why structured
+- [docs/community/03-rfc-v0.md](../community/03-rfc-v0.md) is the RFC-style announcement draft.
+- [docs/overview/01-why-skillspec.md](01-why-skillspec.md) explains why structured
   behavior contracts help.
-- [docs/why-skillspec-demo/](why-skillspec-demo/) contains a demo-ready prose versus
+- [docs/examples/why-skillspec-demo/](../examples/why-skillspec-demo/) contains a demo-ready prose versus
   SkillSpec comparison.
-- [docs/02-prose-vs-skillspec.md](02-prose-vs-skillspec.md) compares prose-only
+- [docs/overview/02-prose-vs-skillspec.md](02-prose-vs-skillspec.md) compares prose-only
   skills with SkillSpec-backed skills.
-- [docs/04-community-outreach.md](04-community-outreach.md) names the launch
+- [docs/community/04-community-outreach.md](../community/04-community-outreach.md) names the launch
   audiences and the specific ask.
-- [DISCUSSIONS.md](../DISCUSSIONS.md) defines recommended GitHub Discussions
+- [DISCUSSIONS.md](../../DISCUSSIONS.md) defines recommended GitHub Discussions
   categories.
-- [CONTRIBUTING.md](../CONTRIBUTING.md) describes local development, spec changes,
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) describes local development, spec changes,
   and golden snapshot updates.
-- [docs/05-good-first-issues.md](05-good-first-issues.md) lists starter issues
+- [docs/community/05-good-first-issues.md](../community/05-good-first-issues.md) lists starter issues
   for contributors.
-- [docs/06-community-posts.md](06-community-posts.md) contains short launch post
+- [docs/community/06-community-posts.md](../community/06-community-posts.md) contains short launch post
   drafts.
 
 Repo-local skills live in `.claude/skills/<name>/` and are checked in despite
@@ -936,15 +936,15 @@ common global ignores for `.claude*`. Each one keeps:
 
 SkillSpec v0 has a formal grammar and relationship model:
 
-- [spec/grammar.md](../spec/grammar.md) defines the v0 tree.
-- [spec/relationships.md](../spec/relationships.md) explains how concepts
+- [spec/grammar.md](../../spec/grammar.md) defines the v0 tree.
+- [spec/relationships.md](../../spec/relationships.md) explains how concepts
   associate.
-- [spec/rules.md](../spec/rules.md) defines rule evaluation and negative
+- [spec/rules.md](../../spec/rules.md) defines rule evaluation and negative
   steering.
-- [spec/trace.md](../spec/trace.md) defines append-only decision traces.
-- [spec/imports.md](../spec/imports.md) defines import resolution, sections, and
+- [spec/trace.md](../../spec/trace.md) defines append-only decision traces.
+- [spec/imports.md](../../spec/imports.md) defines import resolution, sections, and
   nesting.
-- [spec/skill.spec.schema.json](../spec/skill.spec.schema.json) is the strict JSON
+- [spec/skill.spec.schema.json](../../spec/skill.spec.schema.json) is the strict JSON
   schema for typed v0 fields.
 
 The core association is:
@@ -972,5 +972,5 @@ still moving. The current focus is proving that existing prose skills can be
 ported into structured, testable, cross-harness behavior without losing their
 source material.
 
-See [roadmap.md](../roadmap.md) for what is distinctive today and where the project
+See [roadmap.md](../../roadmap.md) for what is distinctive today and where the project
 is not yet outstanding.

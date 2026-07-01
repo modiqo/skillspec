@@ -94,8 +94,8 @@ from reportlab.pdfgen import canvas
     assert!(text.contains("What This Measures"));
     assert!(text.contains("Agent follow-through risk:"));
     assert!(text.contains("Discovery risk:"));
-    assert!(text.contains("docs/00-skills-reliability-gap.md"));
-    assert!(text.contains("docs/08-contract-trace-methodology.md"));
+    assert!(text.contains("docs/overview/00-skills-reliability-gap.md"));
+    assert!(text.contains("docs/overview/08-contract-trace-methodology.md"));
     Ok(())
 }
 

@@ -40,7 +40,7 @@ SkillSpec applies that lesson to skills: keep the human instructions, but move t
 
 This document is the conceptual argument. For a runnable side-by-side demo of
 the same argument, see
-[docs/why-skillspec-demo/README.md](why-skillspec-demo/README.md). The demo
+[docs/examples/why-skillspec-demo/README.md](../examples/why-skillspec-demo/README.md). The demo
 package includes a prose-only `SKILL.md`, a SkillSpec-backed loader, a runnable
 `skill.spec.yml`, and a table designed for launch/demo material.
 

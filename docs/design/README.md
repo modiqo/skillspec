@@ -24,65 +24,65 @@ This order matters because SkillSpec is a contract. A design document may explai
 intent, but only the model, parser, schema, tests, and reference docs can define
 what the current implementation accepts.
 
-## Reading Order
+## Catalog
 
-Read the numbered docs in filename order. `README.md` is the index and stays
-unnumbered; every other file is prefixed to preserve the intended sequence in
-directory listings.
+The numeric prefixes preserve the original reading order. The subfolders make
+review ownership explicit: `core`, `authoring`, `runtime`, `router`, and
+`operations`.
 
 | Order | Doc | Purpose |
 | --- | --- | --- |
-| 01 | [SkillSpec As Contract](01-spec-as-contract.md) | Why SkillSpec is a behavior contract rather than prose instructions, a prompt language, or a workflow engine. |
-| 02 | [Grammar And Conformance](02-grammar-and-conformance.md) | The grammar surface, typed fields, references, validation rules, schema strictness, and conformance expectations. |
-| 03 | [Package Anatomy](03-package-anatomy.md) | How the thin `SKILL.md` loader, `skill.spec.yml`, and dependency manifests fit together. |
-| 04 | [Skill Authoring Lifecycle](04-skill-authoring-lifecycle.md) | How a skill moves from prose to structured SkillSpec, including import, review, execution, and iteration. |
-| 05 | [Progressive Sensemaking](05-progressive-sensemaking.md) | How an agent should orient through `sensemake`, `decide`, `query`, and `refs` instead of loading the whole spec file. |
-| 06 | [Rules, Routes, And Decision Algebra](06-rules-routes-and-decision-algebra.md) | How routes, rules, predicates, forbids, allows, elicitations, route order, and after-success closures combine. |
-| 07 | [State Machines, Handoffs, And Jumps](07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
-| 08 | [Imports, Resources, Code, And Recipes](08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
-| 09 | [Phase Tool Boundaries](09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
-| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, quiet progress checks, quiet trace alignment, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
-| 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
-| 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
-| 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
-| 14 | [Skill Router](14-skill-router.md) | How the optional router indexes large skill libraries, applies native Codex and Claude visibility controls, detects out-of-band skills, and preserves a manifest-backed restore path. |
-| 15 | [Capability Bootstrap](15-capability-bootstrap.md) | How durable-executor uses local capability seeds under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet. |
-| 16 | [Command Log](16-command-log.md) | A scannable command table with implemented command names, important args/options, explanations, and realistic examples. |
-| 17 | [Design Documentation QA Process](17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |
-| 18 | [Source Map Progressive Reader](18-source-map-progressive-reader.md) | How `skillspec source map/query/coverage/stale` lets imports navigate large Markdown skill sources by exact handles before `import-skill --source-map`. |
-| 19 | [Workspace Authoring Graph](19-workspace-authoring-graph.md) | How source-shape detection chooses single-skill, multi-skill, plugin-shaped, or revision flow, and how `skillspec workspace map/validate/import/converge/compile/install` handles workspace roots before install. |
-| 20 | [Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md) | How SkillSpec separates wall-clock speed from token economy, then adds spec caching, workspace incremental cache, parallel fanout, batching, and source reuse. |
-| 21 | [One-Shot Porting Workflow](21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated direct-run metric recording for one atomic prose skill without replacing workspace or revision flows. |
-| 22 | [Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md) | How `skillspec doctor` scores static skill risk: frontmatter discovery, activation/context load, obligation position, proof gaps, workspace/package shape, contract mitigation, cited basis registry, and policy-threshold model. |
-| 23 | [Guided Run Loop From Doctor Dogfood](23-guided-run-loop-from-doctor-dogfood.md) | Why doctor dogfood led to moving trampoline guidance into `run-loop --guide agent`, how the CLI tracks current/next/end actions, how resume uses persistent traces, and how the self trampoline stays optimal. |
-| 24 | [Guided Trampoline](24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
-| 25 | [Progressive Agent Guidance](25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
-| 26 | [Plugin Marketplace Install](26-plugin-marketplace-install.md) | How the repo is packaged as Claude and Codex plugin marketplaces, how official install differs from local `skillspec install skill`, and how validation should run before release. |
-| 27 | [Public Doctor Reports](27-public-doctor-reports.md) | How CI dogfoods `skillspec doctor` on the SkillSpec self skill, and how public issue-form requests run doctor against public GitHub skill URLs without executing target repo code or touching private repositories. |
-| 28 | [Router Guard Hooks](28-router-guard-hooks.md) | How router install/enable/update/disable manages harness hooks so router-first readiness can be checked before skill selection. |
-| 29 | [Internal Domain Facades](29-internal-domain-facades.md) | How the CLI now calls internal domain facades before implementation modules, preserving command contracts while preparing for future crate extraction. |
-| 30 | [Testing Matrix](30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
-| 31 | [Controlled Harness Lab](31-controlled-harness-lab.md) | Proposal for no-Docker sandbox harness simulation using isolated homes, fake harness roots, pseudo-harness traces, and optional real harness smoke runs. |
-| 32 | [Router Duplicate Root Selection](32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
-| 33 | [Router Provider Neutrality](33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
-| 34 | [Router Policy Profiles And Passthrough](34-router-policy-profiles-and-passthrough.md) | Proposed provider-neutral router policy layer for ordered preferences, soft and hard rule modes, temporary passthrough profiles, scheduler control, and auditable route explanations. |
-| 35 | [Shape-Specific Checklist Generation](35-shape-specific-checklists.md) | Proposed generated checklist contracts for doctor, import, and run workflows, with common invariants plus single-skill, multi-skill, and plugin-shaped source templates. |
+| 01 | [SkillSpec As Contract](core/01-spec-as-contract.md) | Why SkillSpec is a behavior contract rather than prose instructions, a prompt language, or a workflow engine. |
+| 02 | [Grammar And Conformance](core/02-grammar-and-conformance.md) | The grammar surface, typed fields, references, validation rules, schema strictness, and conformance expectations. |
+| 03 | [Package Anatomy](core/03-package-anatomy.md) | How the thin `SKILL.md` loader, `skill.spec.yml`, and dependency manifests fit together. |
+| 04 | [Skill Authoring Lifecycle](authoring/04-skill-authoring-lifecycle.md) | How a skill moves from prose to structured SkillSpec, including import, review, execution, and iteration. |
+| 05 | [Progressive Sensemaking](runtime/05-progressive-sensemaking.md) | How an agent should orient through `sensemake`, `decide`, `query`, and `refs` instead of loading the whole spec file. |
+| 06 | [Rules, Routes, And Decision Algebra](core/06-rules-routes-and-decision-algebra.md) | How routes, rules, predicates, forbids, allows, elicitations, route order, and after-success closures combine. |
+| 07 | [State Machines, Handoffs, And Jumps](core/07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
+| 08 | [Imports, Resources, Code, And Recipes](core/08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
+| 09 | [Phase Tool Boundaries](core/09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
+| 10 | [Runtime Plan Act Progress Loop](runtime/10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, quiet progress checks, quiet trace alignment, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
+| 11 | [Execution Progress Ledger](runtime/11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
+| 12 | [Traces And Alignment](runtime/12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
+| 13 | [Completion Alignment And Token Reporting](runtime/13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
+| 14 | [Skill Router](router/14-skill-router.md) | How the optional router indexes large skill libraries, applies native Codex and Claude visibility controls, detects out-of-band skills, and preserves a manifest-backed restore path. |
+| 15 | [Capability Bootstrap](runtime/15-capability-bootstrap.md) | How durable-executor uses local capability seeds under `~/.skillspec/capabilities/` when no domain SkillSpec exists yet. |
+| 16 | [Command Log](operations/16-command-log.md) | A scannable command table with implemented command names, important args/options, explanations, and realistic examples. |
+| 17 | [Design Documentation QA Process](operations/17-qa-process.md) | The detailed review checklist used to keep the docs aligned with implementation. |
+| 18 | [Source Map Progressive Reader](authoring/18-source-map-progressive-reader.md) | How `skillspec source map/query/coverage/stale` lets imports navigate large Markdown skill sources by exact handles before `import-skill --source-map`. |
+| 19 | [Workspace Authoring Graph](authoring/19-workspace-authoring-graph.md) | How source-shape detection chooses single-skill, multi-skill, plugin-shaped, or revision flow, and how `skillspec workspace map/validate/import/converge/compile/install` handles workspace roots before install. |
+| 20 | [Performance, Token Economy, And Incremental Processing](operations/20-performance-token-speed.md) | How SkillSpec separates wall-clock speed from token economy, then adds spec caching, workspace incremental cache, parallel fanout, batching, and source reuse. |
+| 21 | [One-Shot Porting Workflow](authoring/21-one-shot-porting.md) | How `skillspec port-one-shot` bundles grammar preflight, source mapping, mechanical import, QA, compile, and estimated direct-run metric recording for one atomic prose skill without replacing workspace or revision flows. |
+| 22 | [Doctor Agent Drift Risk](operations/22-doctor-agent-drift-risk.md) | How `skillspec doctor` scores static skill risk: frontmatter discovery, activation/context load, obligation position, proof gaps, workspace/package shape, contract mitigation, cited basis registry, and policy-threshold model. |
+| 23 | [Guided Run Loop From Doctor Dogfood](runtime/23-guided-run-loop-from-doctor-dogfood.md) | Why doctor dogfood led to moving trampoline guidance into `run-loop --guide agent`, how the CLI tracks current/next/end actions, how resume uses persistent traces, and how the self trampoline stays optimal. |
+| 24 | [Guided Trampoline](runtime/24-guided-trampoline.md) | How `run-loop --guide agent` moves SkillSpec traversal intelligence out of the activated `SKILL.md` trampoline and into a stateful CLI guide with start/current/end anchors and resume state. |
+| 25 | [Progressive Agent Guidance](runtime/25-progressive-agent-guidance.md) | How source staging/mapping, run-loop guidance, progress records, alignment summaries, workspace summaries, and doctor risk analysis use the CLI as an agent-facing conduit for token-efficient deterministic execution. |
+| 26 | [Plugin Marketplace Install](operations/26-plugin-marketplace-install.md) | How the repo is packaged as Claude and Codex plugin marketplaces, how official install differs from local `skillspec install skill`, and how validation should run before release. |
+| 27 | [Public Doctor Reports](operations/27-public-doctor-reports.md) | How CI dogfoods `skillspec doctor` on the SkillSpec self skill, and how public issue-form requests run doctor against public GitHub skill URLs without executing target repo code or touching private repositories. |
+| 28 | [Router Guard Hooks](router/28-router-guard-hooks.md) | How router install/enable/update/disable manages harness hooks so router-first readiness can be checked before skill selection. |
+| 29 | [Internal Domain Facades](operations/29-internal-domain-facades.md) | How the CLI now calls internal domain facades before implementation modules, preserving command contracts while preparing for future crate extraction. |
+| 30 | [Testing Matrix](operations/30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
+| 31 | [Controlled Harness Lab](operations/31-controlled-harness-lab.md) | Proposal for no-Docker sandbox harness simulation using isolated homes, fake harness roots, pseudo-harness traces, and optional real harness smoke runs. |
+| 32 | [Router Duplicate Root Selection](router/32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
+| 33 | [Router Provider Neutrality](router/33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
+| 34 | [Router Policy Profiles And Passthrough](router/34-router-policy-profiles-and-passthrough.md) | Proposed provider-neutral router policy layer for ordered preferences, soft and hard rule modes, temporary passthrough profiles, scheduler control, and auditable route explanations. |
+| 35 | [Shape-Specific Checklist Generation](authoring/35-shape-specific-checklists.md) | Proposed generated checklist contracts for doctor, import, and run workflows, with common invariants plus single-skill, multi-skill, and plugin-shaped source templates. |
 
 ## Visual Explainers
 
-The [explained](explained/README.md) subdirectory is the companion visual layer.
-It is intentionally separate from the numbered design-doc sequence: each file is
-a small diagram-first explainer that points back to the deeper design docs.
+The [visual explainers](../visuals/explainers/README.md) live outside
+`docs/design/` so design records remain implementation-facing. Each explainer is
+a small diagram-first guide that points back to the deeper design docs.
 
 Read these when introducing SkillSpec to someone who needs the system shape
 before the full contract detail:
 
 | Order | Explainer | Purpose |
 | --- | --- | --- |
-| 01 | [Import To Release](explained/01-import-to-release.md) | Source map, scaffold, progressive authoring, QA, compile, and release gates. |
-| 02 | [Runtime Trampoline And Alignment](explained/02-runtime-trampoline-and-alignment.md) | Thin loader, `plan`, `act`, OODA loop, progress ledger, and alignment. |
-| 03 | [Router Mode](explained/03-router-mode.md) | Explicit-only skill catalog, router index, out-of-band repair, and router lifecycle. |
-| 04 | [Durable Executor](explained/04-durable-executor.md) | Durable first-hop execution, capability seeds, handoffs, workspace evidence, synthesis, and durable lifecycle. |
+| 01 | [Import To Release](../visuals/explainers/01-import-to-release.md) | Source map, scaffold, progressive authoring, QA, compile, and release gates. |
+| 02 | [Runtime Trampoline And Alignment](../visuals/explainers/02-runtime-trampoline-and-alignment.md) | Thin loader, `plan`, `act`, OODA loop, progress ledger, and alignment. |
+| 03 | [Router Mode](../visuals/explainers/03-router-mode.md) | Explicit-only skill catalog, router index, out-of-band repair, and router lifecycle. |
+| 04 | [Durable Executor](../visuals/explainers/04-durable-executor.md) | Durable first-hop execution, capability seeds, handoffs, workspace evidence, synthesis, and durable lifecycle. |
 
 ## Evidence Map
 
@@ -90,32 +90,32 @@ Every design claim should be grounded in one or more of these sources:
 
 | Topic | Primary implementation and reference sources |
 | --- | --- |
-| Contract semantics and non-goals | `spec/README.md`, `spec/semantics.md`, `spec/grammar.md`, `docs/01-why-skillspec.md`, `docs/02-prose-vs-skillspec.md` |
+| Contract semantics and non-goals | `spec/README.md`, `spec/semantics.md`, `spec/grammar.md`, `docs/overview/01-why-skillspec.md`, `docs/overview/02-prose-vs-skillspec.md` |
 | Top-level grammar shape | `crates/skillspec-core/src/spec/model.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Validation behavior | `crates/skillspec-core/src/spec/parser/validation.rs`, `conformance/valid/`, `conformance/invalid/` |
 | Route and rule decisions | `crates/skillspec-runtime/src/decision.rs`, `spec/semantics.md`, `spec/relationships.md` |
 | Progressive sensemaking | `crates/skillspec-cli/src/features/sensemake.rs`, `crates/skillspec-authoring/src/compiler.rs` |
 | Runtime phase loop | `crates/skillspec-runtime/src/act.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-cli/src/cli/dispatch/`, `spec/commandspec.md` |
-| Progressive agent guidance | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `docs/design/25-progressive-agent-guidance.md` |
+| Progressive agent guidance | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `docs/design/runtime/25-progressive-agent-guidance.md` |
 | Phase tool boundaries | `crates/skillspec-core/src/spec/model.rs`, `crates/skillspec-runtime/src/act.rs`, `spec/grammar.md`, `spec/skill.spec.schema.json` |
 | Command log | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `spec/commandspec.md`, command help output |
 | Imports and local loading | `spec/imports.md`, `crates/skillspec-core/src/spec/imports.rs`, `crates/skillspec-core/src/spec/parser/validation.rs` |
-| Prose import scaffolding | `crates/skillspec-authoring/src/importer.rs`, `docs/02-prose-vs-skillspec.md`, `docs/design/21-one-shot-porting.md` |
-| One-shot porting | `crates/skillspec-authoring/src/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `docs/design/21-one-shot-porting.md` |
-| Source-map progressive imports | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/18-source-map-progressive-reader.md` |
-| Workspace authoring graph | `crates/skillspec-workspace/src/lib.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
-| Doctor agent drift risk | `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
-| Guided run-loop and trampoline dogfood | `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/24-guided-trampoline.md` |
-| Shape-specific checklist generation | `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/35-shape-specific-checklists.md` |
-| Performance and token economy | `crates/skillspec-authoring/src/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-workspace/src/import.rs`, `docs/design/20-performance-token-speed.md` |
+| Prose import scaffolding | `crates/skillspec-authoring/src/importer.rs`, `docs/overview/02-prose-vs-skillspec.md`, `docs/design/authoring/21-one-shot-porting.md` |
+| One-shot porting | `crates/skillspec-authoring/src/port_one_shot.rs`, `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `docs/design/authoring/21-one-shot-porting.md` |
+| Source-map progressive imports | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/authoring/18-source-map-progressive-reader.md` |
+| Workspace authoring graph | `crates/skillspec-workspace/src/lib.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/authoring/19-workspace-authoring-graph.md` |
+| Doctor agent drift risk | `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/overview/00-skills-reliability-gap.md`, `docs/overview/08-contract-trace-methodology.md`, `docs/design/operations/22-doctor-agent-drift-risk.md` |
+| Guided run-loop and trampoline dogfood | `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/runtime/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/runtime/24-guided-trampoline.md` |
+| Shape-specific checklist generation | `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/authoring/35-shape-specific-checklists.md` |
+| Performance and token economy | `crates/skillspec-authoring/src/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-workspace/src/import.rs`, `docs/design/operations/20-performance-token-speed.md` |
 | Thin loader generation | `crates/skillspec-authoring/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-runtime/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
-| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/`, `docs/design/32-router-duplicate-root-selection.md`, `docs/design/33-router-execution-policy-gate.md`, `docs/design/34-router-policy-profiles-and-passthrough.md` |
+| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/`, `docs/design/router/32-router-duplicate-root-selection.md`, `docs/design/router/33-router-execution-policy-gate.md`, `docs/design/router/34-router-policy-profiles-and-passthrough.md` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `crates/skillspec-runtime/src/align/ledger.rs`, `crates/skillspec-runtime/src/align/types.rs` |
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
-| Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
-| Release-candidate testing | `Justfile`, `.github/workflows/ci.yml`, `crates/skillspec-cli/tests/cli/`, `conformance/`, `examples/`, `docs/design/30-testing-matrix.md`, `docs/design/31-controlled-harness-lab.md` |
+| Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/operations/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
+| Release-candidate testing | `Justfile`, `.github/workflows/ci.yml`, `crates/skillspec-cli/tests/cli/`, `conformance/`, `examples/`, `docs/design/operations/30-testing-matrix.md`, `docs/design/operations/31-controlled-harness-lab.md` |
 
 ## Terms Used In These Docs
 

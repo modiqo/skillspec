@@ -1,8 +1,8 @@
 # SkillSpec Visual Explainers
 
-This folder is the visual, narrative layer for SkillSpec. The numbered design
-docs in `docs/design/` explain the contract in detail; these explainers show the
-same ideas as small workflow diagrams that can be read independently.
+This folder is the visual, narrative layer for SkillSpec. The design docs under
+`docs/design/` explain the contract in detail; these explainers show the same
+ideas as small workflow diagrams that can be read independently.
 
 Use this folder when someone needs to understand the shape of the system before
 reading the full design docs.
@@ -37,10 +37,10 @@ Start here for quick explanation, then read the deeper design doc:
 
 | Visual Topic | Deeper Design Docs |
 | --- | --- |
-| Import, source maps, scaffolding, release gates | `04-skill-authoring-lifecycle.md`, `18-source-map-progressive-reader.md`, `08-imports-resources-code-and-recipes.md`, `17-qa-process.md` |
-| Trampoline loader, OODA loop, progress, alignment | `03-package-anatomy.md`, `10-runtime-plan-act-progress-loop.md`, `11-execution-progress-ledger.md`, `12-traces-and-alignment.md`, `13-completion-alignment-and-token-reporting.md` |
-| Router mode and skill catalog control | `14-skill-router.md`, `16-command-log.md` |
-| Durable execution, capability seeds, and fallback | `15-capability-bootstrap.md`, `16-command-log.md`, `12-traces-and-alignment.md`, `13-completion-alignment-and-token-reporting.md` |
+| Import, source maps, scaffolding, release gates | [Skill Authoring Lifecycle](../../design/authoring/04-skill-authoring-lifecycle.md), [Source Map Progressive Reader](../../design/authoring/18-source-map-progressive-reader.md), [Imports, Resources, Code, And Recipes](../../design/core/08-imports-resources-code-and-recipes.md), [Design Documentation QA Process](../../design/operations/17-qa-process.md) |
+| Trampoline loader, OODA loop, progress, alignment | [Package Anatomy](../../design/core/03-package-anatomy.md), [Runtime Plan Act Progress Loop](../../design/runtime/10-runtime-plan-act-progress-loop.md), [Execution Progress Ledger](../../design/runtime/11-execution-progress-ledger.md), [Traces And Alignment](../../design/runtime/12-traces-and-alignment.md), [Completion Alignment And Token Reporting](../../design/runtime/13-completion-alignment-and-token-reporting.md) |
+| Router mode and skill catalog control | [Skill Router](../../design/router/14-skill-router.md), [Command Log](../../design/operations/16-command-log.md) |
+| Durable execution, capability seeds, and fallback | [Capability Bootstrap](../../design/runtime/15-capability-bootstrap.md), [Command Log](../../design/operations/16-command-log.md), [Traces And Alignment](../../design/runtime/12-traces-and-alignment.md), [Completion Alignment And Token Reporting](../../design/runtime/13-completion-alignment-and-token-reporting.md) |
 
 ## Visual Style
 

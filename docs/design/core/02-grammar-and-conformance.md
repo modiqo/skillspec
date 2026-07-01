@@ -15,7 +15,7 @@ in `spec/grammar.md`, the machine-readable schema lives in
 `crates/skillspec-core/src/spec/model.rs`.
 
 For visual orientation, use the
-[`docs/grammar-atlas/`](../grammar-atlas/README.md) companion. It renders the
+[`docs/visuals/grammar-atlas/`](../../visuals/grammar-atlas/README.md) companion. It renders the
 top-level type schema, reference graph, dataflow/loading model, invariants, and
 a worked example as SVG plates. The atlas is explanatory; the formal grammar,
 schema, Rust model, parser, and conformance fixtures remain the source of truth.

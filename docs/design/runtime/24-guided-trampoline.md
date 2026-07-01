@@ -1153,8 +1153,8 @@ Update:
 
 ```text
 spec/commandspec.md
-docs/README_DETAILED.md
-docs/design/16-command-log.md
+docs/overview/README_DETAILED.md
+docs/design/operations/16-command-log.md
 skills/skillspec/skill.spec.yml command entries
 skills/skillspec/skill.spec.yml tests
 CLI --help

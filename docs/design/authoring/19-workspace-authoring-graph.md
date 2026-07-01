@@ -567,8 +567,8 @@ Keep these surfaces aligned whenever workspace behavior changes:
 - `crates/skillspec-workspace/src/lib.rs` and submodules for graph,
   fanout, converge, compile, install, and visibility behavior;
 - `spec/commandspec.md` for the formal command inventory;
-- `docs/design/16-command-log.md` for the quick command table;
-- `docs/README_DETAILED.md` and top-level `README.md` for user workflows;
+- `docs/design/operations/16-command-log.md` for the quick command table;
+- `docs/overview/README_DETAILED.md` and top-level `README.md` for user workflows;
 - `skills/skillspec/skill.spec.yml` and generated `skills/skillspec/SKILL.md`
   for prompt-driven multiplexer behavior;
 - CLI tests in `crates/skillspec-cli/tests/cli/`;

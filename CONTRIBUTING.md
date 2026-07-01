@@ -76,7 +76,7 @@ Snapshot changes should explain whether the change is cosmetic, semantic, or a c
 
 ## Good First Contributions
 
-Start with [docs/05-good-first-issues.md](docs/05-good-first-issues.md). The best early contributions add one focused example, one compiler target, one importer improvement, or one conformance fixture with clear expected behavior.
+Start with [docs/community/05-good-first-issues.md](docs/community/05-good-first-issues.md). The best early contributions add one focused example, one compiler target, one importer improvement, or one conformance fixture with clear expected behavior.
 
 ## Security And Safety
 

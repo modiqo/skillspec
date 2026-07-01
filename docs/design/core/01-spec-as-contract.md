@@ -242,9 +242,9 @@ This doc is grounded in:
   work.
 - `spec/grammar.md`, which describes the conceptual grammar and fixed section
   structure.
-- `docs/01-why-skillspec.md`, which frames the purpose as keeping prose while
+- `docs/overview/01-why-skillspec.md`, which frames the purpose as keeping prose while
   structuring decisions.
-- `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
+- `docs/overview/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.
 - `crates/skillspec-core/src/spec/model.rs`,
   `crates/skillspec-core/src/spec/parser/validation.rs`,

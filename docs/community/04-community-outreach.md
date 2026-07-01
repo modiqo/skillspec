@@ -50,8 +50,8 @@ Ask for:
 ## Launch Checklist
 
 - Open GitHub Discussions with the categories in `DISCUSSIONS.md`.
-- Pin the RFC from `docs/03-rfc-v0.md`.
-- File the starter issues from `docs/05-good-first-issues.md`.
+- Pin the RFC from `docs/community/03-rfc-v0.md`.
+- File the starter issues from `docs/community/05-good-first-issues.md`.
 - Share the before/after example from `examples/before-after/`.
 - Link the minimum compliance gate: `validate`, `imports check`, `test`, and
   `deps check`.
