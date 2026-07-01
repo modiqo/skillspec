@@ -296,11 +296,11 @@ This doc is grounded in:
   instruction material;
 - `spec/grammar.md`, which distinguishes imports, resources, code, artifacts,
   commands, and recipes;
-- `crates/skillspec-cli/src/spec/model.rs`, which defines the typed structures and
+- `crates/skillspec-core/src/spec/model.rs`, which defines the typed structures and
   enums for imports, resources, code, artifacts, commands, and recipes;
-- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates references and orphaned
+- `crates/skillspec-core/src/spec/parser/validation.rs`, which validates references and orphaned
   imports/resources;
-- `crates/skillspec-cli/src/spec/imports.rs`, which validates local import paths,
+- `crates/skillspec-core/src/spec/imports.rs`, which validates local import paths,
   Markdown sections, and load order;
-- `crates/skillspec-cli/src/features/importer.rs`, which scaffolds imports, resources,
+- `crates/skillspec-authoring/src/importer.rs`, which scaffolds imports, resources,
   code, commands, inferred dependencies, and review notes from prose skills.

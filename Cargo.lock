@@ -952,14 +952,92 @@ version = "0.1.5"
 dependencies = [
  "clap",
  "jsonschema",
- "markdown",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-authoring",
+ "skillspec-core",
+ "skillspec-doctor",
+ "skillspec-harness",
+ "skillspec-runtime",
+ "skillspec-workspace",
+]
+
+[[package]]
+name = "skillspec-authoring"
+version = "0.1.5"
+dependencies = [
  "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "skillspec-core",
+ "skillspec-doctor",
+ "skillspec-runtime",
+]
+
+[[package]]
+name = "skillspec-core"
+version = "0.1.5"
+dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "skillspec-doctor"
+version = "0.1.5"
+dependencies = [
+ "markdown",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
+]
+
+[[package]]
+name = "skillspec-harness"
+version = "0.1.5"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
+ "skillspec-runtime",
+]
+
+[[package]]
+name = "skillspec-runtime"
+version = "0.1.5"
+dependencies = [
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-core",
+]
+
+[[package]]
+name = "skillspec-workspace"
+version = "0.1.5"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "skillspec-authoring",
+ "skillspec-core",
+ "skillspec-doctor",
+ "skillspec-harness",
 ]
 
 [[package]]

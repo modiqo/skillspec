@@ -224,13 +224,13 @@ alignment reports, refs, and harness behavior.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/spec/model.rs`, which defines `Route`, `Rule`,
+- `crates/skillspec-core/src/spec/model.rs`, which defines `Route`, `Rule`,
   `Predicate`, and `Expectation`;
-- `crates/skillspec-cli/src/execution/decision.rs`, which defines `RouteSelection` and
+- `crates/skillspec-runtime/src/decision.rs`, which defines `RouteSelection` and
   `RouteSelectionBasis`, and implements default route order, predicate matching,
   rule application, dedupe, decision events, execution-plan attachment, and
   scenario-test comparison;
-- `crates/skillspec-cli/src/spec/parser/validation.rs`, which validates route, rule,
+- `crates/skillspec-core/src/spec/parser/validation.rs`, which validates route, rule,
   elicitation, action, and test references;
 - `spec/semantics.md` and `spec/relationships.md`, which describe the intended
   meaning of routes, rules, predicates, elicitations, tests, and traces.

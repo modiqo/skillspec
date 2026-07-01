@@ -43,8 +43,21 @@ jobs:
       - name: Run tests
         run: cargo test --locked --workspace --all-targets
 
-      - name: Verify crates.io package
-        run: cargo publish --locked --dry-run -p skillspec
+      - name: Verify crate package file sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for package in \
+            skillspec-core \
+            skillspec-runtime \
+            skillspec-doctor \
+            skillspec-authoring \
+            skillspec-harness \
+            skillspec-workspace \
+            skillspec
+          do
+            cargo package --locked --list -p "${package}" > /dev/null
+          done
 
       - name: Build CLI
         shell: bash

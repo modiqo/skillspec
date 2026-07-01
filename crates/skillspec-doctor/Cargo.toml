@@ -1,0 +1,15 @@
+[package]
+name = "skillspec-doctor"
+version = "0.1.5"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Internal Doctor analysis modules for the SkillSpec CLI"
+
+[dependencies]
+skillspec-core = { version = "0.1.5", path = "../skillspec-core" }
+markdown = { version = "1.0.0", features = ["serde"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+serde_yaml = "0.9.34"
+sha2 = "0.10.9"

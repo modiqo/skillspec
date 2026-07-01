@@ -1,0 +1,156 @@
+use super::ProgressEventArg;
+use clap::Subcommand;
+use std::path::PathBuf;
+
+#[derive(Debug, Subcommand)]
+pub(in crate::cli) enum ProgressCommand {
+    #[command(about = "Show completed, current, blocked, and remaining phases")]
+    Show {
+        /// Path to a skill.spec.yml file.
+        path: PathBuf,
+        /// Trace run directory produced by plan/decide/explain --trace-dir.
+        #[arg(long)]
+        run: PathBuf,
+        /// Emit JSON instead of a concise human report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Append one structured execution/progress event to a run ledger")]
+    Record {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Event type to append.
+        #[arg(value_enum)]
+        event: ProgressEventArg,
+        /// Phase id for phase or requirement events.
+        phase: Option<String>,
+        /// Requirement id for requirement events.
+        requirement: Option<String>,
+        /// Obligation, route, closure, or elicitation id for proof events.
+        #[arg(long)]
+        id: Option<String>,
+        /// Event status, such as pass, fail, blocked, or pending.
+        #[arg(long)]
+        status: Option<String>,
+        /// Evidence kind, such as file, trace, command, or response_id.
+        #[arg(long)]
+        evidence_kind: Option<String>,
+        /// Evidence reference, such as @7 or a relative file path.
+        #[arg(long)]
+        evidence_ref: Option<String>,
+        /// Skill that emitted this progress event.
+        #[arg(long)]
+        source_skill: Option<String>,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Append a stats_collected token/workspace metrics event to a run ledger")]
+    Stats {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Rote workspace name.
+        #[arg(long)]
+        workspace: Option<String>,
+        /// Phase id whose requirement(s) this stats event satisfies.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Requirement id satisfied by this stats event. Repeat for multiple requirements.
+        #[arg(long)]
+        requirement: Vec<String>,
+        /// JSON file produced by `rote workspace stats <workspace> --json`.
+        #[arg(long)]
+        workspace_stats_json: Option<PathBuf>,
+        /// Human-readable report produced by `rote workspace stats <workspace>`.
+        #[arg(long)]
+        workspace_stats_report: Option<PathBuf>,
+        /// Total API request+response tokens.
+        #[arg(long)]
+        total_tokens: Option<u64>,
+        /// One-time context-window tokens consumed during exploration.
+        #[arg(long)]
+        context_tokens: Option<u64>,
+        /// Tokens in extracted query results.
+        #[arg(long)]
+        query_result_tokens: Option<u64>,
+        /// Cached response/source tokens before query reduction.
+        #[arg(long)]
+        response_tokens_cached: Option<u64>,
+        /// Tokens saved by query reduction or cache reuse.
+        #[arg(long)]
+        saved_tokens: Option<u64>,
+        /// Percent reduction from cached/source tokens to query-result tokens.
+        #[arg(long)]
+        reduction_percent: Option<f64>,
+        /// Estimated tokens in the compact output visible to the agent.
+        #[arg(long)]
+        agent_visible_tokens: Option<u64>,
+        /// Estimated tokens preserved in artifacts outside the prompt.
+        #[arg(long)]
+        artifact_tokens_preserved: Option<u64>,
+        /// Estimated tokens avoided by showing compact output instead of full artifacts.
+        #[arg(long)]
+        avoided_tokens: Option<u64>,
+        /// Source of the metric values, for example measured or estimated.
+        #[arg(long)]
+        metrics_source: Option<String>,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Append final_response_sent report-section proof to a run ledger")]
+    FinalResponse {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Phase id whose requirement(s) this final response event satisfies.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Requirement id satisfied by this final response event. Repeat for multiple requirements.
+        #[arg(long)]
+        requirement: Vec<String>,
+        /// Final response includes the direct result.
+        #[arg(long)]
+        result: bool,
+        /// Final response includes evidence handles or files.
+        #[arg(long)]
+        evidence: bool,
+        /// Final response includes the alignment summary.
+        #[arg(long)]
+        alignment: bool,
+        /// Final response includes token usage and token savings.
+        #[arg(long)]
+        token_savings: bool,
+        /// Human-readable event note.
+        #[arg(long)]
+        message: Option<String>,
+        /// Emit JSON for the appended event.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Checkpoint multiple structured progress events from JSONL or JSON array",
+        long_about = "Append several structured progress/proof events to execution.jsonl in one foreground checkpoint. Use --file with a JSONL batch and --summary for compact agent-facing output. The legacy --events alias is still accepted."
+    )]
+    Batch {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// JSONL file or JSON array of execution events to append.
+        #[arg(long = "file", visible_alias = "events", value_name = "EVIDENCE_BATCH")]
+        events: PathBuf,
+        /// Label printed in compact summary output.
+        #[arg(long)]
+        checkpoint: Option<String>,
+        /// Emit compact checkpoint output instead of event counts.
+        #[arg(long)]
+        summary: bool,
+        /// Emit JSON for the batch report.
+        #[arg(long)]
+        json: bool,
+    },
+}

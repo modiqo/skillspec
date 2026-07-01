@@ -10,65 +10,58 @@
 //! intentionally designed Rust API with compatibility guarantees.
 
 #[doc(hidden)]
-pub mod error;
+pub use skillspec_core::error;
+
+#[doc(hidden)]
+pub mod domain;
 
 #[doc(hidden)]
 pub mod spec {
-    pub mod grammar;
-    pub mod import_dependency_ledger;
-    pub mod imports;
-    pub mod model;
-    pub mod parser;
+    pub use skillspec_core::spec::{grammar, import_dependency_ledger, imports, model, parser};
 }
 
 #[doc(hidden)]
 pub mod execution {
-    pub mod act;
-    pub mod align;
-    pub mod command_path;
-    pub mod decision;
-    pub mod deps;
-    pub mod progress;
-    pub mod report;
-    pub mod trace;
+    pub use skillspec_runtime::{
+        act, align, command_path, decision, deps, progress, report, trace,
+    };
 }
 
 #[doc(hidden)]
 pub mod lifecycle {
-    pub mod durable_lifecycle;
-    pub mod install;
-    pub mod router;
-    pub mod router_lifecycle;
-    pub mod status;
-    pub mod visibility;
+    pub use skillspec_harness::{
+        durable_lifecycle, install, router, router_lifecycle, status, visibility,
+    };
 }
 
 #[doc(hidden)]
 pub mod features {
     pub mod capability;
-    pub mod compiler;
-    pub mod doctor;
-    pub mod git_context;
-    pub mod guide;
-    pub mod importer;
-    pub mod metrics;
-    pub mod port_one_shot;
-    pub mod remote_source;
     pub mod run_loop;
     pub mod sensemake;
-    pub mod source_map;
-    pub mod workspace;
-    pub mod workspace_synthesizer;
+
+    pub use skillspec_authoring::{
+        compiler, git_context, importer, metrics, port_one_shot, workspace_synthesizer,
+    };
+    pub use skillspec_doctor as doctor;
+    pub use skillspec_doctor::{remote_source, source_map};
 }
 
 #[doc(hidden)]
-pub use execution::{act, align, command_path, decision, deps, progress, report, trace};
-#[doc(hidden)]
-pub use features::{
-    capability, compiler, doctor, git_context, guide, importer, metrics, port_one_shot,
-    remote_source, run_loop, sensemake, source_map, workspace, workspace_synthesizer,
-};
+pub use features::{capability, git_context, run_loop, sensemake};
 #[doc(hidden)]
 pub use lifecycle::{durable_lifecycle, install, router, router_lifecycle, status, visibility};
 #[doc(hidden)]
-pub use spec::{grammar, import_dependency_ledger, imports, model, parser};
+pub use skillspec_authoring::{compiler, importer, metrics, port_one_shot, workspace_synthesizer};
+#[doc(hidden)]
+pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, parser};
+#[doc(hidden)]
+pub use skillspec_doctor as doctor;
+#[doc(hidden)]
+pub use skillspec_doctor::{remote_source, source_map};
+#[doc(hidden)]
+pub use skillspec_runtime::{
+    act, align, command_path, decision, deps, guide, progress, report, trace,
+};
+#[doc(hidden)]
+pub use skillspec_workspace as workspace;

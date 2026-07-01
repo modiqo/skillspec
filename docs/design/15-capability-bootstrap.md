@@ -19,8 +19,8 @@ The implementation keeps the mutable capability inventory outside
 ## Implemented CLI Surface
 
 The source of truth is `crates/skillspec-cli/src/features/capability.rs`, wired
-through `crates/skillspec-cli/src/cli/args.rs` and
-`crates/skillspec-cli/src/cli/dispatch.rs`.
+through `crates/skillspec-cli/src/cli/args/` and
+`crates/skillspec-cli/src/cli/dispatch/`.
 
 Implemented commands:
 

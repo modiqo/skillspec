@@ -528,12 +528,12 @@ proof rows.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/cli/dispatch.rs`, which wires `plan`, `act`, `progress`, and
+- `crates/skillspec-cli/src/cli/dispatch/`, which wires `plan`, `act`, `progress`, and
   `trace align`;
-- `crates/skillspec-cli/src/execution/act.rs`, which renders phase plans, action
+- `crates/skillspec-runtime/src/act.rs`, which renders phase plans, action
   checklists, OODA loops, transitions, and effective tool boundaries;
-- `crates/skillspec-cli/src/execution/progress.rs`, which writes `execution.jsonl` and
+- `crates/skillspec-runtime/src/progress.rs`, which writes `execution.jsonl` and
   derives `progress.json`;
-- `crates/skillspec-cli/src/execution/align.rs`, which reads decision traces and optional
+- `crates/skillspec-runtime/src/align.rs`, which reads decision traces and optional
   execution traces;
 - `spec/commandspec.md`, which documents the CLI surface.

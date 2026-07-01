@@ -258,10 +258,10 @@ agree on whether a tool was in scope.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/spec/model.rs`, which defines `ToolBoundary` and
+- `crates/skillspec-core/src/spec/model.rs`, which defines `ToolBoundary` and
   `ToolBoundaryDefault`;
-- `crates/skillspec-cli/src/execution/act.rs`, which merges entry, route, phase, and
+- `crates/skillspec-runtime/src/act.rs`, which merges entry, route, phase, and
   active forbids into the effective boundary;
 - `spec/grammar.md`, which documents `permission_required_for`;
 - `spec/skill.spec.schema.json`, which defines the schema surface;
-- generated loader output in `crates/skillspec-cli/src/features/compiler.rs`.
+- generated loader output in `crates/skillspec-authoring/src/compiler.rs`.

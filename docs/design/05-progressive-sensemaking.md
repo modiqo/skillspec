@@ -351,10 +351,10 @@ This doc is grounded in:
 - `crates/skillspec-cli/src/features/sensemake.rs`, especially `View`,
   `SensemakeReport`, the escalation list, section map, navigation hints, query
   handles, field projection, and outgoing refs;
-- `crates/skillspec-cli/src/features/compiler.rs`, which emits loader guidance to run
+- `crates/skillspec-authoring/src/compiler.rs`, which emits loader guidance to run
   `sensemake`, `decide`, `query`, `refs`, dependency checks, and trace
   alignment;
 - `examples/durable-executor/SKILL.md`, which shows the generated runtime contract and
   active checklist;
-- `crates/skillspec-cli/src/execution/decision.rs`, which defines the decision output the
+- `crates/skillspec-runtime/src/decision.rs`, which defines the decision output the
   agent must read before acting.

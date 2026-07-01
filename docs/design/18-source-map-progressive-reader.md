@@ -100,16 +100,16 @@ claiming the old evidence still applies.
 
 Keep these surfaces aligned whenever the source-map workflow changes:
 
-- `crates/skillspec-cli/src/cli/args.rs` for command shape and help text;
-- `crates/skillspec-cli/src/features/source_map.rs` for map schema and query behavior;
-- `crates/skillspec-cli/src/spec/grammar.rs` for the import sequence taught by
+- `crates/skillspec-cli/src/cli/args/` for command shape and help text;
+- `crates/skillspec-doctor/src/source_map.rs` for map schema and query behavior;
+- `crates/skillspec-core/src/spec/grammar.rs` for the import sequence taught by
   `skillspec grammar sensemake`;
 - `crates/skillspec-cli/src/features/sensemake.rs` for navigation hints;
 - `spec/commandspec.md` for the formal command inventory;
 - `docs/design/16-command-log.md` for the quick command log;
 - `skills/skillspec/source/SKILL_md.old` and `skills/skillspec/skill.spec.yml` for
   prompt-driven multiplexer behavior;
-- CLI tests in `crates/skillspec-cli/tests/cli.rs`.
+- CLI tests in `crates/skillspec-cli/tests/cli/`.
 
 ## Quality Bar
 

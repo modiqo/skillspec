@@ -273,18 +273,18 @@ replay while leaving execution obligations unproven.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/features/importer.rs`, especially `import_skill`,
+- `crates/skillspec-authoring/src/importer.rs`, especially `import_skill`,
   `imports_resources_and_code`, `commands_from_blocks`, and
   `dependencies_from_analysis`;
-- `crates/skillspec-cli/src/features/compiler.rs`, which generates thin loader skills;
-- `crates/skillspec-cli/src/cli/args.rs` and
-  `crates/skillspec-cli/src/cli/dispatch.rs`, which expose `validate`, `test`,
+- `crates/skillspec-authoring/src/compiler.rs`, which generates thin loader skills;
+- `crates/skillspec-cli/src/cli/args/` and
+  `crates/skillspec-cli/src/cli/dispatch/`, which expose `validate`, `test`,
   `decide`, `sensemake`, `query`, `refs`, `imports check`, `deps check`,
   `compile`, `import-skill`, and `trace align`;
-- `crates/skillspec-cli/src/execution/decision.rs`,
-  `crates/skillspec-cli/src/spec/imports.rs`,
-  `crates/skillspec-cli/src/execution/deps.rs`, and
-  `crates/skillspec-cli/src/execution/align.rs`, which implement the runtime
+- `crates/skillspec-runtime/src/decision.rs`,
+  `crates/skillspec-core/src/spec/imports.rs`,
+  `crates/skillspec-runtime/src/deps.rs`, and
+  `crates/skillspec-runtime/src/align.rs`, which implement the runtime
   and review surfaces;
 - `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.

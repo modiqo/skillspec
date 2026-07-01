@@ -331,9 +331,9 @@ Alignment: fail
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/execution/align.rs`, which defines alignment summaries,
+- `crates/skillspec-runtime/src/align.rs`, which defines alignment summaries,
   completion fields, token summaries, proof rows, and layer statuses;
-- `crates/skillspec-cli/src/features/compiler.rs`, which emits loader instructions for
+- `crates/skillspec-authoring/src/compiler.rs`, which emits loader instructions for
   alignment and token reporting;
 - `docs/design/12-traces-and-alignment.md`, which explains decision traces and
   execution traces;

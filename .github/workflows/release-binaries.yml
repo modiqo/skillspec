@@ -110,7 +110,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Publish crate
+      - name: Publish crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         shell: bash
@@ -120,4 +120,24 @@ jobs:
             echo "CARGO_REGISTRY_TOKEN is required to publish to crates.io" >&2
             exit 1
           fi
-          cargo publish --locked -p skillspec
+          for package in \
+            skillspec-core \
+            skillspec-runtime \
+            skillspec-doctor \
+            skillspec-authoring \
+            skillspec-harness \
+            skillspec-workspace \
+            skillspec
+          do
+            pkgid="$(cargo pkgid -p "${package}")"
+            version="${pkgid##*@}"
+            if [ "${version}" = "${pkgid}" ]; then
+              version="${pkgid##*#}"
+            fi
+            if curl -fsSL "https://crates.io/api/v1/crates/${package}/${version}" > /dev/null; then
+              echo "${package} ${version} already exists on crates.io; skipping"
+              continue
+            fi
+            cargo publish --locked -p "${package}"
+            sleep 30
+          done

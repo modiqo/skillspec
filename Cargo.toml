@@ -1,5 +1,13 @@
 [workspace]
-members = ["crates/skillspec-cli"]
+members = [
+    "crates/skillspec-cli",
+    "crates/skillspec-authoring",
+    "crates/skillspec-core",
+    "crates/skillspec-runtime",
+    "crates/skillspec-doctor",
+    "crates/skillspec-harness",
+    "crates/skillspec-workspace",
+]
 resolver = "2"
 
 [workspace.package]

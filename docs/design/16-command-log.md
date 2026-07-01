@@ -11,7 +11,7 @@ It answers four questions for each command:
 - What does a realistic invocation look like?
 
 This document is not the formal command reference. The source of truth remains
-the clap command tree in `crates/skillspec-cli/src/cli/args.rs` and the reference
+the clap command tree in `crates/skillspec-cli/src/cli/args/` and the reference
 inventory in `spec/commandspec.md`. If this table disagrees with the CLI help or
 reference spec, this table is wrong.
 
@@ -221,23 +221,25 @@ binary.
 
 This doc is grounded in:
 
-- `crates/skillspec-cli/src/cli/args.rs`, which defines the clap command tree;
-- `crates/skillspec-cli/src/cli/dispatch.rs`, which dispatches parsed commands;
+- `crates/skillspec-cli/src/cli/args/`, which defines the clap command tree;
+- `crates/skillspec-cli/src/cli/dispatch/`, which dispatches parsed commands;
+- `crates/skillspec-cli/src/domain/`, which provides the internal command-family
+  facades used by dispatch before reaching implementation modules;
 - `spec/commandspec.md`, which is the reference command inventory;
-- `crates/skillspec-cli/src/execution/act.rs`,
-  `crates/skillspec-cli/src/execution/progress.rs`,
-  `crates/skillspec-cli/src/execution/align.rs`,
-  `crates/skillspec-cli/src/execution/deps.rs`,
-  `crates/skillspec-cli/src/spec/grammar.rs`,
-  `crates/skillspec-cli/src/spec/imports.rs`,
-  `crates/skillspec-cli/src/features/workspace.rs`,
-  `crates/skillspec-cli/src/features/compiler.rs`,
-  `crates/skillspec-cli/src/features/importer.rs`,
+- `crates/skillspec-runtime/src/act.rs`,
+  `crates/skillspec-runtime/src/progress.rs`,
+  `crates/skillspec-runtime/src/align.rs`,
+  `crates/skillspec-runtime/src/deps.rs`,
+  `crates/skillspec-core/src/spec/grammar.rs`,
+  `crates/skillspec-core/src/spec/imports.rs`,
+  `crates/skillspec-workspace/src/lib.rs`,
+  `crates/skillspec-authoring/src/compiler.rs`,
+  `crates/skillspec-authoring/src/importer.rs`,
   `crates/skillspec-cli/src/features/capability.rs`,
-  `crates/skillspec-cli/src/lifecycle/install.rs`,
-  `crates/skillspec-cli/src/lifecycle/router.rs`,
-  `crates/skillspec-cli/src/lifecycle/visibility.rs`,
-  `crates/skillspec-cli/src/lifecycle/router_lifecycle.rs`, and
-  `crates/skillspec-cli/src/lifecycle/durable_lifecycle.rs`, which implement
+  `crates/skillspec-harness/src/install.rs`,
+  `crates/skillspec-harness/src/router.rs`,
+  `crates/skillspec-harness/src/visibility.rs`,
+  `crates/skillspec-harness/src/router_lifecycle.rs`, and
+  `crates/skillspec-harness/src/durable_lifecycle.rs`, which implement
   the listed command behavior;
 - `skillspec --help` and subcommand help output from the current local binary.

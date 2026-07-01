@@ -1,0 +1,761 @@
+use serde::Serialize;
+use skillspec_core::model::{
+    ExecutionPlan, Expectation, Predicate, RouteId, Rule, RuleId, ScenarioTest, SkillSpec,
+    TraceEventKind,
+};
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Decision {
+    pub input: String,
+    pub route: Option<RouteId>,
+    pub route_selection: Option<RouteSelection>,
+    pub route_order: Vec<RouteId>,
+    pub execution_plan: Option<ExecutionPlan>,
+    pub forbid: Vec<String>,
+    pub allow: BTreeMap<String, serde_yaml::Value>,
+    pub elicit: Vec<String>,
+    pub after_success: Vec<String>,
+    pub matched_rules: Vec<MatchedRule>,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct MatchedRule {
+    pub id: RuleId,
+    pub reason: Option<String>,
+}
+
+/// Final route-selection explanation for a decision.
+///
+/// The route id alone is not enough for trace alignment; the basis explains
+/// whether selection came from a rule or from default route order.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct RouteSelection {
+    /// Selected route id.
+    pub route: RouteId,
+    /// Mechanism that selected the route.
+    pub basis: RouteSelectionBasis,
+    /// Rule that caused selection, when a matched rule was involved.
+    pub rule_id: Option<RuleId>,
+    /// Human-readable reason from the matching rule or default behavior.
+    pub reason: Option<String>,
+}
+
+/// Mechanism used to select a route.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteSelectionBasis {
+    /// A matched rule selected its `prefer` route.
+    RulePrefer,
+    /// A matched rule changed route order and the first route in that order won.
+    RouteOrderDefault,
+    /// No rule selected or reordered routes; the first ranked/default route won.
+    DefaultRouteOrder,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum DecisionEvent {
+    InputReceived {
+        input: String,
+    },
+    SpecLoaded {
+        skill_id: String,
+        schema: String,
+    },
+    RuleEvaluated {
+        rule_id: RuleId,
+        matched: bool,
+    },
+    RuleMatched {
+        rule_id: RuleId,
+        reason: Option<String>,
+    },
+    RouteSelected {
+        route: RouteId,
+        basis: RouteSelectionBasis,
+        rule_id: Option<RuleId>,
+        reason: Option<String>,
+    },
+    RouteOrderSet {
+        route_order: Vec<RouteId>,
+    },
+    ForbidAdded {
+        forbid: Vec<String>,
+    },
+    AllowAdded {
+        allow: BTreeMap<String, serde_yaml::Value>,
+    },
+    ElicitationRequested {
+        elicit: Vec<String>,
+    },
+    AfterSuccessScheduled {
+        after_success: Vec<String>,
+    },
+    OutcomeRecorded {
+        route: Option<RouteId>,
+        route_selection: Option<RouteSelection>,
+        matched_rules: Vec<RuleId>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TestRun {
+    pub passed: Vec<TestCaseResult>,
+    pub failed: Vec<TestCaseResult>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TestCaseResult {
+    pub name: String,
+    pub input: String,
+    pub failures: Vec<String>,
+    pub decision: Decision,
+}
+
+pub fn decide(spec: &SkillSpec, input: &str) -> Decision {
+    decide_with_events(spec, input).decision
+}
+
+pub fn decide_with_events(spec: &SkillSpec, input: &str) -> DecisionWithEvents {
+    let mut decision = Decision {
+        input: input.to_owned(),
+        route: None,
+        route_selection: None,
+        route_order: default_route_order(spec),
+        execution_plan: None,
+        forbid: Vec::new(),
+        allow: BTreeMap::new(),
+        elicit: Vec::new(),
+        after_success: Vec::new(),
+        matched_rules: Vec::new(),
+        reason: None,
+    };
+    let mut events = vec![
+        DecisionEvent::InputReceived {
+            input: input.to_owned(),
+        },
+        DecisionEvent::SpecLoaded {
+            skill_id: spec.id.clone(),
+            schema: spec.schema.clone(),
+        },
+    ];
+    let mut route_order_selection_source: Option<(RuleId, Option<String>)> = None;
+
+    for rule in &spec.rules {
+        let matched = matches_rule(rule, input);
+        events.push(DecisionEvent::RuleEvaluated {
+            rule_id: rule.id.clone(),
+            matched,
+        });
+        if matched {
+            apply_rule(
+                &mut decision,
+                &mut events,
+                rule,
+                &mut route_order_selection_source,
+            );
+        }
+    }
+
+    if decision.route.is_none() {
+        if let Some(route) = decision.route_order.first().cloned() {
+            let (basis, rule_id, reason) =
+                if let Some((rule_id, reason)) = route_order_selection_source {
+                    (
+                        RouteSelectionBasis::RouteOrderDefault,
+                        Some(rule_id),
+                        reason,
+                    )
+                } else {
+                    (
+                        RouteSelectionBasis::DefaultRouteOrder,
+                        None,
+                        Some("selected first route by rank/default order".to_owned()),
+                    )
+                };
+            decision.route = Some(route.clone());
+            decision.route_selection = Some(RouteSelection {
+                route: route.clone(),
+                basis: basis.clone(),
+                rule_id: rule_id.clone(),
+                reason: reason.clone(),
+            });
+            events.push(DecisionEvent::RouteSelected {
+                route,
+                basis,
+                rule_id,
+                reason,
+            });
+        }
+    }
+
+    dedupe_strings(&mut decision.forbid);
+    dedupe_strings(&mut decision.elicit);
+    dedupe_strings(&mut decision.after_success);
+    decision.execution_plan = selected_route(spec, decision.route.as_ref())
+        .and_then(|route| route.execution_plan.clone());
+    events.push(DecisionEvent::OutcomeRecorded {
+        route: decision.route.clone(),
+        route_selection: decision.route_selection.clone(),
+        matched_rules: decision
+            .matched_rules
+            .iter()
+            .map(|matched| matched.id.clone())
+            .collect(),
+    });
+
+    DecisionWithEvents { decision, events }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DecisionWithEvents {
+    pub decision: Decision,
+    pub events: Vec<DecisionEvent>,
+}
+
+pub fn run_tests(spec: &SkillSpec) -> TestRun {
+    let mut passed = Vec::new();
+    let mut failed = Vec::new();
+
+    for test in &spec.tests {
+        let result = run_test(spec, test);
+        if result.failures.is_empty() {
+            passed.push(result);
+        } else {
+            failed.push(result);
+        }
+    }
+
+    TestRun { passed, failed }
+}
+
+fn run_test(spec: &SkillSpec, test: &ScenarioTest) -> TestCaseResult {
+    let decision = decide(spec, &test.input);
+    let failures = compare_expectation(&decision, &test.expect);
+    TestCaseResult {
+        name: test.name.clone(),
+        input: test.input.clone(),
+        failures,
+        decision,
+    }
+}
+
+fn compare_expectation(decision: &Decision, expectation: &Expectation) -> Vec<String> {
+    let mut failures = Vec::new();
+
+    if let Some(expected_route) = &expectation.route {
+        if decision.route.as_ref() != Some(expected_route) {
+            failures.push(format!(
+                "expected route {}, got {}",
+                expected_route.0,
+                decision
+                    .route
+                    .as_ref()
+                    .map(|route| route.0.as_str())
+                    .unwrap_or("<none>")
+            ));
+        }
+    }
+
+    if !expectation.route_order.is_empty() && decision.route_order != expectation.route_order {
+        failures.push(format!(
+            "expected route_order {:?}, got {:?}",
+            route_names(&expectation.route_order),
+            route_names(&decision.route_order)
+        ));
+    }
+    if !expectation.plan_phases.is_empty() {
+        let actual = decision
+            .execution_plan
+            .as_ref()
+            .map(|plan| {
+                plan.phases
+                    .iter()
+                    .map(|phase| phase.id.clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if expectation.plan_phases != actual {
+            failures.push(format!(
+                "expected plan_phases {:?}, got {:?}",
+                expectation.plan_phases, actual
+            ));
+        }
+    }
+    if !expectation.plan_jumps.is_empty() {
+        let actual = decision
+            .execution_plan
+            .as_ref()
+            .map(|plan| {
+                plan.phases
+                    .iter()
+                    .flat_map(|phase| {
+                        phase
+                            .jumps
+                            .iter()
+                            .map(|jump| format!("{}:{}->{}", phase.id, jump.when, jump.to_phase))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for expected in &expectation.plan_jumps {
+            if !actual.iter().any(|jump| jump == expected) {
+                failures.push(format!("expected plan_jump {expected:?}, got {:?}", actual));
+            }
+        }
+    }
+
+    for expected in &expectation.forbid {
+        if !decision.forbid.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected forbid {expected:?}"));
+        }
+    }
+    if let Some(expected) = &expectation.forbid_exact {
+        compare_string_set("forbid_exact", expected, &decision.forbid, &mut failures);
+    }
+    for expected in &expectation.not_forbid {
+        if decision.forbid.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected forbid not to contain {expected:?}"));
+        }
+    }
+
+    for expected in &expectation.after_success {
+        if !decision
+            .after_success
+            .iter()
+            .any(|actual| actual == expected)
+        {
+            failures.push(format!("expected after_success {expected:?}"));
+        }
+    }
+    if let Some(expected) = &expectation.after_success_exact {
+        compare_string_set(
+            "after_success_exact",
+            expected,
+            &decision.after_success,
+            &mut failures,
+        );
+    }
+    for expected in &expectation.not_after_success {
+        if decision
+            .after_success
+            .iter()
+            .any(|actual| actual == expected)
+        {
+            failures.push(format!(
+                "expected after_success not to contain {expected:?}"
+            ));
+        }
+    }
+
+    for expected in &expectation.elicit {
+        if !decision.elicit.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected elicit {expected:?}"));
+        }
+    }
+    if let Some(expected) = &expectation.elicit_exact {
+        compare_string_set("elicit_exact", expected, &decision.elicit, &mut failures);
+    }
+    for expected in &expectation.not_elicit {
+        if decision.elicit.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected elicit not to contain {expected:?}"));
+        }
+    }
+
+    let matched_rules = decision
+        .matched_rules
+        .iter()
+        .map(|matched| matched.id.clone())
+        .collect::<Vec<_>>();
+    for expected in &expectation.matched_rules {
+        if !matched_rules.iter().any(|actual| actual == expected) {
+            failures.push(format!("expected matched_rule {:?}", expected.0));
+        }
+    }
+    if let Some(expected) = &expectation.matched_rules_exact {
+        compare_rule_set(
+            "matched_rules_exact",
+            expected,
+            &matched_rules,
+            &mut failures,
+        );
+    }
+    for expected in &expectation.not_matched_rules {
+        if matched_rules.iter().any(|actual| actual == expected) {
+            failures.push(format!(
+                "expected matched_rules not to contain {:?}",
+                expected.0
+            ));
+        }
+    }
+
+    failures
+}
+
+fn compare_string_set(
+    label: &str,
+    expected: &[String],
+    actual: &[String],
+    failures: &mut Vec<String>,
+) {
+    let expected = expected.iter().cloned().collect::<BTreeSet<_>>();
+    let actual = actual.iter().cloned().collect::<BTreeSet<_>>();
+    if expected != actual {
+        failures.push(format!("expected {label} {:?}, got {:?}", expected, actual));
+    }
+}
+
+fn compare_rule_set(
+    label: &str,
+    expected: &[RuleId],
+    actual: &[RuleId],
+    failures: &mut Vec<String>,
+) {
+    let expected = expected
+        .iter()
+        .map(|rule| rule.0.clone())
+        .collect::<BTreeSet<_>>();
+    let actual = actual
+        .iter()
+        .map(|rule| rule.0.clone())
+        .collect::<BTreeSet<_>>();
+    if expected != actual {
+        failures.push(format!("expected {label} {:?}, got {:?}", expected, actual));
+    }
+}
+
+fn matches_rule(rule: &Rule, input: &str) -> bool {
+    matches_predicate(&rule.when, input)
+}
+
+fn matches_predicate(predicate: &Predicate, input: &str) -> bool {
+    let normalized = input.to_lowercase();
+    let mut has_condition = false;
+
+    if !predicate.user_says_any.is_empty() {
+        has_condition = true;
+        if !predicate
+            .user_says_any
+            .iter()
+            .any(|needle| contains_phrase(&normalized, &needle.to_lowercase()))
+        {
+            return false;
+        }
+    }
+
+    if !predicate.user_says_all_groups.is_empty() {
+        has_condition = true;
+        for group in &predicate.user_says_all_groups {
+            if group.is_empty() {
+                return false;
+            }
+            if !group
+                .iter()
+                .any(|needle| contains_phrase(&normalized, &needle.to_lowercase()))
+            {
+                return false;
+            }
+        }
+    }
+
+    if let Some(expected) = predicate.task_recurrence_likely {
+        has_condition = true;
+        if recurrence_likely(&normalized) != expected {
+            return false;
+        }
+    }
+
+    if let Some(expected) = predicate.domain_object_task {
+        has_condition = true;
+        if domain_object_task(&normalized) != expected {
+            return false;
+        }
+    }
+
+    if let Some(expected) = predicate.command_likely_long_running {
+        has_condition = true;
+        if long_running(&normalized) != expected {
+            return false;
+        }
+    }
+
+    if let Some(expected) = predicate.interactive_prompt_likely {
+        has_condition = true;
+        if interactive(&normalized) != expected {
+            return false;
+        }
+    }
+
+    has_condition
+}
+
+fn apply_rule(
+    decision: &mut Decision,
+    events: &mut Vec<DecisionEvent>,
+    rule: &Rule,
+    route_order_selection_source: &mut Option<(RuleId, Option<String>)>,
+) {
+    events.push(DecisionEvent::RuleMatched {
+        rule_id: rule.id.clone(),
+        reason: rule.reason.clone(),
+    });
+    if let Some(route) = &rule.prefer {
+        decision.route = Some(route.clone());
+        decision.route_selection = Some(RouteSelection {
+            route: route.clone(),
+            basis: RouteSelectionBasis::RulePrefer,
+            rule_id: Some(rule.id.clone()),
+            reason: rule.reason.clone(),
+        });
+        events.push(DecisionEvent::RouteSelected {
+            route: route.clone(),
+            basis: RouteSelectionBasis::RulePrefer,
+            rule_id: Some(rule.id.clone()),
+            reason: rule.reason.clone(),
+        });
+    }
+    if !rule.route_order.is_empty() {
+        decision.route_order = rule.route_order.clone();
+        *route_order_selection_source = Some((rule.id.clone(), rule.reason.clone()));
+        events.push(DecisionEvent::RouteOrderSet {
+            route_order: rule.route_order.clone(),
+        });
+    }
+    if !rule.forbid.is_empty() {
+        events.push(DecisionEvent::ForbidAdded {
+            forbid: rule.forbid.clone(),
+        });
+    }
+    if !rule.allow.is_empty() {
+        events.push(DecisionEvent::AllowAdded {
+            allow: rule.allow.clone(),
+        });
+    }
+    if !rule.elicit.is_empty() {
+        events.push(DecisionEvent::ElicitationRequested {
+            elicit: rule.elicit.clone(),
+        });
+    }
+    if !rule.after_success.is_empty() {
+        events.push(DecisionEvent::AfterSuccessScheduled {
+            after_success: rule.after_success.clone(),
+        });
+    }
+    decision.forbid.extend(rule.forbid.clone());
+    decision.elicit.extend(rule.elicit.clone());
+    decision.after_success.extend(rule.after_success.clone());
+    decision.allow.extend(rule.allow.clone());
+    decision.reason = rule.reason.clone().or_else(|| decision.reason.clone());
+    decision.matched_rules.push(MatchedRule {
+        id: rule.id.clone(),
+        reason: rule.reason.clone(),
+    });
+}
+
+impl DecisionEvent {
+    pub fn kind(&self) -> TraceEventKind {
+        match self {
+            Self::InputReceived { .. } => TraceEventKind::InputReceived,
+            Self::SpecLoaded { .. } => TraceEventKind::SpecLoaded,
+            Self::RuleEvaluated { .. } => TraceEventKind::RuleEvaluated,
+            Self::RuleMatched { .. } => TraceEventKind::RuleMatched,
+            Self::RouteSelected { .. } => TraceEventKind::RouteSelected,
+            Self::RouteOrderSet { .. } => TraceEventKind::RouteOrderSet,
+            Self::ForbidAdded { .. } => TraceEventKind::ForbidAdded,
+            Self::AllowAdded { .. } => TraceEventKind::AllowAdded,
+            Self::ElicitationRequested { .. } => TraceEventKind::ElicitationRequested,
+            Self::AfterSuccessScheduled { .. } => TraceEventKind::AfterSuccessScheduled,
+            Self::OutcomeRecorded { .. } => TraceEventKind::OutcomeRecorded,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self.kind() {
+            TraceEventKind::InputReceived => "input_received",
+            TraceEventKind::SpecLoaded => "spec_loaded",
+            TraceEventKind::RuleEvaluated => "rule_evaluated",
+            TraceEventKind::RuleMatched => "rule_matched",
+            TraceEventKind::RouteSelected => "route_selected",
+            TraceEventKind::RouteOrderSet => "route_order_set",
+            TraceEventKind::ForbidAdded => "forbid_added",
+            TraceEventKind::AllowAdded => "allow_added",
+            TraceEventKind::ElicitationRequested => "elicitation_requested",
+            TraceEventKind::AfterSuccessScheduled => "after_success_scheduled",
+            TraceEventKind::OutcomeRecorded => "outcome_recorded",
+        }
+    }
+}
+
+fn default_route_order(spec: &SkillSpec) -> Vec<RouteId> {
+    let mut routes = spec.routes.clone();
+    routes.sort_by_key(|route| route.rank.unwrap_or(i64::MAX));
+    routes.into_iter().map(|route| route.id).collect()
+}
+
+fn selected_route<'a>(
+    spec: &'a SkillSpec,
+    route_id: Option<&RouteId>,
+) -> Option<&'a skillspec_core::model::Route> {
+    let route_id = route_id?;
+    spec.routes.iter().find(|route| &route.id == route_id)
+}
+
+fn recurrence_likely(input: &str) -> bool {
+    [
+        "daily",
+        "weekly",
+        "monthly",
+        "every morning",
+        "every day",
+        "every week",
+        "every month",
+        "again",
+        "recurring",
+    ]
+    .iter()
+    .any(|needle| contains_phrase(input, needle))
+}
+
+fn domain_object_task(input: &str) -> bool {
+    [
+        "alert",
+        "ticket",
+        "issue",
+        "calendar",
+        "email",
+        "crm",
+        "repo",
+        "pull request",
+        "dashboard",
+        "invoice",
+        "customer",
+        "incident",
+    ]
+    .iter()
+    .any(|needle| contains_phrase(input, needle))
+}
+
+fn long_running(input: &str) -> bool {
+    [
+        "test",
+        "build",
+        "release",
+        "deploy",
+        "server",
+        "watch",
+        "tail",
+        "monitor",
+        "background process",
+        "tracked background",
+        "in the background",
+    ]
+    .iter()
+    .any(|needle| contains_phrase(input, needle))
+}
+
+fn interactive(input: &str) -> bool {
+    ["login", "auth", "mfa", "otp", "password", "prompt"]
+        .iter()
+        .any(|needle| contains_phrase(input, needle))
+}
+
+fn dedupe_strings(values: &mut Vec<String>) {
+    let mut seen = std::collections::BTreeSet::new();
+    values.retain(|value| seen.insert(value.clone()));
+}
+
+fn route_names(routes: &[RouteId]) -> Vec<&str> {
+    routes.iter().map(|route| route.0.as_str()).collect()
+}
+
+fn contains_phrase(input: &str, phrase: &str) -> bool {
+    let phrase = phrase.trim();
+    if phrase.is_empty() {
+        return false;
+    }
+    bounded_contains(input, phrase)
+        || plural_candidate(phrase).is_some_and(|plural| bounded_contains(input, &plural))
+}
+
+fn bounded_contains(input: &str, phrase: &str) -> bool {
+    let mut search_start = 0;
+    while let Some(offset) = input[search_start..].find(phrase) {
+        let start = search_start + offset;
+        let end = start + phrase.len();
+        if phrase_boundary(input, start, end) {
+            return true;
+        }
+        search_start = end;
+        if search_start >= input.len() {
+            return false;
+        }
+    }
+    false
+}
+
+fn plural_candidate(phrase: &str) -> Option<String> {
+    if phrase.ends_with('s') {
+        None
+    } else {
+        Some(format!("{phrase}s"))
+    }
+}
+
+fn phrase_boundary(input: &str, start: usize, end: usize) -> bool {
+    let before = input[..start].chars().next_back();
+    let after = input[end..].chars().next();
+    !before.is_some_and(is_identifier_char) && !after.is_some_and(is_identifier_char)
+}
+
+fn is_identifier_char(value: char) -> bool {
+    value.is_ascii_alphanumeric() || value == '_'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scenario_tests_support_exact_negative_and_matched_rule_expectations() {
+        let yaml = r#"
+schema: skillspec/v0
+id: decision.expectations
+title: Decision Expectations
+description: Exercises richer scenario assertions.
+routes:
+  - id: local
+    label: Local
+    rank: 10
+  - id: browser
+    label: Browser
+    rank: 20
+rules:
+  - id: browse_rule
+    when:
+      user_says_any: ["browse"]
+    prefer: browser
+    forbid: [native_search_as_answer]
+    reason: Browser requests must use browser route.
+tests:
+  - name: browse selects browser exactly
+    input: browse the page
+    expect:
+      route: browser
+      forbid_exact: [native_search_as_answer]
+      not_forbid: [raw_shell]
+      elicit_exact: []
+      after_success_exact: []
+      matched_rules_exact: [browse_rule]
+      not_matched_rules: []
+"#;
+        let spec = serde_yaml::from_str::<SkillSpec>(yaml).unwrap();
+        skillspec_core::parser::validate_spec(&spec).unwrap();
+
+        let result = run_tests(&spec);
+
+        assert_eq!(result.passed.len(), 1);
+        assert!(result.failed.is_empty());
+    }
+}
