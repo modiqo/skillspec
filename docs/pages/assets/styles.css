@@ -1096,8 +1096,8 @@ body {
 
 .site-header {
   display: grid;
-  grid-template-columns: minmax(170px, 0.8fr) minmax(260px, 0.48fr) auto;
-  gap: 24px;
+  grid-template-columns: minmax(170px, 0.62fr) minmax(190px, 0.44fr) minmax(0, 1.72fr);
+  gap: clamp(12px, 1.8vw, 24px);
   align-items: center;
   border-bottom: 2px solid var(--line);
   padding: 18px min(44px, 5vw);
@@ -1107,6 +1107,7 @@ body {
 .site-brand {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 1.55rem;
@@ -1114,7 +1115,7 @@ body {
 }
 
 .site-brand img {
-  width: min(210px, 42vw);
+  width: clamp(150px, 14vw, 210px);
   height: auto;
   display: block;
 }
@@ -1124,8 +1125,9 @@ body {
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  justify-self: end;
-  width: max-content;
+  justify-self: stretch;
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
   border: 2px solid var(--line);
   background: rgba(238, 230, 216, 0.58);
@@ -1133,15 +1135,19 @@ body {
 
 .site-nav a {
   display: inline-flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   border-left: 1px solid var(--line-soft);
-  padding: 13px 18px;
+  padding: 13px clamp(8px, 0.92vw, 18px);
   color: var(--muted);
-  font-size: 0.96rem;
+  font-size: clamp(0.84rem, 0.58vw + 0.34rem, 0.96rem);
   font-weight: 650;
   line-height: 1.2;
+  overflow: hidden;
   text-decoration: none;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1218,12 +1224,18 @@ body {
   align-items: center;
 }
 
+.github-link > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .star-link {
   gap: 12px;
 }
 
 .star-badge {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 5px;
   align-items: center;
   border-left: 1px solid currentColor;
@@ -3383,6 +3395,25 @@ pre code {
   text-underline-offset: 4px;
 }
 
+@media (max-width: 1280px) {
+  .site-header {
+    grid-template-columns: minmax(170px, auto) minmax(240px, 1fr);
+  }
+
+  .site-nav {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .site-nav a {
+    padding: 12px 10px;
+    font-size: 0.9rem;
+  }
+}
+
 @media (max-width: 1080px) {
   .site-header,
   .hero,
@@ -3396,10 +3427,10 @@ pre code {
   }
 
   .site-nav {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    justify-self: start;
-    width: max-content;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    justify-self: stretch;
+    width: 100%;
   }
 
   .section-heading {
