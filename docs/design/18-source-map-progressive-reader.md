@@ -27,12 +27,10 @@ That works for small files, but it is brittle for real skills:
 For imports, the expected flow is:
 
 ```bash
-# URI sources only:
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-
-# Local source path or selected_source_path from source stage:
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+# Local source path or public GitHub skill URI:
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source query <draft>/.skillspec/source-map/source-map.json code --view summary
@@ -40,16 +38,42 @@ skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <sou
 skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
 
-For URI imports, `source stage` is the authoritative URI-to-local-source gate.
-Agents should use its `selected_source_path` when there is one candidate, or ask
-the user to choose from `candidates[].source_path`. Web search, raw GitHub
-fetches, and ad hoc sparse-checkout probing are troubleshooting paths only after
-`source stage` fails and the user approves.
+For URI imports, `source map` owns the normal sparse checkout path. It stages
+the public GitHub source through the same parser used by `source stage`, maps
+the selected local source, and reports `source_path` for the later `stale` and
+`import-skill` commands. When a repo URI contains multiple `SKILL.md`
+candidates, the command refuses to guess and prints the candidate source paths.
+Use `source stage` explicitly when the task is candidate discovery, when the
+user wants a persistent checkout before mapping, or when staging needs
+troubleshooting. Web search, raw GitHub fetches, and ad hoc sparse-checkout
+probing remain troubleshooting paths only after SkillSpec staging fails and the
+user approves.
 
 Agents should query exact handles with `--view full` when they need the source
 span for a heading, code block, dependency mention, local reference, or modal
 obligation. A full file read remains acceptable only for bounded small sources
 after the source map shows that no sibling material affects the import.
+
+`source lens` is the progressive promotion view. It walks parsed Markdown blocks
+in deterministic order and defaults to one unit per call. Each unit includes:
+
+- review position and remaining count;
+- source node id, line range, preview, and source hash;
+- attached classifications and references;
+- suggested SkillSpec constructs;
+- required target kinds for proof, such as `rule`, `resource`, `code`, or
+  `dependency`.
+
+The intended loop is: inspect one lens unit, port that unit into matching
+SkillSpec constructs, validate the package draft, record the unit hash and
+target in promotion proof, then advance to the returned `next_cursor`. This is
+deliberately different from a bulk edit that rewrites every scaffold and points
+all source obligations at one generic route.
+
+Conditional workflow language is a first-class review signal. Parsed text with
+phrases such as `if`, `when`, `unless`, `only if`, or `provided that` is emitted
+as `conditional_rule_candidate` and requires a structural `rule` target in
+promotion proof.
 
 ## Parser Choice
 
@@ -117,7 +141,10 @@ The source map is evidence, not scratch. A high-quality import should show:
 
 - the source package was staged locally when remote;
 - `source-map.json` and `source-map.md` were produced;
-- `source coverage` and relevant `source query` handles were inspected;
+- `source coverage`, `source lens`, and relevant `source query` handles were
+  inspected;
+- promotion proof includes lens source hashes and construct-compatible targets
+  for every promoted source obligation;
 - dependency and code classifications were reviewed before proof or install;
 - `source stale` passed before import;
 - `import-skill --source-map` was used;

@@ -1,0 +1,309 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "10-doctor-matrix",
+  "summary": {
+    "status": "pass",
+    "cases_total": 9,
+    "cases_passed": 9,
+    "cases_failed": 0,
+    "claims_total": 40,
+    "claims_passed": 40,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "doctor_reports_non_skill_file_path_as_shape_only",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "shape_only",
+          "observed": "shape_only"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "non_skill_repository",
+          "observed": "non_skill_repository"
+        },
+        {
+          "id": "doctor.issues.no_skill_entrypoint",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "doctor_rejects_nonexistent_path",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "doctor.stderr.missing_path",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_empty_skill_without_panic",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "full",
+          "observed": "full"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "simple_skill",
+          "observed": "simple_skill"
+        },
+        {
+          "id": "doctor.issues.missing_or_malformed_frontmatter",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.issues.missing_behavior_contract",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.issues.missing_trace_proof_surface",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_simple_skill_folder",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "full",
+          "observed": "full"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "simple_skill",
+          "observed": "simple_skill"
+        },
+        {
+          "id": "doctor.score_model.primary_score_label",
+          "status": "pass",
+          "expected": "agent_follow_through_risk",
+          "observed": "agent_follow_through_risk"
+        },
+        {
+          "id": "doctor.frontmatter.name",
+          "status": "pass",
+          "expected": "review-skill",
+          "observed": "review-skill"
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_direct_skill_md_path",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "full",
+          "observed": "full"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "simple_skill",
+          "observed": "simple_skill"
+        },
+        {
+          "id": "doctor.target.normalized",
+          "status": "pass",
+          "expected": "<LAB_ROOT>/fixtures/direct-skill/SKILL.md",
+          "observed": "<LAB_ROOT>/fixtures/direct-skill/SKILL.md"
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_malformed_frontmatter",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.frontmatter.parse_status",
+          "status": "pass",
+          "expected": "invalid_yaml",
+          "observed": "invalid_yaml"
+        },
+        {
+          "id": "doctor.issues.missing_or_malformed_frontmatter",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_entry_skill_with_cross_referenced_subskills",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "workspace",
+          "observed": "workspace"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "entry_skill_with_subskills",
+          "observed": "entry_skill_with_subskills"
+        },
+        {
+          "id": "doctor.package_count",
+          "status": "pass",
+          "expected": 3,
+          "observed": 3
+        },
+        {
+          "id": "doctor.referenced.legal_review",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.referenced.contract_review",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_plugin_workspace",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "workspace",
+          "observed": "workspace"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "plugin_workspace",
+          "observed": "plugin_workspace"
+        },
+        {
+          "id": "doctor.plugin.namespace",
+          "status": "pass",
+          "expected": "commercial-legal",
+          "observed": "commercial-legal"
+        },
+        {
+          "id": "doctor.package.shape_role",
+          "status": "pass",
+          "expected": "plugin_skill",
+          "observed": "plugin_skill"
+        }
+      ]
+    },
+    {
+      "id": "doctor_reports_non_skill_repository_shape",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "doctor.exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "doctor.analysis_status",
+          "status": "pass",
+          "expected": "shape_only",
+          "observed": "shape_only"
+        },
+        {
+          "id": "doctor.shape.kind",
+          "status": "pass",
+          "expected": "non_skill_repository",
+          "observed": "non_skill_repository"
+        },
+        {
+          "id": "doctor.counts.code_files",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "doctor.issues.no_skill_entrypoint",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}

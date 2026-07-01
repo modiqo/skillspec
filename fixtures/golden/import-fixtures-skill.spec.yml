@@ -73,7 +73,8 @@ code:
       line_end: 14
     purpose: Imported fenced code block; review before execution.
     requires:
-      dependencies: []
+      dependencies:
+      - rote
       imports: []
       resources:
       - skill
@@ -121,7 +122,7 @@ review_required:
 - Review command blocks and decide which should become command templates.
 - Review extracted resources and code snippets; promote only intentional snippets into runnable recipes.
 - Review inferred command dependencies and add permission/provision choices where needed.
-- Review deps.toml and preserve required, optional, script import, and inferred dependency evidence before proof or install.
+- 'Review deps.toml with typed evidence: executable commands, explicit APIs/services, package-manager evidence, and reference/example imports; quarantine prose-like or low-confidence candidates before proof or install.'
 - Add scenario tests before trusting this structured skill.
 metadata:
   code_block_count: 1

@@ -24,13 +24,15 @@ skillspec <COMMAND>
 | `test <path>` | Run scenario tests declared in a SkillSpec. |
 | `decide <path> --input <text> [--trace-dir <dir>]` | Evaluate routing rules for a user task and emit JSON. |
 | `plan <path> --input <text> [--trace-dir <dir>]` | List selected-route execution phases in order. |
-| `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and action checklist in one spec load; with `--guide`, emit start/current/end anchors and persisted resume state. |
+| `run-loop <path> (--input <text> \| --resume <run-dir>) [--guide agent,full] [--view <view>] [--trace-dir <dir>] [--phase <id>] [--json]` | Batch sensemake, decide, plan, and current-gate control data in one spec load; with `--guide agent --json`, emit machine-readable start/current/end anchors and persisted resume state. |
+| `run <COMMAND>` | Generate read-only execution checklists for specs or guided run directories. |
 | `act <path> --input <text> [--trace-dir <dir> \| --run <run-dir>] [--phase <id>]` | Turn a SkillSpec decision into a current-route action checklist. |
 | `explain <path> --input <text> [--trace-dir <dir>]` | Explain routing decisions for a user task. |
 | `sensemake <path> [--view <view>] [--json]` | Teach the shape of one SkillSpec and its progressive navigation handles. |
 | `query <path> <handle> [--view <view>] [--json]` | Query one SkillSpec collection, item, or field path. |
 | `refs <path> <handle> [--view <view>] [--json]` | Show outgoing SkillSpec references for one item handle. |
-| `doctor <target> [--html] [--json]` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk. Defaults to a formatted user report; use `--html` for a self-contained review page and `--json` for machines. |
+| `doctor <target> [--html] [--json]` or `doctor checklist <source>` | Scan a local or public GitHub skill/repo target for shape first, then static drift, frontmatter discovery, token/context, proof-gap, and workspace/package risk; or generate a read-only shape-specific doctor checklist. |
+| `import <COMMAND>` | Generate read-only import checklists for sources or workspace manifests. |
 | `source <COMMAND>` | Map and query source packages for progressive import. |
 | `workspace <COMMAND>` | Map, validate, fanout-import, converge, compile, and install multi-skill or plugin-shaped workspaces. |
 | `grammar <COMMAND>` | Teach the embedded grammar and semantic porting workflow. |
@@ -52,6 +54,23 @@ skillspec <COMMAND>
 | `capability <COMMAND>` | Manage local capability seeds for durable bootstrap. |
 
 All commands support `-h, --help` through clap.
+
+## Agent Intent Defaults
+
+Low-level CLI commands remain explicit, but the SkillSpec harness route treats
+common user intents as composed workflows:
+
+- `assess skill`: run `doctor` or `doctor checklist` only, print the report, and
+  stop without source maps, imports, progress proof, compile, dry-run, or install.
+- `import skill`: run assessment first, then import through the correct
+  single-skill, multi-skill, entry-with-subskills, or plugin-shaped path. Stop
+  after reviewed import/build artifacts and offer the dry-run install command as
+  an optional next step.
+- `install skill`: if the input is raw prose, a local folder, or a public URI,
+  run assessment, import/promotion, validation, compile, dry-run install, target
+  approval, and retirement approval before mutating harness roots. If the input
+  is already a reviewed generated package or compiled workspace build, skip
+  re-import but still validate/readiness-check and dry-run before install.
 
 ## `validate`
 
@@ -135,15 +154,18 @@ Options:
 - `--phase <PHASE>`: expand this execution phase instead of the first pending
   phase.
 - `--guide <GUIDE>`: emit a stateful guide. Values are `agent` and `full`.
-  `agent` prints compact start/current/end anchors plus next commands; `full`
-  adds fingerprints and progress-record detail.
+  Use `agent --json` for normal harness execution so the model consumes
+  machine-readable start/current/end anchors without a human checklist parade.
+  Proof-bearing end anchors include a quiet token-stats command before
+  final-response and alignment proof. `full` adds fingerprints and debug
+  navigation detail.
 - `--json`: emit JSON instead of a compact human report.
 
 `run-loop` is a batching convenience for the common agent planning path. It
-loads the spec once, runs sensemake, decision, plan, and action-checklist
-construction in process, and prints a compact summary with wall-clock and
-estimated output metrics. It does not execute tools or mutate external systems
-except optional decision trace output.
+loads the spec once, runs sensemake, decision, plan, and current-gate
+construction in process, and emits either JSON control data or a compact human
+summary with wall-clock and estimated output metrics. It does not execute tools
+or mutate external systems except optional decision trace output.
 
 With `--guide agent`, `run-loop` also writes:
 
@@ -156,6 +178,40 @@ With `--guide agent`, `run-loop` also writes:
 Use `--resume <run-dir> --guide agent` after compaction or interruption. Resume
 recovers the original input from the decision trace, verifies fingerprints,
 replays the decision, reads `execution.jsonl`, and prints the current gate.
+
+## `run`
+
+```text
+skillspec run <COMMAND>
+```
+
+Subcommands:
+
+- `checklist <skill.spec.yml-or-run-dir> [--stage <entry|loop|exit>] [--json]`
+
+### `run checklist`
+
+```text
+skillspec run checklist <TARGET> [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<TARGET>`: either a `skill.spec.yml` file or a guided run directory
+  containing `guide-state.json`.
+
+Options:
+
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `loop`.
+- `--json`: emit JSON instead of a concise human report.
+
+`run checklist` is read-only. For a spec file, it emits the `run-loop` command
+needed to start a guided task. For a run directory, it reads persisted guide
+state and emits the selected-route execution checklist for the requested stage:
+current phase, open requirements, allowed commands, forbids, repeat-until
+condition, and exit proof commands. It exits non-zero when a run directory is
+missing guide state or when exit is requested before remaining phases are done.
 
 ## `act`
 
@@ -283,8 +339,9 @@ Arguments:
 
 Options:
 
-- default output: emit a formatted human report with assessment, surface,
-  packages, findings, next actions, and basis summary.
+- default output: emit a formatted human report with assessment, shape
+  contract, surface, workspace identity, packages, findings, next actions, and
+  basis summary.
 - `--html`: emit a self-contained HTML report suitable for redirecting to a
   file and sharing in review.
 - `--json`: emit the full machine-readable report. This is mutually exclusive
@@ -305,13 +362,31 @@ these shapes:
 - `multi_skill_workspace`: multiple `SKILL.md` packages without a plugin
   namespace marker. Doctor reports `analysis_status: workspace`, aggregate
   workspace risk, and one package report per `SKILL.md`.
-- `plugin_workspace`: a plugin-shaped root with `skills/` plus
-  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`. Doctor reports
-  `analysis_status: workspace`, preserves plugin namespaces in package ids, and
-  emits one package report per plugin skill.
+- `plugin_workspace`: a plugin-shaped root with `skills/` plus harness-neutral
+  plugin metadata, such as `.agent-plugin/marketplace.json`,
+  `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or other
+  plugin-named metadata folders with a supported manifest. Compatibility
+  markers such as `.mcp.json` and `CLAUDE.md` are also recognized. Doctor
+  reports `analysis_status: workspace`, preserves plugin namespaces in package
+  ids, and emits one package report per plugin skill.
 - `non_skill_repository`: no `SKILL.md` was found. Doctor stops before
   source-map parsing and reports code/manifest signals instead of wasting time
   on a normal code repo.
+
+Workspace reports include `workspace_identity`: total source files, namespaced
+package count, namespace count, `SKILL.md` count, unique byte-identical
+`SKILL.md` content count, repeated content groups/occurrences, estimated token
+load if copied byte-for-byte, repeated frontmatter names, and
+`source_content_refs` with one canonical path plus aliases for repeated source
+bodies. These are identity and load-bearing risk facts, not duplicate-package
+errors: namespace/path remains the package identity while repeated bytes should
+be made referentiable during import/install work.
+
+All formatted report modes include a Shape Contract section that restates the
+detected kind, kind-specific handling rule, analysis status, skill-file count,
+package count, namespace count, plugin-root count, primary skill when present,
+plugin-root details when present, referenced skill paths when present, and the
+next command implied by the shape gate.
 
 For public GitHub targets, `doctor` performs a temporary partial sparse checkout
 and removes it after the report. Supported remote forms include
@@ -330,6 +405,31 @@ workspace name collisions.
 The verdict is about context and reliability burden, not observed runtime
 failure. Dynamic behavior remains `unproven` until a trace can be aligned.
 
+### `doctor checklist`
+
+```text
+skillspec doctor checklist <SOURCE> [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<SOURCE>`: local `SKILL.md` file, local folder, public GitHub skill folder,
+  public GitHub repo URL, or GitHub shorthand to inspect.
+
+Options:
+
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `entry`.
+- `--json`: emit JSON instead of a concise human report.
+
+`doctor checklist` runs the same shape inspection as `doctor`, then emits a
+concrete checklist for the detected source shape. Single-skill, multi-skill,
+entry-with-subskills, and plugin-shaped roots get different activation policy,
+command, repeat-until, evidence, and forbid guidance. Non-skill repositories
+return a blocked checklist and exit non-zero. The command does not stage a
+workspace manifest, import drafts, promote semantics, compile, install, or write
+proof files.
+
 ## `source`
 
 ```text
@@ -338,7 +438,7 @@ skillspec source <COMMAND>
 
 Subcommands:
 
-- `map <path> --out <dir> [--json]`
+- `map <source> --out <dir> [--json]`
 - `query <source-map.json> <handle> [--view <index|summary|full>] [--json]`
 - `coverage <source-map.json> [--json]`
 - `stale <source-map.json> [--root <path>] [--json]`
@@ -353,12 +453,13 @@ and exact spans instead of loading the entire source into model context.
 ### `source map`
 
 ```text
-skillspec source map <PATH> --out <OUT>
+skillspec source map <SOURCE> --out <OUT>
 ```
 
 Arguments:
 
-- `<PATH>`: local `SKILL.md` file or skill folder to map.
+- `<SOURCE>`: local `SKILL.md` file, local skill folder, public GitHub skill
+  folder/repo URI, or GitHub owner/repo shorthand to map.
 
 Options:
 
@@ -366,9 +467,25 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 The generated map records files, hashes, Markdown nodes, frontmatter, byte and
-line ranges, local/external references, code blocks, dependency mentions, modal
+line ranges, local/external references, code blocks, dependency signals, modal
 obligation language, and review-required classifications. It preserves
 frontmatter as a first-class node instead of treating it as Markdown prose.
+
+For public GitHub sources, `source map` stages the source with SkillSpec's
+URI staging logic, maps the selected local source, and reports the local
+`source_path` for later `source stale` and `import-skill` commands. If a repo
+URI resolves to multiple `SKILL.md` candidates, the command refuses to guess and
+prints candidate source paths. Use `source stage` directly when candidate
+discovery, workspace shape preservation, or explicit staging is the task.
+
+`source stage` preserves the selected source shape and emits it directly as
+`source_shape.kind` alongside `staged_source_path`. Repo-root targets are cloned
+as the source root so plugin metadata, shared files, and folder structure remain
+available to `doctor`, `import checklist`, and `workspace map`. Explicit
+subfolder targets are sparse-staged only within that requested subfolder. When
+the selected root contains multiple `SKILL.md` packages, stage output points to
+workspace-map next steps; treat `source_shape.kind` as authoritative and choose
+`candidates[].source_path` only for an explicitly single-skill import.
 
 ### `source query`
 
@@ -393,6 +510,31 @@ Options:
 Use `--view index` to inspect structural headings and code blocks, `--view
 summary` to inspect compact classifications with line ranges and previews, and
 `--view full` on a specific node handle to recover the exact source span.
+
+### `source lens`
+
+```text
+skillspec source lens <MAP> [--cursor <N>] [--limit <N>]
+```
+
+Arguments:
+
+- `<MAP>`: path to `source-map.json`.
+
+Options:
+
+- `--cursor <N>`: 1-based review unit cursor. Defaults to `1`.
+- `--limit <N>`: number of units to show. Defaults to `1` so promotion
+  proceeds block by block.
+- `--json`: emit JSON instead of a concise human report.
+
+The lens is the progressive porting view over the Markdown parser output. Each
+unit contains a countdown position, source block hash, line range, preview,
+classifications, references, suggested constructs, and required target kinds.
+Conditional workflow language is classified as `conditional_rule_candidate` and
+requires a structural `rule` target. Promotion proof must preserve the unit hash
+and point promoted blocks at matching SkillSpec constructs rather than a generic
+route.
 
 ## `workspace`
 
@@ -443,18 +585,23 @@ and invocation visibility, assigns package ids, assigns deterministic install
 slugs, scans Markdown for cross-package references, and writes a markdown report
 beside the manifest.
 
-The default `workspace-path` policy prefixes install folders with the workspace
-slug and relative package path. This is safest for side-by-side publication and
-plugin-shaped workspaces because it avoids flattening packages with repeated
-local names. Use `local-name` for replacement/upgrade flows where the generated
-package must retire an existing canonical folder such as `rote-setup`.
-Validation rejects duplicate `install_slug` values before install.
+The default `workspace-path` policy preserves multi-skill and plugin-shaped
+source identity. Single-package workspaces may install by manifest slug, but
+multi-skill and plugin installs keep the source parent folder and write compiled
+packages back at their original relative paths. Use `local-name` only for
+single-package replacement/upgrade flows where the generated package must retire
+an existing canonical folder such as `rote-setup`. Validation rejects
+`local-name` for multi-skill and plugin-shaped manifests before install.
+Validation also rejects duplicate `install_slug` values before install.
 
 When the source has plugin-shaped folders, the mapper preserves those boundaries
-as namespaces instead of flattening names. A folder with `skills/` plus
-`.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` is treated as a plugin
-root. Its `plugin.json` name, or the folder slug when no plugin name exists, is
-used to create skill-safe public names such as
+as namespaces instead of flattening names. A folder with `skills/` plus a
+plugin-named metadata folder containing a supported manifest, such as
+`.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, or
+`.claude-plugin/plugin.json`, is treated as a plugin root. Compatibility markers
+such as `.mcp.json` and `CLAUDE.md` are also recognized. The manifest name/id, or
+the folder slug when no plugin name exists, is used to create skill-safe public
+names such as
 `commercial-legal-cold-start-interview`. Same-plugin slash references such as
 `/cold-start-interview` resolve inside that namespace, while explicit references
 such as `/privacy-legal:use-case-triage` resolve across namespaces.
@@ -559,6 +706,19 @@ whose dependencies are not ready, and writes:
 
 It does not compile loaders, install skills, or refresh router indexes.
 
+When the build root has not been populated, the next step is `workspace import`,
+not compile or install. When packages are blocked only because they are still
+mechanical scaffolds or are missing promotion proof, the next step is the
+package loop:
+
+```text
+skillspec import checklist <MANIFEST> --build-root <BUILD_ROOT> --stage loop --json
+```
+
+That blocker is recoverable work. Treat it as terminal only when the loop needs
+user approval, credentials, inaccessible source, a policy waiver, or another
+external state change.
+
 ### `workspace compile`
 
 ```text
@@ -589,6 +749,11 @@ dependents whose dependencies did not compile and writes:
 - `<BUILD_ROOT>/<package>/SKILL.md`
 
 It does not install skills or refresh router indexes.
+
+If compile reports blocked scaffolds or missing promotion proof, return to the
+same `skillspec import checklist <MANIFEST> --build-root <BUILD_ROOT> --stage
+loop --json` package loop instead of ending the run. If every package is missing
+from the build root, run `workspace import` first.
 
 ### `workspace install`
 
@@ -626,10 +791,19 @@ Options:
 - `--json`: emit JSON instead of a concise human report.
 
 `workspace install` preflights the whole workspace before copying package
-folders. It uses the manifest `install_slug` for every installed folder, checks
-that compiled `SKILL.md` loaders and `skill.spec.yml` files exist, blocks folder
-collisions unless `--retire-existing` is selected, blocks public-name
-collisions, and blocks dependents whose dependencies are not install-ready.
+folders. Single-package workspaces use the manifest `install_slug`. Multi-skill
+and plugin-shaped workspaces use a harder shape-preserving path: the target is
+`<harness-skill-root>/<workspace-or-plugin-parent>/<original-package-path>`, and
+flattened per-package folders such as `<workspace>--skills--<skill>` or
+`<plugin-parent>--skills--<skill>` are not valid install targets. During actual
+install the command copies the original parent folder from the reference source,
+excludes the original skill package subtree, creates a fresh replacement subtree,
+and writes the compiled SkillSpec-backed package folders back at their original
+relative paths. It checks that compiled `SKILL.md` loaders and
+`skill.spec.yml` files exist, blocks parent folder collisions unless
+`--retire-existing` is selected, blocks public-name collisions, and blocks
+dependents whose dependencies are not install-ready. Plugin reports additionally
+record `plugin_parent` and `plugin_skill_path` for plugin-package auditability.
 
 On dry-run, no harness files are written. On install, packages are copied in
 dependency order and the command writes:
@@ -743,7 +917,7 @@ skillspec trace <COMMAND>
 Subcommands:
 
 - `compact <run-dir>`
-- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--summary] [--proof-digest <path>] [--json]`
+- `align <path> --decision-trace <run-dir> [--execution-trace <jsonl>...] [--quiet] [--summary] [--proof-digest <path>] [--json]`
 
 ### `trace compact`
 
@@ -774,20 +948,23 @@ Options:
   action evidence. Repeat for multiple ledgers.
 - `--summary`: emit only the completion-facing alignment summary, token usage
   block, and `alignment.json` path while still writing the full report to disk.
+- `--quiet`: write `alignment.json` and any proof digest without terminal
+  output. Use this for normal agent execution.
 - `--proof-digest <PROOF_DIGEST>`: write a grouped missing-proof digest for
-  one-shot final proof batching. Use this with `--summary` during completion
-  audits, then build `<run-dir>/final-proof.jsonl` from the digest and run
-  `skillspec progress batch` once before the final alignment rerun.
+  one-shot final proof batching. Use this with `--quiet` during completion
+  audits, then record any real captured proof with `skillspec progress
+  checkpoint` or an existing JSONL proof artifact with `skillspec progress
+  batch` once before the final alignment rerun.
 - `--json`: emit JSON instead of a concise human report.
 
 Current alignment compares deterministic decision-trace facts. Default human
 output includes a summary before the detailed check list. `--summary` suppresses
-the detailed checks, proof rows, and obligation list for normal harness
-completion display. The full report is always written to
+the detailed checks, proof rows, and obligation list for explicit completion
+inspection. Normal agent execution should use `--quiet`; the full report is always written to
 `<DECISION_TRACE>/alignment.json`. `--proof-digest` writes a sidecar JSON file
 that groups missing phase requirements, route fulfillment, route checks,
 forbid/no-violation rows, elicitations, and after-success closures by the event
-shape needed for `progress batch`.
+shape needed for `progress checkpoint` or file-based `progress batch`.
 The full human report includes the selected route, route-selection basis,
 matched rules, pass/fail/unproven counts for deterministic checks, and
 pass/fail/unproven counts for execution obligations.
@@ -847,11 +1024,14 @@ Options:
 
 - `--run <RUN>`: trace run directory produced by `plan`, `decide`, or
   `explain` with `--trace-dir`.
+- `--quiet`: write `progress.json` without terminal output. Use this for
+  normal agent gate checks.
 - `--json`: emit JSON instead of a concise human report.
 
 `progress show` reads the decision trace and the run's `execution.jsonl`,
 then writes a derived `progress.json`. It reports completed, current, blocked,
-and remaining phases plus open requirements for the current phase.
+and remaining phases plus open requirements for the current phase unless
+`--quiet` is supplied.
 
 ### `progress record`
 
@@ -885,12 +1065,34 @@ Options:
   trace id, or relative file path.
 - `--source-skill <SOURCE_SKILL>`: skill that emitted this progress event.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
+
+### `progress checkpoint`
+
+```text
+skillspec progress checkpoint <RUN>
+  [--requirement-satisfied <PHASE>/<REQUIREMENT>=<KIND>:<REF>]...
+  [--phase-completed <PHASE>=<KIND>:<REF>]...
+  [--route-fulfilled <ROUTE>=<KIND>:<REF>]...
+  [--route-check-completed <CHECK>=<KIND>:<REF>]...
+  [--after-success-completed <CLOSURE>=<KIND>:<REF>]...
+  [--obligation-satisfied <OBLIGATION>=<KIND>:<REF>]...
+  [--elicitation-answered <ELICITATION>=<KIND>:<REF>]...
+  [--evidence-attached <KIND>:<REF>]...
+  [--checkpoint <LABEL>] [--quiet] [--summary] [--json]
+```
+
+`progress checkpoint` records routine successful proof rows in one checkpoint
+without requiring an agent to hand-author an event JSONL file. Use it at
+natural phase boundaries when the evidence already exists and the event shape
+is one of the common success rows above. It appends the same `execution.jsonl`
+ledger shape as `progress record` and `progress batch`.
 
 ### `progress batch`
 
 ```text
-skillspec progress batch <RUN> --file <EVIDENCE_BATCH> [--checkpoint <LABEL>] [--summary]
+skillspec progress batch <RUN> --file <EVIDENCE_BATCH> [--checkpoint <LABEL>] [--quiet] [--summary]
 ```
 
 Arguments:
@@ -905,19 +1107,22 @@ Options:
   Event names may use hyphens or underscores.
 - `--checkpoint <LABEL>`: label for compact checkpoint output. Defaults to
   `checkpointing evidence`.
+- `--quiet`: append the batch without foreground output. Use this for normal
+  agent execution so proof bookkeeping does not become user-visible command
+  chatter.
 - `--summary`: emit the compact foreground checkpoint summary:
   `[checkpointing evidence...]`, `status`, `records`, `requirements`, and
-  `trace`.
+  `trace`. Use this for debugging, failure triage, or explicit proof
+  inspection, not routine agent execution.
 - `--json`: emit JSON for the compact batch report.
 
-`progress batch` records several proof events in one foreground checkpoint. Use
-it at natural boundaries that would otherwise create a visible progress parade:
-after dry-run and planning, after create or mutation, after probe or
-verification, before route fulfillment, and before final alignment. Successful
-routine ledger writes should use `--summary`; failures, blocked requirements,
-or user-relevant proof gaps should still be surfaced individually. The command
-preserves the same granular `execution.jsonl` ledger shape as `progress record`;
-it only reduces command chatter.
+`progress batch` records several proof events from an existing JSONL or JSON
+array artifact in one checkpoint. Prefer `progress checkpoint` for routine
+successful rows so agents do not hand-author event files. Successful routine
+ledger writes should use `--quiet`; failures, blocked requirements, or
+user-relevant proof gaps should still be surfaced individually. The command
+preserves the same granular `execution.jsonl` ledger shape as `progress
+record`; it only keeps bookkeeping out of the normal user log.
 
 ### `progress stats`
 
@@ -962,10 +1167,11 @@ Options:
   `estimated` for direct-run summary metrics or `measured` for
   harness-provided exact counts.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
 `progress stats` appends a machine-readable `stats_collected` event to
-`<RUN>/execution.jsonl` so `trace align --summary` can report numeric token
+`<RUN>/execution.jsonl` so `trace align` can report numeric token
 consumption and savings. It understands the current durable workspace stats JSON shape, including
 `metrics.total_tokens`, `metrics.context_tokens`,
 `token_savings.source_tokens`, `token_savings.result_tokens`, and
@@ -978,14 +1184,15 @@ also appends matching `requirement_satisfied` events so phase completion
 summaries can prove the stats requirements without manual JSONL edits.
 
 For direct workspace runs, copy the metrics from the command's `--summary`
-block into `progress stats` before running `trace align --summary`:
+block into `progress stats --quiet` before running quiet alignment:
 
 ```bash
 skillspec progress stats .skillspec/traces/<run-id> \
   --agent-visible-tokens 190 \
   --artifact-tokens-preserved 96190 \
   --avoided-tokens 96000 \
-  --metrics-source estimated
+  --metrics-source estimated \
+  --quiet
 ```
 
 ### `progress final-response`
@@ -1002,20 +1209,21 @@ Options:
 
 - `--result`: final response includes the direct result.
 - `--evidence`: final response includes evidence handles or files.
-- `--alignment`: final response includes the alignment summary.
+- `--alignment`: final response includes the alignment status or report path.
 - `--token-savings`: final response includes token usage and token savings.
 - `--phase <PHASE>`: phase id whose requirement(s) this final response event
   satisfies.
 - `--requirement <REQUIREMENT>`: requirement id satisfied by this final
   response event. Repeat for multiple requirements. Requires `--phase`.
 - `--message <MESSAGE>`: human-readable event note.
+- `--quiet`: append the event without terminal output.
 - `--json`: emit JSON for the appended event.
 
 `progress final-response` appends the `final_response_sent` event shape that
 `trace align` uses to prove the final report included evidence, alignment, and
-token-savings sections. Run it after drafting those sections and before the
-final answer, then rerun `trace align --summary` and report the rerun alignment
-summary.
+token-savings sections. Run it with `--quiet` after drafting those sections and
+before the final answer, then rerun `trace align --quiet` and report only the
+final result in plain language.
 When `--phase` and `--requirement` are supplied, it also appends matching
 `requirement_satisfied` events so completion summaries can prove the final
 report closure requirements.
@@ -1081,6 +1289,46 @@ Options:
   - `claude-skill`
   - `markdown`
 
+## `import`
+
+```text
+skillspec import <COMMAND>
+```
+
+Subcommands:
+
+- `checklist <source-or-skillspec.workspace.yml> [--build-root <dir>] [--stage <entry|loop|exit>] [--json]`
+
+### `import checklist`
+
+```text
+skillspec import checklist <TARGET> [--build-root <BUILD_ROOT>] [--stage <STAGE>] [--json]
+```
+
+Arguments:
+
+- `<TARGET>`: a source root/file/URI to inspect, or a
+  `skillspec.workspace.yml` manifest for workspace import checklists.
+
+Options:
+
+- `--build-root <BUILD_ROOT>`: mirrored workspace build root produced by
+  `workspace import`. Required for workspace loop and exit checklists.
+- `--stage <STAGE>`: checklist stage. Values are `entry`, `loop`, and `exit`.
+  Defaults to `entry`.
+- `--json`: emit JSON instead of a concise human report.
+
+`import checklist` is read-only. For source roots, it runs source-shape
+inspection and selects the matching single-skill, multi-skill, entry-skill, or
+plugin checklist template. For workspace manifests, entry checks validate and
+fan out the workspace, loop checks locate the next package without
+`.skillspec/workspace-promotion.json`, and exit checks name converge, compile,
+dry-run install, retirement, and install gates. The loop stage is intentionally
+package-specific: it points at the current package source map and requires
+source lens block review, structural rules for conditionals, dependency ledger
+review, tests, and promotion proof before advancing. It exits non-zero for
+blocked inputs, such as requesting loop or exit without `--build-root`.
+
 ## `import-skill`
 
 ```text
@@ -1112,9 +1360,15 @@ Notes:
   `source/SKILL.md` or another Markdown-looking `SKILL*.md` file, because
   harnesses and scanners may discover or rank Markdown skill-looking files.
 - The command writes a scaffolded `deps.toml` beside the generated
-  `skill.spec.yml`, declares it as a file dependency/artifact, and infers simple
-  CLI plus fenced-code package dependencies from Python and JavaScript/TypeScript
-  imports.
+  `skill.spec.yml` and declares it as a file dependency/artifact. Dependency
+  extraction is evidence-based and typed: executable command evidence can create
+  `cli` entries, declared live services/APIs can be reviewed into service/api
+  entries, package-manager evidence can create package entries, and fenced-code
+  Python/JavaScript/TypeScript imports are reference/example evidence until
+  review promotes them. Accepted CLI dependency keys are normalized while the
+  executable command is preserved. Invalid prose-like candidates such as
+  `Optional.`, `TABLE`, HTTP methods like `GET`, placeholders, or private/source
+  variable names are quarantined instead of written as hard dependencies.
 - The generated ledger is review scaffolding. Before proof or install, complete
   it with package mentions from source prose, references, helper scripts,
   command examples, and manifests, preserving authority, local status, install
@@ -1158,7 +1412,7 @@ Choose the import path before running `port-one-shot`:
 | --- | --- |
 | Exactly one `SKILL.md` under the selected source root | `port-one-shot` |
 | Multiple `SKILL.md` files, shared standards packages, or cross-skill file references | `workspace map`, `workspace validate`, `workspace import`, then converge/compile |
-| Plugin-shaped source root with `skills/` and `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
+| Plugin-shaped source root with `skills/` and harness-neutral plugin metadata, such as `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or another supported plugin manifest | workspace flow with plugin namespace preservation |
 | Existing reviewed `skill.spec.yml` | revise the existing spec; do not re-import the folder |
 
 `port-one-shot` is the safe default for one atomic prose skill. It bundles:
@@ -1287,14 +1541,28 @@ Options:
   `skill-index.sqlite`.
 - `--query <QUERY>`: user task text to route.
 - `--top <TOP>`: number of candidates to return. Defaults to 5.
+- `--profile <PROFILE>`: apply this router policy profile instead of the
+  active profile stored in the index.
 - `--execution-mode <direct|durable>`: execution mode already selected by the
   user or caller.
+- `--current-harness <agents|codex|claude-local>`: current harness context used
+  only to choose the physical copy when duplicate logical skills exist.
+- `--current-root <PATH>`: current harness-visible root used only to choose the
+  physical copy when duplicate logical skills exist.
 - `--json`: emit JSON instead of a concise human report.
 
 The route result includes selected skill, candidates, scores, confidence,
 visibility, SkillSpec-backed status, and an
 `execution_mode_direct_or_durable` elicitation hint when no execution mode was
 supplied and a candidate was selected.
+
+When a router policy profile is active in `skill-index.sqlite`, or `--profile`
+names one, route applies matching preference rules before the final match gate.
+Policy remains provider-neutral: rule targets are `skill:<name>`, `tag:<tag>`,
+`source:<source>`, and `has_skill_spec:<true|false>`. Route output preserves
+`base_score`, `policy_score`, `policy_reason`, and a `policy` report with
+matched rules. Soft-passthrough profiles return `bypass` with
+`policy_passthrough` unless a matching rule allows or prefers a candidate.
 
 ## `skills`
 
@@ -1361,13 +1629,24 @@ skillspec router <COMMAND>
 
 Subcommands:
 
-- `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--force] [--json]`
 - `update [--backup-dir <path>] [--dry-run] [--json]`
 - `enable [--dry-run] [--json]`
 - `disable [--dry-run] [--json]`
 - `uninstall` or `delete` `[--manifest <path>] [--index <index-file-or-router-dir>] [--keep-index] [--dry-run] [--json]`
 - `index refresh --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
 - `index status --roots <path>... --index <index-file-or-router-dir> [--visibility-manifest <path>] [--json]`
+- `policy init --index <index-file-or-router-dir> [--json]`
+- `policy list --index <index-file-or-router-dir> [--json]`
+- `policy show --index <index-file-or-router-dir> [--profile <name>] [--json]`
+- `policy get <id> --index <index-file-or-router-dir> [--json]`
+- `policy set-profile <name> --index <index-file-or-router-dir> [--mode route|soft-passthrough|native-passthrough] [--active] [--strict] [--description <text>] [--json]`
+- `policy set-rule <id> --index <index-file-or-router-dir> --profile <name> [--priority <n>] [--mode soft|hard] [--anchor none|policy] [--enabled true|false] [--when-any <phrase>]... [--when-all <phrase>]... [--when-none <phrase>]... [--prefer <target>]... [--allow <target>]... [--suppress <target>]... [--forbid <target>]... [--json]`
+- `policy remove-rule <id> --index <index-file-or-router-dir> [--json]`
+- `policy explain --index <index-file-or-router-dir> --query <text> [--profile <name>] [--top <n>] [--json]`
+- `profile status --index <index-file-or-router-dir> [--json]`
+- `profile apply <profile> --index <index-file-or-router-dir> [--dry-run] [--json]`
+- `profile clear --index <index-file-or-router-dir> [--dry-run] [--json]`
 
 `router install` writes a SkillSpec-backed `skill-router` skill into every
 configured `--roots` path, a visibility manifest, a SQLite index, and a router
@@ -1380,6 +1659,14 @@ durable first-hop execution is unavailable until durable-executor is installed
 separately. After building the index, install runs `index status` internally and
 reports preparedness; a prepared router has a present, non-stale index whose
 indexed skill count matches the discovered skill count.
+
+If `--index` points at an existing file where the router config directory must be
+created, install fails with an explicit legacy-index error instead of overwriting
+or flattening the path. This commonly happens when an older install used
+`~/.skillspec/router` directly as the SQLite index file. Re-run with `--force`
+only after accepting the migration; the legacy file is moved to
+`<router-dir>/skill-index.sqlite`, then router config is written under the same
+directory.
 
 `router enable` is the reversible switch-on path for an installed router. It
 reads router config, refreshes every managed `skill-router` package, applies
@@ -1416,6 +1703,20 @@ index, and runs the preparedness check. When router config is disabled, refresh
 rebuilds the index without re-enabling router visibility. SkillSpec-backed
 additions are indexed directly; prose-only additions are also indexed, with
 conversion advice retained in the report.
+
+Router policy commands store operator preferences in normalized SQLite tables
+inside the same `skill-index.sqlite` database used by `skillspec route`. A
+profile chooses the operating mode. `route` keeps normal routing with policy
+score adjustments; `soft-passthrough` bypasses by default unless a matching rule
+selects a skill; `native-passthrough` records the intended high-throughput mode,
+but route-time behavior is soft passthrough until native lifecycle visibility
+mutation is implemented. Rules match query phrases and apply ordered effects:
+`prefer`, `allow`, `suppress`, or `forbid`. Use `policy get <id>` or
+`policy show --profile <name>` before editing an existing preference policy, so
+agents preserve stored predicates, order, and targets. `policy explain` runs the
+same route path with a selected profile and returns the route report with policy
+details. `router profile` commands switch the active SQLite profile without
+editing generated router files.
 
 ## `durable-executor`
 

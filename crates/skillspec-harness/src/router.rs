@@ -1,3 +1,4 @@
+use crate::router_policy::{self, RoutePolicyReport};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -25,7 +26,10 @@ pub struct RouteOptions {
     pub index: PathBuf,
     pub query: String,
     pub top: usize,
+    pub profile: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
+    pub current_harness: Option<RouteHarness>,
+    pub current_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +44,24 @@ pub struct IndexStatusOptions {
 pub enum ExecutionMode {
     Direct,
     Durable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RouteHarness {
+    Agents,
+    Codex,
+    ClaudeLocal,
+}
+
+impl RouteHarness {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Agents => "agents",
+            Self::Codex => "codex",
+            Self::ClaudeLocal => "claude-local",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -113,6 +135,7 @@ pub struct RouteReport {
     pub decision_reason: String,
     pub elicitation: Option<String>,
     pub execution_mode: Option<ExecutionMode>,
+    pub policy: Option<RoutePolicyReport>,
     pub index: PathBuf,
 }
 
@@ -122,10 +145,25 @@ pub struct RouteCandidate {
     pub name: String,
     pub path: PathBuf,
     pub score: f64,
+    pub base_score: f64,
+    pub policy_score: f64,
     pub confidence: Confidence,
     pub reason: String,
+    pub policy_reason: Option<String>,
     pub visibility: Visibility,
     pub has_skill_spec: bool,
+    #[serde(skip_serializing)]
+    pub(crate) logical_key: String,
+    #[serde(skip_serializing)]
+    pub(crate) skill_dir: PathBuf,
+    #[serde(skip_serializing)]
+    pub(crate) source: String,
+    #[serde(skip_serializing)]
+    pub(crate) tags: Vec<String>,
+    #[serde(skip_serializing)]
+    pub(crate) policy_anchor: bool,
+    #[serde(skip_serializing)]
+    pub(crate) policy_forbidden: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -152,6 +190,8 @@ pub enum RouteBypassReason {
     NoCandidates,
     LowConfidence,
     AmbiguousMatch,
+    NoActivationAnchor,
+    PolicyPassthrough,
 }
 
 impl RouteBypassReason {
@@ -160,6 +200,8 @@ impl RouteBypassReason {
             Self::NoCandidates => "no_candidates",
             Self::LowConfidence => "low_confidence",
             Self::AmbiguousMatch => "ambiguous_match",
+            Self::NoActivationAnchor => "no_activation_anchor",
+            Self::PolicyPassthrough => "policy_passthrough",
         }
     }
 }
@@ -415,8 +457,34 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
     let index = normalize_index_path(options.index);
     let conn = Connection::open(&index)?;
     let entries = read_entries(&conn, &index)?;
-    let candidates = score_candidates(&entries, &options.query, options.top);
-    let match_decision = decide_candidate_match(&candidates);
+    let context = RouteSelectionContext {
+        current_harness: options.current_harness,
+        current_root: options.current_root,
+        current_dir: std::env::current_dir().ok(),
+    };
+    let raw_candidates = score_candidates(&entries, &options.query, entries.len().max(options.top));
+    let mut all_candidates =
+        collapse_duplicate_candidates(raw_candidates, &context, entries.len().max(options.top));
+    let policy_application = router_policy::apply_to_candidates(
+        &conn,
+        options.profile.as_deref(),
+        &options.query,
+        &mut all_candidates,
+    )?;
+    all_candidates.retain(|candidate| candidate.score > 0.0);
+    assign_confidence(&mut all_candidates);
+    let mut candidates = all_candidates.clone();
+    candidates.truncate(options.top);
+    let match_decision = if let Some(policy_bypass) = policy_application.forced_bypass {
+        MatchDecision {
+            decision: RouteDecision::Bypass,
+            selected: None,
+            bypass_reason: Some(policy_bypass.reason),
+            decision_reason: policy_bypass.decision_reason,
+        }
+    } else {
+        apply_activation_anchor_gate(&options.query, decide_candidate_match(&candidates))
+    };
     let selected = match_decision.selected;
     let elicitation = if options.execution_mode.is_none() && selected.is_some() {
         Some("execution_mode_direct_or_durable".to_owned())
@@ -432,8 +500,16 @@ pub fn route(options: RouteOptions) -> Result<RouteReport> {
         decision_reason: match_decision.decision_reason,
         elicitation,
         execution_mode: options.execution_mode,
+        policy: policy_application.report,
         index,
     })
+}
+
+#[derive(Clone, Debug, Default)]
+struct RouteSelectionContext {
+    current_harness: Option<RouteHarness>,
+    current_root: Option<PathBuf>,
+    current_dir: Option<PathBuf>,
 }
 
 pub(crate) fn normalize_index_path(path: PathBuf) -> PathBuf {
@@ -608,14 +684,30 @@ pub fn render_route(report: &RouteReport) -> String {
     if let Some(reason) = report.bypass_reason {
         output.push_str(&format!("Bypass reason: {}\n", reason.as_str()));
     }
+    if let Some(policy) = &report.policy {
+        output.push_str(&format!(
+            "Policy: {} ({})\n",
+            policy.profile,
+            policy.mode.as_str()
+        ));
+    }
     if let Some(selected) = &report.selected {
         output.push_str(&format!(
             "Selected: {} ({:.3})\n",
             selected.name, selected.score
         ));
+        if selected.policy_score != 0.0 {
+            output.push_str(&format!(
+                "Score: base {:.3}, policy {:+.3}\n",
+                selected.base_score, selected.policy_score
+            ));
+        }
         output.push_str(&format!("Path: {}\n", selected.path.display()));
         output.push_str(&format!("Confidence: {:?}\n", selected.confidence).to_lowercase());
         output.push_str(&format!("Reason: {}\n", selected.reason));
+        if let Some(policy_reason) = &selected.policy_reason {
+            output.push_str(&format!("Policy reason: {policy_reason}\n"));
+        }
     } else {
         output.push_str("Selected: none\n");
     }
@@ -626,9 +718,11 @@ pub fn render_route(report: &RouteReport) -> String {
         output.push_str("\nCandidates:\n");
         for candidate in &report.candidates {
             output.push_str(&format!(
-                "- {} {:.3}: {}\n",
+                "- {} {:.3} (base {:.3}, policy {:+.3}): {}\n",
                 candidate.name,
                 candidate.score,
+                candidate.base_score,
+                candidate.policy_score,
                 candidate.path.display()
             ));
         }
@@ -678,6 +772,55 @@ fn decide_candidate_match(candidates: &[RouteCandidate]) -> MatchDecision {
         decision_reason: "best candidate did not pass the automatic match gate".to_owned(),
     }
 }
+
+fn apply_activation_anchor_gate(query: &str, decision: MatchDecision) -> MatchDecision {
+    let Some(selected) = &decision.selected else {
+        return decision;
+    };
+    if activation_anchor_matches(query, selected) {
+        return decision;
+    }
+    MatchDecision {
+        decision: RouteDecision::Bypass,
+        selected: None,
+        bypass_reason: Some(RouteBypassReason::NoActivationAnchor),
+        decision_reason: format!(
+            "top candidate {} did not match an activation anchor in the request",
+            selected.name
+        ),
+    }
+}
+
+fn activation_anchor_matches(query: &str, candidate: &RouteCandidate) -> bool {
+    if candidate.policy_anchor {
+        return true;
+    }
+    let query_terms = tokenize(&normalize_query(query));
+    let query_text = normalize_query(query);
+    if query_text.contains(&candidate.name.replace('-', " "))
+        || query_text.contains(&candidate.name)
+    {
+        return true;
+    }
+    candidate
+        .name
+        .split(['-', '_', ' '])
+        .filter(|term| !ROUTER_GENERIC_ANCHOR_TERMS.contains(term))
+        .any(|term| term.len() >= 4 && query_terms.iter().any(|query_term| query_term == term))
+}
+
+fn normalize_query(query: &str) -> String {
+    query
+        .to_ascii_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+const ROUTER_GENERIC_ANCHOR_TERMS: &[&str] = &[
+    "create", "docs", "document", "executor", "find", "router", "setup", "skill", "skills",
+    "update",
+];
 
 pub(crate) fn scan_roots(roots: &[PathBuf], warnings: &mut Vec<String>) -> Result<Vec<SkillEntry>> {
     let mut entries = Vec::new();
@@ -1108,6 +1251,7 @@ fn create_schema(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS skills_name_idx ON skills(name);
         ",
     )?;
+    router_policy::create_schema(conn)?;
     Ok(())
 }
 
@@ -1273,13 +1417,21 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
                 name: entry.name.clone(),
                 path: entry.path.clone(),
                 score,
+                base_score: score,
+                policy_score: 0.0,
                 confidence: Confidence::Low,
                 reason,
+                policy_reason: None,
                 visibility: entry.visibility,
                 has_skill_spec: entry.has_skill_spec,
+                logical_key: logical_candidate_key(entry),
+                skill_dir: entry.skill_dir.clone(),
+                source: entry.source.clone(),
+                tags: entry.tags.clone(),
+                policy_anchor: false,
+                policy_forbidden: false,
             }
         })
-        .filter(|candidate| candidate.score > 0.0)
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| {
         right
@@ -1308,6 +1460,210 @@ fn score_candidates(entries: &[SkillEntry], query: &str, top: usize) -> Vec<Rout
     }
     candidates.truncate(top);
     candidates
+}
+
+fn collapse_duplicate_candidates(
+    candidates: Vec<RouteCandidate>,
+    context: &RouteSelectionContext,
+    top: usize,
+) -> Vec<RouteCandidate> {
+    if top == 0 {
+        return Vec::new();
+    }
+    let mut groups: BTreeMap<String, Vec<RouteCandidate>> = BTreeMap::new();
+    for candidate in candidates {
+        groups
+            .entry(candidate.logical_key.clone())
+            .or_default()
+            .push(candidate);
+    }
+
+    let mut collapsed = groups
+        .into_values()
+        .map(|group| representative_candidate(group, context))
+        .collect::<Vec<_>>();
+    collapsed.sort_by(|left, right| {
+        right
+            .score
+            .partial_cmp(&left.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(left.name.cmp(&right.name))
+            .then(left.path.cmp(&right.path))
+    });
+    assign_confidence(&mut collapsed);
+    collapsed.truncate(top);
+    collapsed
+}
+
+fn representative_candidate(
+    mut group: Vec<RouteCandidate>,
+    context: &RouteSelectionContext,
+) -> RouteCandidate {
+    debug_assert!(!group.is_empty());
+    let max_score = group
+        .iter()
+        .map(|candidate| candidate.score)
+        .fold(0.0_f64, f64::max);
+    group.sort_by(|left, right| {
+        physical_preference_key(left, context)
+            .cmp(&physical_preference_key(right, context))
+            .then_with(|| {
+                right
+                    .score
+                    .partial_cmp(&left.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .then(left.path.cmp(&right.path))
+    });
+    let mut representative = group.remove(0);
+    representative.score = max_score;
+    if !group.is_empty() {
+        representative.reason = format!("{}, duplicate roots collapsed", representative.reason);
+    }
+    representative
+}
+
+fn physical_preference_key(
+    candidate: &RouteCandidate,
+    context: &RouteSelectionContext,
+) -> (u8, usize, String) {
+    if let Some(root) = &context.current_root {
+        if candidate.skill_dir.starts_with(root) {
+            return (0, root_order(candidate), path_key(candidate));
+        }
+    }
+    if let Some(current_harness) = context.current_harness {
+        if route_harness_for_skill_dir(&candidate.skill_dir) == Some(current_harness) {
+            return (1, root_order(candidate), path_key(candidate));
+        }
+    }
+    if is_current_project_local_candidate(candidate, context.current_dir.as_deref()) {
+        return (2, root_order(candidate), path_key(candidate));
+    }
+    if candidate.has_skill_spec {
+        return (3, root_order(candidate), path_key(candidate));
+    }
+    (4, root_order(candidate), path_key(candidate))
+}
+
+fn is_current_project_local_candidate(
+    candidate: &RouteCandidate,
+    current_dir: Option<&Path>,
+) -> bool {
+    if route_harness_for_skill_dir(&candidate.skill_dir) != Some(RouteHarness::ClaudeLocal) {
+        return false;
+    }
+    let Some(current_dir) = current_dir else {
+        return false;
+    };
+    let Some(project_root) = project_root_for_claude_skill_dir(&candidate.skill_dir) else {
+        return false;
+    };
+    current_dir.starts_with(project_root)
+}
+
+fn project_root_for_claude_skill_dir(skill_dir: &Path) -> Option<&Path> {
+    let skills_root = skill_dir.parent()?;
+    let claude_dir = skills_root.parent()?;
+    if skills_root.file_name().and_then(|value| value.to_str()) == Some("skills")
+        && claude_dir.file_name().and_then(|value| value.to_str()) == Some(".claude")
+    {
+        claude_dir.parent()
+    } else {
+        None
+    }
+}
+
+fn root_order(candidate: &RouteCandidate) -> usize {
+    let Some(rest) = candidate.source.strip_prefix("root-") else {
+        return usize::MAX;
+    };
+    let Some((index, _)) = rest.split_once(':') else {
+        return usize::MAX;
+    };
+    index.parse::<usize>().unwrap_or(usize::MAX)
+}
+
+fn path_key(candidate: &RouteCandidate) -> String {
+    candidate.path.to_string_lossy().replace('\\', "/")
+}
+
+fn assign_confidence(candidates: &mut [RouteCandidate]) {
+    let top_score = candidates
+        .first()
+        .map(|candidate| candidate.score)
+        .unwrap_or(0.0);
+    let second_score = candidates
+        .get(1)
+        .map(|candidate| candidate.score)
+        .unwrap_or(0.0);
+    for (index, candidate) in candidates.iter_mut().enumerate() {
+        candidate.confidence = if index == 0 && top_score >= 8.0 && top_score >= second_score * 1.25
+        {
+            Confidence::High
+        } else if candidate.score >= 3.0 {
+            Confidence::Medium
+        } else {
+            Confidence::Low
+        };
+    }
+}
+
+fn logical_candidate_key(entry: &SkillEntry) -> String {
+    if entry.has_skill_spec {
+        let spec_path = entry.skill_dir.join("skill.spec.yml");
+        if let Ok(spec) = parser::load_spec(&spec_path) {
+            return format!("spec:{}", spec.id);
+        }
+    }
+    let logical_checksum = fs::read_to_string(&entry.path)
+        .map(|body| normalized_prose_checksum(&body))
+        .unwrap_or_else(|_| entry.checksum.clone());
+    format!("skill:{}:{logical_checksum}", entry.name)
+}
+
+fn normalized_prose_checksum(body: &str) -> String {
+    let Some(rest) = body.strip_prefix("---") else {
+        return checksum(body);
+    };
+    let Some((frontmatter, markdown_body)) = rest.split_once("\n---") else {
+        return checksum(body);
+    };
+    let Ok(mut value) = serde_yaml::from_str::<serde_yaml::Value>(frontmatter) else {
+        return checksum(body);
+    };
+    if let serde_yaml::Value::Mapping(mapping) = &mut value {
+        mapping.remove(serde_yaml::Value::String(
+            "disable-model-invocation".to_owned(),
+        ));
+    }
+    let normalized_frontmatter =
+        serde_yaml::to_string(&value).unwrap_or_else(|_| frontmatter.to_owned());
+    checksum(&format!(
+        "---\n{}---{}",
+        normalized_frontmatter.trim_end(),
+        markdown_body
+    ))
+}
+
+pub fn route_harness_for_root(root: &Path) -> Option<RouteHarness> {
+    if root.file_name().and_then(|value| value.to_str()) != Some("skills") {
+        return None;
+    }
+    match root
+        .parent()
+        .and_then(|parent| parent.file_name())
+        .and_then(|value| value.to_str())
+    {
+        Some(".agents") => Some(RouteHarness::Agents),
+        Some(".codex") => Some(RouteHarness::Codex),
+        Some(".claude") => Some(RouteHarness::ClaudeLocal),
+        _ => None,
+    }
+}
+
+pub fn route_harness_for_skill_dir(skill_dir: &Path) -> Option<RouteHarness> {
+    route_harness_for_root(skill_dir.parent()?)
 }
 
 fn is_managed_router_entry(entry: &SkillEntry) -> bool {
@@ -1550,16 +1906,205 @@ mod tests {
         );
     }
 
+    #[test]
+    fn duplicate_logical_candidates_collapse_and_prefer_current_harness() {
+        let candidates = vec![
+            route_candidate_at(
+                "durable-executor",
+                "/tmp/home/.agents/skills/durable-executor/SKILL.md",
+                "spec:durable.executor",
+                "root-0:/tmp/home/.agents/skills",
+            ),
+            route_candidate_at(
+                "durable-executor",
+                "/tmp/home/.codex/skills/durable-executor/SKILL.md",
+                "spec:durable.executor",
+                "root-1:/tmp/home/.codex/skills",
+            ),
+            route_candidate_at(
+                "durable-executor",
+                "/tmp/home/project/.claude/skills/durable-executor/SKILL.md",
+                "spec:durable.executor",
+                "root-2:/tmp/home/project/.claude/skills",
+            ),
+        ];
+        let context = RouteSelectionContext {
+            current_harness: Some(RouteHarness::Codex),
+            current_root: None,
+            current_dir: None,
+        };
+
+        let collapsed = collapse_duplicate_candidates(candidates, &context, 5);
+        let decision = decide_candidate_match(&collapsed);
+
+        assert_eq!(collapsed.len(), 1);
+        assert_eq!(collapsed[0].confidence, Confidence::High);
+        assert_eq!(
+            collapsed[0].path,
+            PathBuf::from("/tmp/home/.codex/skills/durable-executor/SKILL.md")
+        );
+        assert!(collapsed[0].reason.contains("duplicate roots collapsed"));
+        assert_eq!(decision.decision, RouteDecision::UseSkill);
+        assert_eq!(
+            decision.selected.unwrap().path,
+            PathBuf::from("/tmp/home/.codex/skills/durable-executor/SKILL.md")
+        );
+    }
+
+    #[test]
+    fn prose_logical_key_ignores_visibility_only_frontmatter() {
+        let root = std::env::temp_dir().join(format!(
+            "skillspec-router-logical-key-{}-{}",
+            std::process::id(),
+            now_unix()
+        ));
+        let agents_dir = root.join(".agents/skills/durable-executor");
+        let claude_dir = root.join("project/.claude/skills/durable-executor");
+        fs::create_dir_all(&agents_dir).unwrap();
+        fs::create_dir_all(&claude_dir).unwrap();
+        let plain = r#"---
+name: durable-executor
+description: Use as the durable execution first-hop.
+---
+# Durable Executor
+"#;
+        let visibility_marked = r#"---
+name: durable-executor
+description: Use as the durable execution first-hop.
+disable-model-invocation: true
+---
+# Durable Executor
+"#;
+        fs::write(agents_dir.join("SKILL.md"), visibility_marked).unwrap();
+        fs::write(claude_dir.join("SKILL.md"), plain).unwrap();
+        let agents_entry = prose_entry(&agents_dir, "root-0:/tmp/.agents/skills");
+        let claude_entry = prose_entry(&claude_dir, "root-1:/tmp/project/.claude/skills");
+
+        assert_eq!(
+            logical_candidate_key(&agents_entry),
+            logical_candidate_key(&claude_entry)
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn same_name_with_different_logical_identity_stays_ambiguous() {
+        let candidates = vec![
+            route_candidate_at(
+                "deploy",
+                "/tmp/home/.agents/skills/deploy/SKILL.md",
+                "skill:deploy:sha256:left",
+                "root-0:/tmp/home/.agents/skills",
+            ),
+            route_candidate_at(
+                "deploy",
+                "/tmp/home/.codex/skills/deploy/SKILL.md",
+                "skill:deploy:sha256:right",
+                "root-1:/tmp/home/.codex/skills",
+            ),
+        ];
+        let context = RouteSelectionContext::default();
+
+        let collapsed = collapse_duplicate_candidates(candidates, &context, 5);
+        let decision = decide_candidate_match(&collapsed);
+
+        assert_eq!(collapsed.len(), 2);
+        assert_eq!(decision.decision, RouteDecision::Ambiguous);
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::AmbiguousMatch)
+        );
+    }
+
+    #[test]
+    fn activation_anchor_blocks_generic_docs_prompt_false_positive() {
+        let candidate = route_candidate("workflow-create", 9.0, Confidence::High);
+
+        let decision = apply_activation_anchor_gate(
+            "ok - lets do this and document it in docs/design",
+            decide_candidate_match(&[candidate]),
+        );
+
+        assert_eq!(decision.decision, RouteDecision::Bypass);
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.bypass_reason,
+            Some(RouteBypassReason::NoActivationAnchor)
+        );
+    }
+
     fn route_candidate(name: &str, score: f64, confidence: Confidence) -> RouteCandidate {
+        let path = PathBuf::from(format!("/tmp/{name}/SKILL.md"));
+        let skill_dir = path.parent().unwrap().to_path_buf();
         RouteCandidate {
             id: name.to_owned(),
             name: name.to_owned(),
-            path: PathBuf::from(format!("/tmp/{name}/SKILL.md")),
+            path,
             score,
+            base_score: score,
+            policy_score: 0.0,
             confidence,
             reason: "test".to_owned(),
+            policy_reason: None,
             visibility: Visibility::Implicit,
             has_skill_spec: false,
+            logical_key: format!("skill:{name}:test"),
+            skill_dir,
+            source: "root-0:/tmp".to_owned(),
+            tags: Vec::new(),
+            policy_anchor: false,
+            policy_forbidden: false,
+        }
+    }
+
+    fn route_candidate_at(
+        name: &str,
+        path: &str,
+        logical_key: &str,
+        source: &str,
+    ) -> RouteCandidate {
+        let path = PathBuf::from(path);
+        let skill_dir = path.parent().unwrap().to_path_buf();
+        RouteCandidate {
+            id: format!("{name}-test"),
+            name: name.to_owned(),
+            path,
+            score: 9.0,
+            base_score: 9.0,
+            policy_score: 0.0,
+            confidence: Confidence::Medium,
+            reason: "test".to_owned(),
+            policy_reason: None,
+            visibility: Visibility::Implicit,
+            has_skill_spec: logical_key.starts_with("spec:"),
+            logical_key: logical_key.to_owned(),
+            skill_dir,
+            source: source.to_owned(),
+            tags: Vec::new(),
+            policy_anchor: false,
+            policy_forbidden: false,
+        }
+    }
+
+    fn prose_entry(skill_dir: &Path, source: &str) -> SkillEntry {
+        let path = skill_dir.join("SKILL.md");
+        let body = fs::read_to_string(&path).unwrap();
+        SkillEntry {
+            id: "durable-executor".to_owned(),
+            name: "durable-executor".to_owned(),
+            path,
+            skill_dir: skill_dir.to_path_buf(),
+            description: "Use as the durable execution first-hop.".to_owned(),
+            short_description: None,
+            source: source.to_owned(),
+            visibility: Visibility::ManualOnly,
+            has_skill_spec: false,
+            checksum: checksum(&body),
+            tags: Vec::new(),
+            triggers: Vec::new(),
+            negative_triggers: Vec::new(),
+            text: "durable executor first hop".to_owned(),
         }
     }
 }

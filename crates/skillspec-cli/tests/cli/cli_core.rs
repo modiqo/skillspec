@@ -111,19 +111,66 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     let allowed_commands = report["current_gate"]["allowed_commands"]
         .as_array()
         .ok_or_else(|| invalid_json_shape("missing allowed commands"))?;
+    assert!(allowed_commands.iter().all(|command| command
+        .as_str()
+        .is_some_and(|command| !command.contains("skillspec act"))));
+    assert!(allowed_commands
+        .iter()
+        .any(|command| command.as_str().is_some_and(|command| command
+            .contains("progress checkpoint")
+            && command.contains("--requirement-satisfied")
+            && command.contains("--phase-completed")
+            && command.contains("--quiet"))));
     assert!(allowed_commands.iter().any(|command| command
         .as_str()
-        .is_some_and(|command| command.contains("skillspec act"))));
-    assert!(allowed_commands.iter().any(|command| command
+        .is_some_and(|command| command.contains("progress show") && command.contains("--quiet"))));
+    let allowed_now = report["current_gate"]["allowed_now"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing allowed_now"))?;
+    assert!(allowed_now.iter().all(|item| {
+        item.as_str().is_some_and(|item| {
+            !item.contains("skillspec query") && !item.contains("skillspec refs")
+        })
+    }));
+    assert!(report["end"]["final_progress_command"]
         .as_str()
-        .is_some_and(|command| command.contains("progress batch")
-            && command.contains("evidence-batch.jsonl"))));
+        .is_some_and(
+            |command| command.contains("progress final-response") && command.contains("--quiet")
+        ));
+    assert!(report["end"]["token_stats_command"]
+        .as_str()
+        .is_some_and(|command| command.contains("progress stats")
+            && command.contains("--agent-visible-tokens")
+            && command.contains("--artifact-tokens-preserved")
+            && command.contains("--avoided-tokens")
+            && command.contains("--metrics-source estimated")
+            && command.contains("--quiet")));
+    assert!(report["end"]["alignment_command"]
+        .as_str()
+        .is_some_and(|command| command.contains("trace align")
+            && command.contains("--quiet")
+            && !command.contains("--summary")));
+    assert!(report["resume"]["command"]
+        .as_str()
+        .is_some_and(|command| command.contains("--guide agent") && command.contains("--json")));
+    assert!(report["current_gate"]["recommended_queries"]
+        .as_array()
+        .is_some_and(|queries| queries.is_empty()));
     let progress_hints = report["current_gate"]["progress_to_record"]
         .as_array()
         .ok_or_else(|| invalid_json_shape("missing progress hints"))?;
     assert!(progress_hints
         .iter()
         .any(|hint| hint["event"] == "phase_completed"));
+    assert!(progress_hints
+        .iter()
+        .all(|hint| hint["command"]
+            .as_str()
+            .is_some_and(|command| !command.starts_with('{')
+                && !command.contains("\"event\"")
+                && (command.contains("--requirement-satisfied")
+                    || command.contains("--phase-completed"))
+                && !command.contains("skillspec progress record"))));
 
     let run_dir = PathBuf::from(
         report["start"]["run_dir"]
@@ -132,6 +179,134 @@ fn run_loop_guide_agent_writes_resume_state() -> std::result::Result<(), Box<dyn
     );
     assert!(run_dir.join("guide-state.json").is_file());
     assert!(run_dir.join("guide-summary.md").is_file());
+    Ok(())
+}
+
+#[test]
+fn run_loop_guide_suppresses_proof_plumbing_for_diagnostic_routes(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("run-loop-guide-diagnostic");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: cli.diagnostic
+title: Diagnostic Spec
+description: Exercises quiet diagnostic guide behavior.
+activation:
+  summary: Diagnostic and proof routes.
+entry:
+  prompt: Decide before tools.
+  decision_required: true
+routes:
+  - id: diagnostic
+    label: Diagnostic
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: inspect
+          owner_skill: diagnostic
+          requires: [doctor]
+          forbid: [progress_batch, trace_align]
+  - id: proof
+    label: Proof
+    execution_plan:
+      mode: ordered
+      phases:
+        - id: execute
+          owner_skill: proof
+          requires: [evidence]
+rules:
+  - id: doctor_rule
+    when:
+      user_says_any: [doctor]
+    prefer: diagnostic
+    forbid: [progress_batch, trace_align]
+  - id: proof_rule
+    when:
+      user_says_any: [execute]
+    prefer: proof
+trace:
+  mode: event_log
+  required: true
+  record: [input_received, rule_matched, route_selected]
+commands:
+  doctor:
+    template: echo doctor
+    safety: read_only
+  evidence:
+    template: echo evidence
+    safety: read_only
+"#,
+    );
+
+    let diagnostic = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("doctor this skill")
+        .arg("--trace-dir")
+        .arg(dir.path().join("diagnostic-traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&diagnostic);
+    let diagnostic_report = json_stdout(&diagnostic);
+    assert_eq!(diagnostic_report["start"]["selected_route"], "diagnostic");
+    let diagnostic_commands = diagnostic_report["current_gate"]["allowed_commands"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing diagnostic allowed commands"))?;
+    assert!(diagnostic_commands.iter().all(|command| command
+        .as_str()
+        .is_some_and(|command| !command.contains("progress"))));
+    assert!(diagnostic_report["current_gate"]["progress_to_record"]
+        .as_array()
+        .is_some_and(|hints| hints.is_empty()));
+    assert_eq!(
+        diagnostic_report["end"]["alignment_command"],
+        "not required for this diagnostic route"
+    );
+    assert_eq!(
+        diagnostic_report["end"]["token_stats_command"],
+        "not required for this diagnostic route"
+    );
+
+    let proof = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("execute this skill")
+        .arg("--trace-dir")
+        .arg(dir.path().join("proof-traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&proof);
+    let proof_report = json_stdout(&proof);
+    assert_eq!(proof_report["start"]["selected_route"], "proof");
+    let proof_commands = proof_report["current_gate"]["allowed_commands"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing proof allowed commands"))?;
+    assert!(proof_commands
+        .iter()
+        .any(|command| command.as_str().is_some_and(|command| command
+            .contains("progress checkpoint")
+            && command.contains("--quiet"))));
+    let proof_hints = proof_report["current_gate"]["progress_to_record"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing proof progress hints"))?;
+    assert!(proof_hints
+        .iter()
+        .all(|hint| hint["command"]
+            .as_str()
+            .is_some_and(|command| !command.starts_with('{')
+                && !command.contains("\"event\"")
+                && (command.contains("--requirement-satisfied")
+                    || command.contains("--phase-completed"))
+                && !command.contains("skillspec progress record"))));
     Ok(())
 }
 
@@ -207,6 +382,87 @@ fn run_loop_guide_resume_advances_from_execution_ledger(
     assert!(completed_phases
         .iter()
         .any(|phase| phase == "collect_cli_evidence"));
+    Ok(())
+}
+
+#[test]
+fn run_loop_guide_does_not_treat_blocked_phase_as_final_when_work_can_continue(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("run-loop-guide-blocked-not-final");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(&spec, rich_spec());
+
+    let start = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--input")
+        .arg("browse the app")
+        .arg("--trace-dir")
+        .arg(dir.path().join("traces"))
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&start);
+    let start_report = json_stdout(&start);
+    let run_dir = PathBuf::from(
+        start_report["start"]["run_dir"]
+            .as_str()
+            .ok_or_else(|| invalid_json_shape("missing run_dir"))?,
+    );
+
+    let complete_first = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("phase-completed")
+        .arg("collect_cli_evidence")
+        .arg("--evidence-kind")
+        .arg("command")
+        .arg("--evidence-ref")
+        .arg("guide-test")
+        .output()?;
+    assert_success(&complete_first);
+
+    let block_second = Command::new(bin())
+        .arg("progress")
+        .arg("record")
+        .arg(&run_dir)
+        .arg("phase-blocked")
+        .arg("browser_handoff")
+        .arg("--evidence-kind")
+        .arg("report")
+        .arg("--evidence-ref")
+        .arg("needs-followup")
+        .output()?;
+    assert_success(&block_second);
+
+    let resume = Command::new(bin())
+        .arg("run-loop")
+        .arg(&spec)
+        .arg("--resume")
+        .arg(&run_dir)
+        .arg("--guide")
+        .arg("agent")
+        .arg("--json")
+        .output()?;
+    assert_success(&resume);
+    let resume_report = json_stdout(&resume);
+    let do_now = resume_report["current_gate"]["do_now"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing do_now"))?;
+    assert!(do_now.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("recoverable blockers"))));
+    assert!(!do_now.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("move to the end anchor"))));
+    let when_to_advance = resume_report["current_gate"]["when_to_advance"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing when_to_advance"))?;
+    assert!(when_to_advance.iter().any(|item| item
+        .as_str()
+        .is_some_and(|item| item.contains("user intervention"))));
     Ok(())
 }
 

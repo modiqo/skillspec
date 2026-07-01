@@ -43,10 +43,14 @@ activation:
     - plugin namespaces
     - namespaced skills
     - namespaced skill packages
+    - plugin metadata manifest
+    - .agent-plugin/marketplace.json
+    - .codex-plugin/plugin.json
     - .claude-plugin/plugin.json
     - .mcp.json
     - plugin slash command
-    - claude plugin skills
+    - harness plugin skills
+    - plugin skills
     - many SKILL.md files
     - parent folder with multiple skills
     - fanout converge
@@ -120,6 +124,9 @@ activation:
     - skillspec import-skill
     - skillspec port-one-shot
     - skillspec doctor
+    - skillspec doctor checklist
+    - skillspec import checklist
+    - skillspec run checklist
     - skillspec source map
     - skillspec source query
     - source-map.json
@@ -158,7 +165,7 @@ applies_when:
       - import a public GitHub skill into SkillSpec
       - import an existing prose skill from a local folder or public URI
       - diagnose reliability debt and context burden in a prose skill before porting
-      - preserve imported dependency mentions, package authority, install risk, and missing dependency proof gaps
+      - preserve imported dependency evidence, package authority, install risk, and missing dependency proof gaps
       - inspect installed SkillSpec status, lifecycle state, roots, router index state, and skill inventory
       - install skill-router after SkillSpec is installed
       - install router mode after SkillSpec is installed
@@ -172,7 +179,7 @@ applies_when:
       - replace an existing active prose skill with a reviewed SkillSpec-backed skill without leaving both discoverable
       - run proof or value reporting for a ported skill
 entry:
-  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, answer read-only source-shape questions with doctor, map multi-skill and plugin-shaped workspaces before import, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
+  prompt: Multiplex SkillSpec setup inside the harness prompt. Teach the harness the current grammar, choose the right route, answer read-only assess/source-shape questions with doctor and doctor checklist only, run assessment as the first gate for import requests, stop import requests before harness mutation while offering an install dry-run option, map multi-skill and plugin-shaped workspaces before import, drive semantic imports through shape-specific import checklist stages, choose sequential phase gates versus isolated package fanout deliberately, stage or map single-skill sources, treat install requests for raw sources as assess plus import plus compile plus dry-run plus approved install, install compiled workspaces only after dry-run proof, install router or optional durable-executor only through reviewed commands, prefer compact summaries and handles over full reports in chat, observe durable workspaces when requested, then validate, phase-plan, record progress evidence, and prove value before install.
   decision_required: true
   forbid_before_decision:
     - edit_yaml_from_memory
@@ -187,6 +194,11 @@ entry:
     - work_around_missing_dependency_without_waiver
     - claim_partial_dependency_proof_as_full
     - leave_old_and_new_skill_discoverable_without_user_choice
+    - use_generic_skill_installer_for_skillspec_install
+    - copy_raw_skill_md_as_skillspec_install
+    - treat_harness_availability_as_skillspec_install
+    - bulk_promote_scaffolds_without_package_checklist
+    - apply_yaml_generator_across_packages
     - parallelize_dependency_bound_or_mutating_phases
     - load_full_reports_when_summary_suffices
     - claim_token_savings_without_metrics
@@ -226,7 +238,7 @@ routes:
     description: Use when the user asks what shape a skill, skill folder, repository, or URL has, or asks to run doctor without requesting import, port, compile, install, or proof.
     execution_plan:
       mode: ordered
-      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before import or mutation.
+      reason: Shape inspection is a read-only diagnostic gate. It should run doctor, report simple_skill, entry_skill_with_subskills, multi_skill_workspace, plugin_workspace, or non_skill_repository, and stop before source-map, import, mutation, progress-ledger, or alignment proof work.
       phases:
         - id: run_shape_doctor
           owner_skill: skillspec
@@ -242,7 +254,19 @@ routes:
               - any_unlisted_tool
           requires:
             - doctor_source_shape
+            - doctor_checklist_entry
           forbid:
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
+            - progress_record_phase
+            - progress_record_requirement
+            - progress_checkpoint
+            - progress_batch
+            - trace_align
             - port_one_shot_or_manual_import
             - import_skill_draft
             - workspace_import_packages
@@ -250,6 +274,8 @@ routes:
             - workspace_compile_build
             - workspace_install_packages
             - workspace_install_apply_visibility
+            - install_skill
+            - install_dry_run
             - install_from_remote_checkout
             - execute_imported_snippets_during_staging
         - id: report_shape
@@ -258,11 +284,24 @@ routes:
           requires:
             - report_source_shape
           forbid:
+            - source_map_create
+            - source_map_coverage
+            - source_map_nodes
+            - source_map_dependencies
+            - source_map_code
+            - source_map_stale
+            - progress_record_phase
+            - progress_record_requirement
+            - progress_checkpoint
+            - progress_batch
+            - trace_align
             - port_one_shot_or_manual_import
             - import_skill_draft
             - workspace_import_packages
             - workspace_compile_build
             - workspace_install_packages
+            - install_skill
+            - install_dry_run
   - id: local_skill_port
     label: Port local skill
     rank: 1
@@ -393,9 +432,202 @@ routes:
             - fetch_raw_github_skill_md_for_import
         - id: continue_as_local_port
           owner_skill: skillspec
+          description: Continue only when source-shape recon proves the staged remote source is one atomic skill package. If the staged source is a parent folder, multi-skill workspace, or plugin-shaped skill root, switch to workspace import/promotion/install routing instead of treating fanout scaffolds as completion.
           route: local_skill_port
           requires:
             - local_porting_loop
+  - id: remote_source_import_install
+    label: Import and install remote source
+    rank: 2
+    description: "Use when the user asks to import/port/convert a public remote source and install it. In SkillSpec, install means doctor -> import -> install: stage the source, doctor/map its shape, import into SkillSpec drafts, semantically promote every generated package draft, converge, compile, dry-run install, then install. A fanout import that produced scaffolds is an intermediate artifact, not a completed request; recoverable blockers become the next work queue until user intervention is genuinely required."
+    execution_plan:
+      mode: ordered
+      reason: Compound import-and-install requests need one uninterrupted SkillSpec path from doctor through import to reviewed install. Workspace fanout may produce one package or many, but no package can be installed until its scaffold is promoted and convergence, compile, and dry-run install have passed. A scaffold, missing promotion proof, or dependency review note is a continuation gate, not a final blocker, unless resolving it requires user approval, credentials, unavailable source, a policy waiver, or another external state change. Installing raw SKILL.md folders through a generic harness installer is not a SkillSpec install.
+      phases:
+        - id: approve_remote_source
+          owner_skill: skillspec
+          requires:
+            - approve_remote_source_access
+        - id: stage_remote_source
+          owner_skill: skillspec
+          requires:
+            - stage_remote_folder
+          forbid:
+            - install_from_remote_checkout
+            - execute_imported_snippets_during_staging
+            - web_search_for_remote_source
+            - fetch_raw_github_skill_md_for_import
+        - id: map_staged_source_graph
+          owner_skill: skillspec
+          description: Classify the staged source and build a workspace manifest. A single atomic skill is still represented as one workspace package for this compound install path; plugin and multi-skill roots keep their shape.
+          requires:
+            - decide_import_mode_from_source_shape
+            - inventory_source_folder
+            - doctor_source_skill
+            - import_checklist_entry
+            - workspace_map_source
+            - workspace_validate_manifest
+          forbid:
+            - import_workspace_root_as_single_skill
+            - use_port_one_shot_for_workspace_root
+            - use_port_one_shot_for_plugin_root
+            - skip_doctor_before_import
+        - id: scope_large_plugin_workspace
+          owner_skill: skillspec
+          description: If the validated manifest is a plugin workspace with more than 20 skill packages, warn that quantity creates agent follow-through risk and ask the user to approve a starting scope. Default to the top 20 dependency-ready or entry-priority packages from the manifest order, then continue in later batches until the full requested port is complete.
+          requires:
+            - choose_execution_strategy
+            - choose_large_plugin_port_scope
+          forbid:
+            - silently_attempt_over_20_plugin_full_port
+            - bulk_promote_scaffolds_without_package_checklist
+            - claim_top_twenty_scope_as_full_plugin_port
+        - id: import_workspace_packages
+          owner_skill: skillspec
+          description: Run fanout import for each package under the mapped build root. Generated package drafts remain scaffolds.
+          requires:
+            - workspace_import_packages
+            - import_checklist_loop
+            - produce_workspace_import_report
+          forbid:
+            - compile_or_install_during_workspace_import
+            - install_generated_scaffold
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+        - id: promote_workspace_packages
+          owner_skill: skillspec
+          description: Promote every generated package draft from its own source map and source lens before convergence.
+          requires:
+            - classify_workspace_scaffolds
+            - import_checklist_loop
+            - promote_workspace_scaffold_batches
+            - validate_promoted_package_specs
+            - deps_check_promoted_packages
+            - test_promoted_packages
+            - produce_workspace_promotion_report
+          forbid:
+            - claim_scaffold_as_finished_skill
+            - install_generated_scaffold
+            - auto_fill_scaffold_from_inference
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+        - id: converge_workspace_build
+          owner_skill: skillspec
+          requires:
+            - workspace_converge_build
+            - produce_workspace_converge_report
+        - id: compile_workspace_build
+          owner_skill: skillspec
+          requires:
+            - workspace_compile_build
+            - produce_workspace_compile_report
+          forbid:
+            - install_during_workspace_compile
+            - use_generic_skill_installer_for_skillspec_install
+        - id: install_workspace_build
+          owner_skill: skillspec
+          requires:
+            - workspace_install_dry_run
+            - produce_workspace_install_report
+            - approve_install_targets
+            - approve_retire_existing_skill
+            - workspace_install_packages
+            - produce_workspace_install_manifest
+          forbid:
+            - install_without_workspace_dry_run
+            - refresh_router_during_workspace_install
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+            - treat_harness_availability_as_skillspec_install
+  - id: local_source_import_install
+    label: Import and install local source
+    rank: 2
+    description: "Use when the user asks to install a raw local SKILL.md file or skill folder. In SkillSpec, install means doctor -> import -> install: assess shape first, import and semantically review the source, then compile, dry-run, and install only after dependency, target, and retirement gates."
+    execution_plan:
+      mode: ordered
+      reason: A raw local source install request is an end-state intent, not permission to copy prose into a harness. It must run the same source-shape assessment and import/review ladder as import, then add dependency review, compile, dry-run install, target approval, retirement approval, and final install. Generic harness skill installation or raw SKILL.md copying is not a SkillSpec install.
+      phases:
+        - id: assess_local_source_for_install
+          owner_skill: skillspec
+          description: Classify the local source before importing or installing. If doctor reports a multi-skill, entry-with-subskills, or plugin-shaped source, switch to workspace map/import/promotion/install instead of flattening it.
+          requires:
+            - decide_import_mode_from_source_shape
+            - inventory_source_folder
+            - doctor_source_skill
+            - import_checklist_entry
+          forbid:
+            - import_workspace_root_as_single_skill
+            - use_port_one_shot_without_shape_recon
+            - use_port_one_shot_for_workspace_root
+            - use_port_one_shot_for_plugin_root
+            - skip_doctor_before_import
+        - id: scope_large_plugin_workspace
+          owner_skill: skillspec
+          description: If the local source is a plugin workspace with more than 20 skill packages, warn that quantity creates agent follow-through risk and ask the user to approve a starting scope. Default to the top 20 dependency-ready or entry-priority packages from the manifest order, then continue in later batches until the full requested port is complete.
+          requires:
+            - choose_execution_strategy
+            - choose_large_plugin_port_scope
+          forbid:
+            - silently_attempt_over_20_plugin_full_port
+            - bulk_promote_scaffolds_without_package_checklist
+            - claim_top_twenty_scope_as_full_plugin_port
+        - id: import_and_review_local_source
+          owner_skill: skillspec
+          route: local_skill_port
+          description: Import and semantically promote the source-backed SkillSpec before any harness mutation.
+          requires:
+            - local_porting_loop
+            - run_structural_qa
+          forbid:
+            - install_unreviewed_draft
+            - treat_mechanical_draft_as_final
+            - install_before_validate_test_imports_deps
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+        - id: plan_local_install
+          owner_skill: skillspec
+          description: Review dependency surface, compile the reviewed SkillSpec, and dry-run the harness install before writing to any skill root.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - local_skill_files
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - deps_check_all
+            - show_dependency_surface
+            - approve_dependency_surface
+            - compile_codex_skill
+            - compile_claude_skill
+            - list_install_targets
+            - install_dry_run
+            - approve_install_targets
+            - approve_retire_existing_skill
+          forbid:
+            - install_before_dependency_surface_approval
+            - install_before_validate_test_imports_deps
+            - leave_old_and_new_skill_discoverable_without_user_choice
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+        - id: install_reviewed_local_result
+          owner_skill: skillspec
+          description: Install only the compiled, reviewed result after the dry-run and approvals are clean.
+          requires:
+            - install_skill
+          forbid:
+            - install_unreviewed_draft
+            - install_from_remote_checkout
+            - leave_old_and_new_skill_discoverable_without_user_choice
+            - use_generic_skill_installer_for_skillspec_install
+            - copy_raw_skill_md_as_skillspec_install
+            - treat_harness_availability_as_skillspec_install
+        - id: report_local_import_install
+          owner_skill: skillspec
+          description: Report the import artifacts, installed target paths, retired backup paths when applicable, and value proof.
+          requires:
+            - generate_value_report
   - id: workspace_skill_authoring
     label: Map multi-skill workspace
     rank: 3
@@ -478,15 +710,67 @@ routes:
             - compile_or_install_during_workspace_import
         - id: report_workspace_import
           owner_skill: skillspec
-          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next converge command.
+          description: Report built, failed, skipped, and blocked packages plus per-package evidence paths and the next scaffold-promotion batch plan.
           requires:
             - choose_execution_strategy
             - preserve_compact_evidence
             - report_workspace_import
+  - id: workspace_promote_scaffolds
+    label: Complete workspace scaffolds
+    rank: 5
+    description: Use after workspace fanout import has produced generated package drafts that must be semantically promoted from scaffold shape into real SkillSpecs before converge, compile, or install.
+    execution_plan:
+      mode: ordered
+      reason: Mechanical fanout import preserves source evidence; it does not create finished skills. Promotion must run in bounded dependency-ready batches so each package gets real activation, routes, rules, dependency decisions, tests, and proof before the graph can converge.
+      phases:
+        - id: classify_scaffold_outputs
+          owner_skill: skillspec
+          description: Inspect generated package drafts and classify every package as mechanical_scaffold, reviewed_ready, failed, or blocked by dependency order.
+          requires:
+            - classify_workspace_scaffolds
+            - produce_workspace_promotion_plan
+          forbid:
+            - compile_or_install_during_workspace_import
+            - install_generated_scaffold
+        - id: promote_scaffold_batches
+          owner_skill: skillspec
+          description: Promote generated package scaffolds one package at a time from the import checklist loop, keeping package review isolated while using the checklist countdown to avoid blind bulk edits.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_repo_files
+              - local_skill_files
+            permission_required_for:
+              - any_unlisted_tool
+          requires:
+            - choose_execution_strategy
+            - import_checklist_loop
+            - promote_workspace_scaffold_batches
+            - produce_workspace_promotion_report
+          forbid:
+            - install_generated_scaffold
+            - claim_scaffold_as_finished_skill
+            - compile_or_install_during_workspace_import
+        - id: validate_promoted_workspace_packages
+          owner_skill: skillspec
+          description: Validate every promoted package and keep unresolved packages blocked instead of deleting review notes or weakening dependencies.
+          requires:
+            - validate_promoted_package_specs
+            - deps_check_promoted_packages
+            - test_promoted_packages
+          forbid:
+            - delete_dependency_evidence_to_pass_qa
+            - clear_review_required_without_source_backed_decision
+        - id: report_workspace_promotion
+          owner_skill: skillspec
+          description: Report promoted, still-scaffolded, failed, and blocked packages plus the next converge command only when all installable packages are reviewed.
+          requires:
+            - preserve_compact_evidence
+            - report_workspace_promotion
   - id: workspace_converge
     label: Converge workspace build
-    rank: 5
-    description: Use when generated workspace package drafts should be checked against the validated workspace graph before compile or install.
+    rank: 6
+    description: Use when reviewed workspace package drafts should be checked against the validated workspace graph before compile or install.
     execution_plan:
       mode: ordered
       reason: Converge is the graph-level proof gate after fanout import; it must verify generated specs and dependency readiness without compiling or installing.
@@ -521,7 +805,7 @@ routes:
             - report_workspace_converge
   - id: workspace_compile
     label: Compile workspace build
-    rank: 6
+    rank: 7
     description: Use when converged workspace package drafts should be compiled into harness-ready SKILL.md loaders under the mirrored build root.
     execution_plan:
       mode: ordered
@@ -559,8 +843,8 @@ routes:
             - report_workspace_compile
   - id: workspace_install
     label: Install workspace build
-    rank: 7
-    description: Use when compiled workspace packages should be dry-run planned or installed into harness roots using manifest install_slug folders, with explicit workspace visibility policy planning.
+    rank: 8
+    description: Use when compiled workspace packages should be dry-run planned or installed into harness roots with explicit workspace visibility policy planning. Single-package workspaces use manifest install_slug folders; multi-skill and plugin-shaped workspaces preserve the source parent folder and package-relative paths.
     execution_plan:
       mode: ordered
       reason: Workspace install is the Phase 7 gate after compile; it must prove the full install plan, block collisions before mutation, install dependencies first, report entry/support visibility, and leave router refresh separate.
@@ -573,7 +857,7 @@ routes:
             - validate_workspace_graph
         - id: plan_workspace_install
           owner_skill: skillspec
-          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation. Use workspace-path slugs for side-by-side or plugin-safe installs; use local-name with --retire-existing only when replacing canonical existing skill folders.
+          description: Run the workspace install dry-run so every harness write, visibility target, collision, missing loader, and dependency blocker is visible before mutation. Use workspace-path for multi-skill and plugin-shaped installs so the source parent folder is preserved; use local-name with --retire-existing only when replacing one canonical existing skill folder.
           tool_boundary:
             allow:
               - skillspec_cli
@@ -617,7 +901,7 @@ routes:
     description: Use when the user wants post-install setup to create or refresh router mode in the configured skill roots.
     execution_plan:
       mode: ordered
-      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain the fast path; guard owns freshness, ordinary requests run one route query, and route JSON only loads a skill for decision use_skill while bypass or ambiguous continues normal behavior.
+      reason: Router mode changes skill visibility and harness prompt hooks, so it must inventory roots, run the router install command, verify managed guard hooks and first_hop_ready, verify routed skills are explicit-only, and explain the fast path; guard owns freshness, ordinary requests run one route query with harness/root context when available, duplicate physical roots collapse to one logical skill, the router stays provider-neutral, and route JSON only loads a skill for decision use_skill while bypass or ambiguous continues normal behavior.
       phases:
         - id: inspect_router_targets
           owner_skill: skillspec
@@ -720,9 +1004,51 @@ routes:
           description: Report enabled state, harness_hooks installed/removed status, visibility change count, index rebuild/preparedness for enable, and restart warning.
           requires:
             - verify_router_updated
+  - id: manage_router_policy
+    label: Manage router preference policy
+    rank: 6
+    description: Use when the user wants to create, inspect, tune, activate, or explain SQLite-backed router policy profiles and preference rules.
+    execution_plan:
+      mode: ordered
+      reason: Router policy is local SQLite state inside the router index. Agents must inspect existing policy before replacing a rule, then set the complete desired profile or rule, get it back, and explain a representative route decision before reporting success.
+      phases:
+        - id: inspect_router_policy_surface
+          owner_skill: skillspec
+          description: Verify policy/profile commands exist and inspect current policy state before changing it.
+          requires:
+            - router_policy_help
+            - router_profile_help
+            - router_policy_list_or_show
+          forbid:
+            - overwrite_policy_without_readback
+        - id: write_router_policy
+          owner_skill: skillspec
+          description: Create or update a provider-neutral policy profile and preference rule using explicit query predicates and targets.
+          tool_boundary:
+            allow:
+              - skillspec_cli
+              - local_router_index
+              - declared_commands_dependencies_imports_resources
+            permission_required_for:
+              - install_or_release_side_effect
+              - any_unlisted_tool
+          requires:
+            - router_policy_set_profile
+            - router_policy_set_rule
+            - router_policy_get
+          forbid:
+            - hardcode_provider_policy_in_router_code
+            - write_policy_without_index
+        - id: prove_router_policy
+          owner_skill: skillspec
+          description: Explain a representative policy-influenced route decision and optionally switch the active profile through the profile command.
+          requires:
+            - router_policy_explain
+            - router_profile_apply_or_clear
+            - verify_router_policy
   - id: inspect_skillspec_status
     label: Inspect SkillSpec status
-    rank: 6
+    rank: 7
     description: Use when the user wants a read-only report of installed SkillSpec lifecycle state, supported roots, router index status, and SkillSpec-backed versus legacy prose skills.
     execution_plan:
       mode: ordered
@@ -947,7 +1273,7 @@ routes:
               - workspace
               - trace_dir
               - return_to
-              - execution_policy
+              - execution_constraints
               - evidence_context
             forbid:
               - direct_cli_without_rote_exec
@@ -1115,8 +1441,9 @@ rules:
         - multi-skill workspace
         - plugin-shaped repo
         - plugin-shaped workspace
-        - claude plugin
-        - claude plugin skills
+        - harness plugin
+        - harness plugin skills
+        - plugin skills
         - plugin namespace
         - namespaced skills
         - repeated skill names
@@ -1131,6 +1458,7 @@ rules:
         - skill depends on another skill
         - plugin.json
         - .claude-plugin
+        - plugin metadata manifest
         - CLAUDE.md plugin
         - MCP plugin
         - same skill name collision
@@ -1161,7 +1489,28 @@ rules:
       - compile_or_install_during_workspace_import
     after_success:
       - report_workspace_import
-    reason: Fanout import starts from a validated workspace manifest and writes one generated package draft per atomic skill; it must not compile, install, or refresh router indexes.
+      - promote_workspace_scaffold_batches
+    reason: Fanout import starts from a validated workspace manifest and writes one generated mechanical draft per atomic skill; it must not compile, install, refresh router indexes, or call the drafts finished before scaffold promotion.
+  - id: route_workspace_scaffolds_to_batch_promotion
+    when:
+      user_says_any:
+        - complete workspace scaffolds
+        - promote workspace scaffolds
+        - finish workspace package drafts
+        - complete generated package drafts
+        - semantically promote workspace
+        - batch promote skills
+        - batch semantic promotion
+        - scaffold promotion
+        - generated mechanical scaffold
+    prefer: workspace_promote_scaffolds
+    forbid:
+      - install_generated_scaffold
+      - claim_scaffold_as_finished_skill
+      - compile_or_install_during_workspace_import
+    after_success:
+      - report_workspace_promotion
+    reason: Workspace import produces mechanical scaffolds; each package must be completed from source evidence in dependency-ready batches before converge, compile, or install.
   - id: route_workspace_converge_to_proof
     when:
       user_says_any:
@@ -1264,6 +1613,182 @@ rules:
       - web_search_for_remote_source
       - fetch_raw_github_skill_md_for_import
     reason: Remote inputs must be staged locally before import and install.
+  - id: route_remote_import_install_to_full_pipeline
+    when:
+      user_says_all_groups:
+        - - github.com
+          - owner/repo
+          - tree/main
+          - public repo
+          - remote skill
+        - - import
+          - port
+          - convert
+        - - install it
+          - install the result
+    prefer: remote_source_import_install
+    elicit:
+      - approve_remote_source_access
+      - approve_dependency_surface
+      - approve_install_targets
+      - approve_retire_existing_skill
+    forbid:
+      - install_from_remote_checkout
+      - execute_imported_snippets_during_staging
+      - web_search_for_remote_source
+      - fetch_raw_github_skill_md_for_import
+      - import_workspace_root_as_single_skill
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
+      - compile_or_install_during_workspace_import
+      - install_generated_scaffold
+      - claim_scaffold_as_finished_skill
+      - auto_fill_scaffold_from_inference
+      - install_without_workspace_dry_run
+      - leave_old_and_new_skill_discoverable_without_user_choice
+      - use_generic_skill_installer_for_skillspec_install
+      - copy_raw_skill_md_as_skillspec_install
+      - treat_harness_availability_as_skillspec_install
+    after_success:
+      - report_workspace_recon
+      - report_workspace_import
+      - promote_workspace_scaffold_batches
+      - report_workspace_promotion
+      - report_workspace_converge
+      - report_workspace_compile
+      - retire_existing_skill_when_approved
+      - report_workspace_install
+    reason: Remote import-and-install requests are not satisfied by fanout scaffolds or legacy SKILL.md copies. They must run doctor before import, then continue through per-package semantic promotion, convergence, compile, dry-run install, approved retirement of preexisting active skills, and final install.
+  - id: large_plugin_import_install_requires_top_twenty_scope
+    when:
+      user_says_any:
+        - plugin with more than 20 skills
+        - over 20 skills
+        - more than 20 SKILL.md
+        - 254 skills
+        - large plugin workspace
+        - big plugin
+        - PostHog/skills
+    prefer: remote_source_import_install
+    elicit:
+      - choose_large_plugin_port_scope
+    forbid:
+      - silently_attempt_over_20_plugin_full_port
+      - claim_top_twenty_scope_as_full_plugin_port
+      - use_generic_skill_installer_for_skillspec_install
+      - copy_raw_skill_md_as_skillspec_install
+    after_success:
+      - choose_execution_strategy
+      - promote_workspace_scaffold_batches
+      - report_workspace_promotion
+    reason: Large plugin workspaces are high-risk for agent follow-through. After doctor/map validates the package count, suggest a top-20 starting port from manifest order or user priority, make the reduced scope explicit, and continue the remaining packages in later batches instead of silently attempting all packages or falling back to raw skill copy.
+  - id: route_remote_install_source_to_full_pipeline
+    when:
+      user_says_all_groups:
+        - - github.com
+          - owner/repo
+          - tree/main
+          - public repo
+          - remote skill
+        - - install skill
+          - install this skill
+          - install the skill
+          - install repo
+          - install this repo
+          - install from
+    prefer: remote_source_import_install
+    elicit:
+      - approve_remote_source_access
+      - approve_dependency_surface
+      - approve_install_targets
+      - approve_retire_existing_skill
+    forbid:
+      - install_from_remote_checkout
+      - execute_imported_snippets_during_staging
+      - web_search_for_remote_source
+      - fetch_raw_github_skill_md_for_import
+      - import_workspace_root_as_single_skill
+      - use_port_one_shot_for_workspace_root
+      - use_port_one_shot_for_plugin_root
+      - compile_or_install_during_workspace_import
+      - install_generated_scaffold
+      - claim_scaffold_as_finished_skill
+      - auto_fill_scaffold_from_inference
+      - install_without_workspace_dry_run
+      - leave_old_and_new_skill_discoverable_without_user_choice
+      - use_generic_skill_installer_for_skillspec_install
+      - copy_raw_skill_md_as_skillspec_install
+      - treat_harness_availability_as_skillspec_install
+    after_success:
+      - report_workspace_recon
+      - report_workspace_import
+      - promote_workspace_scaffold_batches
+      - report_workspace_promotion
+      - report_workspace_converge
+      - report_workspace_compile
+      - retire_existing_skill_when_approved
+      - report_workspace_install
+    reason: Remote install requests are end-state requests. They must stage the source, doctor/assess shape, import and promote packages, converge, compile, dry-run, and install only after approvals; they must never install directly from the remote checkout or copy legacy SKILL.md packages as a substitute.
+  - id: route_local_install_source_to_assess_import_install
+    when:
+      user_says_all_groups:
+        - - install skill
+          - install this skill
+          - install the skill
+          - install local skill
+          - install from local
+        - - SKILL.md
+          - local folder
+          - /Users/
+          - /tmp/
+          - .agents/skills
+          - .codex/skills
+          - /skills/
+    prefer: local_source_import_install
+    elicit:
+      - approve_dependency_surface
+      - approve_install_targets
+      - approve_retire_existing_skill
+    forbid:
+      - skip_doctor_before_import
+      - install_unreviewed_draft
+      - install_before_validate_test_imports_deps
+      - install_before_dependency_surface_approval
+      - leave_old_and_new_skill_discoverable_without_user_choice
+      - use_generic_skill_installer_for_skillspec_install
+      - copy_raw_skill_md_as_skillspec_install
+      - treat_harness_availability_as_skillspec_install
+    after_success:
+      - local_porting_loop
+      - deps_check_all
+      - install_skill
+      - retire_existing_skill_when_approved
+      - generate_value_report
+    reason: Installing a raw local skill source must run doctor/assessment and import first, then compile, dry-run, approval, retirement, and final install. The low-level install command is only for reviewed generated packages, never a generic fallback for raw prose skills.
+  - id: route_import_skill_to_assess_then_import
+    when:
+      user_says_any:
+        - import skill
+        - import this skill
+        - import local skill
+        - import SKILL.md
+        - port skill
+        - convert skill
+    route_order:
+      - local_skill_port
+      - remote_skill_port
+      - workspace_skill_authoring
+    forbid:
+      - install_unreviewed_draft
+      - install_skill
+      - workspace_install_packages
+      - workspace_install_apply_visibility
+      - leave_old_and_new_skill_discoverable_without_user_choice
+    after_success:
+      - local_porting_loop
+      - generate_value_report
+      - offer_install_after_import
+    reason: Import requests start with source-shape assessment and produce reviewed import artifacts. They should stop before harness mutation and offer an install dry-run path instead of installing by default.
   - id: route_source_shape_questions_to_doctor
     when:
       user_says_any:
@@ -1279,9 +1804,28 @@ rules:
         - run doctor on this url
         - doctor on this repo
         - doctor on this url
+        - assess skill
+        - assess the skill
+        - assess this skill
+        - assess this folder
+        - assess this repo
+        - assess skill with doctor
+        - doctor assessment
+        - skill assessment
         - diagnose source shape
     prefer: inspect_source_shape
     forbid:
+      - source_map_create
+      - source_map_coverage
+      - source_map_nodes
+      - source_map_dependencies
+      - source_map_code
+      - source_map_stale
+      - progress_record_phase
+      - progress_record_requirement
+      - progress_checkpoint
+      - progress_batch
+      - trace_align
       - port_one_shot_or_manual_import
       - import_skill_draft
       - workspace_import_packages
@@ -1289,11 +1833,13 @@ rules:
       - workspace_compile_build
       - workspace_install_packages
       - workspace_install_apply_visibility
+      - install_skill
+      - install_dry_run
       - install_from_remote_checkout
       - execute_imported_snippets_during_staging
     after_success:
       - report_source_shape
-    reason: Shape questions should run the static doctor shape gate and stop; they should not import, port, compile, install, or choose a remote candidate.
+    reason: Shape questions should run the static doctor shape gate and stop; they should not source-map, import, port, compile, install, choose a remote candidate, or create progress/alignment proof ledgers.
   - id: post_install_setup_routes_to_multiplexer
     when:
       user_says_any:
@@ -1347,6 +1893,23 @@ rules:
     after_success:
       - verify_router_installed
     reason: Router setup is its own post-install path and must install into selected roots, not a separate router root.
+  - id: route_router_policy_to_policy_management
+    when:
+      user_says_any:
+        - router policy
+        - router preference
+        - preference policy
+        - policy profile
+        - policy rule
+        - set router policy
+        - get router policy
+        - explain router policy
+        - passthrough profile
+        - soft passthrough
+    prefer: manage_router_policy
+    after_success:
+      - verify_router_policy
+    reason: Router preference policy is SQLite-backed operator state in the router index; inspect with get/show before replacing rules, then explain a representative route decision.
   - id: route_router_switch_to_lifecycle
     when:
       user_says_any:
@@ -1633,7 +2196,7 @@ rules:
       - preserve_dependency_ledger
       - show_dependency_surface
       - report_dependency_waiver
-    reason: Imported skills must preserve source, reference, script, code, command, and package-manifest dependency mentions as package evidence before install or proof.
+    reason: Imported skills must preserve source-backed dependency evidence with typed authority before install or proof; arbitrary prose, comments, placeholders, and example app snippets are not hard runtime dependencies until reviewed.
   - id: install_requires_validated_reviewed_spec
     when:
       user_says_any:
@@ -1764,6 +2327,7 @@ elicitations:
     question: May I stage the public remote source locally for read-only import?
     required_when:
       - route: remote_skill_port
+      - route: remote_source_import_install
     choices:
       - id: approve_read_only
         label: Approve read-only staging
@@ -1772,6 +2336,36 @@ elicitations:
         label: Use local source only
         description: Do not access the remote; wait for a local path.
     default: approve_read_only
+  choose_large_plugin_port_scope:
+    question: This plugin workspace has more than 20 skill packages, which creates follow-through risk. Which scope should be ported first?
+    required_when:
+      - route: remote_source_import_install
+        predicate:
+          user_says_any:
+            - plugin with more than 20 skills
+            - over 20 skills
+            - more than 20 SKILL.md
+            - 254 skills
+            - large plugin workspace
+            - PostHog/skills
+      - route: local_source_import_install
+        predicate:
+          user_says_any:
+            - plugin with more than 20 skills
+            - over 20 skills
+            - more than 20 SKILL.md
+            - large plugin workspace
+    choices:
+      - id: top_twenty_first
+        label: Top 20 first
+        description: Port the top 20 dependency-ready or entry-priority packages from the workspace manifest, then continue remaining packages in later batches.
+      - id: named_subset
+        label: Named subset
+        description: Port only the package IDs or plugin namespace paths the user names, then continue after review.
+      - id: all_packages
+        label: All packages
+        description: Attempt the full plugin only after explicitly accepting quantity risk and longer follow-through time.
+    default: top_twenty_first
   choose_durable_source:
     question: Which durable-executor source should be used?
     required_when:
@@ -1818,6 +2412,7 @@ elicitations:
     question: Do you approve the imported dependency ledger and any missing dependency decisions for validation, proof, compile, or install?
     required_when:
       - route: compile_and_install_reviewed_skill
+      - route: remote_source_import_install
     choices:
       - id: approve_checked_only
         label: Checked dependencies only
@@ -1836,6 +2431,7 @@ elicitations:
     question: Which harness targets should receive the generated SkillSpec-backed skill?
     required_when:
       - route: compile_and_install_reviewed_skill
+      - route: remote_source_import_install
     choices:
       - id: codex_and_agents
         label: Codex and Agents
@@ -1851,6 +2447,7 @@ elicitations:
     question: If the target skill already exists in a harness root, should SkillSpec back up and remove the old active skill before installing the reviewed replacement?
     required_when:
       - route: compile_and_install_reviewed_skill
+      - route: remote_source_import_install
     choices:
       - id: retire_existing
         label: Retire existing
@@ -1948,7 +2545,7 @@ artifacts:
   source_map:
     kind: file
     path: .skillspec/source-map/source-map.json
-    description: Markdown AST-backed map of staged source files, byte ranges, line ranges, references, code blocks, dependency mentions, and review-required spans.
+    description: Markdown AST-backed map of staged source files, byte ranges, line ranges, references, code blocks, dependency signals, and review-required spans.
     produced_by:
       - kind: command
         id: source_map_create
@@ -1992,7 +2589,7 @@ artifacts:
   workspace_import_report:
     kind: report
     path: workspace-build/workspace-import.report.md
-    description: Fanout import report naming built, failed, skipped, and blocked packages, per-package evidence paths, and the next converge command.
+    description: Fanout import report naming built, failed, skipped, and blocked mechanical package drafts, per-package evidence paths, and the next scaffold-promotion batch plan.
     produced_by:
       - kind: command
         id: workspace_import_packages
@@ -2002,17 +2599,43 @@ artifacts:
   workspace_package_drafts:
     kind: file
     path: workspace-build/<package>/skill.spec.yml
-    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import.
+    description: One mechanical draft SkillSpec per atomic workspace package, generated under the mirrored build root by workspace import; not compile- or install-ready until semantic promotion completes.
     produced_by:
       - kind: command
         id: workspace_import_packages
     consumed_by:
       - kind: recipe
         id: workspace_import_loop
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
       - kind: command
         id: workspace_converge_build
       - kind: command
         id: workspace_compile_build
+  workspace_promotion_report:
+    kind: report
+    path: workspace-build/workspace-promotion.report.md
+    description: Batch semantic-promotion report naming promoted, still-scaffolded, failed, blocked, and next-batch workspace packages before converge.
+    produced_by:
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
+    consumed_by:
+      - kind: recipe
+        id: workspace_converge_loop
+  workspace_promotion_proof:
+    kind: file
+    path: workspace-build/<package>/.skillspec/workspace-promotion.json
+    description: Package-local proof that a generated workspace draft was semantically promoted from its own source, with reviewed status, current source/spec/source-map hashes, and activation/routes/rules/dependencies/checks/proof review flags. Converge and install must block when this file is missing, stale, incomplete, or paired with a wrapper that delegates execution back to the original SKILL.md prose.
+    produced_by:
+      - kind: recipe
+        id: workspace_scaffold_promotion_loop
+    consumed_by:
+      - kind: command
+        id: workspace_converge_build
+      - kind: command
+        id: workspace_install_dry_run
+      - kind: command
+        id: workspace_install_packages
   workspace_converge_report:
     kind: report
     path: workspace-build/workspace-converge.report.md
@@ -2177,6 +2800,8 @@ artifacts:
       - kind: command
         id: progress_record_requirement
       - kind: command
+        id: progress_checkpoint
+      - kind: command
         id: progress_batch
     consumed_by:
       - kind: command
@@ -2196,7 +2821,7 @@ artifacts:
   alignment_report:
     kind: file
     path: .skillspec/traces/<run-id>/alignment.json
-    description: Full trace alignment report written by trace_align while chat receives only the compact completion summary.
+    description: Full trace alignment report written by quiet trace_align; inspect only for debugging, blockers, failures, or explicit proof requests.
     produced_by:
       - kind: command
         id: trace_align
@@ -2206,7 +2831,7 @@ artifacts:
   proof_digest:
     kind: file
     path: .skillspec/traces/<run-id>/proof-digest.json
-    description: Grouped missing-proof digest from trace_align, used to plan one final-proof batch instead of a repeated alignment loop.
+    description: Grouped missing-proof digest from trace_align, used to report partial alignment and plan real repair work. Do not use this digest to invent route, obligation, elicitation, or phase events after the fact.
     produced_by:
       - kind: command
         id: trace_align
@@ -2218,7 +2843,7 @@ artifacts:
   final_proof_batch:
     kind: file
     path: .skillspec/traces/<run-id>/final-proof.jsonl
-    description: Agent-authored proof events with real evidence refs, derived from proof-digest.json and appended once with progress_batch.
+    description: Optional troubleshooting-only batch for real evidence rows that were captured during the work but not yet appended. It must not be used to manufacture route fulfillment, obligations, elicitations, or phase proof after alignment reports missing evidence.
     produced_by:
       - kind: recipe
         id: local_porting_loop
@@ -2295,22 +2920,29 @@ commands:
       dependencies:
         - rg_cli
   doctor_source_skill:
-    description: Run the static doctor shape gate and score frontmatter discovery risk, agent drift risk, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. Multi-skill, entry-with-subskills, and plugin-shaped roots return workspace reports with one package report per SKILL.md; non-skill code repos return shape-only reports.
+    description: Run the static doctor shape gate and score frontmatter discovery risk, agent drift risk, activation-loaded surface, primacy-bias risk, code/instruction mixing, ambiguity, dependency contract, and proof gaps. Multi-skill, entry-with-subskills, and plugin-shaped roots return workspace reports with one package report per SKILL.md plus workspace_identity counts for total source files, namespaces, namespaced packages, unique byte-identical skill content, repeated content groups, repeated frontmatter names, estimated copied-vs-referenced source tokens, and source_content_ref aliases; non-skill code repos return shape-only reports.
     template: mkdir -p <draft-dir>/.skillspec/reports && skillspec doctor <source-skill-folder-or-repo-uri> --json > <draft-dir>/.skillspec/reports/doctor.json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   doctor_source_shape:
-    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
+    description: Print the default formatted source shape and risk report for a local skill folder, parent folder, public GitHub skill folder, or public GitHub repo URI. The report includes a Shape Contract section with detected kind, kind-specific handling, analysis status, skill-file count, package count, namespace count, plugin-root count/details, referenced skill paths, and next command. Workspace reports also include a Workspace Identity section that distinguishes namespaced package identity from repeated byte-identical source content and shows source_content_ref aliases. Use for user questions like "what is the shape of this skill", "shape of skill", or "run doctor on this repo/url"; stop after reporting shape and recommended next command. Do not run source-map, import, progress, or alignment commands for this read-only diagnostic unless the user explicitly asks for proof. Use `--html` only when the user asks for a shareable report, and `--json` only when a downstream command needs machine fields.
     template: skillspec doctor <source-skill-folder-or-repo-uri>
-    safety: local_write
+    safety: network_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  doctor_checklist_entry:
+    description: Generate the read-only source-shape checklist for a local folder or public GitHub URI, including detected shape, activation policy, entry commands, evidence requirements, repeat-until condition, and forbids.
+    template: skillspec doctor checklist <source-skill-folder-or-repo-uri> --stage entry --json
+    safety: network_read
     requires:
       dependencies:
         - skillspec_cli
   source_map_create:
-    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span.
-    template: skillspec source map <source-skill-folder> --out <draft-dir>/.skillspec/source-map
+    description: Build a Markdown AST-backed source map before import so large prose sources can be read by handle and exact span. The source may be a local skill folder or a public GitHub skill URI. URI source-map requests stage the selected source and report source_path for stale/import-skill, but repo/workspace imports should run source stage first so shape classification can preserve plugin metadata and shared folders.
+    template: skillspec source map <source-skill-folder-or-github-uri> --out <draft-dir>/.skillspec/source-map
     safety: local_write
     requires:
       dependencies:
@@ -2322,15 +2954,22 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  source_map_lens:
+    description: Review one parsed Markdown block at a time from source-map.json, with cursor/countdown, source hash, classifications, references, suggested constructs, conditional-rule signals, and required SkillSpec target kinds. Use this during promotion before editing each block's corresponding activation/routes/rules/resources/code/dependencies/proof.
+    template: skillspec source lens <draft-dir>/.skillspec/source-map/source-map.json --cursor <n>
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
   source_map_nodes:
-    description: Inspect structural source handles before opening detailed spans.
+    description: Inspect structural source handles before opening detailed spans. Use the bounded index view; do not run `nodes --view summary` or `nodes --view full` in chat unless the user explicitly asks for exhaustive source-map output.
     template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json nodes --view index
     safety: local_read
     requires:
       dependencies:
         - skillspec_cli
   source_map_dependencies:
-    description: Inspect dependency mentions and imported package signals from the mapped source before proof or install.
+    description: Inspect dependency evidence and imported package signals from the mapped source before proof or install.
     template: skillspec source query <draft-dir>/.skillspec/source-map/source-map.json dependencies --view summary
     safety: local_read
     requires:
@@ -2351,14 +2990,14 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_map_source:
-    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Default install slugs use workspace-path namespacing for side-by-side and plugin-safe installs. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
+    description: Build the authoring-side package graph for a source root with one or more atomic SKILL.md packages, preserving plugin-shaped namespace roots when present. This is structure recon before fanout import, not router indexing. Default install slugs use workspace-path namespacing and preserve parent/package shape for multi-skill and plugin-shaped installs. Use summary mode to preserve proof files while reporting wall-clock and estimated token metrics.
     template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_map_replacement_source:
-    description: Build the workspace package graph with canonical local-name install slugs for replacement or upgrade installs that must retire existing skill folders such as rote-setup instead of installing namespaced generated folders. Do not use this for plugin-shaped workspaces with repeated local skill names unless validation proves install_slug uniqueness.
+    description: Build the workspace package graph with canonical local-name install slugs only for single-package replacement or upgrade installs that must retire existing skill folders such as rote-setup instead of installing namespaced generated folders. Do not use this for multi-skill or plugin-shaped workspaces; validation rejects local-name because it flattens source-local identity.
     template: skillspec workspace map <source-root> --out <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --install-slug-policy local-name --summary
     safety: local_write
     requires:
@@ -2372,29 +3011,50 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_import_packages:
-    description: Run fanout import from a validated workspace manifest, writing one generated package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
+    description: Run fanout import from a validated workspace manifest, writing one generated mechanical package draft per atomic skill under a mirrored build root while preserving successes and blocking dependents of failed packages. Dependency-ready packages may import in parallel, and unchanged packages with intact artifacts may be reused from the workspace cache. These drafts are scaffolds and must be semantically promoted before converge, compile, install, or alignment-as-complete. Use summary mode to keep agent-visible output small while full source maps, cache hits/misses, and package evidence stay on disk.
     template: skillspec workspace import <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --out <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
+  import_checklist_entry:
+    description: Generate the shape-specific import entry checklist for a source root or workspace manifest. This is read-only and names the correct single-skill, multi-skill, plugin, or workspace command ladder before any promotion or install.
+    template: skillspec import checklist <source-root-or-workspace-manifest> --stage entry --json
+    safety: network_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  import_checklist_loop:
+    description: Generate the package-specific workspace import loop checklist from the manifest and build root, locating the next package missing promotion proof and naming the source-lens, validate, deps, and test commands for that package.
+    template: skillspec import checklist <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --stage loop --json
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  import_checklist_exit:
+    description: Generate the workspace import exit checklist, including converge, compile, dry-run install, approved retirement, and install gates. This is read-only and must precede workspace converge/compile/install when the import path is checklist-driven.
+    template: skillspec import checklist <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --stage exit --json
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
   workspace_converge_build:
-    description: Verify a workspace build root against the validated manifest, checking generated package specs, package-local imports/resources, explicit failures, and dependency readiness before compile or install. Use summary mode to report compact readiness counts plus metrics.
+    description: Verify a workspace build root against the validated manifest, checking reviewed package specs, package-local imports/resources, explicit failures, dependency readiness, source/spec-bound workspace-promotion proof, and mechanical-scaffold or prose-wrapper blockers before compile or install. Use summary mode to report compact readiness counts plus metrics.
     template: skillspec workspace converge <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_compile_build:
-    description: Compile a converged workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Use summary mode to report compact compile counts plus metrics.
+    description: Compile a converged reviewed workspace build into harness-ready package loaders under the mirrored build root without installing or refreshing router state. Mechanical scaffolds must remain blocked. Use summary mode to report compact compile counts plus metrics.
     template: skillspec workspace compile <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex-skill --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_dry_run:
-    description: Preflight a compiled workspace install into harness roots, showing every planned write, default entry-implicit visibility target, and blocker without writing harness files. Use summary mode to report compact install counts plus metrics.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --dry-run --summary
+    description: Preflight a compiled reviewed workspace install into harness roots, showing every planned write, default entry-implicit visibility target, promotion-proof blocker, scaffold/prose-wrapper blocker, and folder or same-public-name retirement before writing harness files. For multi-skill and plugin-shaped manifests, verify the plan preserves the source parent folder, copies non-skill parent files from the reference source, replaces the source skill package subtree with compiled package folders at the same relative paths, and blocks flattened top-level package installs. Use --retire-existing by default after approval so a preexisting active skill, workspace parent, or plugin parent is backed up and removed instead of left discoverable beside the replacement.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --retire-existing --dry-run --summary
     safety: local_read
     requires:
       dependencies:
@@ -2407,15 +3067,15 @@ commands:
       dependencies:
         - skillspec_cli
   workspace_install_packages:
-    description: Install compiled workspace packages into harness roots using manifest install_slug folders after a clean dry-run, reporting visibility policy without refreshing router indexes. Use summary mode to report compact install counts plus metrics.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --summary
+    description: Install compiled reviewed workspace packages into harness roots after a clean dry-run, retiring approved preexisting active skill folders, workspace/plugin parent folders, or same-public-name collisions with backups and reporting visibility policy without refreshing router indexes. For multi-skill and plugin-shaped manifests, install the source parent folder as the harness unit, copy non-skill files from the reference parent, replace the source skill package subtree, and write compiled package folders back at the same relative paths instead of flattened top-level folders. Mechanical scaffolds, prose wrappers, and packages missing current workspace-promotion proof are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --retire-existing --summary
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   workspace_install_apply_visibility:
-    description: Install compiled workspace packages and apply the selected workspace visibility policy with a reversible visibility manifest. Use summary mode to report compact install counts plus metrics while preserving full install proof.
-    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --apply-visibility --summary
+    description: Install compiled reviewed workspace packages, retire approved preexisting active skill folders, workspace/plugin parent folders, or same-public-name collisions with backups, and apply the selected workspace visibility policy with a reversible visibility manifest. For multi-skill and plugin-shaped manifests, preserve the source parent shape and replace only the source skill package subtree with compiled packages at the same relative paths. Mechanical scaffolds, prose wrappers, and packages missing current workspace-promotion proof are blocked even if a stale loader exists. Use summary mode to report compact install counts plus metrics while preserving full install proof.
+    template: skillspec workspace install <draft-dir>/.skillspec/workspace/skillspec.workspace.yml --build-root <workspace-build-root> --target codex --retire-existing --apply-visibility --summary
     safety: local_write
     requires:
       dependencies:
@@ -2429,7 +3089,7 @@ commands:
     template: cp -f <source-skill-folder>/SKILL.md <output-skill-folder>/source/SKILL_md.old
     safety: local_write
   stage_remote_folder:
-    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser; use the returned selected_source_path or candidates.source_path for doctor, source map, import-skill, workspace map, or port-one-shot. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
+    description: Stage a public GitHub repository, tree URL, owner/repo shorthand, or owner/repo/path shorthand locally through the SkillSpec URI parser for candidate discovery or explicit persistent staging. Repo-root targets are cloned as the selected source root so plugin metadata, shared files, and folder shape remain available for doctor, import checklist, and workspace map. Explicit subfolder targets are sparse-staged only inside that requested folder. Treat source_shape.kind as authoritative for staged_source_path. Use selected_source_path for one atomic skill; when source_shape.kind is multi_skill_workspace or plugin_workspace, run shape/checklist/workspace handling against staged_source_path unless the user explicitly asked for one candidate skill. Do not web-search, fetch raw GitHub URLs, or hand-write sparse-checkout loops before this command.
     template: skillspec source stage <github-skill-uri> --out <staging-root> --json
     safety: network_read
     requires:
@@ -2486,59 +3146,87 @@ commands:
       dependencies:
         - skillspec_cli
   progress_record_phase:
-    description: Append structured evidence that a phase started, completed, or blocked.
+    description: Low-level troubleshooting command for one foreground phase progress row. Do not use for routine successful proof; use progress_checkpoint once for typed routine rows.
     template: skillspec progress record <trace-dir> phase-completed <phase-id> --evidence-kind <kind> --evidence-ref <ref>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_record_requirement:
-    description: Append structured evidence that a phase requirement was satisfied or failed.
+    description: Low-level troubleshooting command for one foreground requirement row. Do not use for routine successful proof; use progress_checkpoint once for typed routine rows.
     template: skillspec progress record <trace-dir> requirement-satisfied <phase-id> <requirement-id> --evidence-kind <kind> --evidence-ref <ref>
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
+  progress_checkpoint:
+    description: Append routine successful phase, requirement, route, closure, elicitation, obligation, or evidence proof events from typed flags as one quiet background checkpoint without hand-authoring event JSONL. Use --summary only for debugging or when the user asks to inspect proof recording.
+    template: skillspec progress checkpoint <trace-dir> --requirement-satisfied <phase-id>/<requirement-id>=<kind>:<ref> --phase-completed <phase-id>=<kind>:<ref> --checkpoint "checkpointing evidence" --quiet
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
   progress_batch:
-    description: Append several routine proof events from one JSONL file as a compact foreground checkpoint so final alignment proof and phase checkpoints do not become a visible progress parade.
-    template: skillspec progress batch <trace-dir> --file <trace-dir>/final-proof.jsonl --checkpoint "checkpointing evidence" --summary
+    description: Append proof events from an existing JSONL or JSON array artifact as a quiet background checkpoint. Prefer progress_checkpoint for routine successful rows so agents do not hand-author event JSONL.
+    template: skillspec progress batch <trace-dir> --file <trace-dir>/<proof-events>.jsonl --checkpoint "checkpointing evidence" --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_stats_durable_workspace:
-    description: Append measured durable-executor workspace token stats to execution.jsonl so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
-    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id>
+    description: Append measured durable-executor workspace token stats to execution.jsonl quietly so trace align can report measured token consumption and savings. Use only when the active route actually used durable-executor workspace evidence.
+    template: skillspec progress stats <trace-dir> --workspace <workspace> --workspace-stats-report <trace-dir>/workspace-stats.txt --phase <phase-id> --requirement <stats-requirement-id> --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
         - rote_cli
   progress_stats_summary_metrics:
-    description: Append direct-run summary metrics to execution.jsonl so trace align can report estimated output economy instead of not recorded.
-    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id>
+    description: Append direct-run summary metrics to execution.jsonl quietly so trace align can report estimated output economy instead of not recorded.
+    template: skillspec progress stats <trace-dir> --agent-visible-tokens <n> --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source estimated --phase <phase-id> --requirement <stats-requirement-id> --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   progress_show:
-    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
-    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir>
+    description: Check completed, current, blocked, and remaining phases from the run execution ledger and write progress.json without transcript output. Treat this as an internal gate check; surface only gate-level status unless details are requested or needed for a blocker/failure.
+    template: skillspec progress show <skill-folder>/skill.spec.yml --run <trace-dir> --quiet
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   run_loop:
-    description: "Start the stateful agent guide in one spec load: select route, write trace, print start/current/end anchors, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent
+    description: "Start the stateful agent guide in one spec load: select route, write trace, emit JSON control data, and persist guide-state.json plus guide-summary.md for compaction-safe resume."
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --input <user-task> --trace-dir <trace-dir> --guide agent --json
     safety: local_write
     requires:
       dependencies:
         - skillspec_cli
   run_loop_resume:
-    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and printing the current gate.
-    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent
+    description: Resume a stateful agent guide from an existing run directory by replaying the decision trace, reading execution.jsonl, validating fingerprints, and emitting JSON control data.
+    template: skillspec run-loop <skill-folder>/skill.spec.yml --resume <trace-dir> --guide agent --json
     safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_checklist_entry:
+    description: Generate the read-only execution entry checklist from a skill.spec.yml before starting a guided run-loop.
+    template: skillspec run checklist <skill-folder>/skill.spec.yml --stage entry --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_checklist_loop:
+    description: Generate the current guided-run checklist from guide-state.json, including phase, open requirements, allowed commands, forbids, and repeat-until condition.
+    template: skillspec run checklist <trace-dir> --stage loop --json
+    safety: local_read
+    requires:
+      dependencies:
+        - skillspec_cli
+  run_checklist_exit:
+    description: Generate the guided-run exit checklist from guide-state.json, including token stats, final progress, alignment, and proof-path requirements.
+    template: skillspec run checklist <trace-dir> --stage exit --json
+    safety: local_read
     requires:
       dependencies:
         - skillspec_cli
@@ -2623,6 +3311,20 @@ commands:
     requires:
       dependencies:
         - skillspec_cli
+  router_policy_help:
+    description: Verify that the installed CLI exposes the router policy command surface.
+    template: skillspec router policy --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_profile_help:
+    description: Verify that the installed CLI exposes the router profile command surface.
+    template: skillspec router profile --help
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
   durable_help:
     description: Verify that the installed CLI exposes the durable-executor lifecycle command surface.
     template: skillspec durable-executor --help
@@ -2638,8 +3340,8 @@ commands:
       dependencies:
         - rote_cli
   router_install:
-    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks, make routed skills explicit-only, and install a fast-path decision-gated router that loads a skill only for route decision use_skill.
-    template: skillspec router install --roots <skill-roots> --index <router-index>
+    description: Install or refresh router mode in the selected skill roots, install managed Codex/Claude prompt guard hooks with harness context, make routed skills explicit-only, and install a fast-path decision-gated provider-neutral router that collapses duplicate logical skills and loads a skill only for route decision use_skill. If the router index path is a legacy SQLite file that blocks the router config directory, rerun with --force only after accepting the migration to <router-index>/skill-index.sqlite.
+    template: skillspec router install --roots <skill-roots> --index <router-index> [--force]
     safety: local_write
     requires:
       dependencies:
@@ -2680,7 +3382,7 @@ commands:
       dependencies:
         - skillspec_cli
   router_guard:
-    description: Verify router-first readiness through the managed guard, repairing stale visibility/index drift and reporting first_hop_ready.
+    description: Verify router-first readiness through the managed guard, repairing stale visibility/index drift and reporting first_hop_ready. Managed hooks pass --harness so route can prefer the current physical root when duplicate logical skills exist.
     template: skillspec router guard --json
     safety: local_write
     requires:
@@ -2689,6 +3391,48 @@ commands:
   router_index_refresh:
     description: Refresh an installed router index through the router lifecycle; prefer this over direct skillspec index because refresh also reapplies router-managed visibility and checks preparedness.
     template: skillspec router index refresh --roots <skill-roots> --index <router-index>
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_list_or_show:
+    description: Inspect SQLite-backed router policy profiles and rules before editing policy state.
+    template: skillspec router policy show --index <router-index> --profile <profile> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_get:
+    description: Get one router policy profile or rule by id before editing it, preserving existing predicates, priority, anchor, and targets.
+    template: skillspec router policy get <profile-or-rule-id> --index <router-index> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_set_profile:
+    description: Create or update a SQLite-backed router policy profile in the router index; use route for normal routing and soft-passthrough for focus/code modes that bypass unless policy explicitly selects a skill.
+    template: skillspec router policy set-profile <profile> --index <router-index> --mode route|soft-passthrough|native-passthrough --active --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_set_rule:
+    description: Add or replace a provider-neutral router policy rule using query phrases and generic targets such as skill:<name>, tag:<tag>, source:<root>, or has_skill_spec:true. Read existing policy with router_policy_get or router_policy_list_or_show before replacing a rule.
+    template: skillspec router policy set-rule <rule-id> --index <router-index> --profile <profile> --priority <n> --anchor none|policy --when-any <phrase> --prefer skill:<name> --json
+    safety: local_write
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_policy_explain:
+    description: Explain how the active or named router policy profile changes a route decision, including base score, policy score, matched rules, and policy passthrough bypass.
+    template: skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json
+    safety: read_only
+    requires:
+      dependencies:
+        - skillspec_cli
+  router_profile_apply_or_clear:
+    description: Switch the active SQLite-backed router policy profile or clear it without changing the router install.
+    template: skillspec router profile apply <profile> --index <router-index> --json
     safety: local_write
     requires:
       dependencies:
@@ -2795,8 +3539,8 @@ commands:
       dependencies:
         - skillspec_cli
   trace_align:
-    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json while printing only the compact completion-facing summary.
-    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --summary --proof-digest <trace-dir>/proof-digest.json
+    description: Replay and align a captured decision trace plus execution ledger, writing full alignment.json and grouped proof-digest.json without transcript output. Use --summary only for debugging or explicit proof inspection.
+    template: skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <trace-dir> --execution-trace <trace-dir>/execution.jsonl --proof-digest <trace-dir>/proof-digest.json --quiet
     safety: read_only
     requires:
       dependencies:
@@ -2841,7 +3585,7 @@ recipes:
       - note: Extract source code blocks and scripts into package-local resource files, then reference them from resources/code, commands, recipes, tests, or review notes.
       - produce_artifact: coverage_matrix
   dependency_preservation_loop:
-    description: Preserve imported dependency mentions as deps.toml package evidence before QA, proof, compile, or install.
+    description: Preserve imported dependency evidence as typed deps.toml package evidence before QA, proof, compile, or install.
     ordered: true
     requires:
       resources:
@@ -2851,7 +3595,7 @@ recipes:
         - dependency_ledger
     steps:
       - run_command: source_map_dependencies
-      - note: Extract dependencies from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests; include source authority, package risk, local status, install candidate, required workflows, and degraded proof impact.
+      - note: Extract dependency evidence from SKILL.md, referenced docs, helper scripts, command examples, and package manifests. Treat fenced code imports as reference/example evidence unless reviewed into skill runtime; include typed source authority, package risk, local status, install candidate, required workflows, and degraded proof impact.
       - produce_artifact: dependency_ledger
       - run_command: inspect_dependency_ledger
       - ask: approve_dependency_surface
@@ -2873,12 +3617,13 @@ recipes:
       - produce_artifact: workspace_map_report
       - run_command: workspace_validate_manifest
       - note: Treat every folder containing SKILL.md as one atomic skill package. Do not import the parent root as a single skill.
-      - note: Preserve plugin-shaped roots as namespaces when a folder has skills/ plus .claude-plugin/plugin.json, .mcp.json, or CLAUDE.md; use skill-safe public names to avoid collisions instead of flattening repeated local names.
+      - note: Preserve plugin-shaped roots as namespaces when a folder has skills/ plus a plugin-named metadata folder containing a supported manifest, such as .agent-plugin/marketplace.json, .codex-plugin/plugin.json, .claude-plugin/plugin.json, or another supported plugin manifest. Treat .mcp.json and CLAUDE.md as compatibility markers only; use skill-safe public names to avoid collisions instead of flattening repeated local names.
       - note: Treat relative file references as hard dependencies. Treat plugin slash-command references as workflow links unless the manifest records a hard file dependency.
       - note: Use the workspace manifest for fanout planning; do not use skillspec index because router indexing serves runtime skill selection, not authoring recon.
       - note: Run recon as a sequential graph gate from compact command summaries; preserve the full workspace map and validation reports on disk instead of loading them into chat unless a blocker needs exact detail.
       - note: Stop after the validated graph in phases 1-3. Fanout import and converge generation belong to the next implementation phase.
       - note: Report plugin namespaces, package map, hard dependency graph, workflow references, warnings, and next fanout/converge phase from the validated workspace manifest.
+      - note: If the validated source is a plugin workspace with more than 20 packages, report the quantity and agent follow-through risk before promotion, suggest the top 20 dependency-ready or entry-priority package IDs from manifest order as the starting scope, and require choose_large_plugin_port_scope before beginning semantic promotion.
   workspace_import_loop:
     description: "Phase 4 workspace fanout import: validate the workspace manifest, run per-package doctor/source-map/import-skill, preserve successful package outputs, and report failed or blocked packages."
     ordered: true
@@ -2890,8 +3635,10 @@ recipes:
         - workspace_import_report
         - workspace_package_drafts
     steps:
+      - run_command: import_checklist_entry
       - run_command: workspace_validate_manifest
       - run_command: workspace_import_packages
+      - run_command: import_checklist_loop
       - produce_artifact: workspace_import_report
       - produce_artifact: workspace_package_drafts
       - note: Do not compile loaders, install skills, or refresh router indexes during workspace import.
@@ -2900,8 +3647,37 @@ recipes:
       - note: Prefer the compact import summary in chat. Open per-package reports, source maps, or full generated specs only for failed packages, review, or exact proof.
       - note: Treat failed package imports as package-level failures and block dependents instead of deleting successful independent outputs.
       - note: Report built, cached, failed, skipped, and blocked packages with per-package doctor, source-map, and import evidence paths.
+      - note: Generated package drafts are scaffolds, not finished ports. The next phase is workspace_scaffold_promotion_loop; do not converge, compile, install, align as complete, or report success until promotion is done.
+  workspace_scaffold_promotion_loop:
+    description: "Phase 5 workspace scaffold completion: classify generated package drafts, process the import checklist loop one package at a time with a manifest countdown, promote each scaffold into a reviewed SkillSpec from source evidence, and report remaining blockers before converge."
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+      artifacts:
+        - workspace_manifest
+        - workspace_package_drafts
+        - workspace_promotion_report
+    steps:
+      - run_command: import_checklist_loop
+      - run_command: workspace_converge_build
+      - note: "Use converge as a classifier: generated mechanical scaffolds must report blocked until promoted. A package with id imported.skill, Imported SkillSpec scaffold description, empty routes, importer review_required notes, source/SKILL_md.old, or deps.toml review_required=true is not ready."
+      - note: Use `skillspec import checklist ... --stage loop` as the work cursor. It must name one current package, its index/count, remaining packages, source-map cursor, package-local QA commands, required proof, and forbids before edits begin.
+      - note: When choose_large_plugin_port_scope selected top_twenty_first or named_subset, process only that approved scope, report remaining package count, and continue later batches until the full requested plugin port is complete. Do not claim the scoped batch as a full plugin port.
+      - note: Process one package per checklist loop result. Do not review one representative package, run a Ruby/Python YAML generator across packages, or bulk-apply routes/rules/tests to siblings.
+      - note: For each package, read only its package-local source/SKILL_md.old, source-map lens block, doctor report, deps.toml, and referenced package summaries needed by its declared dependencies.
+      - note: Promote real behavior into activation, routes, rules, elicitations, dependencies, imports, resources, code, artifacts, recipes, states, commands, closures, tests, and review_required. Do not auto-fill from vibes.
+      - note: Do not create a wrapper that tells the harness to load the original SKILL.md as authoritative runtime instructions. The original prose may be preserved as evidence, but execution must be represented by source-backed routes, phase order, rules, tool boundaries, checks, dependencies, and proof obligations.
+      - note: A promoted package must have at least one source-backed route or be explicitly classified as support/manual-only with a dependency/use relationship; empty-route entry skills remain blocked.
+      - note: Preserve dependency evidence. Do not delete deps.toml entries or review_required notes just to pass QA; clear a review note only when the package has an evidence-backed replacement.
+      - note: For each promoted package run validate, imports check, deps check, and scenario tests or record the exact blocker. Keep package failures isolated and block dependents.
+      - note: For each promoted package write .skillspec/workspace-promotion.json with schema skillspec/workspace-promotion/v0, status reviewed, package_id, current source_sha256, spec_sha256, optional source_map_sha256, and true review flags for activation, routes, rules, dependencies, checks/tests, and proof. This is package-local promotion proof, not final alignment proof.
+      - note: After each package, rerun the import checklist loop. The countdown must advance to the next package or report the exact blocker; do not print full package specs in chat.
+      - produce_artifact: workspace_promotion_proof
+      - produce_artifact: workspace_promotion_report
+      - note: Run workspace converge only after all installable packages are promoted or intentionally blocked. Converge blocking on a scaffold is a correct signal to return to the import checklist loop for the named package, not a terminal final-response blocker.
   workspace_converge_loop:
-    description: "Phase 5 workspace converge: verify generated package drafts and dependency readiness against the workspace graph before compile or install."
+    description: "Phase 6 workspace converge: verify reviewed package drafts and dependency readiness against the workspace graph before compile or install."
     ordered: true
     requires:
       dependencies:
@@ -2918,7 +3694,7 @@ recipes:
       - note: Keep convergence sequential at the graph level even when checks are computed internally in parallel; do not let a ready independent package erase blocked or failed dependency evidence.
       - note: Prefer the compact convergence summary in chat and use report paths for the detailed proof.
       - note: Do not compile loaders, install skills, or refresh router indexes during convergence.
-      - note: Report ready, failed, blocked, and missing packages, then stop if any package is not ready.
+      - note: Report ready, failed, blocked, and missing packages. If any package is not ready, route back to the package promotion or repair loop with the exact next command; stop only when user approval, credentials, inaccessible source, a policy waiver, or another external state change is required.
   workspace_compile_loop:
     description: "Phase 6 workspace compile: recheck convergence, compile ready package specs into SKILL.md loaders, and report compile readiness before install."
     ordered: true
@@ -2941,7 +3717,7 @@ recipes:
       - note: Compile may batch independent ready packages only when outputs are package-local; dependency ordering, missing-package blockers, and compile failure propagation stay sequential.
       - note: Prefer the compact compile summary in chat and keep generated loaders and detailed compile reports as artifact paths unless exact review is needed.
       - note: Do not install skills, retire existing skills, mutate harness roots, refresh router indexes, or change visibility during workspace compile.
-      - note: Report compiled, failed, blocked, missing, and skipped packages, then stop before Phase 7 install planning.
+      - note: Report compiled, failed, blocked, missing, and skipped packages. Continue to Phase 7 install planning only when compile succeeds; otherwise route back to converge or package promotion with the exact next command.
   workspace_install_loop:
     description: "Phase 7 workspace install: dry-run the compiled workspace install, block collisions before mutation, install packages in dependency order, report entry/support visibility, and keep router refresh separate."
     ordered: true
@@ -2958,14 +3734,14 @@ recipes:
       - run_command: workspace_validate_manifest
       - run_command: workspace_install_dry_run
       - produce_artifact: workspace_install_report
-      - note: Review the dry-run report before actual install; missing loaders, folder collisions, public-name collisions, blocked dependencies, or surprising visibility targets must stop the install.
-      - note: If this is a replacement/upgrade install, use --install-slug-policy local-name with --retire-existing during the dry-run so canonical folders such as rote-setup are the planned targets.
-      - note: Keep workspace-path slugs for side-by-side or plugin-shaped installs unless local-name validation proves every install_slug is unique.
+      - note: Review the dry-run report before actual install; missing loaders, unapproved folder collisions, unapproved public-name collisions, blocked dependencies, or surprising visibility targets must stop the install.
+      - note: Use --retire-existing by default after approval so old active folders, workspace/plugin parent folders, or same-public-name collisions are backed up and removed; use --install-slug-policy local-name only for single-package canonical replacement/upgrade installs such as rote-setup.
+      - note: Keep workspace-path for multi-skill and plugin-shaped installs; local-name validation rejects those shapes because it flattens source-local identity.
       - run_command: workspace_install_packages
       - produce_artifact: workspace_install_manifest
       - produce_artifact: workspace_install_report
       - note: Use workspace_install_apply_visibility instead of the plain install command when the user wants native visibility metadata written; the reversible manifest is workspace-visibility.manifest.json by default.
-      - note: Install packages using manifest install_slug folders and dependency order only.
+      - note: For multi-skill and plugin-shaped manifests, install the source parent folder, copy non-skill parent files, and replace the source skill package subtree with compiled package folders at the same relative paths rather than flattened top-level package folders.
       - note: Keep install, visibility mutation, collision handling, and router-refresh advice sequential; do not parallelize writes to harness roots.
       - note: Prefer compact install counts and metrics in chat while preserving install manifests and visibility manifests on disk.
       - note: Do not refresh router indexes or silently overwrite existing skills during workspace install; router refresh remains a separate runtime command after install.
@@ -2991,10 +3767,17 @@ recipes:
       - run_command: doctor_source_skill
       - run_command: source_map_create
       - run_command: source_map_coverage
+      - run_command: source_map_lens
       - run_command: source_map_nodes
       - run_command: source_map_dependencies
       - run_command: source_map_code
       - run_command: source_map_stale
+      - note: >-
+          Use source lens as the progressive review cursor: inspect one parsed
+          block, port that block into matching SkillSpec constructs, validate
+          the local spec, record its source_hash and structural target in
+          coverage proof, then move to the next cursor. Do not script a single
+          bulk rewrite across all blocks.
       - note: Use source-map handles and --view full for exact spans instead of loading large source files wholesale.
       - run_command: preserve_source_skill
       - run_command: grammar_sensemake_index
@@ -3003,7 +3786,7 @@ recipes:
       - run_command: sensemake_draft
       - run_command: grammar_checklist_import
       - load_resource: source_skill_md
-      - note: Before semantic promotion, inspect and complete the scaffolded deps.toml generated by import-skill. Preserve all dependency mentions from source prose, references, helper scripts, code imports, command examples, and package manifests. Record authority values such as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - note: Before semantic promotion, inspect and complete the scaffolded deps.toml generated by import-skill. Preserve dependency evidence from source prose, references, helper scripts, command examples, package manifests, and fenced code imports, but classify it before creating a hard dependency. Record executable commands as cli only when the skill invokes them, live services/APIs only when the skill needs them to function, package dependencies only from package-manager evidence, and example-code/user-app imports as reference/example evidence unless reviewed into skill runtime. Quarantine invalid or low-confidence candidates such as Optional., TABLE, HTTP methods like GET, placeholders, and private/source variable names instead of blocking install.
       - produce_artifact: dependency_ledger
       - run_command: inspect_dependency_ledger
       - ask: approve_dependency_surface
@@ -3015,14 +3798,28 @@ recipes:
       - run_command: deps_check_all
       - run_command: test_spec
       - run_command: compile_codex_skill
+      - run_command: run_checklist_entry
+      - run_command: run_loop
+      - run_command: run_checklist_loop
       - run_command: plan_phase_order
       - run_command: act_named_phase
-      - run_command: progress_record_requirement
-      - run_command: progress_record_phase
-      - note: Run trace_align once to create <trace-dir>/proof-digest.json; if multiple missing proof rows remain, write <trace-dir>/final-proof.jsonl from that digest and real evidence, then run progress_batch once instead of showing one progress command per row.
-      - run_command: progress_batch
+      - note: >-
+          For workspace/plugin imports, review packages in manifest order as a
+          visible countdown: package <index>/<count>, <remaining_after>
+          remaining. For each package, read its own source/SKILL_md.old and
+          source map, fix that package spec, run validation/deps/tests/compile
+          checks for that package, and write a package-local
+          workspace-promotion.json with review_session matching the imported
+          package countdown plus source_obligation_coverage rows containing the
+          source lens source_hash and target kinds that match the lens-required
+          constructs. Never review one representative package and bulk-apply
+          that promotion to the rest.
+      - note: Record routine successful phase and requirement proof rows with progress_checkpoint once. Do not hand-author event JSONL for routine rows, and do not run progress_record_requirement or progress_record_phase for successful routine rows; those low-level commands are only for foreground blockers, failures, or debugging.
+      - note: Run trace_align once to create <trace-dir>/proof-digest.json. If rows are missing, report partial alignment unless the evidence was captured when the work happened. Do not create route, obligation, elicitation, or phase proof rows after the fact just to make alignment pass.
+      - run_command: progress_checkpoint
       - run_command: progress_show
       - run_command: decide_demo
+      - run_command: run_checklist_exit
       - run_command: trace_align
       - run_command: value_report
       - note: >-
@@ -3045,13 +3842,12 @@ recipes:
     steps:
       - ask: approve_remote_source_access
       - run_command: stage_remote_folder
-      - note: If source stage returns selected_source_path, use that local folder as the source and do not run additional remote discovery. If it returns multiple candidates, ask choose_candidate_skill using candidates.source_path. If it returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
-      - ask: choose_candidate_skill
-      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the authoritative URI-to-local-source gate.
+      - note: Read source stage source_shape.kind before narrating the staged source. If it returns selected_source_path and source_shape.kind is simple_skill, use that local folder as the source and do not run additional remote discovery. If source_shape.kind is multi_skill_workspace or plugin_workspace, run doctor checklist/import checklist against staged_source_path and route through workspace map/import/converge/compile/install, preserving source shape. Ask choose_candidate_skill using candidates.source_path only when the user explicitly asked for one atomic skill. If staging returns no candidates or fails, stop with the exact staging error unless the user approves troubleshooting.
+      - note: Do not search the web, fetch raw GitHub URLs, or run ad hoc git ls-tree/sparse-checkout loops to locate the same URI; source stage is the explicit candidate-discovery gate, and source map owns direct URI sparse staging for source-map evidence.
       - branch:
-          if: candidate selected or exactly one candidate exists
+          if: selected source is one atomic skill
           then: local_porting_loop
-          otherwise: find_skill_candidates
+          otherwise: workspace_recon_loop
   install_reviewed_skill_loop:
     description: Compile and install only after QA and explicit approvals.
     ordered: true
@@ -3099,7 +3895,7 @@ recipes:
       - run_command: router_guard
       - note: Treat direct skillspec index as router-catalog construction only. It is not source/workspace recon and does not activate disabled router mode.
       - note: Report guard hook paths from harness_hooks and whether router guard returned first_hop_ready. Router-first is guaranteed only when managed hooks are loaded by the active harness.
-      - note: Report that every request should route through skill-router first, but ordinary prompts should use the fast path after guard readiness; run one route query, do not run index status, and load a domain skill only when route JSON says decision use_skill with a non-null selected skill. For bypass or ambiguous, continue normal behavior instead of forcing an unrelated skill.
+      - note: Report that every request should route through skill-router first, but ordinary prompts should use the fast path after guard readiness; run one route query, do not run index status, and load a domain skill only when route JSON says decision use_skill with a non-null selected skill. Duplicate physical roots are collapsed by logical skill identity before matching, and harness/root context only chooses the installed copy. The router is provider-neutral; execution substrate policy belongs to the selected skill or durable-executor. For bypass or ambiguous, continue normal behavior instead of forcing an unrelated skill.
       - note: Report whether durable-executor is present and remains implicit, or whether durable first-hop is unavailable.
   router_update_loop:
     description: Backup-first router maintenance through the prompt skill.
@@ -3124,6 +3920,23 @@ recipes:
       - run_command: verify_router_install
       - note: For enable, report index rebuild, preparedness, harness_hooks installed status, and that the router becomes the first hop when managed hooks are loaded. For disable, report harness_hooks removed/missing status, that router is explicit-only, routed skills are implicit/default, files remain installed, and active harnesses should restart.
       - note: If disabled, direct skillspec index may write a catalog, but it will not make router selection active until router mode is enabled.
+  router_policy_loop:
+    description: Read-before-write router preference policy setup through SQLite-backed policy/profile commands.
+    ordered: true
+    requires:
+      dependencies:
+        - skillspec_cli
+    steps:
+      - run_command: router_policy_help
+      - run_command: router_profile_help
+      - run_command: router_policy_list_or_show
+      - note: Before changing an existing rule or profile, run router_policy_get for the target id and preserve existing priority, anchor, predicates, and targets unless the user asks to replace them.
+      - run_command: router_policy_set_profile
+      - run_command: router_policy_set_rule
+      - run_command: router_policy_get
+      - run_command: router_policy_explain
+      - run_command: router_profile_apply_or_clear
+      - note: Report the active profile, matched policy rule, selected or bypass decision, base score, policy score, and whether policy_passthrough applied.
   status_inspection_loop:
     description: Read-only SkillSpec lifecycle, roots, router-index, and skill inventory inspection.
     ordered: true
@@ -3215,7 +4028,7 @@ code:
     language: text
     kind: validator
     source:
-      inline: "Guide the promotion pass; do not auto-fill the scaffold. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep the pass short and deliberate: choose real activation/routes, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Artifact produced_by/consumed_by entries are executable refs only: command, code, or recipe; never route or rule. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass."
+      inline: "Guide the promotion pass; do not auto-fill the scaffold. For workspace fanout, split packages into dependency-ready batches from skillspec.workspace.yml and process only independent packages in bounded parallel increments, normally 3 to 5 packages per batch. For each package, use its own source/SKILL_md.old, source map, doctor report, deps.toml, and declared dependency summaries; keep edits and proof package-local. For each source-backed obligation, decide whether it becomes activation, route, rule, elicitation, dependency, import, resource, code, artifact, recipe, state, command, closure, test, review_required, or metadata. Keep each package pass short and deliberate: choose real activation/routes or explicitly classify the package as support/manual-only, promote only evidenced behavior, fill coverage rows for promoted and unresolved obligations, then run the QA ladder once per package. The mechanical draft is evidence, not authority. Do not consult existing ports, repo history, memory, or examples unless the user explicitly asks. Quote YAML string scalars that contain colon-space, especially elicitation questions, descriptions, steps[].note, recipe/procedure notes, and review notes. Artifact produced_by/consumed_by entries are executable refs only: command, code, or recipe; never route or rule. When source code appears in source prose or sibling files, preserve it as package-local resource files and connect it through resources/code with provenance. Preserve every dependency mention in deps.toml with authority, risk, local status, install candidate, required workflows, and degraded proof impact; do not delete dependencies to make validation or proof pass. After each batch, report promoted, still_scaffolded, failed, blocked, and next_batch package ids; do not converge, compile, install, or align the workspace as complete while any installable package remains a mechanical scaffold."
     provenance:
       resource: source_skill_md
       heading: Creation Procedure
@@ -3310,13 +4123,17 @@ snippets:
   compact_evidence_shape:
     text: |
       Token economy SOP:
-      - Prefer --summary, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
+      - Prefer compact workspace summaries, quiet trace_align artifacts, --view index, --view summary, source-map handles, alignment rows, and artifact paths.
       - Keep full reports, source maps, loaders, manifests, logs, and JSON proof on disk.
       - Open full JSON, full reports, or full source spans only when the task, review, blocker, or proof gap needs exact evidence.
+      - Keep SkillSpec implementation details in the background: do not narrate ledger writes, raw progress commands, trace plumbing, checkpoint rows, or alignment internals as user-visible progress.
+      - For Doctor/source-shape diagnostic routes, answer from the doctor report and stop; do not create source maps, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
+      - Do not run `skillspec progress checkpoint --help`, `skillspec progress batch --help`, `skillspec progress record --help`, or `skillspec query ... command:progress_*` during normal execution; the guide emits the checkpoint flag shape and quiet command.
+      - For source maps, use `nodes --view index` and exact handles for full text. Do not run collection-level `nodes --view summary` or `nodes --view full` in chat.
       - Treat durable-executor workspace stats as measured token accounting and direct CLI --summary blocks as estimated output economy.
       - Record direct-run summary metrics with progress_stats_summary_metrics before trace_align; otherwise alignment must report token usage as not recorded.
-      - Stage successful routine evidence rows in a JSONL batch and run one foreground progress_batch checkpoint at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
-      - Run one initial trace_align with proof-digest, one progress_batch for grouped final proof, and one final trace_align; do not rerun alignment after each individual proof row.
+      - Record successful routine evidence rows with one quiet progress_checkpoint command at natural boundaries: after dry-run/planning, after mutation, after verification, before route fulfillment, and before final alignment.
+      - Run one initial quiet trace_align with proof-digest, one quiet progress_checkpoint or progress_batch for grouped final proof, and one final quiet trace_align; do not rerun alignment after each individual proof row.
       - Surface individual progress rows only for failures, blocked requirements, or proof gaps the user must understand.
       - Report metrics_source with token numbers; say not recorded instead of inventing savings when neither measured nor estimated metrics exist.
   dependency_surface_shape:
@@ -3325,8 +4142,10 @@ snippets:
       - import-skill creates deps.toml beside skill.spec.yml and declares it as a file dependency/artifact.
       - Complete the scaffolded ledger for every imported/shareable skill.
       - If review finds no dependencies, keep the scaffold with dependency_count = 0. Do not replace it with a byte-empty deps.toml.
-      - Extract dependency mentions from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests.
-      - Record authority as source_required, source_recommended, reference_required, script_import, example_only, or inferred.
+      - Extract dependency evidence from SKILL.md, referenced docs, helper scripts, fenced code imports, command examples, and package manifests, but do not turn arbitrary prose, comments, placeholders, or example app snippets into executable dependencies.
+      - Classify dependency source before creating [[dependency]]: cli only for commands the skill invokes, api/service only for live services the skill requires, package only from package-manager evidence, and reference/example for docs snippets or user-project code.
+      - Quarantine low-confidence or invalid candidates such as Optional., Required, Replace, TABLE, GET, <personProp1>, and private/source variable names instead of adding them to [[dependency]] or blocking downstream packages.
+      - Record authority as declared, command_evidence, package_manager_evidence, api_required, reference_import, example_only, or inferred_review_required.
       - Record local_status as present, missing, unknown, provisionable, deferred, or required_but_unproven.
       - Record package risk, install candidate, required workflows, degraded_without, proof substitution, and user approval or waiver.
       - Do not mutate the dependency set to make QA pass. Missing required dependencies make proof partial unless installed or explicitly deferred.
@@ -3345,7 +4164,7 @@ snippets:
       install = "pip install pypdf"
 closures:
   choose_execution_strategy:
-    description: State whether the active work stays sequential or uses package-scoped fanout, and preserve the reason when many packages, plugins, cross-skill references, or expensive proof work are involved.
+    description: State whether the active work stays sequential or uses package-scoped fanout, and preserve the reason when many packages, plugins, cross-skill references, or expensive proof work are involved. For plugin workspaces with more than 20 packages, include the approved top-20, named-subset, or all-packages scope and the remaining package count.
   preserve_compact_evidence:
     description: Keep large proof artifacts on disk, report compact summaries plus paths in chat, and load full detail only for exact review, blockers, or proof gaps.
   fill_coverage_matrix:
@@ -3353,7 +4172,7 @@ closures:
   split_source_code_into_resources:
     description: When source material contains scripts or code blocks, preserve each durable code surface as a package-local resource file, declare matching resources/code entries with provenance, and reference them from commands, recipes, tests, artifacts, or review notes.
   preserve_dependency_ledger:
-    description: Keep the scaffolded deps.toml beside skill.spec.yml for imported/shareable skills, preserving every dependency mention with authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver.
+    description: Keep the scaffolded deps.toml beside skill.spec.yml for imported/shareable skills, preserving dependency evidence with typed authority, package risk, local status, install candidate, required workflows, degraded proof impact, and approval or waiver. Do not promote arbitrary prose, comments, placeholders, or reference/example code imports into hard runtime dependencies; quarantine low-confidence candidates until reviewed.
   produce_workspace_manifest:
     description: Write skillspec.workspace.yml with every atomic skill package, plugin namespace, skill-safe public name, deterministic install slug, package kind, cross-skill reference, and inferred hard depends_on edge found during structure recon.
     commands:
@@ -3366,6 +4185,14 @@ closures:
     description: Run workspace fanout import and write a report that names built, failed, skipped, and blocked packages plus per-package evidence paths.
     commands:
       - workspace_import_packages
+  promote_workspace_scaffold_batches:
+    description: Complete generated workspace package scaffolds in dependency-ready bounded batches before converge, compile, or install.
+    code:
+      - review_and_promote_draft
+  produce_workspace_promotion_report:
+    description: Write a compact promotion report naming promoted, still-scaffolded, failed, blocked, and next-batch package ids.
+    code:
+      - review_and_promote_draft
   produce_workspace_converge_report:
     description: Run workspace converge and write a graph-level proof report that names ready, failed, blocked, and missing package drafts, dependency-readiness status, validation warnings, and cross-package reference counts.
     commands:
@@ -3392,9 +4219,13 @@ closures:
       - workspace_install_packages
       - workspace_install_apply_visibility
   report_workspace_import:
-    description: Summarize the workspace import result, generated package drafts, package-level failures, blocked dependents, and the next converge command without compiling or installing anything.
+    description: Summarize the workspace import result, generated mechanical package drafts, package-level failures, blocked dependents, and the next scaffold-promotion batch plan without converging, compiling, or installing anything.
     commands:
       - workspace_import_packages
+  report_workspace_promotion:
+    description: Summarize batch scaffold promotion results, including promoted, still-scaffolded, failed, blocked, and next-batch package ids before converge.
+    code:
+      - review_and_promote_draft
   report_workspace_converge:
     description: Summarize the workspace converge result, generated spec readiness, dependency blockers, missing package drafts, validation warnings, and Phase 6 or per-package compile next steps without compiling or installing anything.
     commands:
@@ -3415,9 +4246,11 @@ closures:
       - workspace_map_source
       - workspace_validate_manifest
   report_source_shape:
-    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not import, port, compile, install, or choose a remote candidate during read-only inspection.
+    description: Summarize the doctor report, including shape.kind, analysis_status, recommended_command, skill_files count, plugin namespaces if any, negative signals, frontmatter discovery risk, agent or workspace risk, and package count. Do not source-map, import, port, compile, install, choose a remote candidate, record progress proof, or run alignment during read-only inspection.
     commands:
       - doctor_source_shape
+  offer_install_after_import:
+    description: After a successful import/port request, state that no harness install was performed by default, name the reviewed artifact or workspace build, and offer the exact dry-run install command or workspace install dry-run command as the next optional step.
   produce_mechanical_draft:
     description: Save the import-skill output and report its inferred deps, commands, imports, and review notes.
   produce_reviewed_spec:
@@ -3447,7 +4280,7 @@ closures:
   generate_value_report:
     description: Print extracted triggers, routes, rules, dependencies, commands, tests, resources moved out of prompt path, phase progress, token consumption and savings, decision trace, alignment summary, and contract-quality grades.
   retire_existing_skill_when_approved:
-    description: When replacing an existing active skill, install with --retire-existing after approval, report the backup path, and avoid leaving duplicate old/new skills discoverable in harness roots. If the user chooses side-by-side testing, require a distinct --name instead.
+    description: When replacing an existing active skill, install with --retire-existing after approval, report the backup path, retire same-public-name collisions even when the old skill lives in a different folder, and avoid leaving duplicate old/new skills discoverable in harness roots. If the user chooses side-by-side testing, require a distinct --name or install slug instead.
   show_dependency_surface:
     description: Show dependency ids, source authority, local status, permission sensitivity, install risk, provision choices, missing required dependencies, optional/example dependencies, and degraded proof impact before compile/install/proof approval.
   report_dependency_waiver:
@@ -3461,6 +4294,11 @@ closures:
     description: Report the router update backup path, updated recorded roots, preparedness state, durable-executor status, and harness restart warning.
     commands:
       - router_update
+  verify_router_policy:
+    description: Report the active router policy profile, stored profile/rule readback, representative explain output, selected skill or policy passthrough bypass, base score, policy score, and matched rule.
+    commands:
+      - router_policy_get
+      - router_policy_explain
   report_skillspec_status:
     description: Report router installed/enabled state, durable-executor installed/enabled state, supported and scanned roots, router index exists/stale/updated data, and SkillSpec-backed versus legacy skill counts and names.
     commands:
@@ -3580,6 +4418,12 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_checkpoint
+        - progress_batch
+        - trace_align
         - port_one_shot_or_manual_import
         - import_skill_draft
         - workspace_import_packages
@@ -3597,10 +4441,58 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - source_map_coverage
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_checkpoint
+        - progress_batch
+        - trace_align
         - import_skill_draft
         - workspace_import_packages
         - workspace_install_packages
         - execute_imported_snippets_during_staging
+  - name: doctor assessment url does not enter source map or proof parade
+    input: assess this skill with doctor https://github.com/org/repo/tree/main/skills/example
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_remote_sources_to_remote_port
+      after_success:
+        - report_source_shape
+      forbid:
+        - source_map_create
+        - source_map_coverage
+        - source_map_nodes
+        - progress_record_phase
+        - progress_record_requirement
+        - progress_checkpoint
+        - progress_batch
+        - trace_align
+        - import_skill_draft
+        - workspace_import_packages
+        - workspace_install_packages
+  - name: assess skill is read only doctor
+    input: assess skill /Users/me/.agents/skills/example
+    expect:
+      route: inspect_source_shape
+      matched_rules:
+        - route_source_shape_questions_to_doctor
+      not_matched_rules:
+        - route_import_skill_to_assess_then_import
+        - route_local_install_source_to_assess_import_install
+      after_success:
+        - report_source_shape
+      forbid:
+        - source_map_create
+        - import_skill_draft
+        - workspace_import_packages
+        - install_skill
+        - workspace_install_packages
+        - progress_checkpoint
+        - trace_align
   - name: shape of local skill runs doctor
     input: shape of skill /Users/me/tulving/skills
     expect:
@@ -3610,6 +4502,10 @@ tests:
       after_success:
         - report_source_shape
       forbid:
+        - source_map_create
+        - progress_record_phase
+        - progress_record_requirement
+        - trace_align
         - port_one_shot_or_manual_import
         - import_skill_draft
         - workspace_import_packages
@@ -3658,9 +4554,22 @@ tests:
         - route_workspace_import_to_fanout
       after_success:
         - report_workspace_import
+        - promote_workspace_scaffold_batches
       forbid:
         - use_router_index_for_authoring_recon
         - import_workspace_root_as_single_skill
+        - compile_or_install_during_workspace_import
+  - name: workspace scaffolds promote before converge
+    input: /skillspec complete workspace scaffolds in ./workspace-build
+    expect:
+      route: workspace_promote_scaffolds
+      matched_rules:
+        - route_workspace_scaffolds_to_batch_promotion
+      after_success:
+        - report_workspace_promotion
+      forbid:
+        - install_generated_scaffold
+        - claim_scaffold_as_finished_skill
         - compile_or_install_during_workspace_import
   - name: workspace package drafts converge before compile
     input: /skillspec workspace converge ./build/skillspec.workspace.yml --build-root ./workspace-build
@@ -3728,6 +4637,23 @@ tests:
         - execute_imported_snippets_during_staging
         - web_search_for_remote_source
         - fetch_raw_github_skill_md_for_import
+  - name: import skill assesses and offers install without installing
+    input: import skill /Users/me/.agents/skills/example
+    expect:
+      route: local_skill_port
+      matched_rules:
+        - route_import_skill_to_assess_then_import
+        - grammar_preflight_is_mandatory
+      after_success:
+        - local_porting_loop
+        - generate_value_report
+        - offer_install_after_import
+      forbid:
+        - install_unreviewed_draft
+        - install_skill
+        - workspace_install_packages
+        - workspace_install_apply_visibility
+        - leave_old_and_new_skill_discoverable_without_user_choice
   - name: prompt skill is named skillspec
     input: /skillspec import /Users/me/.agents/skills/durable-executor
     expect:
@@ -3739,6 +4665,46 @@ tests:
       after_success:
         - local_porting_loop
         - generate_value_report
+  - name: install local raw source assesses imports then installs
+    input: install skill /Users/me/.agents/skills/example into codex
+    expect:
+      route: local_source_import_install
+      matched_rules:
+        - route_local_install_source_to_assess_import_install
+      elicit:
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      after_success:
+        - local_porting_loop
+        - deps_check_all
+        - install_skill
+        - retire_existing_skill_when_approved
+        - generate_value_report
+      forbid:
+        - skip_doctor_before_import
+        - install_unreviewed_draft
+        - install_before_validate_test_imports_deps
+        - install_before_dependency_surface_approval
+        - leave_old_and_new_skill_discoverable_without_user_choice
+  - name: install remote source assesses imports then installs
+    input: install skill https://github.com/org/repo/tree/main/skills/pdf into codex
+    expect:
+      route: remote_source_import_install
+      matched_rules:
+        - route_remote_install_source_to_full_pipeline
+        - route_remote_sources_to_remote_port
+      elicit:
+        - approve_remote_source_access
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      forbid:
+        - install_from_remote_checkout
+        - execute_imported_snippets_during_staging
+        - import_workspace_root_as_single_skill
+        - install_generated_scaffold
+        - claim_scaffold_as_finished_skill
   - name: router install routes to post install router setup
     input: /skillspec install router mode into my skill roots
     expect:
@@ -3900,11 +4866,12 @@ tests:
         - treat_mechanical_draft_as_final
         - install_unreviewed_draft
         - consult_existing_ports_without_user_request
-  - name: compound remote import install proof starts with remote port
+  - name: compound remote import install uses full workspace pipeline
     input: /skillspec import https://github.com/anthropics/skills/tree/main/skills/pdf, compile it for Codex, install it, and prove it
     expect:
-      route: remote_skill_port
+      route: remote_source_import_install
       matched_rules:
+        - route_remote_import_install_to_full_pipeline
         - route_remote_sources_to_remote_port
         - route_prompt_import_to_skill_port
         - grammar_preflight_is_mandatory
@@ -3914,7 +4881,6 @@ tests:
         - prove_requests_route_to_value
       elicit:
         - approve_remote_source_access
-        - choose_candidate_skill
         - approve_dependency_surface
         - approve_install_targets
         - approve_retire_existing_skill
@@ -3927,6 +4893,93 @@ tests:
         - drop_imported_dependency_mentions
         - work_around_missing_dependency_without_waiver
         - claim_partial_dependency_proof_as_full
+        - import_workspace_root_as_single_skill
+        - use_port_one_shot_for_workspace_root
+        - compile_or_install_during_workspace_import
+        - install_generated_scaffold
+        - claim_scaffold_as_finished_skill
+        - leave_old_and_new_skill_discoverable_without_user_choice
+  - name: remote workspace import install cannot stop at scaffolds
+    input: /skillspec import https://github.com/org/repo/tree/main/privacy-legal and install it
+    expect:
+      route: remote_source_import_install
+      matched_rules:
+        - route_remote_import_install_to_full_pipeline
+      elicit:
+        - approve_remote_source_access
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      after_success:
+        - report_workspace_recon
+        - report_workspace_import
+        - promote_workspace_scaffold_batches
+        - report_workspace_promotion
+        - report_workspace_converge
+        - report_workspace_compile
+        - retire_existing_skill_when_approved
+        - report_workspace_install
+      forbid:
+        - install_from_remote_checkout
+        - compile_or_install_during_workspace_import
+        - install_generated_scaffold
+        - claim_scaffold_as_finished_skill
+        - auto_fill_scaffold_from_inference
+        - install_without_workspace_dry_run
+        - leave_old_and_new_skill_discoverable_without_user_choice
+        - use_generic_skill_installer_for_skillspec_install
+        - copy_raw_skill_md_as_skillspec_install
+        - treat_harness_availability_as_skillspec_install
+  - name: large plugin import install asks for top twenty scope
+    input: /skillspec install skill from https://github.com/PostHog/skills plugin with 254 skills
+    expect:
+      route: remote_source_import_install
+      matched_rules:
+        - route_remote_install_source_to_full_pipeline
+        - large_plugin_import_install_requires_top_twenty_scope
+      elicit:
+        - approve_remote_source_access
+        - choose_large_plugin_port_scope
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      after_success:
+        - choose_execution_strategy
+        - promote_workspace_scaffold_batches
+        - report_workspace_promotion
+        - report_workspace_converge
+        - report_workspace_compile
+        - report_workspace_install
+      forbid:
+        - silently_attempt_over_20_plugin_full_port
+        - claim_top_twenty_scope_as_full_plugin_port
+        - install_generated_scaffold
+        - use_generic_skill_installer_for_skillspec_install
+        - copy_raw_skill_md_as_skillspec_install
+        - treat_harness_availability_as_skillspec_install
+  - name: skillspec install means doctor import install
+    input: /skillspec install local skill from local folder /Users/me/.agents/skills/example
+    expect:
+      route: local_source_import_install
+      matched_rules:
+        - route_local_install_source_to_assess_import_install
+      elicit:
+        - approve_dependency_surface
+        - approve_install_targets
+        - approve_retire_existing_skill
+      after_success:
+        - local_porting_loop
+        - deps_check_all
+        - install_skill
+        - retire_existing_skill_when_approved
+        - generate_value_report
+      forbid:
+        - skip_doctor_before_import
+        - install_unreviewed_draft
+        - install_before_validate_test_imports_deps
+        - use_generic_skill_installer_for_skillspec_install
+        - copy_raw_skill_md_as_skillspec_install
+        - treat_harness_availability_as_skillspec_install
   - name: remote import preserves dependency ledger before proof
     input: /skillspec import a remote SKILL.md with Python package dependencies, do not install missing packages, and prove it
     expect:
@@ -4066,7 +5119,7 @@ tests:
 review_required:
   - Execution evidence remains unproven until the generated skill runs a real user task end-to-end through the target harness.
   - Remote staging assumes a public GitHub source; private repositories and non-GitHub archives need explicit auth/source handling.
-  - Remote import/port requests must use `skillspec source stage <uri> --json` before doctor, source map, import-skill, workspace map, or port-one-shot. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after the staging command fails and the user approves.
+  - Remote source-map requests for one atomic skill may use `skillspec source map <uri> --out <draft>/.skillspec/source-map`, which performs SkillSpec-owned URI staging and reports the local source_path. Remote import/port requests that may be repo/workspace/plugin shaped must use `skillspec source stage <uri> --json` first; repo-root staging preserves plugin metadata and shared folders, explicit subfolder staging stays scoped to the requested folder, and source_shape.kind is authoritative for staged_source_path. Web search, raw GitHub fetching, and ad hoc sparse-checkout probing are troubleshooting paths only after SkillSpec staging fails and the user approves.
   - durable-executor is optional and not assumed to be bundled with router mode; install requires an explicit local durable-executor source folder, and remote sources must be staged before lifecycle install.
   - Observed-workspace spec creation is a rote-specific optional integration; it depends on the quality of the durable rote workspace log and should mark inferred behavior in the coverage matrix.
   - The value-report command is the intended UX surface; until implemented as a native CLI command, the harness must synthesize the report from sensemake, test, deps, imports, decide, and align outputs.
@@ -4089,12 +5142,12 @@ metadata:
     note: Mechanical import found command surfaces but no strategic routes, rules, recipes, or tests, so semantic promotion is mandatory.
   extracted_value_targets:
     activation_triggers: 12
-    routes: 12
-    rules: 23
+    routes: 21
+    rules: 33
     dependency_checks: 5
-    command_templates: 55
-    recipes: 13
-    closures: 23
+    command_templates: 88
+    recipes: 21
+    closures: 36
     tests: 24
     references_moved_out_of_prompt_path: 1
     estimated_context_reduction: 85%

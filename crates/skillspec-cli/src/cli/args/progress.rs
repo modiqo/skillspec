@@ -14,6 +14,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after writing progress.json.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append one structured execution/progress event to a run ledger")]
     Record {
@@ -47,6 +50,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append a stats_collected token/workspace metrics event to a run ledger")]
     Stats {
@@ -103,6 +109,9 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(about = "Append final_response_sent report-section proof to a run ledger")]
     FinalResponse {
@@ -120,7 +129,7 @@ pub(in crate::cli) enum ProgressCommand {
         /// Final response includes evidence handles or files.
         #[arg(long)]
         evidence: bool,
-        /// Final response includes the alignment summary.
+        /// Final response includes the alignment status or report path.
         #[arg(long)]
         alignment: bool,
         /// Final response includes token usage and token savings.
@@ -132,10 +141,13 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit JSON for the appended event.
         #[arg(long)]
         json: bool,
+        /// Suppress stdout after appending the event.
+        #[arg(long)]
+        quiet: bool,
     },
     #[command(
         about = "Checkpoint multiple structured progress events from JSONL or JSON array",
-        long_about = "Append several structured progress/proof events to execution.jsonl in one foreground checkpoint. Use --file with a JSONL batch and --summary for compact agent-facing output. The legacy --events alias is still accepted."
+        long_about = "Append several structured progress/proof events to execution.jsonl in one checkpoint. Use --file with a JSONL batch, --quiet for background agent execution, or --summary for compact debug output. The legacy --events alias is still accepted."
     )]
     Batch {
         /// Trace run directory containing execution.jsonl.
@@ -149,7 +161,57 @@ pub(in crate::cli) enum ProgressCommand {
         /// Emit compact checkpoint output instead of event counts.
         #[arg(long)]
         summary: bool,
+        /// Suppress stdout after successfully appending the batch.
+        #[arg(long)]
+        quiet: bool,
         /// Emit JSON for the batch report.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Checkpoint routine progress events from typed arguments",
+        long_about = "Append routine successful progress/proof events to execution.jsonl in one checkpoint without hand-authoring an evidence JSONL file. Repeat flags as needed. Use PHASE/REQUIREMENT=KIND:REF for requirement rows and TARGET=KIND:REF for target rows."
+    )]
+    Checkpoint {
+        /// Trace run directory containing execution.jsonl.
+        run: PathBuf,
+        /// Requirement proof as PHASE/REQUIREMENT=KIND:REF. Repeat for several requirements.
+        #[arg(
+            long = "requirement-satisfied",
+            value_name = "PHASE/REQUIREMENT=KIND:REF"
+        )]
+        requirement_satisfied: Vec<String>,
+        /// Phase completion proof as PHASE=KIND:REF. Repeat for several phases.
+        #[arg(long = "phase-completed", value_name = "PHASE=KIND:REF")]
+        phase_completed: Vec<String>,
+        /// Route fulfillment proof as ROUTE=KIND:REF. Repeat for several routes.
+        #[arg(long = "route-fulfilled", value_name = "ROUTE=KIND:REF")]
+        route_fulfilled: Vec<String>,
+        /// Route check proof as CHECK=KIND:REF. Repeat for several checks.
+        #[arg(long = "route-check-completed", value_name = "CHECK=KIND:REF")]
+        route_check_completed: Vec<String>,
+        /// After-success closure proof as CLOSURE=KIND:REF. Repeat for several closures.
+        #[arg(long = "after-success-completed", value_name = "CLOSURE=KIND:REF")]
+        after_success_completed: Vec<String>,
+        /// Obligation proof as OBLIGATION=KIND:REF. Repeat for several obligations.
+        #[arg(long = "obligation-satisfied", value_name = "OBLIGATION=KIND:REF")]
+        obligation_satisfied: Vec<String>,
+        /// Elicitation proof as ELICITATION=KIND:REF. Repeat for several elicitations.
+        #[arg(long = "elicitation-answered", value_name = "ELICITATION=KIND:REF")]
+        elicitation_answered: Vec<String>,
+        /// Attach extra evidence as KIND:REF. Repeat for several evidence items.
+        #[arg(long = "evidence-attached", value_name = "KIND:REF")]
+        evidence_attached: Vec<String>,
+        /// Label printed in compact summary output.
+        #[arg(long)]
+        checkpoint: Option<String>,
+        /// Emit compact checkpoint output instead of event counts.
+        #[arg(long)]
+        summary: bool,
+        /// Suppress stdout after successfully appending the checkpoint.
+        #[arg(long)]
+        quiet: bool,
+        /// Emit JSON for the checkpoint report.
         #[arg(long)]
         json: bool,
     },

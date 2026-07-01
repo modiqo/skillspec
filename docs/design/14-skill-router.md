@@ -28,7 +28,7 @@ The implemented CLI surface is:
 
 ```bash
 skillspec index --roots <skill-root>... --out <index-file-or-router-dir> [--visibility-manifest <manifest>]
-skillspec route --index <index-file-or-router-dir> --query '<user task>' --top 5 --json
+skillspec route --index <index-file-or-router-dir> --query '<user task>' [--current-harness agents|codex|claude-local] [--current-root <skill-root>] --top 5 --json
 skillspec skills audit --roots <skill-root>... --json
 skillspec visibility plan --roots <skill-root>... --json
 skillspec visibility apply --roots <skill-root>... --manifest <manifest> --json
@@ -37,11 +37,11 @@ skillspec skills set-visibility <skill> manual-only --roots <skill-root>... --ma
 skillspec skills disable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec skills enable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec status [--roots <skill-root>...] [--json]
-skillspec router install --roots <skill-root>... --index <index-file-or-router-dir>
+skillspec router install --roots <skill-root>... --index <index-file-or-router-dir> [--force]
 skillspec router enable
 skillspec router disable
 skillspec router update [--backup-dir <backup-dir>]
-skillspec router guard [--config <router-config>] [--hook] [--json]
+skillspec router guard [--config <router-config>] [--hook] [--harness agents|codex|claude-local] [--json]
 skillspec router index status --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router index refresh --roots <skill-root>... --index <index-file-or-router-dir> --visibility-manifest <manifest>
 skillspec router uninstall # alias: delete
@@ -66,6 +66,12 @@ skillspec durable-executor delete # alias: uninstall
 Any index argument can be either the SQLite file itself or the router directory;
 directory paths resolve to `skill-index.sqlite`.
 
+If an older local install used `~/.skillspec/router` as a SQLite index file,
+`router install --index ~/.skillspec/router` cannot also create
+`~/.skillspec/router/config.json`. In that case install reports a legacy-index
+collision and asks for `--force`; the forced path moves the old file to
+`~/.skillspec/router/skill-index.sqlite` before creating router config.
+
 Router mode is the managed state created by `skillspec router install`:
 
 - after install/enable and when managed hooks are loaded by the active harness,
@@ -88,6 +94,9 @@ Router mode is the managed state created by `skillspec router install`:
 - ordinary first-hop routing does not run index status or repair checks when the
   prompt hook has already reported `first_hop_ready=true`; it runs a single
   `skillspec route` decision and obeys that result;
+- route first collapses duplicate physical installs of the same logical skill,
+  then uses optional harness/root context only to choose which physical copy to
+  load;
 - the manifest is the only rollback authority.
 
 Router install does not install or copy `durable-executor`. If
@@ -190,6 +199,38 @@ not make the router implicit or change routed-skill visibility; run
 `skillspec router enable` to reactivate router mode, or keep using
 `skillspec route` manually against the standalone index.
 
+## Duplicate Logical Skills
+
+Multi-harness setups often install the same skill into `.agents`, `.codex`, and
+project-local `.claude` roots. Those copies are physical duplicates, not three
+different routing choices. The router therefore collapses candidates by logical
+identity before it applies the `use_skill`/`bypass`/`ambiguous` match gate.
+
+Logical identity is:
+
+- the resolved `skill.spec.yml` `id` when the skill is SkillSpec-backed;
+- otherwise the skill name plus a normalized prose checksum that strips
+  visibility-only `disable-model-invocation` frontmatter before hashing.
+
+After collapse, the representative candidate keeps the strongest duplicate
+score so the match gate is still based on the user's intent, not on filesystem
+placement. Filesystem preference only chooses which copy to load:
+
+1. `--current-root`, when the caller knows the active skill root.
+2. `--current-harness`, when the caller knows the active harness.
+3. Project-local `.claude/skills` when the current working directory is inside
+   that project.
+4. A SkillSpec-backed copy.
+5. Configured root order from the index, then stable path order.
+
+This keeps the router harness-agnostic for logical selection while still letting
+a Codex session load the Codex copy and a Claude project session load the local
+Claude copy. It also preserves ambiguity for real conflicts: two skills with
+the same display name but different `skill.spec.yml` ids or different prose
+normalized prose checksums remain separate candidates and can still return
+`ambiguous`. Router-managed visibility metadata alone is not enough to split a
+logical prose skill.
+
 ## Visibility Model
 
 The router uses native harness controls where available.
@@ -260,10 +301,36 @@ The match gate is intentionally conservative:
 
 - `use_skill`: the top candidate has high confidence and clears the separation
   threshold from the next candidate.
-- `bypass`: no positive candidate exists or the best candidate is only low or
-  medium confidence.
+- `bypass`: no positive candidate exists, the best candidate is only low or
+  medium confidence, or the top candidate lacks an activation anchor.
 - `ambiguous`: strong top candidates are too close for automatic skill
   selection.
+
+The activation-anchor gate prevents broad skills from winning on generic prose
+overlap. A candidate must match its name or a non-generic name anchor such as
+`linear`, `pdf`, `adapter`, or `browse`; generic words such as `docs`,
+`document`, `create`, `skill`, and `router` are not enough by themselves.
+
+## Execution Substrate Boundary
+
+The router is provider-neutral. It answers only whether a local skill should be
+loaded, and which installed copy should be loaded. It must not hardcode a vendor,
+adapter system, browser system, shell runner, or durable execution substrate.
+
+Execution substrate policy belongs in one of these places:
+
+- the selected skill's own `skill.spec.yml`, when a domain skill declares its
+  allowed tools, forbids, phases, checks, and evidence;
+- the optional durable-executor skill, when the user or installation policy
+  chooses durable execution;
+- a future declarative capability contract, if SkillSpec grows a portable way
+  for skills to advertise execution substrates without binding the router to a
+  particular provider.
+
+This boundary matters for open source adoption. A project should be able to use
+SkillSpec router with its own skills, tools, adapters, browser automation, and
+execution recorder without inheriting another vendor's runtime policy from the
+harness.
 
 ## Durable Execution
 
@@ -323,8 +390,8 @@ the user already chose durable/direct mode, the task is pure discussion, or the
 selected skill is `durable-executor` itself.
 
 When durable mode is active, the durable envelope wins on execution substrate.
-For example, if the selected domain skill says to run `git status`, the durable
-envelope still requires the actual process to run through `rote exec`.
+For example, if a selected domain skill asks for a local process, the active
+durable-executor contract decides how that process is recorded and proved.
 
 ## Safety Boundaries
 

@@ -131,8 +131,10 @@ fn render_current_gate(output: &mut String, gate: &CurrentGate) {
     write_bullets(output, &gate.do_not);
     output.push_str("\nNEXT COMMANDS\n");
     write_command_bullets(output, &gate.allowed_commands);
-    output.push_str("\nLOAD MORE ONLY IF NEEDED\n");
-    write_command_bullets(output, &gate.recommended_queries);
+    if !gate.recommended_queries.is_empty() {
+        output.push_str("\nLOAD MORE ONLY IF BLOCKED\n");
+        write_command_bullets(output, &gate.recommended_queries);
+    }
     output.push('\n');
 }
 
@@ -143,6 +145,10 @@ fn render_end(output: &mut String, report: &GuideReport) {
     output.push_str(&format!(
         "- route_fulfillment_event: {}\n",
         report.end.route_fulfillment_event
+    ));
+    output.push_str(&format!(
+        "- token_stats: `{}`\n",
+        report.end.token_stats_command
     ));
     output.push_str(&format!(
         "- final_progress: `{}`\n",

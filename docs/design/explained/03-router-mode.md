@@ -60,13 +60,16 @@ Grounded command:
 ```sh
 skillspec router install \
   --roots <skill-root>... \
-  --index <router-index>
+  --index <router-index> \
+  [--force]
 ```
 
 Review check:
 
 - Router skill is generated in each configured root.
 - Router config records managed roots and router skill dirs.
+- `--force` is only for accepted migration of a legacy router SQLite index file
+  into `<router-index>/skill-index.sqlite`.
 - Visibility is manifest-backed for restore.
 - After harness restart, the router is the implicit first hop for every request
   in managed roots.
@@ -87,6 +90,15 @@ candidates from the local index and returns a decision: `use_skill`, `bypass`,
 or `ambiguous`. Only `use_skill` authorizes loading the selected skill. `bypass`
 and `ambiguous` keep the agent on the normal path instead of loading an
 unrelated or uncertain candidate.
+
+If the same logical skill is installed in several roots, route collapses those
+physical copies before matching. Harness/root context only chooses which copy to
+load after the logical skill has already won.
+
+Route is provider-neutral. It does not choose a vendor-specific adapter, browser,
+shell runner, or durable execution substrate. Substrate policy belongs to the
+selected skill's contract or to durable-executor when durable execution is
+active.
 
 Prompt-hook guard owns freshness. When guard context says
 `first_hop_ready=true`, the ordinary router path is a single `skillspec route`
@@ -112,6 +124,8 @@ Grounded command:
 skillspec route \
   --index <router-index> \
   --query '<user task>' \
+  --current-harness codex \
+  --current-root <active-skill-root> \
   --json
 ```
 
@@ -121,6 +135,10 @@ Review check:
   skill's task.
 - A selected skill is loaded only for `decision: use_skill`; its SkillSpec or
   prose contract still owns the domain work.
+- If durable execution is active, durable-executor owns the execution envelope,
+  evidence, and substrate policy after routing.
+- Duplicate physical installs of the same logical skill should not create
+  `ambiguous`; true different skills still can.
 - Index status and repair are lifecycle operations, not part of ordinary
   dispatch when guard already reports `first_hop_ready=true`.
 - Durable execution remains a separate execution policy.

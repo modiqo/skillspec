@@ -19,7 +19,7 @@ This avoids treating `port-one-shot` as a universal shortcut.
 | --- | --- | --- |
 | Exactly one `SKILL.md` below the selected root, no plugin markers, no reviewed `skill.spec.yml` to revise | Single atomic skill | `skillspec port-one-shot <source> --out <draft> --target codex-skill --prove` |
 | More than one `SKILL.md`, shared standards packages, or relative references into sibling skill folders | Ordinary multi-skill workspace | `skillspec workspace map`, `workspace validate`, `workspace import`, `workspace converge`, `workspace compile` |
-| A root with `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | Plugin-shaped workspace | Workspace flow with plugin namespace preservation |
+| A root with `skills/` plus harness-neutral plugin metadata such as `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or another supported plugin manifest | Plugin-shaped workspace | Workspace flow with plugin namespace preservation |
 | A reviewed `skill.spec.yml` already exists and the request is to improve it | Existing SkillSpec revision | `skillspec grammar sensemake`, `skillspec sensemake`, precise `query`/`refs`, then validate/test/compile |
 
 The source shape wins over command convenience. If a user asks for one-shot on a
@@ -155,10 +155,12 @@ legal-plugins/
 
 Detection:
 
-- a directory is a plugin root when it has a `skills/` subdirectory plus
-  `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md`;
+- a directory is a plugin root when it has a `skills/` subdirectory plus a
+  plugin-named metadata folder containing a supported manifest, such as
+  `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, or
+  `.claude-plugin/plugin.json`;
 - packages below `<plugin-root>/skills/` inherit that plugin namespace;
-- the namespace comes from `.claude-plugin/plugin.json` field `name` when
+- the namespace comes from the plugin manifest `name`, `id`, or `title` when
   present, otherwise from the plugin folder name;
 - repeated local names are allowed because public names are namespaced.
 
@@ -192,11 +194,10 @@ to contain colons.
 
    The mapper recursively scans directories, skipping ignored build and VCS
    folders. A directory is recorded as a plugin root when it has `skills/` and
-   at least one supported plugin marker:
-
-   - `.claude-plugin/plugin.json`
-   - `.mcp.json`
-   - `CLAUDE.md`
+   at least one supported plugin marker: a plugin-named metadata folder with a
+   supported manifest such as `.agent-plugin/marketplace.json`,
+   `.codex-plugin/plugin.json`, or `.claude-plugin/plugin.json`. Compatibility
+   markers such as `.mcp.json` and `CLAUDE.md` are also recognized.
 
    Plugin roots are sorted deepest first so package classification chooses the
    most specific plugin root if nested plugin-shaped folders ever appear.
@@ -220,9 +221,10 @@ to contain colons.
 5. Assign install identity.
 
    Every package receives a deterministic `install_slug`. The default policy is
-   `workspace-path`: workspace slug plus relative package path. This keeps
-   side-by-side workspace installs and plugin-shaped packages from flattening
-   into the same harness folder.
+   `workspace-path`: workspace slug plus relative package path. Single-package
+   installs may use that slug as the target folder. Multi-skill and
+   plugin-shaped installs use the same source identity to preserve the parent
+   folder and write compiled packages back at their original relative paths.
 
    Replacement/upgrade flows can choose `local-name`:
 
@@ -243,11 +245,11 @@ to contain colons.
      --dry-run
    ```
 
-   Use `local-name` only when the intent is to replace canonical installed
-   skills, for example retiring `rote-setup` with a generated `rote-setup`
-   package. Validation rejects duplicate `install_slug` values before install,
-   so plugin workspaces with repeated local names must keep `workspace-path` or
-   manually choose unique manifest slugs.
+   Use `local-name` only when the intent is to replace one canonical installed
+   skill, for example retiring `rote-setup` with a generated `rote-setup`
+   package. Validation rejects `local-name` for multi-skill and plugin-shaped
+   workspaces because it flattens source-local identity. Those workspaces must
+   keep `workspace-path` or use a native plugin export/install path.
 
 6. Build the skill invocation index.
 
@@ -307,18 +309,23 @@ For a single atomic skill:
 
 For an ordinary multi-skill workspace:
 
-1. `workspace map` decides the package graph;
+1. `workspace map` decides the package graph and records `source_shape`;
 2. `workspace validate` blocks broken paths, cycles, self-dependencies, and
    install slug collisions;
 3. `workspace import` creates one generated package folder per atomic source
-   skill;
+   skill. These are mechanical drafts, not finished ports;
 4. packages are processed in dependency order, so shared packages such as
    `coding-standards` are handled before dependents;
-5. `workspace converge` checks that all generated specs exist and that
-   dependents are not released while dependencies are missing or failed;
-6. `workspace compile` creates one harness loader per ready package;
-7. `workspace install` installs the grouped package set using manifest
-   `install_slug` folders.
+5. each generated package must be semantically promoted from its own source and
+   write package-local `.skillspec/workspace-promotion.json` proof;
+6. `workspace converge` checks that all generated specs exist, that promotion
+   proof is current, and that dependents are not released while dependencies are
+   missing or failed;
+7. `workspace compile` creates one harness loader per ready package;
+8. `workspace install` preserves the source parent folder as the harness-visible
+   unit: non-skill files are copied from the reference parent, the source skill
+   package subtree is replaced, and compiled SkillSpec-backed package folders
+   are written back to their original relative paths.
 
 For a plugin-shaped workspace:
 
@@ -329,9 +336,13 @@ For a plugin-shaped workspace:
 4. explicit namespace invocations can cross plugin boundaries;
 5. plugin workflow links are preserved as references for reports and alignment
    without turning the whole plugin library into one cyclic dependency graph;
-6. install uses namespaced public names plus `workspace-path` install slugs by
-   default; replacement installs may opt into `local-name` only when duplicate
-   install slugs are not present.
+6. install preserves the plugin parent folder as the harness-visible unit:
+   non-`skills/` files are copied from the reference plugin parent, the source
+   `skills/` subtree is replaced, and compiled SkillSpec-backed package folders
+   are written below `<plugin-parent>/skills/<relative-skill-path>`;
+7. `local-name` and flattened package folders such as
+   `<plugin-parent>--skills--<skill>` are rejected because they erase
+   plugin-local identity and lose plugin parent metadata.
 
 Workspace install can optionally apply visibility. With the default
 `entry-implicit` policy, entry packages stay implicitly visible and shared,
@@ -359,14 +370,69 @@ skillspec workspace install <build>/skillspec.workspace.yml --build-root <worksp
 package per atomic skill. Dependency-ready packages in the same graph level may
 import in parallel, and unchanged packages with intact proof artifacts are
 reused from `<workspace-build>/.skillspec/workspace-cache.json` and reported as
-`cached`. `converge` checks generated drafts against the graph.
+`cached`.
+
+Between `import` and `converge`, each package needs real promotion work. The
+operator or agent must review that package's source, source map, doctor report,
+dependency ledger, and package references, then encode the behavior into
+activation, routes, rules, elicitations, dependencies, tool boundaries, checks,
+tests, and proof obligations. `skillspec source lens <source-map.json> --cursor
+<n>` is the deterministic progressive view for this pass: review one parsed
+block, port that block, validate, record its hash and target, then advance. A
+wrapper that simply tells the harness to load the original `SKILL.md` as
+authoritative runtime instructions is still a scaffold.
+
+Every promoted workspace package writes:
+
+```text
+<workspace-build>/<package>/.skillspec/workspace-promotion.json
+```
+
+The proof file uses schema `skillspec/workspace-promotion/v0` and records:
+
+- `package_id`;
+- `review_session` with the package-local countdown:
+  `package_index`, `package_count`, and `remaining_after`;
+- `status: reviewed`;
+- `source_sha256`, `spec_sha256`, and optional `source_map_sha256`;
+- review flags for activation, routes, rules, dependencies, checks/tests, and
+  proof;
+- `source_obligation_coverage`, a `skillspec/source-obligation-coverage/v0`
+  object that accounts for every computed source-map obligation.
+
+Source obligation coverage is generic. It is computed from source-map
+classifications, source references, and text-bearing source nodes; it is not
+domain-specific. Each obligation must be marked `promoted` with one or more
+existing SkillSpec target refs, or `not_applicable` with a specific reason. If
+the source lens exposes a block hash, the coverage entry must repeat that hash.
+If the lens says the block requires a specific target kind such as `rule`,
+`resource`, `code`, or `dependency`, a generic `route` target is not enough.
+`deferred`, `unresolved`, `waived`, missing, duplicate, stale, targetless,
+hashless, or construct-incompatible obligations block the package.
+
+The review session is also package-local. `workspace import` writes
+`.skillspec/workspace-import.json` with the package index, total package count,
+and remaining package count. `workspace converge`, `workspace compile`, and
+`workspace install` require `.skillspec/workspace-promotion.json` to repeat
+that countdown for the same package. A proof that says one representative
+package was reviewed and then bulk-applied to other packages is not installable;
+each package must be reviewed, fixed, verified, and proven from its own
+`source/SKILL_md.old` and source map.
+
+`converge` and `install` recompute the hashes and block packages when promotion
+proof is missing, stale, incomplete, missing source-obligation coverage, or
+paired with a prose-wrapper contract. This is intentionally separate from trace
+alignment. Alignment proof cannot be used to declare that a generated workspace
+scaffold was promoted.
+
+`converge` checks generated drafts and promotion proof against the graph.
 `--summary` keeps agent-facing output compact by printing wall-clock and
 estimated token metrics while preserving full reports and package evidence on
 disk.
 Those estimates are direct-run output-economy metrics: agent-visible summary
 tokens versus artifact tokens kept out of chat. Durable-executor runs add a
 separate measured token-accounting layer when workspace stats are available.
-When a run needs these estimates in `trace align --summary`, record the summary values
+When a run needs these estimates in quiet trace alignment, record the summary values
 with `skillspec progress stats <run-dir> --agent-visible-tokens <n>
 --artifact-tokens-preserved <n> --avoided-tokens <n> --metrics-source
 estimated` before alignment.
@@ -392,14 +458,13 @@ namespace to avoid flattening collisions.
 ## Plugin Namespaces
 
 A directory is treated as a plugin root when it has a `skills/` subdirectory and
-at least one plugin marker:
+at least one plugin marker: a plugin-named metadata folder with a supported
+manifest such as `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`,
+or `.claude-plugin/plugin.json`. Compatibility markers such as `.mcp.json` and
+`CLAUDE.md` are also recognized.
 
-- `.claude-plugin/plugin.json`
-- `.mcp.json`
-- `CLAUDE.md`
-
-The namespace comes from `.claude-plugin/plugin.json` field `name` when present.
-When that file is missing or has no usable name, the plugin folder slug is used.
+The namespace comes from the manifest `name`, `id`, or `title` when present.
+When no manifest has a usable name, the plugin folder slug is used.
 
 For plugin packages:
 
@@ -462,9 +527,11 @@ plugin-local duplicate names unique before install.
 
 ## Install Visibility
 
-Workspace install uses manifest `install_slug` folders so packages from the same
-workspace cannot overwrite ordinary single-skill installs accidentally. Install
-is always planned first with `--dry-run`.
+Workspace install uses manifest `install_slug` folders for single-package
+workspaces. Multi-skill and plugin-shaped workspaces preserve the source parent
+folder and replace the source skill package subtree with compiled SkillSpec
+packages at the same relative paths. Install is always planned first with
+`--dry-run`.
 
 When `--apply-visibility` is used, the default `entry-implicit` policy keeps
 entry packages visible and makes shared/helper/wrapper packages manual-only.

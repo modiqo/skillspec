@@ -537,7 +537,7 @@ description: Router lifecycle fixture.
 commands:
   router_install:
     description: Install router mode.
-    template: skillspec router install --roots <skill-roots> --index <router-index>
+    template: skillspec router install --roots <skill-roots> --index <router-index> [--force]
     safety: local_write
   router_enable:
     description: Enable router mode.
@@ -561,6 +561,10 @@ commands:
         .unwrap();
     assert_success(&output);
     let out = stdout(&output);
+    assert!(out
+        .contains("skillspec router install --roots <skill-roots> --index <router-index> --json"));
+    assert!(out.contains("legacy router SQLite file"));
+    assert!(out.contains("--force"));
     assert!(out.contains("direct `skillspec index`"));
     assert!(out.contains("router-specific catalog construction"));
     assert!(
@@ -568,6 +572,56 @@ commands:
     );
     assert!(out.contains("skillspec router guard --json"));
     assert!(out.contains("skillspec status --json"));
+}
+
+#[test]
+fn sensemake_teaches_router_policy_when_spec_uses_policy_commands() {
+    let dir = TempDir::new("sensemake-router-policy");
+    let spec = dir.path().join("skill.spec.yml");
+    write_file(
+        &spec,
+        r#"
+schema: skillspec/v0
+id: skillspec.multiplexer
+title: SkillSpec Multiplexer
+description: Router policy fixture.
+commands:
+  router_policy_set_profile:
+    description: Set a router policy profile.
+    template: skillspec router policy set-profile <profile> --index <router-index> --mode route --active --json
+    safety: local_write
+  router_policy_set_rule:
+    description: Set a router preference rule.
+    template: skillspec router policy set-rule <rule-id> --index <router-index> --profile <profile> --when-any <phrase> --prefer skill:<name> --json
+    safety: local_write
+  router_policy_get:
+    description: Get one router policy item.
+    template: skillspec router policy get <id> --index <router-index> --json
+    safety: read_only
+  router_policy_explain:
+    description: Explain a policy route.
+    template: skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json
+    safety: read_only
+  router_profile_apply_or_clear:
+    description: Apply a router policy profile.
+    template: skillspec router profile apply <profile> --index <router-index> --json
+    safety: local_write
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("sensemake")
+        .arg(&spec)
+        .output()
+        .unwrap();
+    assert_success(&output);
+    let out = stdout(&output);
+    assert!(out.contains("create or activate router policy profile"));
+    assert!(out.contains("skillspec router policy set-profile <profile> --index <router-index> --mode route --active --json"));
+    assert!(out.contains("create router preference rule"));
+    assert!(out.contains("skillspec router policy get <id> --index <router-index> --json"));
+    assert!(out.contains("skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json"));
+    assert!(out.contains("skillspec router profile apply <profile> --index <router-index> --json"));
 }
 
 #[test]
@@ -825,7 +879,9 @@ fn grammar_commands_teach_embedded_porting_workflow() {
     assert!(out.contains("embedded: grammar.md"));
     assert!(out.contains("Progressive command sequence:"));
     assert!(out.contains("skillspec grammar sensemake --view porting"));
-    assert!(out.contains("skillspec source map <source-skill> --out <draft>/.skillspec/source-map"));
+    assert!(out.contains(
+        "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map"
+    ));
     assert!(out.contains(
         "skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary"
     ));

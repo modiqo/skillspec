@@ -90,10 +90,10 @@ stable JSONL stream and summary for later review.
 
 ## Alignment
 
-`skillspec trace align <spec> --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json`
-compares the current spec with a decision trace, prints only the
-completion-facing summary for normal harness use, and writes a grouped
-missing-proof digest for batch final proof cleanup.
+`skillspec trace align <spec> --decision-trace <run_dir> --quiet --proof-digest <run_dir>/proof-digest.json`
+compares the current spec with a decision trace, writes alignment artifacts for
+normal harness use, and writes a grouped missing-proof digest for batch final
+proof cleanup.
 
 The aligner:
 
@@ -120,17 +120,17 @@ The report includes:
 - execution `obligations`;
 - user-facing `proof_rows`.
 
-`skillspec trace align --summary` writes the full report to
-`<run_dir>/alignment.json` while keeping terminal output compact.
+`skillspec trace align --quiet` writes the full report to
+`<run_dir>/alignment.json` without terminal output.
 `--proof-digest` writes `<run_dir>/proof-digest.json`, grouping missing phase
 requirements, route fulfillment, route checks, forbids, elicitations, and
 after-success closures by the event shape needed for one `progress batch`
 append. Append grouped proof with
 `skillspec progress batch <run_dir> --file <run_dir>/final-proof.jsonl
---checkpoint "checkpointing evidence" --summary` so the transcript shows one
-foreground checkpoint while the ledger keeps every granular row. Omit
+--checkpoint "checkpointing evidence" --quiet` so the ledger keeps every
+granular row without adding proof-bookkeeping output to the transcript. Use
 `--summary` only for debugging, failure triage, or explicit user requests for
-detailed checks.
+proof checkpoint details.
 
 `ok` is true when no deterministic check failed. A report can have `ok: true`
 and `status: unproven` when decision replay succeeded but execution proof is
@@ -269,8 +269,8 @@ After execution:
 ```sh
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json \
+  --quiet
 ```
 
 When structured execution evidence exists:
@@ -279,8 +279,8 @@ When structured execution evidence exists:
 skillspec trace align skill.spec.yml \
   --decision-trace .skillspec/traces/<run-id> \
   --execution-trace execution-ledger.jsonl \
-  --summary \
-  --proof-digest .skillspec/traces/<run-id>/proof-digest.json
+  --proof-digest .skillspec/traces/<run-id>/proof-digest.json \
+  --quiet
 ```
 
 The final report should include:

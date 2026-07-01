@@ -6,6 +6,7 @@ members = [
     "crates/skillspec-runtime",
     "crates/skillspec-doctor",
     "crates/skillspec-harness",
+    "crates/skillspec-harness-lab",
     "crates/skillspec-workspace",
 ]
 resolver = "2"

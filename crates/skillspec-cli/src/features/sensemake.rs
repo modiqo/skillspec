@@ -90,8 +90,9 @@ pub fn sensemake(spec: &SkillSpec, path: &Path, view: View) -> SensemakeReport {
 fn escalation(spec: &SkillSpec) -> Vec<String> {
     let mut items = vec![
         "start with sensemake --view index only when unfamiliar".to_owned(),
-        "for active task execution, prefer run-loop --guide agent so the CLI prints start/current/end anchors and persists resume state".to_owned(),
-        "when several routine proof rows are ready, stage them in <run-dir>/evidence-batch.jsonl and run progress batch --file ... --checkpoint \"checkpointing evidence\" --summary instead of printing one progress record command per row".to_owned(),
+        "for active task execution, prefer run-loop --guide agent --json so the CLI emits machine-readable current-gate control data and persists resume state".to_owned(),
+        "when several routine proof rows are ready, run progress checkpoint ... --checkpoint \"checkpointing evidence\" --quiet with typed flags instead of printing one progress record command per row or hand-authoring event JSONL".to_owned(),
+        "do not backfill missing route, obligation, elicitation, or phase proof after alignment; report partial alignment unless the evidence was captured when the work happened".to_owned(),
         "use decide for task routing".to_owned(),
         "use query/refs for matched ids instead of reading the whole YAML".to_owned(),
         "escalate index -> summary -> full only when needed".to_owned(),
@@ -110,19 +111,19 @@ fn escalation(spec: &SkillSpec) -> Vec<String> {
     }
     if has_doctor(spec) {
         items.push(
-            "for source diagnostics, run doctor before import as a cheap current-skill baseline; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; for URI imports, stage first and run doctor on the returned local source path; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps; after doctor, import the skill, read the alignment summary, optionally publish the proof artifacts, restart, and try the SkillSpec-backed skill normally"
+            "for source diagnostics or assess-skill requests, run doctor before import as a cheap current-skill baseline and stop after the report unless the user also asked to import or install; default doctor output explains agent follow-through risk in plain language, --markdown is for GitHub summaries or issue comments, --html is for shareable review pages, and --json is for machine extraction; doctor can inspect public GitHub URIs directly, and source map can map public GitHub URIs by sparse-staging them internally; simple skills get full reliability scoring, while multi-skill, entry-with-subskills, plugin, and non-skill repo targets return shape-aware next steps"
                 .to_owned(),
         );
     }
     if has_source_import(spec) {
         items.push(
-            "for URI imports, first run source stage and use the returned selected_source_path/candidates; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/query/coverage/stale before import-skill and pass the fresh source-map.json with --source-map"
+            "for import-skill requests, assess shape first, then import and semantically review the source; do not install by default, and after a successful import offer the dry-run install command as an optional next step; for URI imports, run source stage first when the target may be a repo/workspace, because repo-root staging preserves plugin metadata and shared folders while explicit subfolder staging stays scoped to that folder; treat source stage source_shape.kind as authoritative for the staged root, then run doctor/import checklist against staged_source_path; use workspace handling for multi_skill_workspace or plugin_workspace; ask the user to choose candidates.source_path only when the request is explicitly for one atomic skill; for one atomic local prose import, prefer port-one-shot; for manual imports, run source map/coverage/lens/query/stale before import-skill, use source lens to review one parsed block at a time, and pass the fresh source-map.json with --source-map"
                 .to_owned(),
         );
     }
     if has_workspace_authoring(spec) {
         items.push(
-            "for multi-skill or plugin-shaped source roots, run workspace map/validate before fanout import; use workspace converge before compile and workspace install dry-run before writing harness roots"
+            "for install-skill requests on raw sources, treat install as assess plus import plus semantic review plus compile plus dry-run plus approved install, not as direct harness copy; for multi-skill or plugin-shaped source roots, run doctor/import checklist first, then workspace map/validate before fanout import; use import checklist loop with --build-root for package-by-package promotion, workspace converge before compile, and workspace install dry-run before writing harness roots; if converge, compile, or install reports scaffolds, missing promotion proof, or an empty build root, follow its next command back to workspace import or import checklist loop and keep working until user approval, credentials, inaccessible source, a policy waiver, or another external state change is needed; multi-skill and plugin-shaped workspace install preserves the source parent folder, copies non-skill parent files from the reference source, replaces the source skill package subtree with compiled packages at the same relative paths, and must not flatten packages into top-level install folders"
                 .to_owned(),
         );
     }
@@ -380,16 +381,22 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         NavigationHint {
             intent: "start guided task execution",
             command: format!(
-                "skillspec run-loop {spec_path} --input '<task>' --trace-dir .skillspec/traces --guide agent"
+                "skillspec run-loop {spec_path} --input '<task>' --trace-dir .skillspec/traces --guide agent --json"
             ),
         },
         NavigationHint {
+            intent: "generate guided execution checklist",
+            command: format!("skillspec run checklist {spec_path} --stage entry"),
+        },
+        NavigationHint {
             intent: "resume guided task execution",
-            command: format!("skillspec run-loop {spec_path} --resume <run-dir> --guide agent"),
+            command: format!(
+                "skillspec run-loop {spec_path} --resume <run-dir> --guide agent --json"
+            ),
         },
         NavigationHint {
             intent: "checkpoint routine proof evidence",
-            command: "skillspec progress batch <run-dir> --file <run-dir>/evidence-batch.jsonl --checkpoint \"checkpointing evidence\" --summary".to_owned(),
+            command: "skillspec progress checkpoint <run-dir> --requirement-satisfied <phase>/<requirement>=<kind>:<ref> --phase-completed <phase>=<kind>:<ref> --checkpoint \"checkpointing evidence\" --quiet".to_owned(),
         },
         NavigationHint {
             intent: "task routing",
@@ -426,7 +433,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
         NavigationHint {
             intent: "prove completion",
             command: format!(
-                "skillspec trace align {spec_path} --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json"
+                "skillspec trace align {spec_path} --decision-trace <run_dir> --proof-digest <run_dir>/proof-digest.json --quiet"
             ),
         },
     ];
@@ -489,6 +496,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_router_lifecycle(spec) {
         hints.extend([
             NavigationHint {
+                intent: "install router mode",
+                command: "skillspec router install --roots <skill-roots> --index <router-index> --json # if the index path is a legacy router SQLite file, rerun with --force to migrate it".to_owned(),
+            },
+            NavigationHint {
                 intent: "inspect installed lifecycle, roots, index, and skill inventory status",
                 command: "skillspec status --json".to_owned(),
             },
@@ -509,6 +520,38 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 command:
                     "skillspec router index refresh --roots <skill-roots> --index <router-index>"
                         .to_owned(),
+            },
+        ]);
+    }
+    if has_router_policy(spec) {
+        hints.extend([
+            NavigationHint {
+                intent: "create or activate router policy profile",
+                command:
+                    "skillspec router policy set-profile <profile> --index <router-index> --mode route --active --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "create router preference rule",
+                command:
+                    "skillspec router policy set-rule <rule-id> --index <router-index> --profile <profile> --when-any <phrase> --prefer skill:<name> --anchor policy --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "get router policy profile or rule",
+                command: "skillspec router policy get <id> --index <router-index> --json"
+                    .to_owned(),
+            },
+            NavigationHint {
+                intent: "explain policy-influenced route decision",
+                command:
+                    "skillspec router policy explain --index <router-index> --profile <profile> --query <task> --json"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "apply active router policy profile",
+                command: "skillspec router profile apply <profile> --index <router-index> --json"
+                    .to_owned(),
             },
         ]);
     }
@@ -541,7 +584,7 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_source_import(spec) {
         hints.extend([
             NavigationHint {
-                intent: "stage remote source URI before import",
+                intent: "stage remote source URI for candidate discovery",
                 command: "skillspec source stage <github-skill-uri> --out <staging-root> --json"
                     .to_owned(),
             },
@@ -550,15 +593,33 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 command: "skillspec doctor <source-skill-folder-or-repo-uri>".to_owned(),
             },
             NavigationHint {
+                intent: "generate shape-specific doctor checklist",
+                command:
+                    "skillspec doctor checklist <source-skill-folder-or-repo-uri> --stage entry"
+                        .to_owned(),
+            },
+            NavigationHint {
                 intent: "map import source",
                 command:
-                    "skillspec source map <source-skill> --out <draft>/.skillspec/source-map"
+                    "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "generate source import checklist",
+                command:
+                    "skillspec import checklist <source-skill-folder-or-repo-uri> --stage entry"
                         .to_owned(),
             },
             NavigationHint {
                 intent: "inspect source structure",
                 command:
                     "skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "review next source block",
+                command:
+                    "skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1"
                         .to_owned(),
             },
             NavigationHint {
@@ -598,6 +659,12 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
                 intent: "fanout import workspace packages",
                 command:
                     "skillspec workspace import <build>/skillspec.workspace.yml --out <workspace-build> --summary"
+                        .to_owned(),
+            },
+            NavigationHint {
+                intent: "review next workspace package import checklist",
+                command:
+                    "skillspec import checklist <build>/skillspec.workspace.yml --build-root <workspace-build> --stage loop"
                         .to_owned(),
             },
             NavigationHint {
@@ -685,6 +752,16 @@ fn has_router_lifecycle(spec: &SkillSpec) -> bool {
             command.template.contains("router enable")
                 || command.template.contains("router guard")
                 || command.template.contains("skillspec status")
+        })
+}
+
+fn has_router_policy(spec: &SkillSpec) -> bool {
+    spec.commands
+        .keys()
+        .any(|id| id.starts_with("router_policy_") || id.starts_with("router_profile_"))
+        || spec.commands.values().any(|command| {
+            command.template.contains("router policy")
+                || command.template.contains("router profile")
         })
 }
 

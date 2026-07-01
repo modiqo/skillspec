@@ -347,13 +347,18 @@ fn progressive_sequence() -> Vec<CommandStep> {
         },
         CommandStep {
             phase: "map source package",
-            command: "skillspec source map <source-skill> --out <draft>/.skillspec/source-map",
+            command: "skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map",
             proves: "Markdown files, frontmatter, byte ranges, line ranges, references, code blocks, dependencies, and review-required spans were indexed without loading the full source into model context",
         },
         CommandStep {
             phase: "inspect source map",
             command: "skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index",
             proves: "the harness sees the source structure and exact handles before opening detailed spans",
+        },
+        CommandStep {
+            phase: "review source lens",
+            command: "skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1",
+            proves: "the harness reviews one parsed Markdown block at a time with countdown, source hash, classifications, references, and required target kinds",
         },
         CommandStep {
             phase: "review source obligations",
@@ -412,7 +417,7 @@ fn progressive_sequence() -> Vec<CommandStep> {
         },
         CommandStep {
             phase: "align proof",
-            command: "skillspec trace align <draft>/skill.spec.yml --decision-trace <run_dir> --summary --proof-digest <run_dir>/proof-digest.json",
+            command: "skillspec trace align <draft>/skill.spec.yml --decision-trace <run_dir> --proof-digest <run_dir>/proof-digest.json --quiet",
             proves: "decision replay is stable and remaining execution evidence gaps are grouped for one final proof batch",
         },
     ]

@@ -1,0 +1,315 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "17-pseudo-harness-simulator",
+  "summary": {
+    "status": "pass",
+    "cases_total": 6,
+    "cases_passed": 6,
+    "cases_failed": 0,
+    "claims_total": 44,
+    "claims_passed": 44,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "router_bypass_does_not_load_domain_skill",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "hook.first_hop_ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "event_order.hook_before_catalog",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "event_order.catalog_before_route",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "bypass",
+          "observed": "bypass"
+        },
+        {
+          "id": "route.selected_null",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "catalog.router_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "router_selected_domain_loads_one_skill",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "use_skill",
+          "observed": "use_skill"
+        },
+        {
+          "id": "route.selected",
+          "status": "pass",
+          "expected": "notes",
+          "observed": "notes"
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "domain.loaded_name",
+          "status": "pass",
+          "expected": "notes",
+          "observed": "notes"
+        },
+        {
+          "id": "domain.trampoline",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "event_order.route_before_load",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "router_guard_repairs_before_catalog_build",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "guard.repaired",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "event_order.hook_before_catalog",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "out_of_band.markdown_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "catalog.markdown_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "bypass",
+          "observed": "bypass"
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        }
+      ]
+    },
+    {
+      "id": "duplicate_root_candidates_collapse_to_one_logical_selection",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "use_skill",
+          "observed": "use_skill"
+        },
+        {
+          "id": "route.selected",
+          "status": "pass",
+          "expected": "durable-executor",
+          "observed": "durable-executor"
+        },
+        {
+          "id": "route.durable_candidate_count",
+          "status": "pass",
+          "expected": 1,
+          "observed": 1
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "domain.loaded_name",
+          "status": "pass",
+          "expected": "durable-executor",
+          "observed": "durable-executor"
+        },
+        {
+          "id": "domain.selected_path",
+          "status": "pass",
+          "expected": "<PROJECT>/.claude/skills/durable-executor/SKILL.md",
+          "observed": "<PROJECT>/.claude/skills/durable-executor/SKILL.md"
+        }
+      ]
+    },
+    {
+      "id": "durable_observer_remains_implicit_with_router",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "catalog.router_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "catalog.durable_implicit",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "catalog.pdf_manual_only",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "bypass",
+          "observed": "bypass"
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": false,
+          "observed": false
+        },
+        {
+          "id": "event_order.catalog_before_route",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "imported_trampoline_handoff_is_visible",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.ready",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "route.decision",
+          "status": "pass",
+          "expected": "use_skill",
+          "observed": "use_skill"
+        },
+        {
+          "id": "route.selected",
+          "status": "pass",
+          "expected": "widget-flow",
+          "observed": "widget-flow"
+        },
+        {
+          "id": "domain.loaded",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "domain.loaded_name",
+          "status": "pass",
+          "expected": "widget-flow",
+          "observed": "widget-flow"
+        },
+        {
+          "id": "domain.trampoline",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "event.trampoline_checked",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "event_order.load_before_trampoline_check",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}

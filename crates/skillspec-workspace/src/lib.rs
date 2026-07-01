@@ -12,6 +12,7 @@ mod compile;
 mod converge;
 mod import;
 mod install;
+mod readiness;
 
 pub use compile::{compile_workspace, render_compile_report, WorkspaceCompileReport};
 pub use converge::{converge_workspace, render_converge_report, WorkspaceConvergeReport};
@@ -30,11 +31,52 @@ pub struct WorkspaceManifest {
     pub source_root: String,
     pub workspace_slug: String,
     #[serde(default)]
+    pub source_shape: WorkspaceSourceShape,
+    #[serde(default)]
     pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub output_root: String,
     pub packages: BTreeMap<String, WorkspacePackage>,
     #[serde(default)]
     pub references: Vec<WorkspaceReference>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkspaceSourceShape {
+    #[serde(default)]
+    pub kind: WorkspaceSourceShapeKind,
+    #[serde(default)]
+    pub skill_files: usize,
+    #[serde(default)]
+    pub plugin_roots: Vec<WorkspacePluginRoot>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceSourceShapeKind {
+    #[default]
+    Unknown,
+    SingleSkill,
+    MultiSkillWorkspace,
+    PluginWorkspace,
+}
+
+impl WorkspaceSourceShapeKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::SingleSkill => "single_skill",
+            Self::MultiSkillWorkspace => "multi_skill_workspace",
+            Self::PluginWorkspace => "plugin_workspace",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkspacePluginRoot {
+    pub path: String,
+    pub namespace: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -128,6 +170,7 @@ pub struct WorkspaceMapReport {
     pub report_path: String,
     pub source_root: String,
     pub workspace_slug: String,
+    pub source_shape: WorkspaceSourceShape,
     pub install_slug_policy: WorkspaceInstallSlugPolicy,
     pub plugin_namespaces: Vec<WorkspacePluginNamespaceReport>,
     pub package_count: usize,
@@ -185,6 +228,13 @@ struct PluginRoot {
     namespace: String,
 }
 
+#[derive(Debug)]
+struct WorkspaceDiscovery {
+    packages: Vec<SkillPackageSource>,
+    plugin_roots: Vec<PluginRoot>,
+    skill_file_count: usize,
+}
+
 pub fn guard_single_skill_source(path: &Path, command_name: &str) -> Result<()> {
     let source_root = source_root(path);
     let skill_files = discover_skill_files(&source_root)?;
@@ -209,8 +259,8 @@ pub fn map_workspace(
     install_slug_policy: WorkspaceInstallSlugPolicy,
 ) -> Result<WorkspaceMapReport> {
     let source_root = normalize_source_root(source_root)?;
-    let packages = discover_packages(&source_root)?;
-    if packages.is_empty() {
+    let discovery = discover_workspace(&source_root)?;
+    if discovery.packages.is_empty() {
         return Err(Error::InvalidInput {
             message: format!(
                 "workspace map expected at least one SKILL.md under {}",
@@ -219,10 +269,11 @@ pub fn map_workspace(
         });
     }
 
+    let source_shape = source_shape(&discovery);
     let workspace_slug = workspace_slug(&source_root);
     let output_root = default_output_root(&source_root);
     let mut package_map = BTreeMap::new();
-    for package in packages {
+    for package in discovery.packages {
         let install_slug = install_slug_for_policy(&workspace_slug, &package, install_slug_policy);
         let kind = infer_package_kind(&package);
         package_map.insert(
@@ -245,6 +296,7 @@ pub fn map_workspace(
         schema: WORKSPACE_SCHEMA.to_owned(),
         source_root: path_to_string(&source_root),
         workspace_slug,
+        source_shape,
         install_slug_policy,
         output_root: path_to_string(&output_root),
         packages: package_map,
@@ -285,6 +337,14 @@ pub fn render_map_report(report: &WorkspaceMapReport, manifest: &WorkspaceManife
     output.push_str(&format!(
         "- install_slug_policy: {}\n",
         report.install_slug_policy.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_shape: {}\n",
+        manifest.source_shape.kind.as_str()
+    ));
+    output.push_str(&format!(
+        "- source_skill_files: {}\n",
+        manifest.source_shape.skill_files
     ));
     output.push_str(&format!("- packages: {}\n", report.package_count));
     output.push_str(&format!("- manifest: {}\n", report.manifest_path));
@@ -451,6 +511,14 @@ pub fn render_map_summary(report: &WorkspaceMapReport, elapsed: Duration) -> Str
         output.push_str(&format!(
             "- install_slug_policy: {}\n",
             report.install_slug_policy.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_shape: {}\n",
+            report.source_shape.kind.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_skill_files: {}\n",
+            report.source_shape.skill_files
         ));
         output.push_str(&format!("- packages: {}\n", report.package_count));
         output.push_str(&format!(
@@ -656,6 +724,14 @@ pub fn render_install_summary(report: &WorkspaceInstallReport, elapsed: Duration
             "- install_slug_policy: {}\n",
             report.install_slug_policy.as_str()
         ));
+        output.push_str(&format!(
+            "- source_shape: {}\n",
+            report.source_shape.kind.as_str()
+        ));
+        output.push_str(&format!(
+            "- source_skill_files: {}\n",
+            report.source_shape.skill_files
+        ));
         output.push_str(&format!("- installed: {}\n", report.installed.len()));
         output.push_str(&format!("- planned: {}\n", report.planned.len()));
         output.push_str(&format!("- failed: {}\n", report.failed.len()));
@@ -814,6 +890,16 @@ pub(crate) fn validate_manifest(
             manifest.schema
         ));
     }
+    if matches!(
+        manifest.source_shape.kind,
+        WorkspaceSourceShapeKind::PluginWorkspace | WorkspaceSourceShapeKind::MultiSkillWorkspace
+    ) && manifest.install_slug_policy == WorkspaceInstallSlugPolicy::LocalName
+    {
+        errors.push(format!(
+            "{} workspaces must preserve parent/package shape; install_slug_policy local-name flattens source-local names. Use workspace-path.",
+            manifest.source_shape.kind.as_str()
+        ));
+    }
 
     let source_root = PathBuf::from(&manifest.source_root);
     if !source_root.is_dir() {
@@ -949,14 +1035,42 @@ pub(crate) fn validate_manifest(
     }
 }
 
-fn discover_packages(source_root: &Path) -> Result<Vec<SkillPackageSource>> {
+fn discover_workspace(source_root: &Path) -> Result<WorkspaceDiscovery> {
     let plugin_roots = discover_plugin_roots(source_root)?;
     let mut skill_files = discover_skill_files(source_root)?;
     skill_files.sort();
-    skill_files
+    let skill_file_count = skill_files.len();
+    let packages = skill_files
         .into_iter()
         .map(|skill_path| package_from_skill_file(source_root, &skill_path, &plugin_roots))
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+    Ok(WorkspaceDiscovery {
+        packages,
+        plugin_roots,
+        skill_file_count,
+    })
+}
+
+fn source_shape(discovery: &WorkspaceDiscovery) -> WorkspaceSourceShape {
+    let kind = if !discovery.plugin_roots.is_empty() {
+        WorkspaceSourceShapeKind::PluginWorkspace
+    } else if discovery.skill_file_count > 1 {
+        WorkspaceSourceShapeKind::MultiSkillWorkspace
+    } else {
+        WorkspaceSourceShapeKind::SingleSkill
+    };
+    WorkspaceSourceShape {
+        kind,
+        skill_files: discovery.skill_file_count,
+        plugin_roots: discovery
+            .plugin_roots
+            .iter()
+            .map(|root| WorkspacePluginRoot {
+                path: path_to_string(&root.path),
+                namespace: root.namespace.clone(),
+            })
+            .collect(),
+    }
 }
 
 fn package_from_skill_file(
@@ -1060,14 +1174,66 @@ fn collect_plugin_roots(source_root: &Path, dir: &Path, roots: &mut Vec<PluginRo
 }
 
 fn is_plugin_root(path: &Path) -> bool {
-    path.join("skills").is_dir()
-        && (path.join(".claude-plugin/plugin.json").is_file()
-            || path.join(".mcp.json").is_file()
-            || path.join("CLAUDE.md").is_file())
+    path.join("skills").is_dir() && has_plugin_metadata(path)
+}
+
+fn has_plugin_metadata(path: &Path) -> bool {
+    if path.join(".mcp.json").is_file() || path.join("CLAUDE.md").is_file() {
+        return true;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return false;
+    };
+    entries.filter_map(|entry| entry.ok()).any(|entry| {
+        let child = entry.path();
+        child.is_dir()
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_metadata_dir_name)
+            && plugin_metadata_dir_has_manifest(&child)
+    })
+}
+
+fn is_plugin_metadata_dir_name(name: &str) -> bool {
+    name.trim_start_matches('.')
+        .to_ascii_lowercase()
+        .contains("plugin")
+}
+
+fn plugin_metadata_dir_has_manifest(dir: &Path) -> bool {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return false;
+    };
+    entries.filter_map(|entry| entry.ok()).any(|entry| {
+        entry.path().is_file()
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_manifest_file_name)
+    })
+}
+
+fn is_plugin_manifest_file_name(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "plugin.json"
+            | "marketplace.json"
+            | "manifest.json"
+            | "package.json"
+            | "plugin.yml"
+            | "plugin.yaml"
+            | "marketplace.yml"
+            | "marketplace.yaml"
+            | "manifest.yml"
+            | "manifest.yaml"
+            | "plugin.toml"
+            | "manifest.toml"
+    )
 }
 
 fn plugin_namespace(plugin_root: &Path) -> String {
-    plugin_json_namespace(plugin_root)
+    plugin_manifest_namespace(plugin_root)
         .or_else(|| {
             plugin_root
                 .file_name()
@@ -1079,12 +1245,74 @@ fn plugin_namespace(plugin_root: &Path) -> String {
         .unwrap_or_else(|| "plugin".to_owned())
 }
 
-fn plugin_json_namespace(plugin_root: &Path) -> Option<String> {
-    let plugin_json = plugin_root.join(".claude-plugin/plugin.json");
-    let content = fs::read_to_string(plugin_json).ok()?;
-    let parsed = serde_json::from_str::<serde_json::Value>(&content).ok()?;
-    parsed
+fn plugin_manifest_namespace(plugin_root: &Path) -> Option<String> {
+    let mut candidates = Vec::new();
+    let entries = fs::read_dir(plugin_root).ok()?;
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let child = entry.path();
+        if !child.is_dir()
+            || !entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_metadata_dir_name)
+        {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(&child) else {
+            continue;
+        };
+        for file in files.filter_map(|file| file.ok()) {
+            if file.path().is_file()
+                && file
+                    .file_name()
+                    .to_str()
+                    .is_some_and(is_plugin_manifest_file_name)
+            {
+                candidates.push(file.path());
+            }
+        }
+    }
+    candidates.sort_by_key(|path| plugin_manifest_priority(path));
+    candidates
+        .into_iter()
+        .find_map(|path| namespace_from_manifest_file(&path))
+}
+
+fn plugin_manifest_priority(path: &Path) -> usize {
+    match path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("plugin.json") => 0,
+        Some("marketplace.json") => 1,
+        Some("manifest.json") => 2,
+        Some("package.json") => 3,
+        _ => 4,
+    }
+}
+
+fn namespace_from_manifest_file(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let value = if matches!(extension.as_str(), "yaml" | "yml") {
+        serde_yaml::from_str::<serde_yaml::Value>(&content).ok()
+    } else if extension == "json" {
+        serde_json::from_str::<serde_json::Value>(&content)
+            .ok()
+            .and_then(|value| serde_yaml::to_value(value).ok())
+    } else {
+        None
+    }?;
+    value
         .get("name")
+        .or_else(|| value.get("id"))
+        .or_else(|| value.get("title"))
         .and_then(|value| value.as_str())
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -1354,6 +1582,7 @@ fn map_report(
         report_path: path_to_string(report_path),
         source_root: manifest.source_root.clone(),
         workspace_slug: manifest.workspace_slug.clone(),
+        source_shape: manifest.source_shape.clone(),
         install_slug_policy: manifest.install_slug_policy,
         plugin_namespaces: plugin_namespace_reports(manifest),
         package_count: manifest.packages.len(),

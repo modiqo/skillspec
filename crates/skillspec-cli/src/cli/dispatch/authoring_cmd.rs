@@ -1,4 +1,4 @@
-use crate::cli::args::{CompileTarget, RouterExecutionModeArg};
+use crate::cli::args::{CompileTarget, RouteHarnessArg, RouterExecutionModeArg};
 use skillspec::{domain::authoring, error::Result, report};
 use std::io::Write;
 use std::path::PathBuf;
@@ -100,22 +100,30 @@ pub(super) fn index(
     }
 }
 
-pub(super) fn route(
-    index: PathBuf,
-    query: String,
-    top: usize,
-    execution_mode: Option<RouterExecutionModeArg>,
-    json: bool,
-) -> Result<()> {
+pub(super) fn route(options: RouteCommandOptions) -> Result<()> {
     let route_report = authoring::route(authoring::RouteOptions {
-        index,
-        query,
-        top,
-        execution_mode: execution_mode.map(Into::into),
+        index: options.index,
+        query: options.query,
+        top: options.top,
+        profile: options.profile,
+        execution_mode: options.execution_mode.map(Into::into),
+        current_harness: options.current_harness.map(Into::into),
+        current_root: options.current_root,
     })?;
-    if json {
+    if options.json {
         report::json(&route_report)
     } else {
         report::text(&authoring::render_route(&route_report))
     }
+}
+
+pub(super) struct RouteCommandOptions {
+    pub(super) index: PathBuf,
+    pub(super) query: String,
+    pub(super) top: usize,
+    pub(super) profile: Option<String>,
+    pub(super) execution_mode: Option<RouterExecutionModeArg>,
+    pub(super) current_harness: Option<RouteHarnessArg>,
+    pub(super) current_root: Option<PathBuf>,
+    pub(super) json: bool,
 }

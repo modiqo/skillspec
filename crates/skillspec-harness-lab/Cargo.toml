@@ -1,0 +1,12 @@
+[package]
+name = "skillspec-harness-lab"
+version = "0.1.5"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Test-only controlled harness lab for SkillSpec integration coverage"
+publish = false
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"

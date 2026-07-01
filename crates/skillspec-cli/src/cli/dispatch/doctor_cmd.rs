@@ -1,6 +1,9 @@
 use skillspec::{domain::doctor, error::Result, report};
 
-pub(super) fn run(path: String, json: bool, html: bool, markdown: bool) -> Result<()> {
+pub(super) fn run(path: Option<String>, json: bool, html: bool, markdown: bool) -> Result<()> {
+    let path = path.ok_or_else(|| skillspec::error::Error::InvalidInput {
+        message: "doctor requires a target or subcommand, for example `skillspec doctor <target>` or `skillspec doctor checklist <target>`".to_owned(),
+    })?;
     let doctor_report = doctor::inspect_target(&path)?;
     if json {
         report::json(&doctor_report)

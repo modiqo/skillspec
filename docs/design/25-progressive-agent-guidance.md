@@ -66,33 +66,35 @@ When SkillSpec analyzes a `SKILL.md` package for import, it should not ask the
 agent to read the whole skill first. The import path starts with staging and
 mapping.
 
-For URI sources:
+For local source packages or public GitHub skill URIs:
 
 ```bash
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-```
-
-The staging command parses GitHub repository, branch, and path shape, then
-returns a local `selected_source_path` or candidate `source_path` values. This
-prevents agents from drifting into web search, raw GitHub URLs, or ad hoc sparse
-checkout loops for normal imports.
-
-For local source packages, or the local path returned by `source stage`:
-
-```bash
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <source-skill>
 skillspec import-skill <source-skill> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
 
+When the source is a GitHub URI, `source map` stages the repository through
+SkillSpec's sparse checkout path and prints the selected local `source_path`.
+Use that path for `source stale` and `import-skill`. If the URI resolves to
+multiple `SKILL.md` packages, the command reports candidates instead of
+guessing; the agent should ask the user which candidate to map. This prevents
+agents from drifting into web search, raw GitHub URLs, or ad hoc sparse checkout
+loops for normal imports.
+
 The agent learns the source in parts:
 
 - `source map` records files, headings, code blocks, references, hashes, and
   classifications.
 - `source coverage` tells the agent where review is still needed.
+- `source lens` gives a one-block cursor with source hash, countdown,
+  classifications, references, and required target kinds so promotion can
+  proceed block by block. Conditional language is classified as a rule
+  obligation.
 - `source query` exposes exact handles instead of broad file reads.
 - `source stale` proves the mapped source still matches before import.
 - `import-skill --source-map` binds the generated draft to that source evidence.
@@ -120,7 +122,7 @@ skillspec run-loop ./skill.spec.yml \
 For resume after compaction:
 
 ```bash
-skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent
+skillspec run-loop ./skill.spec.yml --resume <run_dir> --guide agent --json
 ```
 
 The guided loop prints:
@@ -157,18 +159,20 @@ skillspec progress record <run_dir> requirement-satisfied <phase> <requirement> 
   --evidence-kind <kind> \
   --evidence-ref <path-or-id>
 
-skillspec progress batch <run_dir> \
-  --file <run_dir>/evidence-batch.jsonl \
+skillspec progress checkpoint <run_dir> \
+  --requirement-satisfied <phase>/<requirement>=<kind>:<path-or-id> \
+  --phase-completed <phase>=trace:execution.jsonl \
   --checkpoint "checkpointing evidence" \
-  --summary
+  --quiet
 
-skillspec progress show <skill.spec.yml> --run <run_dir>
+skillspec progress show <skill.spec.yml> --run <run_dir> --quiet
 ```
 
 Use `progress record` for a single exceptional row or a user-relevant failure.
-Use `progress batch --summary` when several successful routine proof rows are
-ready at the same boundary. The transcript should show one checkpoint while
-`execution.jsonl` still receives every granular event.
+Use `progress checkpoint --quiet` when several successful routine proof rows
+are ready at the same boundary. The command still completes synchronously, but
+the transcript should stay focused on plain-language status while
+`execution.jsonl` receives every granular event.
 
 The run directory becomes the durable working memory:
 
@@ -194,29 +198,29 @@ See [10 Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md),
 ## Part 4: Completion Is A Gate, Not A Paragraph
 
 At completion, the agent should not narrate a long audit loop. It should run a
-compact alignment gate, batch missing proof rows if needed, then report the
-final compact summary:
+quiet alignment gate, batch missing proof rows if needed, then report the final
+result in plain language with artifact paths:
 
 ```bash
 skillspec trace align <skill.spec.yml> \
   --decision-trace <run_dir> \
   --execution-trace <run_dir>/execution.jsonl \
-  --summary \
-  --proof-digest <run_dir>/proof-digest.json
+  --proof-digest <run_dir>/proof-digest.json \
+  --quiet
 ```
 
 The final response should include the selected route, trace path, alignment
-summary, token usage, and evidence paths. It should not dump the full alignment
-report unless debugging, failure, or the user asks for it.
+status or report path, token usage, and evidence paths. It should not dump the
+alignment report unless debugging, failure, or the user asks for it.
 
 This prevents the "progress parade" failure mode: many small visible alignment
 reruns after each tiny proof row. The intended pattern is:
 
-1. Run one alignment pass with proof digest.
-2. Batch real missing proof rows.
-3. Record final-response evidence.
-4. Run one final compact alignment pass.
-5. Report only the compact completion summary and paths.
+1. Run one quiet alignment pass with proof digest.
+2. Batch real missing proof rows quietly.
+3. Record final-response evidence quietly.
+4. Run one final quiet alignment pass.
+5. Report only the final result and paths.
 
 See [13 Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md).
 
@@ -328,8 +332,8 @@ run-loop --guide agent
 progress record/batch/show
   guides what is complete and what remains
 
-trace align --summary
-  guides completion proof
+trace align --quiet
+  writes completion proof artifacts without transcript noise
 
 workspace --summary
   guides large package graphs without dumping reports

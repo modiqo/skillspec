@@ -1,4 +1,5 @@
 mod capability;
+mod checklist;
 mod deps;
 mod durable;
 mod grammar;
@@ -14,13 +15,16 @@ mod visibility;
 mod workspace;
 
 pub(in crate::cli) use capability::CapabilityCommand;
+pub(in crate::cli) use checklist::{DoctorCommand, ImportCommand, RunCommand};
 pub(in crate::cli) use deps::DepsCommand;
 pub(in crate::cli) use durable::DurableExecutorCommand;
 pub(in crate::cli) use grammar::GrammarCommand;
 pub(in crate::cli) use imports::ImportsCommand;
 pub(in crate::cli) use install::InstallCommand;
 pub(in crate::cli) use progress::ProgressCommand;
-pub(in crate::cli) use router::{RouterCommand, RouterIndexCommand};
+pub(in crate::cli) use router::{
+    RouterCommand, RouterIndexCommand, RouterPolicyCommand, RouterProfileCommand,
+};
 pub(in crate::cli) use skills::SkillsCommand;
 pub(in crate::cli) use source::SourceCommand;
 pub(in crate::cli) use trace::TraceCommand;
@@ -180,11 +184,13 @@ pub(super) enum Command {
         long_about = "Scan a prose SKILL.md file, local folder, public GitHub skill folder, or public GitHub repo URI without executing tools or calling a model. GitHub folder URLs may use /tree/<branch>/...; /blob/<branch>/... is also accepted when the path resolves to a folder rather than SKILL.md. Doctor first builds a current-skill baseline: simple SKILL.md packages receive full agent follow-through risk analysis; multi-skill workspaces, root skills with subskills, and plugin-shaped workspaces receive aggregate workspace risk plus one package report per SKILL.md; non-skill code repos return a shape-only report so doctor does not waste work on ordinary code. Remote GitHub targets are staged with a temporary partial sparse checkout and cleaned up after the report. Human reports explain risk in plain language: how likely the current skill shape is to make an agent skip, reorder, improvise, use the wrong surface, or finish without proof. JSON preserves machine fields including score_model, structural_score, frontmatter discovery risk, activation-loaded surface, instruction-density risk, primacy-bias risk, embedded-code ambiguity, implicit dependency contracts, missing references, and missing proof/trace surfaces."
     )]
     Doctor {
+        #[command(subcommand)]
+        command: Option<DoctorCommand>,
         /// Local SKILL.md file/folder, public GitHub skill folder URL, or public GitHub repo URI.
         ///
         /// GitHub folder URLs may use /tree/<branch>/...; /blob/<branch>/...
         /// is also accepted when the path resolves to a folder rather than SKILL.md.
-        path: String,
+        path: Option<String>,
         /// Emit machine-readable JSON instead of the formatted human report.
         #[arg(long, conflicts_with_all = ["html", "markdown"])]
         json: bool,
@@ -194,6 +200,16 @@ pub(super) enum Command {
         /// Emit GitHub-flavored Markdown instead of the formatted human report.
         #[arg(long, conflicts_with_all = ["json", "html"])]
         markdown: bool,
+    },
+    #[command(about = "Generate shape-specific import checklists")]
+    Import {
+        #[command(subcommand)]
+        command: ImportCommand,
+    },
+    #[command(about = "Generate execution checklists for specs or guided runs")]
+    Run {
+        #[command(subcommand)]
+        command: RunCommand,
     },
     #[command(
         about = "Show installed SkillSpec lifecycle status, roots, router index state, and skill inventory"
@@ -253,7 +269,7 @@ pub(super) enum Command {
     },
     #[command(
         about = "Create a mechanical draft SkillSpec from a local skill file or folder",
-        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or single skill folder after confirming the source is one atomic package. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers are workspaces and should start with `skillspec workspace map <source-root> --out <build-dir>/skillspec.workspace.yml`. Existing reviewed skill.spec.yml files should be revised from grammar/current-spec handles, not re-imported. For large or code-heavy single-skill sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, and seeds it with inferred CLI plus Python/JavaScript/TypeScript package imports for later semantic review."
+        long_about = "Create a mechanical draft SkillSpec from a local SKILL.md file or single skill folder after confirming the source is one atomic package. Parent folders with multiple SKILL.md files, cross-skill references, or plugin markers are workspaces and should start with `skillspec workspace map <source-root> --out <build-dir>/skillspec.workspace.yml`. Existing reviewed skill.spec.yml files should be revised from grammar/current-spec handles, not re-imported. For large or code-heavy single-skill sources, run `skillspec source map`, inspect `source coverage` and focused `source query` handles, then pass the fresh source-map.json with --source-map. The importer materializes fenced code under resources/imported-code/, writes a scaffolded deps.toml beside the draft, declares that ledger as a file dependency/artifact, infers executable CLI dependencies only from command evidence, records Python/JavaScript/TypeScript package imports from fenced code as reference/example evidence, and quarantines invalid prose-like candidates, HTTP methods, placeholders, and source variable names instead of creating hard runtime dependencies."
     )]
     ImportSkill {
         /// Local SKILL.md file or skill folder to import.
@@ -367,9 +383,18 @@ pub(super) enum Command {
         /// Number of candidates to return.
         #[arg(long, default_value_t = 5)]
         top: usize,
+        /// Router policy profile to apply instead of the active profile.
+        #[arg(long)]
+        profile: Option<String>,
         /// Execution mode already selected by user or caller.
         #[arg(long, value_enum)]
         execution_mode: Option<RouterExecutionModeArg>,
+        /// Harness currently making the route decision; only used to choose between duplicate installed copies of the same logical skill.
+        #[arg(long, value_enum)]
+        current_harness: Option<RouteHarnessArg>,
+        /// Skill root currently visible to the active harness; only used to choose between duplicate installed copies of the same logical skill.
+        #[arg(long)]
+        current_root: Option<PathBuf>,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

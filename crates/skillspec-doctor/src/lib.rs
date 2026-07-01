@@ -9,6 +9,7 @@ mod renderer;
 mod risk;
 pub mod source_map;
 mod types;
+mod workspace_package_profile;
 mod workspace_report;
 
 pub use renderer::{render, render_html, render_markdown};
@@ -54,6 +55,8 @@ pub struct DoctorReport {
     pub contract_mitigation: Option<ContractMitigationReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workspace_agent_drift_risk: Option<WorkspaceAgentDriftRiskReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_identity: Option<WorkspaceIdentityReport>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub packages: Vec<DoctorPackageRiskReport>,
     pub basis: Vec<DoctorBasis>,
@@ -98,6 +101,52 @@ pub struct DoctorPluginRootReport {
     pub skill_files: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceIdentityReport {
+    pub source_file_count: usize,
+    pub skill_file_count: usize,
+    pub namespaced_package_count: usize,
+    pub namespace_count: usize,
+    pub namespaces: Vec<WorkspaceNamespaceIdentityReport>,
+    pub unique_skill_content_count: usize,
+    pub repeated_skill_content_groups: usize,
+    pub repeated_skill_content_occurrences: usize,
+    pub total_skill_content_estimated_tokens: usize,
+    pub unique_skill_content_estimated_tokens: usize,
+    pub repeated_skill_content_estimated_tokens: usize,
+    pub source_content_refs: Vec<WorkspaceSourceContentRefReport>,
+    pub same_frontmatter_name_groups: usize,
+    pub same_frontmatter_name_occurrences: usize,
+    pub frontmatter_name_refs: Vec<WorkspaceFrontmatterNameRefReport>,
+    pub recommendation: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceNamespaceIdentityReport {
+    pub namespace: String,
+    pub skill_file_count: usize,
+    pub sample_paths: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceSourceContentRefReport {
+    pub sha256: String,
+    pub canonical_path: String,
+    pub aliases: Vec<String>,
+    pub occurrence_count: usize,
+    pub content_bytes: usize,
+    pub estimated_tokens: usize,
+    pub repeated_occurrence_count: usize,
+    pub repeated_estimated_tokens: usize,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorkspaceFrontmatterNameRefReport {
+    pub public_name: String,
+    pub paths: Vec<String>,
+    pub occurrence_count: usize,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct SurfaceReport {
     pub frontmatter_bytes: usize,
@@ -112,6 +161,7 @@ pub struct SurfaceReport {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DoctorCounts {
+    pub total_files: usize,
     pub markdown_files: usize,
     pub code_files: usize,
     pub manifest_files: usize,
@@ -608,6 +658,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         raw_activation_risk: Some(raw_activation_risk),
         contract_mitigation,
         workspace_agent_drift_risk: None,
+        workspace_identity: None,
         packages: Vec::new(),
         basis,
         suggested_next_steps,
@@ -698,6 +749,10 @@ fn classify_local(path: &Path) -> Result<ShapeClassification> {
         files,
         root_skill_content.as_deref(),
     )
+}
+
+pub(crate) fn classify_source_shape(path: &Path) -> Result<DoctorShapeReport> {
+    Ok(classify_local(path)?.shape)
 }
 
 fn classify_shape_from_files(
@@ -807,6 +862,7 @@ fn shape_only_report_from_classification(
         raw_activation_risk: None,
         contract_mitigation: None,
         workspace_agent_drift_risk: None,
+        workspace_identity: None,
         packages: Vec::new(),
         basis,
         suggested_next_steps,
@@ -890,6 +946,7 @@ fn collect_inventory_files_inner(root: &Path, dir: &Path, files: &mut Vec<PathBu
 
 fn inventory_counts(files: &[PathBuf]) -> DoctorCounts {
     DoctorCounts {
+        total_files: files.len(),
         markdown_files: files.iter().filter(|path| extension_is(path, "md")).count(),
         code_files: files
             .iter()
@@ -906,18 +963,8 @@ fn inventory_counts(files: &[PathBuf]) -> DoctorCounts {
 fn plugin_roots_from_files(root: &Path, files: &[PathBuf]) -> Vec<DoctorPluginRootReport> {
     let mut roots = Vec::<PathBuf>::new();
     for file in files {
-        if file.ends_with(".claude-plugin/plugin.json") {
-            if let Some(plugin_root) = file.parent().and_then(Path::parent) {
-                roots.push(plugin_root.to_path_buf());
-            }
-        } else if file
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name == ".mcp.json" || name == "CLAUDE.md")
-        {
-            if let Some(plugin_root) = file.parent() {
-                roots.push(plugin_root.to_path_buf());
-            }
+        if let Some(plugin_root) = plugin_root_from_marker_file(file) {
+            roots.push(plugin_root);
         }
     }
     roots.sort();
@@ -945,6 +992,46 @@ fn plugin_roots_from_files(root: &Path, files: &[PathBuf]) -> Vec<DoctorPluginRo
             })
         })
         .collect()
+}
+
+fn plugin_root_from_marker_file(file: &Path) -> Option<PathBuf> {
+    let file_name = file.file_name().and_then(|name| name.to_str())?;
+    if file_name == ".mcp.json" || file_name == "CLAUDE.md" {
+        return file.parent().map(Path::to_path_buf);
+    }
+    if !is_plugin_manifest_file_name(file_name) {
+        return None;
+    }
+    let metadata_dir = file.parent()?;
+    let metadata_dir_name = metadata_dir.file_name().and_then(|name| name.to_str())?;
+    if is_plugin_metadata_dir_name(metadata_dir_name) {
+        return metadata_dir.parent().map(Path::to_path_buf);
+    }
+    None
+}
+
+fn is_plugin_metadata_dir_name(name: &str) -> bool {
+    name.trim_start_matches('.')
+        .to_ascii_lowercase()
+        .contains("plugin")
+}
+
+fn is_plugin_manifest_file_name(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "plugin.json"
+            | "marketplace.json"
+            | "manifest.json"
+            | "package.json"
+            | "plugin.yml"
+            | "plugin.yaml"
+            | "marketplace.yml"
+            | "marketplace.yaml"
+            | "manifest.yml"
+            | "manifest.yaml"
+            | "plugin.toml"
+            | "manifest.toml"
+    )
 }
 
 fn referenced_nested_skills(root_skill_content: &str, skill_files: &[PathBuf]) -> Vec<String> {
@@ -1173,7 +1260,7 @@ fn shape_root(path: &Path) -> PathBuf {
 }
 
 fn should_skip_inventory_dir(name: &str) -> bool {
-    if name == ".claude-plugin" {
+    if is_plugin_metadata_dir_name(name) {
         return false;
     }
     if name.starts_with('.') {
@@ -1262,18 +1349,7 @@ fn extension_is(path: &Path, expected: &str) -> bool {
 }
 
 fn plugin_namespace(root: &Path, plugin_root: &Path) -> String {
-    let plugin_json = root.join(plugin_root).join(".claude-plugin/plugin.json");
-    fs::read_to_string(plugin_json)
-        .ok()
-        .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
-        .and_then(|value| {
-            value
-                .get("name")
-                .and_then(|name| name.as_str())
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-                .map(str::to_owned)
-        })
+    plugin_manifest_namespace(root, plugin_root)
         .or_else(|| {
             plugin_root
                 .file_name()
@@ -1283,6 +1359,81 @@ fn plugin_namespace(root: &Path, plugin_root: &Path) -> String {
         .map(|value| slugify(&value))
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "plugin".to_owned())
+}
+
+fn plugin_manifest_namespace(root: &Path, plugin_root: &Path) -> Option<String> {
+    let plugin_root = root.join(plugin_root);
+    let mut candidates = Vec::new();
+    let entries = fs::read_dir(plugin_root).ok()?;
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let child = entry.path();
+        if !child.is_dir()
+            || !entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_plugin_metadata_dir_name)
+        {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(child) else {
+            continue;
+        };
+        for file in files.filter_map(|file| file.ok()) {
+            if file.path().is_file()
+                && file
+                    .file_name()
+                    .to_str()
+                    .is_some_and(is_plugin_manifest_file_name)
+            {
+                candidates.push(file.path());
+            }
+        }
+    }
+    candidates.sort_by_key(|path| plugin_manifest_priority(path));
+    candidates
+        .into_iter()
+        .find_map(|path| namespace_from_manifest_file(&path))
+}
+
+fn plugin_manifest_priority(path: &Path) -> usize {
+    match path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("plugin.json") => 0,
+        Some("marketplace.json") => 1,
+        Some("manifest.json") => 2,
+        Some("package.json") => 3,
+        _ => 4,
+    }
+}
+
+fn namespace_from_manifest_file(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let parsed = if matches!(extension.as_str(), "yaml" | "yml") {
+        serde_yaml::from_str::<serde_yaml::Value>(&content).ok()
+    } else if extension == "json" {
+        serde_json::from_str::<serde_json::Value>(&content)
+            .ok()
+            .and_then(|value| serde_yaml::to_value(value).ok())
+    } else {
+        None
+    }?;
+    parsed
+        .get("name")
+        .or_else(|| parsed.get("id"))
+        .or_else(|| parsed.get("title"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
 }
 
 fn slugify(value: &str) -> String {
@@ -1541,6 +1692,7 @@ fn counts(map: &SourceMap, skill: &SkillBody) -> DoctorCounts {
         .filter(|reference| reference.resolved_file.is_none())
         .count();
     DoctorCounts {
+        total_files: map.files.len(),
         markdown_files,
         code_files,
         manifest_files,
@@ -1936,6 +2088,7 @@ mod tests {
             raw_activation_risk: None,
             contract_mitigation: None,
             workspace_agent_drift_risk: None,
+            workspace_identity: None,
             packages: Vec::new(),
             basis: Vec::new(),
             suggested_next_steps: vec![

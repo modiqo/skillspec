@@ -3,10 +3,17 @@ use skillspec::{domain::evidence, error::Result, report};
 
 pub(super) fn run(command: ProgressCommand) -> Result<()> {
     match command {
-        ProgressCommand::Show { path, run, json } => {
+        ProgressCommand::Show {
+            path,
+            run,
+            json,
+            quiet,
+        } => {
             let report = evidence::show_progress(&path, &run)?;
             if json {
                 report::json(&report)?;
+            } else if quiet {
+                // Quiet progress checks still write progress.json.
             } else {
                 report::text(&evidence::render_progress(&report))?;
             }
@@ -22,7 +29,8 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             evidence_ref,
             source_skill,
             message,
-            json: _,
+            json,
+            quiet,
         } => {
             let event = evidence::record(evidence::RecordOptions {
                 run_dir: run,
@@ -36,7 +44,9 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
                 source_skill,
                 message,
             })?;
-            report::json(&event)?;
+            if json || !quiet {
+                report::json(&event)?;
+            }
         }
         ProgressCommand::Stats {
             run,
@@ -56,7 +66,8 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             avoided_tokens,
             metrics_source,
             message,
-            json: _,
+            json,
+            quiet,
         } => {
             let event = evidence::record_stats(evidence::StatsRecordOptions {
                 run_dir: run,
@@ -77,7 +88,9 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
                 metrics_source,
                 message,
             })?;
-            report::json(&event)?;
+            if json || !quiet {
+                report::json(&event)?;
+            }
         }
         ProgressCommand::FinalResponse {
             run,
@@ -88,7 +101,8 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             alignment,
             token_savings,
             message,
-            json: _,
+            json,
+            quiet,
         } => {
             let event = evidence::record_final_response(evidence::FinalResponseRecordOptions {
                 run_dir: run,
@@ -100,13 +114,16 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
                 included_token_savings: token_savings,
                 message,
             })?;
-            report::json(&event)?;
+            if json || !quiet {
+                report::json(&event)?;
+            }
         }
         ProgressCommand::Batch {
             run,
             events,
             checkpoint,
             summary,
+            quiet,
             json,
         } => {
             let report = evidence::record_batch(evidence::BatchRecordOptions {
@@ -116,6 +133,43 @@ pub(super) fn run(command: ProgressCommand) -> Result<()> {
             })?;
             if json {
                 report::json(&report)?;
+            } else if quiet {
+                // Successful quiet checkpoints intentionally produce no output.
+            } else {
+                report::text(&evidence::render_batch_report(&report, summary))?;
+            }
+        }
+        ProgressCommand::Checkpoint {
+            run,
+            requirement_satisfied,
+            phase_completed,
+            route_fulfilled,
+            route_check_completed,
+            after_success_completed,
+            obligation_satisfied,
+            elicitation_answered,
+            evidence_attached,
+            checkpoint,
+            summary,
+            quiet,
+            json,
+        } => {
+            let report = evidence::record_checkpoint(evidence::CheckpointRecordOptions {
+                run_dir: run,
+                requirement_satisfied,
+                phase_completed,
+                route_fulfilled,
+                route_check_completed,
+                after_success_completed,
+                obligation_satisfied,
+                elicitation_answered,
+                evidence_attached,
+                checkpoint,
+            })?;
+            if json {
+                report::json(&report)?;
+            } else if quiet {
+                // Successful quiet checkpoints intentionally produce no output.
             } else {
                 report::text(&evidence::render_batch_report(&report, summary))?;
             }

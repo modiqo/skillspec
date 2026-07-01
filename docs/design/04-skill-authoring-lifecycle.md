@@ -74,17 +74,20 @@ When debugging one gate or building a custom import flow, use the lower-level
 commands:
 
 ```sh
-# URI sources only:
-skillspec source stage <github-skill-uri> --out <staging-root> --json
-
-# Local source path or selected_source_path from source stage:
-skillspec source map <path> --out <draft>/.skillspec/source-map
+# Local source path or public GitHub skill URI:
+skillspec source map <path-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
+skillspec source lens <draft>/.skillspec/source-map/source-map.json --cursor 1
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
 skillspec source stale <draft>/.skillspec/source-map/source-map.json --root <path>
 skillspec import-skill <path> --out <draft>/skill.spec.yml --source-map <draft>/.skillspec/source-map/source-map.json
 ```
+
+For GitHub sources, `source map` stages the public repository through
+SkillSpec's sparse checkout logic and reports the selected local `source_path`.
+Use that `source_path` for stale checks and import. Run `source stage`
+separately only when you need candidate discovery before mapping.
 
 The source-map step lets the agent inspect structure, dependencies, code blocks,
 references, and exact source spans before importing. The current importer reads
@@ -110,12 +113,19 @@ local Markdown source material and creates a SkillSpec scaffold. It can:
 
 The importer creates a dependency ledger scaffold, not a complete dependency
 review. For imported or shareable skills, the review pass must complete
-`deps.toml` by preserving dependency mentions from `SKILL.md`, referenced docs,
+`deps.toml` by preserving dependency evidence from `SKILL.md`, referenced docs,
 helper scripts, fenced code imports, command examples, and package manifests.
 Each entry should record source authority, local status, install risk, proposed
-provision command, required workflows, and degraded proof impact. A reviewed
-zero-dependency skill should keep `deps.toml` with `dependency_count = 0`; a
-byte-empty ledger is not valid proof that dependencies were reviewed.
+provision command, required workflows, and degraded proof impact. Dependency
+extraction is evidence-based and typed: executable command evidence may create
+`cli` entries, live service/API requirements must be explicit, package-manager
+evidence may create package entries, and example-code imports remain
+reference/example evidence until semantic review promotes them. Prose-like or
+placeholder candidates such as `Optional.`, `TABLE`, `<personProp1>`, or private
+identifiers are quarantined, not written as hard runtime dependencies. A
+reviewed zero-dependency skill should keep `deps.toml` with
+`dependency_count = 0`; a byte-empty ledger is not valid proof that dependencies
+were reviewed.
 
 The importer deliberately does not finish the behavioral contract. The generated
 spec starts with empty `applies_when`, `entry`, `routes`, `rules`, `states`,
@@ -139,10 +149,10 @@ review pass should answer these questions:
 - Which command templates need a safety class?
 - Which dependencies were inferred correctly, and which need permission or
   provision choices?
-- Which dependency mentions came from source-required prose, reference prose,
+- Which dependency evidence came from source-required prose, reference prose,
   helper scripts, code imports, command examples, package manifests, or
-  inference, and are they preserved in `deps.toml` without being deleted to make
-  QA pass?
+  inference, and has it been classified before creating any hard dependency in
+  `deps.toml`?
 - Which Markdown files should be active `imports`, and which should remain
   passive `resources`?
 - Which fenced code blocks are examples, and which are runnable code surfaces?

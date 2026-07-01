@@ -289,7 +289,9 @@ into a safer default path.
 | `decide` | Decision logic used by start and resume. |
 | `plan` | Phase order logic used by path. |
 | `act` | Current-route/current-phase checklist used by current gate. |
-| `progress record` | Records proof rows before advancing. |
+| `progress checkpoint` | Records routine successful proof rows as one quiet checkpoint before advancing. |
+| `progress batch` | Appends an existing JSONL or JSON array proof artifact when one already exists. |
+| `progress record` | Low-level escape hatch for failures, blockers, debugging, or explicit proof-detail requests. |
 | `progress show` | Computes completed/current/blocked/remaining state. |
 | `query` | Loads exact handles named by the guide. |
 | `refs` | Loads relationship edges for active handles. |
@@ -300,6 +302,8 @@ The important policy is:
 ```text
 Use guided run-loop as the default agent-facing entry point.
 Use primitive commands for debugging, explicit inspection, and proof details.
+Keep ledger mechanics out of user-facing progress; users should see plain
+status, not one command per proof row.
 ```
 
 ## Why This Saves Tokens
@@ -492,7 +496,7 @@ current_phase: run_shape_doctor
 open_requirements: doctor_source_shape
 do_not: port, import, compile, install
 next command: skillspec doctor <source>
-resume: skillspec run-loop <spec> --resume <run_dir> --guide agent
+resume: skillspec run-loop <spec> --resume <run_dir> --guide agent --json
 ```
 
 That is the behavioral improvement: the CLI selects the right route, names the

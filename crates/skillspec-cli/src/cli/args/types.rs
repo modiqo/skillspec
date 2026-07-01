@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 use skillspec::{
-    compiler, grammar, install::HarnessTarget, router, sensemake, source_map, visibility, workspace,
+    compiler, grammar, install::HarnessTarget, router, router_policy, sensemake, source_map,
+    visibility, workspace,
 };
 
 #[derive(Clone, Debug, clap::ValueEnum)]
@@ -28,6 +29,32 @@ pub(in crate::cli) enum WorkspaceVisibilityPolicyArg {
 pub(in crate::cli) enum RouterExecutionModeArg {
     Direct,
     Durable,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(in crate::cli) enum RouteHarnessArg {
+    Agents,
+    Codex,
+    ClaudeLocal,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(in crate::cli) enum RouterPolicyProfileModeArg {
+    Route,
+    SoftPassthrough,
+    NativePassthrough,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(in crate::cli) enum RouterPolicyRuleModeArg {
+    Soft,
+    Hard,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(in crate::cli) enum RouterPolicyAnchorArg {
+    None,
+    Policy,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]
@@ -67,6 +94,13 @@ pub(in crate::cli) enum SenseViewArg {
 pub(in crate::cli) enum GuideModeArg {
     Agent,
     Full,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub(in crate::cli) enum ChecklistStageArg {
+    Entry,
+    Loop,
+    Exit,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -133,6 +167,44 @@ impl From<RouterExecutionModeArg> for router::ExecutionMode {
         match value {
             RouterExecutionModeArg::Direct => Self::Direct,
             RouterExecutionModeArg::Durable => Self::Durable,
+        }
+    }
+}
+
+impl From<RouteHarnessArg> for router::RouteHarness {
+    fn from(value: RouteHarnessArg) -> Self {
+        match value {
+            RouteHarnessArg::Agents => Self::Agents,
+            RouteHarnessArg::Codex => Self::Codex,
+            RouteHarnessArg::ClaudeLocal => Self::ClaudeLocal,
+        }
+    }
+}
+
+impl From<RouterPolicyProfileModeArg> for router_policy::PolicyProfileMode {
+    fn from(value: RouterPolicyProfileModeArg) -> Self {
+        match value {
+            RouterPolicyProfileModeArg::Route => Self::Route,
+            RouterPolicyProfileModeArg::SoftPassthrough => Self::SoftPassthrough,
+            RouterPolicyProfileModeArg::NativePassthrough => Self::NativePassthrough,
+        }
+    }
+}
+
+impl From<RouterPolicyRuleModeArg> for router_policy::PolicyRuleMode {
+    fn from(value: RouterPolicyRuleModeArg) -> Self {
+        match value {
+            RouterPolicyRuleModeArg::Soft => Self::Soft,
+            RouterPolicyRuleModeArg::Hard => Self::Hard,
+        }
+    }
+}
+
+impl From<RouterPolicyAnchorArg> for router_policy::PolicyAnchor {
+    fn from(value: RouterPolicyAnchorArg) -> Self {
+        match value {
+            RouterPolicyAnchorArg::None => Self::None,
+            RouterPolicyAnchorArg::Policy => Self::Policy,
         }
     }
 }

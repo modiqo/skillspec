@@ -73,8 +73,10 @@ understand all prose. It should:
 3. extract fenced commands
 4. materialize fenced code into package-local `resources/imported-code/`
    files and reference them from `code.source.file`
-5. write scaffolded `deps.toml`, declare it as a file dependency/artifact, and
-   seed CLI plus Python/JavaScript/TypeScript package imports
+5. write scaffolded `deps.toml`, declare it as a file dependency/artifact, seed
+   CLI dependencies only from executable command evidence, record fenced-code
+   Python/JavaScript/TypeScript package imports as reference/example evidence,
+   and quarantine invalid prose-like candidates instead of hard dependencies
 6. extract tables
 7. identify always/never/forbid/required language
 8. identify examples and trigger phrases

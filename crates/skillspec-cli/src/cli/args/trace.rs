@@ -24,6 +24,9 @@ pub(in crate::cli) enum TraceCommand {
         /// Print only the completion-facing alignment and token summary while writing the full report to alignment.json.
         #[arg(long, conflicts_with = "json")]
         summary: bool,
+        /// Suppress stdout after writing alignment.json and any proof digest.
+        #[arg(long)]
+        quiet: bool,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

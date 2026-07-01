@@ -39,7 +39,7 @@ flowchart LR
 Grounded commands:
 
 ```sh
-skillspec source map <source-skill> --out <draft>/.skillspec/source-map
+skillspec source map <source-skill-or-github-uri> --out <draft>/.skillspec/source-map
 skillspec source coverage <draft>/.skillspec/source-map/source-map.json
 skillspec source query <draft>/.skillspec/source-map/source-map.json nodes --view index
 skillspec source query <draft>/.skillspec/source-map/source-map.json dependencies --view summary
@@ -165,7 +165,7 @@ skillspec test <skill-folder>/skill.spec.yml
 skillspec compile <skill-folder>/skill.spec.yml --target codex-skill
 skillspec plan <skill-folder>/skill.spec.yml --input '<task>' --trace-dir <skill-folder>/.skillspec/traces
 skillspec act <skill-folder>/skill.spec.yml --input '<task>' --run <run-dir> --phase <phase-id>
-skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run-dir> --summary --proof-digest <run-dir>/proof-digest.json
+skillspec trace align <skill-folder>/skill.spec.yml --decision-trace <run-dir> --proof-digest <run-dir>/proof-digest.json --quiet
 ```
 
 Release check:

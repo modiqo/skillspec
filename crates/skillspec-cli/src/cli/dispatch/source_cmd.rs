@@ -17,8 +17,8 @@ pub(super) fn run(command: SourceCommand) -> Result<()> {
                 report::text(&authoring::render_stage_report(&stage_report))?;
             }
         }
-        SourceCommand::Map { path, out, json } => {
-            let report = authoring::create_source_map(&path, &out)?;
+        SourceCommand::Map { source, out, json } => {
+            let report = authoring::create_source_map_from_source(&source, &out)?;
             if json {
                 report::json(&report)?;
             } else {
@@ -36,6 +36,19 @@ pub(super) fn run(command: SourceCommand) -> Result<()> {
                 report::json(&report)?;
             } else {
                 report::text(&authoring::render_source_query(&report))?;
+            }
+        }
+        SourceCommand::Lens {
+            map,
+            cursor,
+            limit,
+            json,
+        } => {
+            let report = authoring::source_lens(&map, cursor, limit)?;
+            if json {
+                report::json(&report)?;
+            } else {
+                report::text(&authoring::render_source_lens(&report))?;
             }
         }
         SourceCommand::Coverage { map, json } => {

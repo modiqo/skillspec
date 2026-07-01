@@ -41,7 +41,7 @@ directory listings.
 | 07 | [State Machines, Handoffs, And Jumps](07-state-machines-handoffs-and-jumps.md) | How lifecycle states, route execution plans, handoffs, and phase jumps are represented without turning SkillSpec into an execution engine. |
 | 08 | [Imports, Resources, Code, And Recipes](08-imports-resources-code-and-recipes.md) | How runtime-loadable imports differ from resources, code blocks, artifacts, commands, and recipes. |
 | 09 | [Phase Tool Boundaries](09-phase-tool-boundaries.md) | How `tool_boundary` is rendered by `act` as a hard per-phase permission boundary for tools, data sources, substrates, providers, adapters, APIs, CLIs, browser modes, and skills. |
-| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, `progress record`, internal `progress show` checks, compact `trace align --summary`, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
+| 10 | [Runtime Plan Act Progress Loop](10-runtime-plan-act-progress-loop.md) | How `plan`, `act`, quiet progress checks, quiet trace alignment, and proof-digest batching form the runtime loop for a SkillSpec-backed run. |
 | 11 | [Execution Progress Ledger](11-execution-progress-ledger.md) | How `execution.jsonl` records phase, requirement, handoff, route, and closure proof for progress and alignment. |
 | 12 | [Traces And Alignment](12-traces-and-alignment.md) | How decision traces and alignment reports support review, replay, and self-reflection. |
 | 13 | [Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md) | How final responses should render alignment summaries, missing proof rows, trace paths, and measured token consumption and savings. |
@@ -63,6 +63,10 @@ directory listings.
 | 29 | [Internal Domain Facades](29-internal-domain-facades.md) | How the CLI now calls internal domain facades before implementation modules, preserving command contracts while preparing for future crate extraction. |
 | 30 | [Testing Matrix](30-testing-matrix.md) | Release-candidate test matrix for install, doctor, import, activation, router, durable executor, and what can or cannot be automated. |
 | 31 | [Controlled Harness Lab](31-controlled-harness-lab.md) | Proposal for no-Docker sandbox harness simulation using isolated homes, fake harness roots, pseudo-harness traces, and optional real harness smoke runs. |
+| 32 | [Router Duplicate Root Selection](32-router-duplicate-root-selection.md) | How route collapses duplicate physical installs into one logical skill, then uses harness/root context only to choose the installed copy to load. |
+| 33 | [Router Provider Neutrality](33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
+| 34 | [Router Policy Profiles And Passthrough](34-router-policy-profiles-and-passthrough.md) | Proposed provider-neutral router policy layer for ordered preferences, soft and hard rule modes, temporary passthrough profiles, scheduler control, and auditable route explanations. |
+| 35 | [Shape-Specific Checklist Generation](35-shape-specific-checklists.md) | Proposed generated checklist contracts for doctor, import, and run workflows, with common invariants plus single-skill, multi-skill, and plugin-shaped source templates. |
 
 ## Visual Explainers
 
@@ -102,11 +106,12 @@ Every design claim should be grounded in one or more of these sources:
 | Workspace authoring graph | `crates/skillspec-workspace/src/lib.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/design/19-workspace-authoring-graph.md` |
 | Doctor agent drift risk | `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `docs/00-skills-reliability-gap.md`, `docs/08-contract-trace-methodology.md`, `docs/design/22-doctor-agent-drift-risk.md` |
 | Guided run-loop and trampoline dogfood | `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/features/run_loop.rs`, `crates/skillspec-doctor/src/lib.rs`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/23-guided-run-loop-from-doctor-dogfood.md`, `docs/design/24-guided-trampoline.md` |
+| Shape-specific checklist generation | `crates/skillspec-doctor/src/`, `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-workspace/src/`, `crates/skillspec-runtime/src/guide/`, `crates/skillspec-cli/src/cli/args/`, `spec/commandspec.md`, `skills/skillspec/SKILL.md`, `skills/skillspec/skill.spec.yml`, `docs/design/35-shape-specific-checklists.md` |
 | Performance and token economy | `crates/skillspec-authoring/src/metrics.rs`, `crates/skillspec-core/src/spec/parser.rs`, `crates/skillspec-workspace/src/import.rs`, `docs/design/20-performance-token-speed.md` |
 | Thin loader generation | `crates/skillspec-authoring/src/compiler.rs`, `examples/durable-executor/SKILL.md` |
 | Dependency checks | `crates/skillspec-runtime/src/deps.rs`, `examples/*/skill.spec.yml`, `examples/*/deps.toml` |
 | Capability bootstrap | `crates/skillspec-cli/src/features/capability.rs`, `examples/durable-executor/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
-| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/` |
+| Skill router | `crates/skillspec-harness/src/router.rs`, `crates/skillspec-harness/src/visibility.rs`, `crates/skillspec-harness/src/router_lifecycle.rs`, `examples/skill-router/skill.spec.yml`, `crates/skillspec-cli/tests/cli/`, `docs/design/32-router-duplicate-root-selection.md`, `docs/design/33-router-execution-policy-gate.md`, `docs/design/34-router-policy-profiles-and-passthrough.md` |
 | Traces, progress, and alignment | `spec/trace.md`, `crates/skillspec-runtime/src/trace.rs`, `crates/skillspec-runtime/src/progress.rs`, `crates/skillspec-runtime/src/align.rs`, `crates/skillspec-runtime/src/align/ledger.rs`, `crates/skillspec-runtime/src/align/types.rs` |
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
 | Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
@@ -179,10 +184,10 @@ by `skillspec trace align --proof-digest`. It converts missing phase
 requirements, routes, route checks, forbids, elicitations, and closures into a
 batch-planning artifact for one `progress batch` call.
 
-`Completion summary` means the compact final status block from
-`skillspec trace align --summary`, including decision replay, phase order, requirement
-proof counts, missing proof rows, forbidden-action status, alignment status, and
-token usage.
+`Completion summary` means the compact final status shape available from
+`skillspec trace align --summary` when proof is explicitly inspected. Normal
+agent execution uses `skillspec trace align --quiet` and reports only the final
+result plus artifact paths unless details are requested or needed for a blocker.
 
 ## Documentation QA Gate
 

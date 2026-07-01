@@ -118,7 +118,7 @@ skillspec progress record <run-dir> requirement-satisfied <phase-id> <requiremen
   --evidence-kind command \
   --evidence-ref <ref>
 
-skillspec progress show ./skill.spec.yml --run <run-dir>
+skillspec progress show ./skill.spec.yml --run <run-dir> --quiet
 ```
 
 Review check:
@@ -148,8 +148,8 @@ Grounded command:
 skillspec trace align ./skill.spec.yml \
   --decision-trace <run-dir> \
   --execution-trace <run-dir>/execution.jsonl \
-  --summary \
-  --proof-digest <run-dir>/proof-digest.json
+  --proof-digest <run-dir>/proof-digest.json \
+  --quiet
 ```
 
 Review check:

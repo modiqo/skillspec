@@ -183,15 +183,22 @@ For imported or shareable skills, `deps.toml` is also the dependency provenance
 ledger. `skillspec import-skill` creates a scaffolded ledger beside the draft
 spec and declares it as a file dependency/artifact, so `skillspec deps check`
 can report a missing or byte-empty ledger. The review pass must complete that
-scaffold by preserving every dependency mention found in `SKILL.md`, referenced
-docs, helper scripts, fenced code imports, command examples, and package
-manifests. If review finds no dependencies, keep the ledger with
+scaffold by preserving dependency evidence found in `SKILL.md`, referenced
+docs, helper scripts, command examples, package manifests, and fenced code
+imports. Extraction is typed and evidence-based: commands invoked by the skill
+may become `cli` dependencies, live APIs/services must be explicit
+service/runtime requirements, package dependencies need package-manager
+evidence, and example-code/user-app imports stay reference evidence unless
+review promotes them. Invalid prose-like candidates such as `Optional.`,
+`TABLE`, placeholders, or private identifiers are quarantined instead of
+blocking install. If review finds no dependencies, keep the ledger with
 `dependency_count = 0`; do not replace it with an empty file. A dependency
 record should include:
 
 - dependency id and ecosystem;
-- authority such as `source_required`, `source_recommended`,
-  `reference_required`, `script_import`, `example_only`, or `inferred`;
+- typed authority such as `declared`, `command_evidence`,
+  `package_manager_evidence`, `api_required`, `reference_import`,
+  `example_only`, or `inferred_review_required`;
 - source location;
 - local status such as `present`, `missing`, `unknown`, `provisionable`,
   `deferred`, or `required_but_unproven`;

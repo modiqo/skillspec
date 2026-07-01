@@ -402,6 +402,297 @@ fn doctor_detects_plugin_workspace_shape() -> std::result::Result<(), Box<dyn st
 }
 
 #[test]
+fn doctor_detects_generic_plugin_metadata_shape(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-generic-plugin-shape");
+    let root = dir.path().join("skills-marketplace");
+    write_file(
+        &root.join(".agent-plugin").join("marketplace.json"),
+        r#"{"name":"neutral-marketplace","version":"1.0.0"}"#,
+    );
+    write_file(
+        &root.join("skills").join("triage").join("SKILL.md"),
+        "---\nname: triage\ndescription: Triage.\n---\n# Triage\n",
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()?;
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["shape"]["kind"], "plugin_workspace");
+    let plugins = report["shape"]["plugin_roots"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing plugin roots"))?;
+    assert_eq!(plugins.len(), 1);
+    assert_eq!(plugins[0]["namespace"], "neutral-marketplace");
+    assert_eq!(plugins[0]["path"], "");
+    assert_eq!(
+        report["packages"][0]["plugin_name"].as_str(),
+        Some("neutral-marketplace")
+    );
+    assert_eq!(
+        report["packages"][0]["shape_role"].as_str(),
+        Some("plugin_skill")
+    );
+    Ok(())
+}
+
+#[test]
+fn doctor_reports_repeated_workspace_skill_content_as_referentiable_identity(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-repeated-content");
+    let root = dir.path().join("posthog-skills");
+    write_file(
+        &root.join(".agent-plugin").join("marketplace.json"),
+        r#"{"name":"posthog-skills","version":"1.0.0"}"#,
+    );
+    let repeated = r#"---
+name: integration-python
+description: PostHog integration for any Python application using the Python SDK
+---
+# Integration Python
+
+Use Python SDK.
+"#;
+    write_file(
+        &root
+            .join("skills")
+            .join("posthog")
+            .join("all")
+            .join("skills")
+            .join("integration-python")
+            .join("SKILL.md"),
+        repeated,
+    );
+    write_file(
+        &root
+            .join("skills")
+            .join("posthog")
+            .join("integration")
+            .join("skills")
+            .join("python")
+            .join("SKILL.md"),
+        repeated,
+    );
+    write_file(
+        &root
+            .join("skills")
+            .join("posthog")
+            .join("integration")
+            .join("skills")
+            .join("node")
+            .join("SKILL.md"),
+        r#"---
+name: integration-node
+description: PostHog integration for Node.
+---
+# Integration Node
+"#,
+    );
+
+    let output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()?;
+    assert_success(&output);
+    let report = json_stdout(&output);
+    assert_eq!(report["analysis_status"], "workspace");
+    assert_eq!(report["shape"]["kind"], "plugin_workspace");
+    assert_eq!(report["workspace_identity"]["skill_file_count"], 3);
+    assert_eq!(report["workspace_identity"]["namespaced_package_count"], 3);
+    assert_eq!(
+        report["workspace_identity"]["unique_skill_content_count"],
+        2
+    );
+    assert_eq!(
+        report["workspace_identity"]["repeated_skill_content_groups"],
+        1
+    );
+    assert_eq!(
+        report["workspace_identity"]["repeated_skill_content_occurrences"],
+        1
+    );
+    assert_eq!(
+        report["workspace_identity"]["same_frontmatter_name_groups"],
+        1
+    );
+    assert!(report["workspace_identity"]["source_file_count"]
+        .as_u64()
+        .is_some_and(|count| count >= 4));
+    let refs = report["workspace_identity"]["source_content_refs"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing source_content_refs"))?;
+    let repeated_ref = refs
+        .iter()
+        .find(|item| item["occurrence_count"] == 2)
+        .ok_or_else(|| invalid_json_shape("missing repeated source content ref"))?;
+    assert_eq!(
+        repeated_ref["aliases"]
+            .as_array()
+            .ok_or_else(|| invalid_json_shape("missing repeated aliases"))?
+            .len(),
+        1
+    );
+    assert!(repeated_ref["canonical_path"]
+        .as_str()
+        .is_some_and(|path| path.contains("integration-python")));
+    assert!(report["workspace_identity"]["recommendation"]
+        .as_str()
+        .is_some_and(|text| text.contains("source_content_ref")));
+    let issues_text = serde_json::to_string(&report["issues"])?;
+    assert!(issues_text.contains("workspace_repeated_skill_content"));
+    assert!(issues_text.contains("workspace_reused_frontmatter_names"));
+
+    let text = Command::new(bin()).arg("doctor").arg(&root).output()?;
+    assert_success(&text);
+    let text = stdout(&text);
+    assert!(text.contains("Shape Contract"));
+    assert!(text.contains("Kind: plugin_workspace"));
+    assert!(text.contains("Packages: 3"));
+    assert!(text.contains("Namespaces: 1"));
+    assert!(text.contains("Plugin roots: 1"));
+    assert!(text.contains("Next command: skillspec workspace map"));
+    assert!(text.contains("Workspace Identity"));
+    assert!(text.contains("unique byte content"));
+    assert!(text.contains("referentiable"));
+    assert!(text.contains("source_content_ref"));
+    assert!(text
+        .contains("Assessment scope: plugin workspace plus full per-package raw skill profiles"));
+    assert!(text.contains("Risk interpretation: Plugin workspace risk is the maximum"));
+    assert!(text.contains("Package risk rollup:"));
+    Ok(())
+}
+
+#[test]
+fn doctor_workspace_rolls_up_full_package_risk_profiles(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-workspace-package-risk");
+    let root = dir.path().join("posthog-skills");
+    let package = root
+        .join("skills")
+        .join("posthog")
+        .join("tools-and-features")
+        .join("skills")
+        .join("hogql");
+    write_file(
+        &root.join(".agent-plugin").join("marketplace.json"),
+        r#"{"name":"posthog-skills","version":"1.0.0"}"#,
+    );
+    write_file(
+        &package.join("SKILL.md"),
+        r#"---
+name: hogql
+description: HogQL queries for PostHog analytics.
+---
+# HogQL
+
+Use Python, shell, and API calls to inspect analytics, run queries, fetch results, and write a final report.
+See [missing reference](missing.md) before using query examples.
+
+```python
+import posthog
+```
+
+```
+curl https://app.posthog.com/api/projects/
+```
+"#,
+    );
+    write_file(
+        &root
+            .join("skills")
+            .join("posthog")
+            .join("survey")
+            .join("skills")
+            .join("creator")
+            .join("SKILL.md"),
+        r#"---
+name: survey-creator
+description: Create PostHog surveys.
+---
+# Survey
+"#,
+    );
+
+    let standalone_output = Command::new(bin())
+        .arg("doctor")
+        .arg(&package)
+        .arg("--json")
+        .output()?;
+    assert_success(&standalone_output);
+    let standalone = json_stdout(&standalone_output);
+    let standalone_score = standalone["agent_drift_risk"]["score"]
+        .as_u64()
+        .ok_or_else(|| invalid_json_shape("missing standalone score"))?;
+    assert!(
+        standalone_score >= 75,
+        "fixture should exercise critical standalone risk, got {standalone_score}"
+    );
+
+    let workspace_output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()?;
+    assert_success(&workspace_output);
+    let workspace = json_stdout(&workspace_output);
+    assert_eq!(workspace["shape"]["kind"], "plugin_workspace");
+
+    let packages = workspace["packages"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing workspace packages"))?;
+    let hogql = packages
+        .iter()
+        .find(|package| {
+            package["path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with("hogql/SKILL.md"))
+        })
+        .ok_or_else(|| invalid_json_shape("missing hogql package profile"))?;
+    assert_eq!(
+        hogql["agent_drift_risk"]["score"].as_u64(),
+        Some(standalone_score)
+    );
+    assert_eq!(
+        hogql["agent_drift_risk"]["level"],
+        standalone["agent_drift_risk"]["level"]
+    );
+    assert_eq!(
+        hogql["risk_profile_source"].as_str(),
+        Some("full_package_analysis")
+    );
+    assert_eq!(
+        hogql["source_content_sha256"]
+            .as_str()
+            .ok_or_else(|| invalid_json_shape("missing source content hash"))?
+            .len(),
+        64
+    );
+    assert!(workspace["workspace_agent_drift_risk"]["score"]
+        .as_u64()
+        .is_some_and(|score| score >= standalone_score));
+    let conditions = workspace["workspace_agent_drift_risk"]["conditions"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing workspace risk conditions"))?;
+    let rollup = conditions
+        .iter()
+        .find(|condition| condition["id"] == "workspace_package_risk_rollup")
+        .ok_or_else(|| invalid_json_shape("missing package risk rollup"))?;
+    assert_eq!(rollup["claim_scope"], "full_package_risk_rollup");
+    assert!(rollup["measurement"]["critical_package_count"]
+        .as_u64()
+        .is_some_and(|count| count >= 1));
+    assert!(rollup["measurement"]["top_packages"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty()));
+    Ok(())
+}
+
+#[test]
 fn doctor_default_output_is_formatted_user_report(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let dir = TempDir::new("doctor-human-report");
@@ -424,8 +715,15 @@ description: Review one file and report risks.
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("SkillSpec Doctor"));
     assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Assessment scope: one atomic SKILL.md package"));
+    assert!(stdout.contains("Risk interpretation: A high score means this raw package"));
     assert!(stdout.contains("Current Skill Baseline"));
     assert!(stdout.contains("Agent follow-through risk:"));
+    assert!(stdout.contains("Shape Contract"));
+    assert!(stdout.contains("Kind: simple_skill"));
+    assert!(stdout.contains("Skill files: 1"));
+    assert!(stdout.contains("Packages: 1"));
+    assert!(stdout.contains("Next command: /skillspec import"));
     assert!(stdout.contains("Surface"));
     assert!(stdout.contains("Findings"));
     assert!(stdout.contains("Next Actions"));
@@ -466,7 +764,10 @@ description: Review one file and report risks.
     assert!(stdout.contains("<title>SkillSpec Doctor Report</title>"));
     assert!(stdout.contains("class=\"hero\""));
     assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Assessment scope"));
+    assert!(stdout.contains("Risk interpretation"));
     assert!(stdout.contains("Agent follow-through risk"));
+    assert!(stdout.contains("Shape Contract"));
     assert!(stdout.contains("Next Actions"));
     assert!(stdout.contains("Research Basis"));
     assert!(stdout.contains("https://github.com/modiqo/skillspec/blob/main/docs/"));
@@ -501,8 +802,13 @@ description: Review one file and report risks.
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("# SkillSpec Doctor report"));
     assert!(stdout.contains("## What This Measures"));
+    assert!(stdout.contains("**Assessment scope:**"));
+    assert!(stdout.contains("**Risk interpretation:**"));
     assert!(stdout.contains("## Current Skill Baseline"));
     assert!(stdout.contains("**Agent follow-through risk:**"));
+    assert!(stdout.contains("## Shape Contract"));
+    assert!(stdout.contains("- **Kind:** `simple_skill`"));
+    assert!(stdout.contains("**Next command**"));
     assert!(stdout.contains("## Surface"));
     assert!(stdout.contains("## Findings"));
     assert!(stdout.contains("## Next Actions"));

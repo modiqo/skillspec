@@ -39,7 +39,10 @@ omitted.
 
 ## Alignment Summary Format
 
-Use the compact summary produced by `skillspec trace align --summary`.
+Use the compact summary shape from `skillspec trace align --summary` when a
+human explicitly asks to inspect proof. Normal agent execution should run
+`skillspec trace align --quiet` and report only the final result plus artifact
+paths.
 
 The preferred human format is:
 
@@ -235,10 +238,10 @@ Compiled SkillSpec loader files should instruct agents to:
 
 - preserve the trace run directory;
 - record progress after phase actions;
-- run `progress show` as an internal gate check before phase transitions;
-- run `trace align --summary --proof-digest` for the first completion audit;
+- run `progress show --quiet` as an internal gate check before phase transitions;
+- run `trace align --quiet --proof-digest` for the first completion audit;
 - batch multiple final proof rows before the final alignment rerun;
-- include alignment summary;
+- include alignment status or report path;
 - include token usage;
 - report missing proof rows;
 - avoid a bare `unproven` result.
@@ -254,8 +257,8 @@ A harness should:
 - preserve token stats in structured execution events;
 - preserve query-reduction stats separately from prompt consumption;
 - expose `alignment.json` as a durable artifact;
-- expose `proof-digest.json` when the first completion alignment finds missing
-  proof, so final evidence can be batched instead of chased one row at a time;
+- expose `proof-digest.json` when completion alignment finds missing proof, so
+  the final response can name the gap or a real repair can be planned;
 - fail or warn when a final answer omits the required alignment and token
   sections for a SkillSpec-backed run.
 
@@ -265,19 +268,20 @@ The model can render the report, but the harness should provide the data.
 
 Completion proof should use a bounded loop:
 
-1. Run `trace align --summary --proof-digest <run-dir>/proof-digest.json`.
-2. If real proof exists for several missing rows, write one
-   `<run-dir>/final-proof.jsonl` file and append it with
-   `skillspec progress batch <run-dir> --file <run-dir>/final-proof.jsonl
-   --checkpoint "checkpointing evidence" --summary`.
-3. Record `progress final-response` once.
-4. Rerun `trace align --summary` once and report the compact result.
+1. Run `trace align --quiet --proof-digest <run-dir>/proof-digest.json`.
+2. If evidence was captured during the work but not yet appended, record the
+   real rows with one `skillspec progress checkpoint <run-dir> ... --checkpoint
+   "checkpointing evidence" --quiet` command. Use file-based `progress batch`
+   only when a JSONL or JSON array proof artifact already exists.
+3. Record `progress final-response --quiet` once.
+4. Rerun `trace align --quiet` once and report the final result in plain language.
 
 Do not rerun alignment after each individual `progress record`. The checkpoint
-command must run in the foreground so the agent cannot claim success before
-evidence is durably appended to `execution.jsonl`. If the final rerun is still
-partial, report the remaining missing proof rows unless there is one obvious
-additional batch to record from evidence already on disk.
+command remains synchronous, but normal agent execution should use `--quiet` so
+durable proof writes do not become transcript noise. Do not create route,
+obligation, elicitation, or phase rows after the fact just to make alignment
+pass. If the final rerun is still partial, report the remaining missing proof
+rows and treat that as the honest result until repair work is actually done.
 
 ## Report Examples
 

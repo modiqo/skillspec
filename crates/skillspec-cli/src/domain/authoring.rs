@@ -2,8 +2,9 @@ use crate::{
     capability, compiler, deps, error, grammar, importer, imports, model, parser, port_one_shot,
     remote_source, router, router_lifecycle, source_map, workspace, workspace_synthesizer,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub use capability::{AddOptions, PreferOptions, SearchOptions, UpdateOptions, VerificationStatus};
 pub use port_one_shot::PortOneShotOptions;
@@ -107,6 +108,85 @@ pub fn create_source_map(
     source_map::create_source_map(path, out)
 }
 
+pub fn create_source_map_from_source(
+    source: &str,
+    out: &Path,
+) -> error::Result<source_map::SourceMapWriteReport> {
+    let local_path = PathBuf::from(source);
+    if local_path.exists() || looks_like_explicit_local_path(source) {
+        return create_source_map(&local_path, out);
+    }
+
+    let Some(_) = remote_source::parse_target(source)? else {
+        return create_source_map(&local_path, out);
+    };
+
+    let stage_root = remote_stage_root_for(out);
+    let stage_report = remote_source::stage_remote_source(source, Some(&stage_root), true)?;
+    let source_path = selected_remote_source_path(&stage_report, out)?;
+    let mut report = create_source_map(Path::new(&source_path), out)?;
+    report.staged_from = Some(stage_report.target);
+    report.staged_checkout = Some(stage_report.checkout_dir);
+    report.source_path = Some(source_path);
+    Ok(report)
+}
+
+fn looks_like_explicit_local_path(source: &str) -> bool {
+    source.starts_with('.')
+        || source.starts_with('/')
+        || source.starts_with('~')
+        || source.starts_with(std::path::MAIN_SEPARATOR)
+}
+
+fn remote_stage_root_for(out: &Path) -> PathBuf {
+    let base = out
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+        .join("staged");
+    base.join(format!("source-map-{}", unique_nanos()))
+}
+
+fn unique_nanos() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0)
+}
+
+fn selected_remote_source_path(
+    report: &remote_source::RemoteStageReport,
+    out: &Path,
+) -> error::Result<String> {
+    if let Some(path) = &report.selected_source_path {
+        return Ok(path.clone());
+    }
+
+    if report.candidates.is_empty() {
+        return Err(error::Error::InvalidInput {
+            message: format!(
+                "remote source {} did not contain a SKILL.md candidate; run `skillspec source stage {} --out <staging-root> --json` to inspect the checkout",
+                report.target, report.target
+            ),
+        });
+    }
+
+    let candidates = report
+        .candidates
+        .iter()
+        .map(|candidate| format!("- {}", candidate.source_path))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Err(error::Error::InvalidInput {
+        message: format!(
+            "remote source {} has multiple SKILL.md candidates; choose one source_path and rerun `skillspec source map <source_path> --out {}`:\n{}",
+            report.target,
+            out.display(),
+            candidates
+        ),
+    })
+}
+
 pub fn render_source_map_write(report: &source_map::SourceMapWriteReport) -> String {
     source_map::render_write_report(report)
 }
@@ -121,6 +201,18 @@ pub fn query_source_map(
 
 pub fn render_source_query(value: &serde_json::Value) -> String {
     source_map::render_query(value)
+}
+
+pub fn source_lens(
+    map: &Path,
+    cursor: usize,
+    limit: usize,
+) -> error::Result<source_map::SourceLensReport> {
+    source_map::lens(map, cursor, limit)
+}
+
+pub fn render_source_lens(report: &source_map::SourceLensReport) -> String {
+    source_map::render_lens(report)
 }
 
 pub fn source_coverage(map: &Path) -> error::Result<source_map::SourceCoverage> {

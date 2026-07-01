@@ -55,7 +55,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, include current harness/root context when available, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. Duplicate physical roots collapse to one logical skill before matching; harness/root context only chooses the installed copy. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -204,8 +204,8 @@ commands:
     safety: local_read
 
   run_route_query:
-    description: Route the user request to candidate skills from the index. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate.
-    template: "skillspec route --index {{index}} --query {{query}} --top 5 --json"
+    description: Route the user request to candidate skills from the index. Duplicate physical roots collapse to one logical skill before matching; optional current harness/root context only chooses the installed copy. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate. The router is provider-neutral and does not hardcode execution substrates; selected skills and durable execution own their own tool policy.
+    template: "skillspec route --index {{index}} --query {{query}} [--current-harness {{current_harness}}] [--current-root {{current_root}}] --top 5 --json"
     safety: local_read
 
   apply_route_decision:

@@ -1,6 +1,10 @@
 # Controlled Harness Lab
 
-Status: proposal.
+Status: implementation started. The core sandbox, Doctor matrix, import matrix,
+reviewed imported-runtime path, router lifecycle path, durable-executor
+lifecycle path, durable rote-exec proof path, and pseudo-harness simulator now
+have committed machine-readable baselines. Later phases should extend the same
+crate instead of adding broad CLI snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
 `docs/design/30-testing-matrix.md` into deterministic local and CI automation.
@@ -85,6 +89,156 @@ It can verify:
 This proves SkillSpec's file mutations and command outputs. It does not prove
 that a real Codex or Claude process reloaded those files.
 
+Each phase should write a machine-readable report card. The JSON report is the
+stable regression artifact; any Markdown rendering is secondary. Report cards
+must use stable case ids and claim ids, normalize temp paths such as
+`<HOME>/.codex/skills`, and avoid timestamps or machine-specific absolute paths.
+
+Minimum JSON shape:
+
+```json
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "09-harness-lab-core",
+  "summary": {
+    "status": "pass",
+    "cases_total": 3,
+    "cases_passed": 3,
+    "cases_failed": 0,
+    "claims_total": 17,
+    "claims_passed": 17,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "detects_sandbox_targets_from_lab_environment",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "install.targets.codex.detected",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+Regression comparison should fail when a previously passing case or claim is
+missing, when a previously passing case or claim becomes failed, or when a stable
+observed value changes. This lets CI track behavior changes without relying on
+large stdout snapshots.
+
+Committed golden baselines live under the harness lab crate, for example:
+
+```text
+crates/skillspec-harness-lab/baselines/09-harness-lab-core.json
+crates/skillspec-harness-lab/baselines/10-doctor-matrix.json
+crates/skillspec-harness-lab/baselines/11-import-matrix.json
+crates/skillspec-harness-lab/baselines/12-imported-skill-runtime.json
+crates/skillspec-harness-lab/baselines/13-router-harness-lab.json
+crates/skillspec-harness-lab/baselines/14-durable-harness-lab.json
+crates/skillspec-harness-lab/baselines/15-durable-rote-exec-proof.json
+crates/skillspec-harness-lab/baselines/15-durable-rote-exec-live.json
+```
+
+Normal test runs compare the candidate report against the committed baseline.
+When behavior intentionally changes, refresh the baseline explicitly:
+
+```sh
+UPDATE_HARNESS_LAB_BASELINES=1 cargo test --locked -p skillspec-harness-lab
+```
+
+or:
+
+```sh
+just harness-lab-update-baselines
+```
+
+The resulting JSON diff is part of the review. Do not update baselines to hide
+unexpected behavior changes.
+
+Current committed phases:
+
+- `09-harness-lab-core`: sandbox root discovery, project-local target
+  detection, and all-detected skill install.
+- `10-doctor-matrix`: Doctor target-shape coverage for non-skill files,
+  missing paths, empty skills, simple folders, direct `SKILL.md` paths,
+  malformed frontmatter, cross-referenced subskills, plugin workspaces, and
+  ordinary code repos.
+- `11-import-matrix`: import-skill target-shape coverage for missing paths,
+  single folders, direct `SKILL.md`, direct Markdown files, empty and malformed
+  drafts, stale source maps, multi-skill rejection, workspace fanout, and
+  plugin workspace import.
+- `12-imported-skill-runtime`: reviewed imported package coverage for
+  compile/install into all sandbox roots, `--retire-existing`, decision-only
+  `unproven` alignment, batched progress evidence, final-response proof, token
+  savings, and full execution alignment.
+- `13-router-harness-lab`: router install coverage for managed router skill
+  files, hooks, visibility, index and config, guard repair for out-of-band
+  skills, route use-skill/bypass behavior, disable/enable visibility toggling,
+  and uninstall cleanup.
+- `14-durable-harness-lab`: durable-executor install/update/delete coverage,
+  managed-marker mutation guards, enable/disable visibility toggling, missing
+  `rote` preflight behavior, and router refresh integration that keeps
+  durable-executor implicit.
+- `15-durable-rote-exec-proof`: durable-executor contract coverage for local
+  command intent, `rote_exec` tool-boundary selection, direct CLI/shell forbids,
+  `rote-shell` guidance presence, and SkillSpec alignment over `rote_exec`
+  process evidence.
+- `15-durable-rote-exec-live`: opt-in local proof that copies an authenticated
+  local `rote` binary and the local `~/.rote` config, excluding existing
+  workspaces, into the lab, sets `ROTE_HOME` to the copied tree, runs `rote exec
+  -- printf skillspec-durable-proof` inside a named sandbox rote workspace, and
+  aligns the resulting evidence. This is excluded from default CI because it
+  depends on a real logged-in local rote environment.
+- `17-pseudo-harness-simulator`: deterministic event-order coverage for the
+  harness boundary: hook before catalog, bypass without domain load, selected
+  skill loads exactly one domain skill, out-of-band repair before catalog,
+  imported trampoline handoff, durable implicit observer visibility, and
+  duplicate-root collapse.
+
+Current phase entrypoints:
+
+| Phase | Entry point | Regression baseline |
+| --- | --- | --- |
+| `09-harness-lab-core` | `crates/skillspec-harness-lab/tests/core.rs` | `baselines/09-harness-lab-core.json` |
+| `10-doctor-matrix` | `crates/skillspec-harness-lab/tests/doctor.rs` | `baselines/10-doctor-matrix.json` |
+| `11-import-matrix` | `crates/skillspec-harness-lab/tests/import.rs` | `baselines/11-import-matrix.json` |
+| `12-imported-skill-runtime` | `crates/skillspec-harness-lab/tests/imported_runtime.rs` | `baselines/12-imported-skill-runtime.json` |
+| `13-router-harness-lab` | `crates/skillspec-harness-lab/tests/router.rs` | `baselines/13-router-harness-lab.json` |
+| `14-durable-harness-lab` | `crates/skillspec-harness-lab/tests/durable.rs` | `baselines/14-durable-harness-lab.json` |
+| `15-durable-rote-exec-proof` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs` | `baselines/15-durable-rote-exec-proof.json` |
+| `15-durable-rote-exec-live` | `crates/skillspec-harness-lab/tests/durable_rote_exec.rs --ignored` | `baselines/15-durable-rote-exec-live.json` |
+| `17-pseudo-harness-simulator` | `crates/skillspec-harness-lab/tests/pseudo_harness.rs` | `baselines/17-pseudo-harness-simulator.json` |
+
+Live checkpoint from 2026-06-29:
+
+- `just dev-install-all` installed the debug CLI and `skills/skillspec` into
+  every detected local target.
+- `skillspec install targets` found `agents`, `codex`, and `claude-local`.
+- `skillspec router guard --json` and `skillspec router guard --hook` both
+  reported router readiness with valid first-hop hook context.
+- `skillspec route --query "what is the time today"` returned `bypass`, so the
+  CLI can avoid routing ordinary requests into a domain skill.
+- `skillspec durable-executor enable --json` succeeded against real roots after
+  filesystem permission was granted.
+- `just harness-lab-live-durable-rote-exec` passed with a copied local `rote`
+  binary, copied local `~/.rote` config, sandbox `ROTE_HOME`, and a real
+  `rote exec -- printf skillspec-durable-proof` command.
+
+The same checkpoint exposed two issues that drove the first simulator phase and
+the follow-up router fix:
+
+- duplicate same-skill installs across `agents`, `codex`, and `claude-local`
+  could produce equal route candidates and `ambiguous_match`; the router fix
+  collapses duplicate logical skills before matching and prefers the active
+  harness/root only when choosing the physical copy;
+- stale visibility manifest entries for removed skills can appear as guard
+  warnings and need a repairable cleanup assertion.
+
 ### Layer 2: Pseudo-Harness Simulator
 
 This layer is a small host-native test binary or helper named something like
@@ -120,9 +274,12 @@ This layer can turn several current manual concerns into automated checks:
 - router is first hop in the simulated harness contract;
 - router bypass does not cause extra skill loading;
 - clear domain intent loads exactly one selected skill;
+- duplicate same-skill candidates across roots collapse to one logical choice
+  or resolve by deterministic root preference;
 - out-of-band implicit skills are repaired before catalog build;
 - imported trampoline activation asks SkillSpec for guidance;
-- durable-executor can remain implicit while router remains selection authority.
+- durable-executor can remain implicit while router remains selection authority;
+- durable-executor activation is not blocked by duplicate root installs.
 
 ### Layer 3: Real Harness Smoke Runner
 
@@ -220,22 +377,27 @@ Use this stack:
 | Branch | Scope | Primary rows moved toward `Covered` |
 | --- | --- | --- |
 | `test/09-harness-lab-core` | Shared sandbox helper, temp home, temp roots, env injection, real-home write guard. | Install/setup sandbox rows. |
+| `test/09b-harness-lab-report-cards` | Machine-readable report cards and report comparison for regression detection. | Stable evidence for every later phase. |
 | `test/10-doctor-matrix` | Doctor target-shape fixtures and output assertions in the lab. | Doctor positive and negative gaps. |
 | `test/11-import-matrix` | Import target-shape fixtures, direct `SKILL.md`, references, workspace/plugin imports, QA commands. | Import positive, negative, and QA gaps. |
-| `test/12-imported-skill-activation` | Compile/install imported skill, retire-existing behavior, trampoline/spec presence, pseudo-activation checks. | Imported install and activation-sim rows. |
+| `test/12-imported-skill-runtime` | Compile/install reviewed imported skill, retire-existing behavior, trampoline/spec presence, decision/plan/act/progress/final-response/align checks. | Imported install and runtime-proof rows. |
 | `test/13-router-harness-lab` | Router install, hooks, visibility, index, guard, route bypass/use-skill, repair, disable/enable/uninstall. | Router harness-sim rows. |
 | `test/14-durable-harness-lab` | Durable install/update/delete, enable/disable, missing `rote`, router plus durable ordering. | Durable harness-sim rows. |
-| `test/15-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
+| `test/15-durable-rote-exec-proof` | Durable route/act contract for `rote_exec`, `rote-shell` guidance fixture, alignment over `rote_exec` process evidence, and opt-in copied local rote binary/config execution proof with sandbox `ROTE_HOME`. | Durable substrate proof rows. |
+| `test/16-matrix-coverage-tightening` | Update the matrix with exact test names and remaining manual gates. | Documentation accuracy. |
+| `test/17-pseudo-harness-simulator` | Add deterministic pseudo-harness scenarios for pre-call hook ordering, bypass/no-load behavior, domain selected-skill loading, imported trampoline handoff, durable implicit observer behavior, and duplicate-root collapse regression coverage. | Router and durable boundary rows that do not require a live harness UI. |
 
-Start small and keep the first branch test-first:
+The implementation lives in a separate test crate so the crate refactor and CLI
+boundary stay clean:
 
 ```text
-crates/skillspec-cli/tests/support/harness_lab.rs
-crates/skillspec-cli/tests/cli/harness_lab.rs
-crates/skillspec-cli/tests/fixtures/harness-lab/
+crates/skillspec-harness-lab/src/
+crates/skillspec-harness-lab/tests/
+crates/skillspec-harness-lab/baselines/
 ```
 
-The support module should expose:
+The support crate should continue to expose small helpers instead of growing a
+single monolithic test file:
 
 - `HarnessLab::new()`;
 - `lab.home()`;

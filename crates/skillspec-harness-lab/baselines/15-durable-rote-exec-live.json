@@ -1,0 +1,123 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "15-durable-rote-exec-live",
+  "summary": {
+    "status": "pass",
+    "cases_total": 1,
+    "cases_passed": 1,
+    "cases_failed": 0,
+    "claims_total": 17,
+    "claims_passed": 17,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "copied_local_rote_runs_one_shot_process",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "local_rote.source_exists",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "local_rote.copied",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_home.source_exists",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_home.copied",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_home.no_preexisting_workspaces_copied",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_home.sandboxed",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "local_rote.version_prefix",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote.workspace_created",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote.workspace_sandbox_off",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote.exec_exit_success",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote.exec_contains_marker",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "skillspec.align_status",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "skillspec.execution_alignment",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "skillspec.unproven_obligations",
+          "status": "pass",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "id": "skillspec.rote_exec_proof_row",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_shell.skill_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "proof.marker",
+          "status": "pass",
+          "expected": "skillspec-durable-proof",
+          "observed": "skillspec-durable-proof"
+        }
+      ]
+    }
+  ]
+}

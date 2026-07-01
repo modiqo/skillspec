@@ -13,6 +13,7 @@ pub(super) fn run(command: TraceCommand) -> Result<()> {
             execution_trace,
             proof_digest,
             summary,
+            quiet,
             json,
         } => {
             let output = evidence::align_decision_trace(
@@ -27,6 +28,8 @@ pub(super) fn run(command: TraceCommand) -> Result<()> {
                     report::proof_digest_written(path)?;
                 }
                 report::json(&output.report)?;
+            } else if quiet {
+                // Quiet alignment still writes alignment.json/proof-digest and preserves exit status.
             } else if summary {
                 report::align_summary(
                     &output.report,

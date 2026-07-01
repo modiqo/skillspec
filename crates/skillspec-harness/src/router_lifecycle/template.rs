@@ -1,10 +1,17 @@
+use crate::router::RouteHarness;
 use std::path::Path;
 
-pub(super) fn render_router_spec(router_name: &str, index: &Path) -> String {
+pub(super) fn render_router_spec(
+    router_name: &str,
+    index: &Path,
+    current_harness: Option<RouteHarness>,
+    current_root: Option<&Path>,
+) -> String {
     let router_skill = yaml_single_quote(router_name);
     let index_path = shell_single_quote(&index.display().to_string());
+    let route_context = route_context_args(current_harness, current_root);
     let route_command = yaml_single_quote(&format!(
-        "skillspec route --index {index_path} --query \"<user task>\" --top 5 --json"
+        "skillspec route --index {index_path} --query \"<user task>\"{route_context} --top 5 --json"
     ));
     let index_status_command = yaml_single_quote(&format!(
         "skillspec router index status --roots <skill-root>... --index {index_path} --visibility-manifest <manifest> --json"
@@ -72,7 +79,7 @@ applies_when:
       - detect or repair skills added outside the SkillSpec install flow
 
 entry:
-  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
+  prompt: If selected implicitly, treat this as the first hop for every request in managed skill roots. For ordinary requests with prompt-hook context first_hop_ready=true, use the SKILL.md fast path; run the route query once, include current harness/root context when available, do not run index status, and do not load this full SkillSpec. Load this SkillSpec for router lifecycle, repair, visibility, guard, index status, index refresh, or missing/failed guard context. Route before reading or searching for domain skill material, then load only when route JSON says decision is use_skill and selected is non-null. Duplicate physical roots collapse to one logical skill before matching; harness/root context only chooses the installed copy. If route JSON says bypass or ambiguous, do not load candidate skills; continue with normal agent behavior.
   decision_required: true
   tool_boundary:
     default: deny
@@ -98,7 +105,7 @@ routes:
       phases:
         - id: route_query
           owner_skill: {router_skill}
-          description: Query the router index once, inspect decision, selected, bypass_reason, and candidates, and load a skill only when decision is use_skill.
+          description: Query the router index once, including any active SQLite router policy profile, inspect decision, selected, bypass_reason, policy, and candidates, and load a skill only when decision is use_skill.
           requires:
             - run_route_query
         - id: match_gate
@@ -126,7 +133,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
+          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. If install reports that the index path is a legacy router SQLite file blocking the config directory, rerun install with --force only after accepting migration to skill-index.sqlite. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -219,7 +226,7 @@ commands:
     safety: local_read
 
   run_route_query:
-    description: Route the user request to candidate skills from the index. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate.
+    description: Route the user request to candidate skills from the index. Duplicate physical roots collapse to one logical skill before matching; optional current harness/root context only chooses the installed copy. The JSON decision is authoritative; use_skill loads selected, bypass continues normal behavior, and ambiguous must not silently load a candidate. The router is provider-neutral and does not hardcode execution substrates; selected skills and durable execution own their own tool policy.
     template: {route_command}
     safety: local_read
 
@@ -234,8 +241,8 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
-    template: 'skillspec router install|enable|disable|update|uninstall|guard|index refresh|index status'
+    description: Apply the requested router lifecycle command. Use router install --force only to migrate an accepted legacy SQLite index file into the router config directory; use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
+    template: 'skillspec router install [--force]|enable|disable|update|uninstall|guard|index refresh|index status'
     safety: local_write
 
   run_visibility_plan:
@@ -276,6 +283,23 @@ tests:
         - visibility_requests_use_native_controls
 "#
     )
+}
+
+fn route_context_args(
+    current_harness: Option<RouteHarness>,
+    current_root: Option<&Path>,
+) -> String {
+    let mut args = String::new();
+    if let Some(harness) = current_harness {
+        args.push_str(&format!(" --current-harness {}", harness.as_str()));
+    }
+    if let Some(root) = current_root {
+        args.push_str(&format!(
+            " --current-root {}",
+            shell_single_quote(&root.display().to_string())
+        ));
+    }
+    args
 }
 
 pub(super) fn yaml_single_quote(value: &str) -> String {

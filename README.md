@@ -187,6 +187,10 @@ just install-skill-all
 # Debug build, debug CLI install, and all detected harness skill installs.
 just dev-install-all
 
+# Opt-in local proof: copy your authenticated rote binary and ~/.rote config
+# into the lab, excluding workspaces, and prove one command uses `rote exec --`.
+just harness-lab-live-durable-rote-exec
+
 # Local preflight before pushing: locked CI checks, package lists, examples, and conformance.
 just preflight
 ```

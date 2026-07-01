@@ -1,0 +1,117 @@
+{
+  "schema": "skillspec/harness-lab-report/v0",
+  "phase": "15-durable-rote-exec-proof",
+  "summary": {
+    "status": "pass",
+    "cases_total": 2,
+    "cases_passed": 2,
+    "cases_failed": 0,
+    "claims_total": 15,
+    "claims_passed": 15,
+    "claims_failed": 0
+  },
+  "cases": [
+    {
+      "id": "durable_executor_selects_rote_exec_contract",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "plan.selected_route",
+          "status": "pass",
+          "expected": "one_shot_process",
+          "observed": "one_shot_process"
+        },
+        {
+          "id": "act.selected_route",
+          "status": "pass",
+          "expected": "one_shot_process",
+          "observed": "one_shot_process"
+        },
+        {
+          "id": "act.route_rule",
+          "status": "pass",
+          "expected": "cli_invocations_use_rote_exec",
+          "observed": "cli_invocations_use_rote_exec"
+        },
+        {
+          "id": "act.allows_rote_exec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "act.forbids_direct_cli",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "act.matches_durable_result_rule",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_shell.skill_present",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "rote_shell.teaches_rote_exec",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        }
+      ]
+    },
+    {
+      "id": "alignment_accepts_rote_exec_process_evidence",
+      "status": "pass",
+      "claims": [
+        {
+          "id": "align.status",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "align.decision_alignment",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "align.execution_alignment",
+          "status": "pass",
+          "expected": "pass",
+          "observed": "pass"
+        },
+        {
+          "id": "align.unproven_obligations",
+          "status": "pass",
+          "expected": 0,
+          "observed": 0
+        },
+        {
+          "id": "align.rote_exec_proof_row",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "align.command_redacted_to_basename",
+          "status": "pass",
+          "expected": true,
+          "observed": true
+        },
+        {
+          "id": "execution.marker_command",
+          "status": "pass",
+          "expected": "skillspec-durable-proof",
+          "observed": "skillspec-durable-proof"
+        }
+      ]
+    }
+  ]
+}

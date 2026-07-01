@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use skillspec_core::error::{Error, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
 mod builder;
 use std::path::{Path, PathBuf};
 
 const SOURCE_MAP_SCHEMA: &str = "skillspec-source-map/v0";
+const SOURCE_LENS_SCHEMA: &str = "skillspec/source-review-lens/v0";
+const SOURCE_QUERY_SUMMARY_LIMIT: usize = 12;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SourceMap {
@@ -113,6 +115,7 @@ pub enum SourceClassificationKind {
     ActivationSignal,
     RouteCandidate,
     ModalObligation,
+    ConditionalRuleCandidate,
     ForbidCandidate,
     ElicitationCandidate,
     DependencyMention,
@@ -164,6 +167,12 @@ pub struct SourceMapWriteReport {
     pub files: usize,
     pub nodes: usize,
     pub classifications: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staged_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staged_checkout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -178,6 +187,61 @@ pub struct SourceStaleFile {
     pub status: String,
     pub expected_sha256: String,
     pub actual_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SourceLensReport {
+    pub schema: String,
+    pub source_map: String,
+    pub cursor: usize,
+    pub limit: usize,
+    pub total: usize,
+    pub shown: usize,
+    pub omitted: usize,
+    pub next_cursor: Option<usize>,
+    pub units: Vec<SourceLensUnit>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SourceLensUnit {
+    pub id: String,
+    pub index: usize,
+    pub count: usize,
+    pub remaining_after: usize,
+    pub source: String,
+    pub source_kind: String,
+    pub file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_range: Option<[usize; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
+    pub suggested_constructs: Vec<String>,
+    pub required_target_kinds: Vec<String>,
+    pub classifications: Vec<SourceLensClassification>,
+    pub references: Vec<SourceLensReference>,
+    pub next: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SourceLensClassification {
+    pub id: String,
+    pub kind: String,
+    pub signals: Vec<String>,
+    pub suggested_constructs: Vec<String>,
+    pub confidence: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SourceLensReference {
+    pub id: String,
+    pub target: String,
+    pub target_kind: String,
+    pub resolved_file: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -203,6 +267,9 @@ pub fn create_source_map(source: &Path, out_dir: &Path) -> Result<SourceMapWrite
         files: map.files.len(),
         nodes: map.nodes.len(),
         classifications: map.classifications.len(),
+        staged_from: None,
+        staged_checkout: None,
+        source_path: None,
     })
 }
 
@@ -265,6 +332,53 @@ pub fn query(path: &Path, handle: &str, view: SourceView) -> Result<Value> {
     }
 }
 
+pub fn lens(path: &Path, cursor: usize, limit: usize) -> Result<SourceLensReport> {
+    if cursor == 0 {
+        return Err(Error::InvalidInput {
+            message: "source lens cursor is 1-based; pass --cursor 1 or greater".to_owned(),
+        });
+    }
+    if limit == 0 {
+        return Err(Error::InvalidInput {
+            message: "source lens limit must be greater than zero".to_owned(),
+        });
+    }
+
+    let map = load(path)?;
+    let mut review_nodes = map
+        .nodes
+        .iter()
+        .filter(|node| node_requires_lens_review(node))
+        .collect::<Vec<_>>();
+    review_nodes.sort_by(|left, right| {
+        left.file
+            .cmp(&right.file)
+            .then_with(|| left.line_range.cmp(&right.line_range))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    let total = review_nodes.len();
+    let start = cursor.saturating_sub(1).min(total);
+    let end = start.saturating_add(limit).min(total);
+    let units = review_nodes[start..end]
+        .iter()
+        .enumerate()
+        .map(|(offset, node)| lens_unit(&map, node, start + offset + 1, total))
+        .collect::<Vec<_>>();
+    let shown = units.len();
+    Ok(SourceLensReport {
+        schema: SOURCE_LENS_SCHEMA.to_owned(),
+        source_map: path.display().to_string(),
+        cursor,
+        limit,
+        total,
+        shown,
+        omitted: total.saturating_sub(end),
+        next_cursor: (end < total).then_some(end + 1),
+        units,
+    })
+}
+
 pub fn stale(path: &Path, root: Option<&Path>) -> Result<SourceStaleReport> {
     let map = load(path)?;
     let root = root
@@ -306,16 +420,28 @@ pub fn render_query(value: &Value) -> String {
 }
 
 pub fn render_write_report(report: &SourceMapWriteReport) -> String {
-    format!(
-        "ok: wrote source map {}\nview: {}\nfiles: {}\nnodes: {}\nclassifications: {}\nnext: run `skillspec source coverage {}` before import\nnext: query exact handles with `skillspec source query {} <handle> --view full`",
+    let mut output = format!(
+        "ok: wrote source map {}\nview: {}\nfiles: {}\nnodes: {}\nclassifications: {}\nnext: run `skillspec source coverage {}` before import\nnext: review one block at a time with `skillspec source lens {} --cursor 1`\nnext: query exact handles with `skillspec source query {} <handle> --view full`",
         report.source_map,
         report.markdown_view,
         report.files,
         report.nodes,
         report.classifications,
         report.source_map,
+        report.source_map,
         report.source_map
-    )
+    );
+    if let Some(staged_from) = &report.staged_from {
+        output.push_str(&format!("\nstaged_from: {staged_from}"));
+    }
+    if let Some(source_path) = &report.source_path {
+        output.push_str(&format!("\nsource_path: {source_path}"));
+        output.push_str(&format!(
+            "\nnext: run `skillspec import-skill {source_path} --out <draft-dir>/skill.spec.yml --source-map {}`",
+            report.source_map
+        ));
+    }
+    output
 }
 
 pub fn render_stale(report: &SourceStaleReport) -> String {
@@ -327,6 +453,63 @@ pub fn render_stale(report: &SourceStaleReport) -> String {
     });
     for file in &report.files {
         output.push_str(&format!("- {}: {}\n", file.path, file.status));
+    }
+    output
+}
+
+pub fn render_lens(report: &SourceLensReport) -> String {
+    let mut output = String::new();
+    output.push_str("source review lens:\n");
+    output.push_str(&format!("- source_map: {}\n", report.source_map));
+    output.push_str(&format!("- cursor: {}\n", report.cursor));
+    output.push_str(&format!("- total: {}\n", report.total));
+    output.push_str(&format!("- shown: {}\n", report.shown));
+    for unit in &report.units {
+        output.push_str(&format!(
+            "\n## {}/{} {}\n",
+            unit.index, unit.count, unit.source
+        ));
+        output.push_str(&format!("- remaining_after: {}\n", unit.remaining_after));
+        output.push_str(&format!("- file: {}\n", unit.file));
+        if let Some(line_range) = unit.line_range {
+            output.push_str(&format!("- lines: {}-{}\n", line_range[0], line_range[1]));
+        }
+        if let Some(hash) = &unit.hash {
+            output.push_str(&format!("- hash: {hash}\n"));
+        }
+        if !unit.required_target_kinds.is_empty() {
+            output.push_str(&format!(
+                "- required_target_kinds: {}\n",
+                unit.required_target_kinds.join(", ")
+            ));
+        }
+        if let Some(preview) = &unit.preview {
+            output.push_str(&format!("- preview: {}\n", compact_one_line(preview)));
+        }
+        if !unit.classifications.is_empty() {
+            output.push_str("- classifications:\n");
+            for classification in &unit.classifications {
+                output.push_str(&format!(
+                    "  - {} {} -> {}\n",
+                    classification.id,
+                    classification.kind,
+                    classification.suggested_constructs.join(", ")
+                ));
+            }
+        }
+        if !unit.references.is_empty() {
+            output.push_str("- references:\n");
+            for reference in &unit.references {
+                output.push_str(&format!(
+                    "  - {} {} {}\n",
+                    reference.id, reference.target_kind, reference.target
+                ));
+            }
+        }
+        output.push_str(&format!("- next: {}\n", unit.next));
+    }
+    if let Some(next_cursor) = report.next_cursor {
+        output.push_str(&format!("\nnext_cursor: {next_cursor}\n"));
     }
     output
 }
@@ -354,19 +537,142 @@ pub fn render_coverage(coverage: &SourceCoverage) -> String {
     output
 }
 
+fn node_requires_lens_review(node: &SourceNodeRecord) -> bool {
+    if matches!(node.kind.as_str(), "root" | "frontmatter") {
+        return false;
+    }
+    if node.coverage_status == SourceCoverageStatus::NotApplicable {
+        return false;
+    }
+    node.title
+        .as_deref()
+        .or(node.text_preview.as_deref())
+        .is_some_and(|text| !text.trim().is_empty())
+        || node.hash.is_some()
+}
+
+fn lens_unit(
+    map: &SourceMap,
+    node: &SourceNodeRecord,
+    index: usize,
+    count: usize,
+) -> SourceLensUnit {
+    let classifications = map
+        .classifications
+        .iter()
+        .filter(|classification| classification.target == node.id)
+        .map(|classification| SourceLensClassification {
+            id: classification.id.clone(),
+            kind: classification.kind.as_str().to_owned(),
+            signals: classification.signals.clone(),
+            suggested_constructs: classification.suggested_constructs.clone(),
+            confidence: classification.confidence.clone(),
+            reason: classification.reason.clone(),
+        })
+        .collect::<Vec<_>>();
+    let references = map
+        .references
+        .iter()
+        .filter(|reference| reference.source == node.id)
+        .map(|reference| SourceLensReference {
+            id: reference.id.clone(),
+            target: reference.target.clone(),
+            target_kind: reference.target_kind.as_str().to_owned(),
+            resolved_file: reference.resolved_file.clone(),
+        })
+        .collect::<Vec<_>>();
+    let mut suggested_constructs = BTreeSet::new();
+    let mut required_target_kinds = BTreeSet::new();
+    for classification in map
+        .classifications
+        .iter()
+        .filter(|classification| classification.target == node.id)
+    {
+        for construct in &classification.suggested_constructs {
+            suggested_constructs.insert(construct.clone());
+            if let Some(kind) = construct_target_kind(construct) {
+                required_target_kinds.insert(kind.to_owned());
+            }
+        }
+    }
+    for reference in map
+        .references
+        .iter()
+        .filter(|reference| reference.source == node.id)
+    {
+        if matches!(
+            reference.target_kind,
+            SourceReferenceKind::LocalFile | SourceReferenceKind::ExternalUri
+        ) {
+            suggested_constructs.insert("resource".to_owned());
+            required_target_kinds.insert("resource".to_owned());
+        }
+    }
+
+    SourceLensUnit {
+        id: format!("lens:{}", node.id),
+        index,
+        count,
+        remaining_after: count.saturating_sub(index),
+        source: node.id.clone(),
+        source_kind: node.kind.clone(),
+        file: node.file.clone(),
+        line_range: node.line_range,
+        hash: node.hash.clone(),
+        title: node.title.clone(),
+        preview: node.title.clone().or_else(|| node.text_preview.clone()),
+        suggested_constructs: suggested_constructs.into_iter().collect(),
+        required_target_kinds: required_target_kinds.into_iter().collect(),
+        classifications,
+        references,
+        next: "port this block into matching SkillSpec constructs, validate, then advance with source lens --cursor <next_cursor>".to_owned(),
+    }
+}
+
+fn construct_target_kind(construct: &str) -> Option<&'static str> {
+    match construct {
+        "activation" => Some("activation"),
+        "route" => Some("route"),
+        "rule" => Some("rule"),
+        "dependency" => Some("dependency"),
+        "code" => Some("code"),
+        "resource" => Some("resource"),
+        "import" => Some("import"),
+        "command" => Some("command"),
+        "elicitation" => Some("elicitation"),
+        "closure" => Some("closure"),
+        "test" => Some("test"),
+        _ => None,
+    }
+}
+
+fn compact_one_line(value: &str) -> String {
+    let mut compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.len() > 240 {
+        compact.truncate(237);
+        compact.push_str("...");
+    }
+    compact
+}
+
 fn nodes_for_view(map: &SourceMap, view: SourceView) -> Value {
     match view {
         SourceView::Full => json!(map.nodes),
-        SourceView::Index => json!(map
-            .nodes
-            .iter()
-            .filter(|node| matches!(
-                node.kind.as_str(),
-                "frontmatter" | "root" | "heading" | "code" | "html"
-            ))
-            .map(node_summary)
-            .collect::<Vec<_>>()),
-        SourceView::Summary => json!(map.nodes.iter().map(node_summary).collect::<Vec<_>>()),
+        SourceView::Index => limited_items(
+            map.nodes
+                .iter()
+                .filter(|node| {
+                    matches!(
+                        node.kind.as_str(),
+                        "frontmatter" | "root" | "heading" | "code" | "html"
+                    )
+                })
+                .map(node_summary)
+                .collect::<Vec<_>>(),
+        ),
+        SourceView::Summary => {
+            limited_items(map.nodes.iter().map(node_summary).collect::<Vec<_>>())
+        }
     }
 }
 
@@ -405,11 +711,12 @@ fn node_for_view(map: &SourceMap, node: &SourceNodeRecord, view: SourceView) -> 
 fn classifications_for_view(map: &SourceMap, view: SourceView) -> Value {
     match view {
         SourceView::Full => json!(map.classifications),
-        SourceView::Index | SourceView::Summary => json!(map
-            .classifications
-            .iter()
-            .map(|classification| classification_summary(map, classification))
-            .collect::<Vec<_>>()),
+        SourceView::Index | SourceView::Summary => limited_items(
+            map.classifications
+                .iter()
+                .map(|classification| classification_summary(map, classification))
+                .collect::<Vec<_>>(),
+        ),
     }
 }
 
@@ -425,11 +732,29 @@ fn classifications_by_kind(
         .collect::<Vec<_>>();
     match view {
         SourceView::Full => json!(classifications),
-        SourceView::Index | SourceView::Summary => json!(classifications
-            .iter()
-            .map(|classification| classification_summary(map, classification))
-            .collect::<Vec<_>>()),
+        SourceView::Index | SourceView::Summary => limited_items(
+            classifications
+                .iter()
+                .map(|classification| classification_summary(map, classification))
+                .collect::<Vec<_>>(),
+        ),
     }
+}
+
+fn limited_items(items: Vec<Value>) -> Value {
+    let total = items.len();
+    let shown_items = items
+        .into_iter()
+        .take(SOURCE_QUERY_SUMMARY_LIMIT)
+        .collect::<Vec<_>>();
+    let shown = shown_items.len();
+    json!({
+        "total": total,
+        "shown": shown,
+        "omitted": total.saturating_sub(shown),
+        "items": shown_items,
+        "next": "query an exact handle with --view full for source text"
+    })
 }
 
 fn classification_summary(map: &SourceMap, classification: &SourceClassificationRecord) -> Value {
@@ -513,6 +838,7 @@ impl SourceClassificationKind {
             SourceClassificationKind::ActivationSignal => "activation_signal",
             SourceClassificationKind::RouteCandidate => "route_candidate",
             SourceClassificationKind::ModalObligation => "modal_obligation",
+            SourceClassificationKind::ConditionalRuleCandidate => "conditional_rule_candidate",
             SourceClassificationKind::ForbidCandidate => "forbid_candidate",
             SourceClassificationKind::ElicitationCandidate => "elicitation_candidate",
             SourceClassificationKind::DependencyMention => "dependency_mention",
@@ -520,6 +846,17 @@ impl SourceClassificationKind {
             SourceClassificationKind::CodeBlock => "code_block",
             SourceClassificationKind::ImportCandidate => "import_candidate",
             SourceClassificationKind::ResourceCandidate => "resource_candidate",
+        }
+    }
+}
+
+impl SourceReferenceKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            SourceReferenceKind::LocalFile => "local_file",
+            SourceReferenceKind::ExternalUri => "external_uri",
+            SourceReferenceKind::Anchor => "anchor",
+            SourceReferenceKind::Unknown => "unknown",
         }
     }
 }

@@ -85,11 +85,16 @@ Implemented root mapping:
 Managed hooks call:
 
 ```sh
-skillspec router guard --config <router-config> --hook
+skillspec router guard --config <router-config> --hook --harness <codex|claude-local>
 ```
 
 `--config` pins the hook to the router config written by install, so the guard
 does not depend on the current session's `SKILLSPEC_HOME`.
+
+`--harness` records which harness invoked the hook. Successful hook output uses
+that as route context so the generated `skill-router` can pass
+`--current-harness` to `skillspec route` and choose the matching physical copy
+when the same logical skill is installed in multiple roots.
 
 `--hook` emits harness hook JSON. On success it injects compact context telling
 the model that router mode is ready and must be the first hop. On failure it

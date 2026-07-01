@@ -144,12 +144,14 @@ pub fn json<T: serde::Serialize>(value: &T) -> Result<()> {
     let mut stdout = io::stdout().lock();
     serde_json::to_writer_pretty(&mut stdout, value)?;
     writeln!(stdout)?;
+    stdout.flush()?;
     Ok(())
 }
 
 pub fn text(value: &str) -> Result<()> {
     let mut stdout = io::stdout().lock();
     writeln!(stdout, "{value}")?;
+    stdout.flush()?;
     Ok(())
 }
 

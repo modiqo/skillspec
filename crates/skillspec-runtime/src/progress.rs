@@ -178,6 +178,20 @@ pub struct BatchRecordOptions {
     pub checkpoint: Option<String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct CheckpointRecordOptions {
+    pub run_dir: PathBuf,
+    pub requirement_satisfied: Vec<String>,
+    pub phase_completed: Vec<String>,
+    pub route_fulfilled: Vec<String>,
+    pub route_check_completed: Vec<String>,
+    pub after_success_completed: Vec<String>,
+    pub obligation_satisfied: Vec<String>,
+    pub elicitation_answered: Vec<String>,
+    pub evidence_attached: Vec<String>,
+    pub checkpoint: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct BatchRecordReport {
     pub schema: String,
@@ -502,6 +516,52 @@ pub fn record_batch(options: BatchRecordOptions) -> Result<BatchRecordReport> {
     })
 }
 
+pub fn record_checkpoint(options: CheckpointRecordOptions) -> Result<BatchRecordReport> {
+    fs::create_dir_all(&options.run_dir).map_err(|source| Error::Write {
+        path: options.run_dir.clone(),
+        source,
+    })?;
+    let run_id = options
+        .run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    let ledger_path = execution_ledger_path(&options.run_dir);
+    let mut events = checkpoint_events(&options, &run_id)?;
+    if events.is_empty() {
+        return Err(Error::InvalidInput {
+            message: "progress checkpoint requires at least one event".to_owned(),
+        });
+    }
+
+    for event in &mut events {
+        normalize_batch_event(event, &run_id)?;
+    }
+
+    let mut by_event = BTreeMap::<String, usize>::new();
+    let mut requirements = BTreeSet::<String>::new();
+    for event in &events {
+        *by_event.entry(event.event.clone()).or_default() += 1;
+        if let Some(requirement) = event.requirement.as_ref() {
+            requirements.insert(requirement.clone());
+        }
+        append_execution_event(&ledger_path, event)?;
+    }
+
+    Ok(BatchRecordReport {
+        schema: "skillspec.progress.batch.v0".to_owned(),
+        run_id,
+        run_dir: options.run_dir.display().to_string(),
+        ledger: ledger_path.display().to_string(),
+        events_file: "<inline checkpoint>".to_owned(),
+        checkpoint: options.checkpoint,
+        appended: events.len(),
+        requirements: requirements.into_iter().collect(),
+        by_event,
+    })
+}
+
 pub fn render_batch_report(report: &BatchRecordReport, summary: bool) -> String {
     if summary {
         return render_batch_summary(report);
@@ -588,7 +648,10 @@ pub fn render(report: &ProgressReport) -> String {
                 ));
             }
         }
-        None => output.push_str("- none; all phases are completed or blocked\n"),
+        None if report.blocked_phases.is_empty() => {
+            output.push_str("- none; all phases are completed\n")
+        }
+        None => output.push_str("- none; blocked phases require resolution or user intervention\n"),
     }
 
     if !report.blocked_phases.is_empty() {
@@ -794,6 +857,206 @@ fn read_batch_events(path: &Path) -> Result<Vec<ExecutionEvent>> {
         events.push(event);
     }
     Ok(events)
+}
+
+fn checkpoint_events(
+    options: &CheckpointRecordOptions,
+    run_id: &str,
+) -> Result<Vec<ExecutionEvent>> {
+    let mut events = Vec::new();
+    for value in &options.requirement_satisfied {
+        let (phase, requirement, evidence_kind, evidence_ref) =
+            parse_requirement_checkpoint(value, "--requirement-satisfied")?;
+        events.push(checkpoint_event(
+            run_id,
+            "requirement_satisfied",
+            Some(phase),
+            Some(requirement),
+            None,
+            Some(evidence_kind),
+            Some(evidence_ref),
+        ));
+    }
+    append_target_events(
+        &mut events,
+        run_id,
+        "phase_completed",
+        &options.phase_completed,
+        "--phase-completed",
+        TargetEventField::Phase,
+    )?;
+    append_target_events(
+        &mut events,
+        run_id,
+        "route_fulfilled",
+        &options.route_fulfilled,
+        "--route-fulfilled",
+        TargetEventField::Id,
+    )?;
+    append_target_events(
+        &mut events,
+        run_id,
+        "route_check_completed",
+        &options.route_check_completed,
+        "--route-check-completed",
+        TargetEventField::Id,
+    )?;
+    append_target_events(
+        &mut events,
+        run_id,
+        "after_success_completed",
+        &options.after_success_completed,
+        "--after-success-completed",
+        TargetEventField::Id,
+    )?;
+    append_target_events(
+        &mut events,
+        run_id,
+        "obligation_satisfied",
+        &options.obligation_satisfied,
+        "--obligation-satisfied",
+        TargetEventField::Id,
+    )?;
+    append_target_events(
+        &mut events,
+        run_id,
+        "elicitation_answered",
+        &options.elicitation_answered,
+        "--elicitation-answered",
+        TargetEventField::Id,
+    )?;
+    for value in &options.evidence_attached {
+        let (evidence_kind, evidence_ref) = parse_evidence(value, "--evidence-attached")?;
+        events.push(checkpoint_event(
+            run_id,
+            "evidence_attached",
+            None,
+            None,
+            None,
+            Some(evidence_kind),
+            Some(evidence_ref),
+        ));
+    }
+    Ok(events)
+}
+
+#[derive(Clone, Copy)]
+enum TargetEventField {
+    Phase,
+    Id,
+}
+
+fn append_target_events(
+    events: &mut Vec<ExecutionEvent>,
+    run_id: &str,
+    event_name: &str,
+    values: &[String],
+    flag: &str,
+    target_field: TargetEventField,
+) -> Result<()> {
+    for value in values {
+        let (target, evidence_kind, evidence_ref) = parse_target_checkpoint(value, flag)?;
+        let (phase, id) = match target_field {
+            TargetEventField::Phase => (Some(target), None),
+            TargetEventField::Id => (None, Some(target)),
+        };
+        events.push(checkpoint_event(
+            run_id,
+            event_name,
+            phase,
+            None,
+            id,
+            Some(evidence_kind),
+            Some(evidence_ref),
+        ));
+    }
+    Ok(())
+}
+
+fn parse_requirement_checkpoint(
+    value: &str,
+    flag: &str,
+) -> Result<(String, String, String, String)> {
+    let (target, evidence_kind, evidence_ref) = parse_target_checkpoint(value, flag)?;
+    let (phase, requirement) = target.split_once('/').ok_or_else(|| Error::InvalidInput {
+        message: format!("{flag} expects PHASE/REQUIREMENT=KIND:REF"),
+    })?;
+    let phase = non_empty(phase, flag, "phase")?;
+    let requirement = non_empty(requirement, flag, "requirement")?;
+    Ok((phase, requirement, evidence_kind, evidence_ref))
+}
+
+fn parse_target_checkpoint(value: &str, flag: &str) -> Result<(String, String, String)> {
+    let (target, evidence) = value.split_once('=').ok_or_else(|| Error::InvalidInput {
+        message: format!("{flag} expects TARGET=KIND:REF"),
+    })?;
+    let target = non_empty(target, flag, "target")?;
+    let (evidence_kind, evidence_ref) = parse_evidence(evidence, flag)?;
+    Ok((target, evidence_kind, evidence_ref))
+}
+
+fn parse_evidence(value: &str, flag: &str) -> Result<(String, String)> {
+    let (kind, reference) = value.split_once(':').ok_or_else(|| Error::InvalidInput {
+        message: format!("{flag} expects KIND:REF evidence"),
+    })?;
+    let kind = non_empty(kind, flag, "evidence kind")?;
+    let reference = non_empty(reference, flag, "evidence ref")?;
+    Ok((kind, reference))
+}
+
+fn non_empty(value: &str, flag: &str, field: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(Error::InvalidInput {
+            message: format!("{flag} has empty {field}"),
+        });
+    }
+    Ok(value.to_owned())
+}
+
+fn checkpoint_event(
+    run_id: &str,
+    event: &str,
+    phase: Option<String>,
+    requirement: Option<String>,
+    id: Option<String>,
+    evidence_kind: Option<String>,
+    evidence_ref: Option<String>,
+) -> ExecutionEvent {
+    let evidence = evidence_kind.zip(evidence_ref).map(|(kind, reference)| {
+        serde_json::json!({
+            "kind": kind,
+            "ref": reference,
+        })
+    });
+    ExecutionEvent {
+        schema: EXECUTION_SCHEMA.to_owned(),
+        run_id: Some(run_id.to_owned()),
+        event: event.to_owned(),
+        phase,
+        requirement,
+        id,
+        status: Some("pass".to_owned()),
+        evidence,
+        source: None,
+        at_unix_ms: Some(unix_ms()),
+        message: None,
+        included_result: None,
+        included_alignment: None,
+        included_evidence: None,
+        included_token_savings: None,
+        workspace: None,
+        total_tokens: None,
+        context_tokens: None,
+        query_result_tokens: None,
+        response_tokens_cached: None,
+        saved_tokens: None,
+        reduction_percent: None,
+        agent_visible_tokens: None,
+        artifact_tokens_preserved: None,
+        avoided_tokens: None,
+        metrics_source: None,
+    }
 }
 
 fn normalize_batch_event(event: &mut ExecutionEvent, run_id: &str) -> Result<()> {

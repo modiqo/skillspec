@@ -22,9 +22,12 @@ fn compile_targets_render_loader_and_full_markdown() {
     assert!(loader_out.contains("skillspec run-loop <skill_dir>/skill.spec.yml"));
     assert!(loader_out.contains("--guide agent"));
     assert!(loader_out.contains("--resume <run_dir>"));
+    assert!(loader_out.contains("Keep SkillSpec mechanics in the background"));
+    assert!(loader_out.contains("For read-only diagnostic routes"));
+    assert!(loader_out.contains("record routine successful evidence"));
     assert!(loader_out.contains("cargo install skillspec"));
     assert!(loader_out.contains("skill.spec.yml"));
-    assert!(loader_out.lines().count() < 60);
+    assert!(loader_out.lines().count() < 70);
     assert!(!loader_out.contains("## Runtime Contract"));
     assert!(!loader_out.contains("## Completion Report"));
     assert!(!loader_out.contains("## Authoring And Revision Contract"));
@@ -107,7 +110,7 @@ print("hello")
     assert!(content.contains("reference:"));
     assert!(content.contains("import: reference"));
     assert!(content.contains("command_block_1"));
-    assert!(content.contains("python3"));
+    assert!(!content.contains("python3"));
     assert!(content.contains("dependency_ledger"));
     assert!(content.contains("path: source/SKILL_md.old"));
 
@@ -126,7 +129,8 @@ print("hello")
     let ledger_content = fs::read_to_string(&ledger).unwrap();
     assert!(ledger_content.contains("schema_version = 1"));
     assert!(ledger_content.contains("dependency_count = "));
-    assert!(ledger_content.contains("id = \"python3\""));
+    assert!(ledger_content.contains("id = \"echo\""));
+    assert!(!ledger_content.contains("id = \"python3\""));
 
     let deps_check = Command::new(bin())
         .arg("deps")
@@ -206,7 +210,8 @@ import { chromium } from "playwright";
         .unwrap();
     assert_success(&nodes);
     let nodes = json_stdout(&nodes);
-    let nodes = nodes.as_array().unwrap();
+    assert!(nodes["total"].as_u64().unwrap() >= nodes["shown"].as_u64().unwrap());
+    let nodes = nodes["items"].as_array().unwrap();
     assert!(nodes
         .iter()
         .any(|node| node["id"] == "frontmatter:skill-md"));
@@ -229,13 +234,15 @@ import { chromium } from "playwright";
     assert!(deps_text.contains("pypdf"));
     assert!(deps_text.contains("reportlab"));
     assert!(deps_text.contains("playwright"));
-    assert!(
-        !deps.as_array().unwrap().iter().any(|entry| entry["signals"]
+    assert!(!deps["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry["signals"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|signal| signal == "json"))
-    );
+            .any(|signal| signal == "json")));
 
     let coverage = Command::new(bin())
         .arg("source")
@@ -301,6 +308,33 @@ import { chromium } from "playwright";
 }
 
 #[test]
+fn source_map_prefers_existing_local_path_over_github_shorthand() {
+    let dir = TempDir::new("source-map-local-shorthand");
+    let skill_dir = dir.path().join("owner").join("repo");
+    let map_dir = dir.path().join("source-map");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        "# Local Skill\n\nAlways treat existing owner/repo paths as local.\n",
+    );
+
+    let map = Command::new(bin())
+        .current_dir(dir.path())
+        .arg("source")
+        .arg("map")
+        .arg("owner/repo")
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+    let report = json_stdout(&map);
+    assert_eq!(report["files"], 1);
+    assert!(report.get("staged_from").is_none());
+    assert!(map_dir.join("source-map.json").is_file());
+}
+
+#[test]
 fn source_map_chunks_oversized_markdown_without_full_ast() {
     let dir = TempDir::new("source-map-chunked");
     let skill_dir = dir.path().join("source-skill");
@@ -357,7 +391,7 @@ import pypdf
         .unwrap();
     assert_success(&nodes);
     let nodes = json_stdout(&nodes);
-    let nodes = nodes.as_array().unwrap();
+    let nodes = nodes["items"].as_array().unwrap();
     assert!(nodes.iter().any(|node| node["kind"] == "paragraph_chunk"));
     assert!(nodes.iter().any(|node| node["kind"] == "code"));
 
@@ -372,4 +406,83 @@ import pypdf
     assert_success(&deps);
     let deps_text = serde_json::to_string(&json_stdout(&deps)).unwrap();
     assert!(deps_text.contains("pypdf"));
+}
+
+#[test]
+fn source_lens_extracts_progressive_review_units() {
+    let dir = TempDir::new("source-lens");
+    let skill_dir = dir.path().join("source-skill");
+    let map_dir = dir.path().join("source-map");
+    write_file(
+        &skill_dir.join("SKILL.md"),
+        r#"---
+name: lens-skill
+description: Use when a port needs progressive source review.
+---
+
+# Lens Skill
+
+Always preserve this rule.
+
+If the user asks for a handoff, capture the blocker first.
+
+Read [reference](reference.md).
+
+```python
+import pypdf
+```
+"#,
+    );
+    write_file(&skill_dir.join("reference.md"), "# Reference\n");
+
+    let map = Command::new(bin())
+        .arg("source")
+        .arg("map")
+        .arg(&skill_dir)
+        .arg("--out")
+        .arg(&map_dir)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&map);
+
+    let first = Command::new(bin())
+        .arg("source")
+        .arg("lens")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&first);
+    let first = json_stdout(&first);
+    assert_eq!(first["schema"], "skillspec/source-review-lens/v0");
+    assert_eq!(first["cursor"], 1);
+    assert_eq!(first["shown"], 1);
+    assert!(first["total"].as_u64().unwrap() >= 4);
+    assert_eq!(first["units"][0]["index"], 1);
+    assert!(first["units"][0]["hash"].as_str().is_some());
+    assert!(first["next_cursor"].as_u64().unwrap() > 1);
+
+    let batch = Command::new(bin())
+        .arg("source")
+        .arg("lens")
+        .arg(map_dir.join("source-map.json"))
+        .arg("--cursor")
+        .arg("1")
+        .arg("--limit")
+        .arg("20")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&batch);
+    let batch = json_stdout(&batch);
+    let units = batch["units"].as_array().unwrap();
+    let serialized = serde_json::to_string(units).unwrap();
+    assert!(serialized.contains("required_target_kinds"));
+    assert!(serialized.contains("conditional_rule_candidate"));
+    assert!(
+        serialized.contains("rule")
+            || serialized.contains("resource")
+            || serialized.contains("dependency")
+    );
 }

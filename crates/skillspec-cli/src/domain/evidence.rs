@@ -2,7 +2,8 @@ use crate::{align, error, parser, progress, trace};
 use std::path::{Path, PathBuf};
 
 pub use progress::{
-    BatchRecordOptions, FinalResponseRecordOptions, RecordOptions, StatsRecordOptions,
+    BatchRecordOptions, CheckpointRecordOptions, FinalResponseRecordOptions, RecordOptions,
+    StatsRecordOptions,
 };
 
 pub struct AlignmentOutput {
@@ -67,6 +68,12 @@ pub fn record_batch(
     options: progress::BatchRecordOptions,
 ) -> error::Result<progress::BatchRecordReport> {
     progress::record_batch(options)
+}
+
+pub fn record_checkpoint(
+    options: progress::CheckpointRecordOptions,
+) -> error::Result<progress::BatchRecordReport> {
+    progress::record_checkpoint(options)
 }
 
 pub fn render_batch_report(report: &progress::BatchRecordReport, summary: bool) -> String {

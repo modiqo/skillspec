@@ -153,9 +153,13 @@ Examples:
 
 The `skillspec` prompt skill does the careful path:
 
-1. Stages remote sources locally with `skillspec source stage <uri> --json`,
-   then uses the returned `selected_source_path` or selected
-   `candidates[].source_path`.
+1. Stages remote sources locally with `skillspec source stage <uri> --json`.
+   Repo-root staging preserves plugin metadata and shared folder shape; explicit
+   subfolder staging stays scoped to that folder. Treat `source_shape.kind` as
+   authoritative for `staged_source_path`. Use `selected_source_path` for one
+   atomic skill, and use the staged root with workspace map/checklists when the
+   stage shape is `multi_skill_workspace` or `plugin_workspace`. Choose
+   `candidates[].source_path` only for an explicitly single-skill import.
 2. Reads the skill folder, not just `SKILL.md`.
 3. Runs the deterministic importer.
 4. Promotes imports, resources, code snippets, artifacts, recipes,
@@ -198,7 +202,7 @@ Before importing, classify the source shape:
 | --- | --- |
 | Exactly one `SKILL.md` and package-local resources | `skillspec port-one-shot` |
 | Multiple `SKILL.md` files or cross-skill file references | `skillspec workspace map`, then validate/import/converge/compile |
-| Plugin-shaped root with `skills/` plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` | workspace flow with plugin namespace preservation |
+| Plugin-shaped root with `skills/` plus harness-neutral plugin metadata, such as `.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, or another supported plugin manifest | workspace flow with plugin namespace preservation |
 | Existing reviewed `skill.spec.yml` | revise the spec from grammar/current-spec handles; do not re-import |
 
 Use `skillspec doctor <target>` as the cheap shape gate when the source could
@@ -328,14 +332,15 @@ artifacts after restarting the harness and interacting with the installed
 SkillSpec-backed skills through the agent.
 
 Install folder names are explicit. The default `--install-slug-policy
-workspace-path` is side-by-side safe for plugin-shaped and published workspace
-installs because it keeps package paths namespaced. Use `--install-slug-policy
-local-name` when the intent is to replace existing canonical skills and retire
-folders such as `rote-setup` instead of installing generated names such as
-`normalized-source--skills--rote-setup`. You can set the policy during
-`workspace map`, or override it during `workspace install` for an existing
-manifest. Validation blocks duplicate install slugs before any harness folder is
-retired.
+workspace-path` preserves parent/package shape for multi-skill and
+plugin-shaped workspace installs. Those installs copy the source parent,
+replace the source skill package subtree, and write compiled packages back at
+their original relative paths instead of flattened generated names such as
+`normalized-source--skills--rote-setup`. Use `--install-slug-policy local-name`
+only when the intent is to replace one existing canonical skill and retire a
+folder such as `rote-setup`. Validation blocks `local-name` for multi-skill and
+plugin-shaped manifests, and blocks duplicate install slugs before any harness
+folder is retired.
 
 Use `--summary` for harness-friendly output with wall-clock and estimated token
 metrics, including cache hits and misses where applicable. The detailed reports,
@@ -358,8 +363,11 @@ skillspec progress stats .skillspec/traces/<run-id> \
 ```
 
 Plugin-shaped repositories keep their plugin boundaries. A folder with `skills/`
-plus `.claude-plugin/plugin.json`, `.mcp.json`, or `CLAUDE.md` becomes a plugin
-namespace. Repeated names are made skill-safe by prefixing the plugin name, so
+plus a plugin-named metadata folder containing a supported manifest, such as
+`.agent-plugin/marketplace.json`, `.codex-plugin/plugin.json`, or
+`.claude-plugin/plugin.json`, becomes a plugin namespace. Compatibility markers
+such as `.mcp.json` and `CLAUDE.md` are also recognized. Repeated names are made
+skill-safe by prefixing the plugin name, so
 `commercial-legal/skills/cold-start-interview` becomes
 `commercial-legal-cold-start-interview`. Inside that plugin,
 `/cold-start-interview` resolves locally; `/privacy-legal:use-case-triage`
@@ -592,7 +600,7 @@ skillspec progress final-response .skillspec/traces/<run-id> \
 skillspec progress batch .skillspec/traces/<run-id> \
   --file .skillspec/traces/<run-id>/final-proof.jsonl \
   --checkpoint "checkpointing evidence" \
-  --summary
+  --quiet
 skillspec progress show path/to/skill.spec.yml \
   --run .skillspec/traces/<run-id>
 ```

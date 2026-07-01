@@ -128,9 +128,19 @@ pub fn converge_workspace(
     let blocked = package_ids_by_status(&package_reports, WorkspaceConvergeStatus::Blocked);
     let missing = package_ids_by_status(&package_reports, WorkspaceConvergeStatus::Missing);
     let report_path = build_root.join("workspace-converge.report.md");
+    let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
+    let next = converge_next_steps(
+        ok,
+        manifest_path,
+        build_root,
+        manifest.packages.len(),
+        failed.len(),
+        blocked.len(),
+        missing.len(),
+    );
 
     let report = WorkspaceConvergeReport {
-        ok: failed.is_empty() && blocked.is_empty() && missing.is_empty(),
+        ok,
         manifest_path: path_to_string(manifest_path),
         build_root: path_to_string(build_root),
         report_path: path_to_string(&report_path),
@@ -143,11 +153,7 @@ pub fn converge_workspace(
         cross_package_references,
         dependency_edges: dependency_edges(&manifest),
         packages: package_reports,
-        next: vec![format!(
-            "skillspec workspace compile {} --build-root {} --target <target>",
-            manifest_path.display(),
-            build_root.display()
-        )],
+        next,
     };
     write_text(&report_path, &render_converge_report(&report))?;
     Ok(report)
@@ -215,14 +221,71 @@ pub fn render_converge_report(report: &WorkspaceConvergeReport) -> String {
     }
 
     output.push_str("\n## Next\n\n");
-    if report.ok {
-        for next in &report.next {
-            output.push_str(&format!("- {next}\n"));
-        }
-    } else {
-        output.push_str("- fix failed or missing package drafts, then rerun workspace converge\n");
+    for next in &report.next {
+        output.push_str(&format!("- {next}\n"));
     }
     output
+}
+
+fn converge_next_steps(
+    ok: bool,
+    manifest_path: &Path,
+    build_root: &Path,
+    package_count: usize,
+    failed_count: usize,
+    blocked_count: usize,
+    missing_count: usize,
+) -> Vec<String> {
+    if ok {
+        return vec![format!(
+            "skillspec workspace compile {} --build-root {} --target codex-skill --summary",
+            manifest_path.display(),
+            build_root.display()
+        )];
+    }
+    if package_count > 0 && missing_count == package_count {
+        return vec![
+            format!(
+                "skillspec workspace import {} --out {} --summary",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            format!(
+                "skillspec import checklist {} --build-root {} --stage loop --json",
+                manifest_path.display(),
+                build_root.display()
+            ),
+        ];
+    }
+    if blocked_count > 0 {
+        return vec![
+            format!(
+                "skillspec import checklist {} --build-root {} --stage loop --json",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            "continue package promotion until the checklist reports complete; scaffold blockers are recoverable work, not terminal final-response blockers".to_owned(),
+        ];
+    }
+    if failed_count > 0 || missing_count > 0 {
+        return vec![
+            format!(
+                "repair only the failed or missing package drafts, then run `skillspec import checklist {} --build-root {} --stage loop --json`",
+                manifest_path.display(),
+                build_root.display()
+            ),
+            format!(
+                "skillspec workspace converge {} --build-root {} --summary",
+                manifest_path.display(),
+                build_root.display()
+            ),
+        ];
+    }
+    vec![format!(
+        "skillspec import checklist {} --build-root {} --stage loop --json",
+        manifest_path.display(),
+        build_root.display()
+    )]
 }
 
 fn converge_one_package(
@@ -257,7 +320,14 @@ fn converge_one_package(
                 )
             } else {
                 match parser::load_spec(&spec_path) {
-                    Ok(_) => (WorkspaceConvergeStatus::Ready, None),
+                    Ok(spec) => {
+                        let gate = super::readiness::review_gate(&output_dir, &spec)?;
+                        if gate.is_blocked() {
+                            (WorkspaceConvergeStatus::Blocked, Some(gate.message()))
+                        } else {
+                            (WorkspaceConvergeStatus::Ready, None)
+                        }
+                    }
                     Err(error) => (WorkspaceConvergeStatus::Failed, Some(error.to_string())),
                 }
             }
