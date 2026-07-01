@@ -7,9 +7,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Request a public SkillSpec Doctor report for a skill repository or skill folder.
+        Request a public SkillSpec Doctor report for a skill repository, plugin workspace, or skill folder.
 
-        Only public GitHub URLs are supported here. Do not paste private URLs, access tokens, or credential-bearing links. For private repositories, install SkillSpec locally and run:
+        Only public GitHub URLs are supported here. The workflow checks source shape first: simple skills, multi-skill folders, and plugin workspaces continue to Doctor; source-code repositories with no SKILL.md stop at a shape-gate report. Do not paste private URLs, access tokens, or credential-bearing links. For private repositories, install SkillSpec locally and run:
 
         ```sh
         curl -fsSL https://skillspec.sh/install.sh | sh
@@ -20,7 +20,7 @@ body:
     id: skill_repo_url
     attributes:
       label: Public GitHub skill URL
-      description: Use a public GitHub repository URL or a public folder URL that contains one or more SKILL.md files. Canonical folder URLs use /tree/<branch>/..., but /blob/<branch>/... is accepted when the path is a folder.
+      description: Use a public GitHub repository or folder URL that contains one or more SKILL.md files, or a plugin workspace root. Generic source repositories are rejected after shape assessment.
       placeholder: https://github.com/org/repo/tree/main/skills/example
     validations:
       required: true

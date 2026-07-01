@@ -5,7 +5,8 @@ SkillSpec supports two public doctor-report paths:
 1. CI dogfood runs `skillspec doctor skills/skillspec/` on every main and pull
    request quality run.
 2. Public users can open a "Doctor report request" issue with a public GitHub
-   skill URL. GitHub Actions validates the URL, runs `skillspec doctor`, uploads
+   skill URL. GitHub Actions validates the URL, stages the source, checks the
+   shape, runs full `skillspec doctor` only for skill-shaped targets, uploads
    report artifacts, and comments back with the formatted report.
 3. The GitHub Pages site at `https://skillspec.sh/` provides a
    public form and report gallery. The form opens a prefilled issue request; the
@@ -89,14 +90,31 @@ SkillSpec can inspect private repositories without the user's local credentials.
 
 ## Report Outputs
 
-For accepted public targets, the workflow builds the current repo CLI and runs:
+For accepted public targets, the workflow builds the current repo CLI and first
+runs the existing shape contract:
 
 ```sh
-skillspec doctor "$target" > doctor-report.txt
-skillspec doctor "$target" --markdown > doctor-report.md
-skillspec doctor "$target" --html > doctor-report.html
-skillspec doctor "$target" --json > doctor-report.json
+skillspec source stage "$target" --out doctor-source-stage --json
 ```
+
+That shape gate writes `shape-gate.md` and `shape-gate.json` into the public
+artifact set. If the shape is `non_skill_repository`, the workflow stops there
+and returns a shape-gate report instead of spending public CI on a generic source
+repository. If the shape is `simple_skill`, `multi_skill_workspace`,
+`entry_skill_with_subskills`, or `plugin_workspace`, the workflow runs full
+Doctor against the staged local source so the report uses the exact shape that
+was gated:
+
+```sh
+skillspec doctor "$staged_source_path" > doctor-report.txt
+skillspec doctor "$staged_source_path" --markdown > doctor-report.md
+skillspec doctor "$staged_source_path" --html > doctor-report.html
+skillspec doctor "$staged_source_path" --json > doctor-report.json
+```
+
+Public sanitization replaces both the submitted GitHub URL and staged local path
+with the compact `github.com/<owner>/<repo>/.../<leaf>` display label before
+comments, summaries, or artifacts are published.
 
 The Actions run summary and issue comment both render a public-safe Markdown
 report directly, so a public user can read the result directly in GitHub without
@@ -111,6 +129,9 @@ HTML, and JSON files. The artifact contains:
 - `doctor-report.md`
 - `doctor-report.html`
 - `doctor-report.json`
+- `shape-gate.md`
+- `shape-gate.json`
+- `source-stage.json`
 - `target.txt` with the compact public target label
 - `doctor-stderr.txt` when a run fails
 
@@ -136,6 +157,11 @@ The Pages source lives under `docs/pages/` and is deployed by
 
 - The request form accepts only public `https://github.com/...` URLs and opens a
   prefilled `Doctor report: request` issue with a generic title.
+- The landing page keeps assessment submission focused; the report gallery lives
+  on `reports.html` so browsing public reports does not dominate the main page.
+- The report gallery explains shape-specific interpretation and links to
+  `docs/design/operations/22-doctor-agent-drift-risk.md` for the deterministic
+  heuristic, citations, and limitations behind the score.
 - The report gallery reads public issues through GitHub's public Issues API and
   keeps entries whose title starts with `Doctor report:` or whose labels include
   `doctor-report`.

@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
     <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260629-slugs">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260701-boom-tax-panel">
   </head>
   <body>
     <header class="site-header">
@@ -35,6 +35,7 @@
         <a href="#install">Install</a>
         <a href="#who-it-is-for">Who it is for</a>
         <a href="./why-skillspec.html">Why SkillSpec</a>
+        <a href="./reports.html">Reports</a>
         <a
           class="github-link star-link"
           href="https://github.com/modiqo/skillspec"
@@ -55,11 +56,23 @@
           <h1 id="page-title">
             <a class="heading-link" href="#home">Make agent skills follow the plan.</a>
           </h1>
-          <p class="lede">
-            Today, most skills are instructions the model may or may not follow.
-            SkillSpec checks a <code>SKILL.md</code>, turns the important parts
-            into a contract, and helps the agent run the right skill with the
-            right steps, tools, checks, and proof.
+          <p class="lede hero-subheading">
+            <span>
+              Today, most skills are instructions the model
+              <span class="squiggle-red">may not follow</span>.
+            </span>
+            <span>
+              SkillSpec checks a <code>SKILL.md</code> and turns the important
+              parts into a <span class="squiggle-blue">contract</span>.
+            </span>
+            <span>
+              It works with any agent harness, so skills run more reliably
+              without wasting tokens.
+            </span>
+            <span>
+              Then it helps the agent run the
+              <span class="squiggle-blue">right skill with the right steps, tools, checks, and proof</span>.
+            </span>
           </p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="primary-link" href="#assess">Assess a skill</a>
@@ -278,8 +291,10 @@
           <p class="input-help">
             Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
             Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
-            This opens a public GitHub issue, so do not submit private repositories,
-            tokens, credentials, or sensitive internal paths.
+            Public CI checks the GitHub source shape before full assessment and
+            stops when no <code>SKILL.md</code> package is found. This opens a public
+            GitHub issue, so do not submit private repositories, tokens,
+            credentials, or sensitive internal paths.
           </p>
           <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
         </form>
@@ -608,54 +623,6 @@ Write SKILL.md, then import and prove it.</code></pre>
         </div>
       </section>
 
-      <section id="recent-doctor-reports" class="reports-section" aria-labelledby="reports-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Public proof</p>
-            <h2 id="reports-title">
-              <a class="heading-link" href="#recent-doctor-reports">Recent Doctor reports</a>
-            </h2>
-          </div>
-          <div class="toolbar">
-            <button class="filter active" type="button" data-filter="all">All</button>
-            <button class="filter" type="button" data-filter="success">Success</button>
-            <button class="filter" type="button" data-filter="error">Error</button>
-            <button id="refresh-reports" type="button">Refresh</button>
-          </div>
-        </div>
-        <div id="reports-status" class="reports-status" role="status" aria-live="polite">
-          Loading reports...
-        </div>
-        <div id="reports-grid" class="reports-grid"></div>
-      </section>
-
-      <section id="doctor-runs" class="runs-section" aria-labelledby="runs-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Public automation</p>
-            <h2 id="runs-title">
-              <a class="heading-link" href="#doctor-runs">Doctor runs</a>
-            </h2>
-          </div>
-        </div>
-        <div id="runs-status" class="reports-status" role="status" aria-live="polite">
-          Loading workflow runs...
-        </div>
-        <div id="runs-list" class="runs-list"></div>
-      </section>
-
-      <section id="report-viewer" class="report-viewer" aria-labelledby="viewer-title" hidden>
-        <div class="viewer-header">
-          <div>
-            <p class="eyebrow">Rendered report</p>
-            <h2 id="viewer-title">
-              <a class="heading-link" href="#report-viewer">Report</a>
-            </h2>
-          </div>
-          <button id="close-viewer" type="button">Close</button>
-        </div>
-        <article id="report-content" class="report-content"></article>
-      </section>
     </main>
     <footer class="site-footer">
       <p class="site-credit">
@@ -665,46 +632,7 @@ Write SKILL.md, then import and prove it.</code></pre>
       </p>
     </footer>
 
-    <template id="report-card-template">
-      <article class="report-card">
-        <div class="card-topline">
-          <span class="status-pill"></span>
-          <span class="issue-number"></span>
-        </div>
-        <h3></h3>
-        <dl>
-          <div>
-            <dt>Verdict</dt>
-            <dd data-field="verdict"></dd>
-          </div>
-          <div>
-            <dt>Shape</dt>
-            <dd data-field="shape"></dd>
-          </div>
-          <div>
-            <dt>Risk</dt>
-            <dd data-field="risk"></dd>
-          </div>
-        </dl>
-        <div class="card-actions">
-          <button type="button" data-action="view">View report</button>
-          <a data-action="issue" target="_blank" rel="noreferrer">GitHub issue</a>
-        </div>
-      </article>
-    </template>
-
-    <template id="run-row-template">
-      <article class="run-row">
-        <span class="status-pill"></span>
-        <div>
-          <h3></h3>
-          <p></p>
-        </div>
-        <a target="_blank" rel="noreferrer">View run</a>
-      </article>
-    </template>
-
     <script src="./assets/site.js?v=20260628-risk-star"></script>
-    <script src="./assets/app.js?v=20260628-api-cache"></script>
+    <script src="./assets/app.js?v=20260701-risk-explainer"></script>
   </body>
 </html>
