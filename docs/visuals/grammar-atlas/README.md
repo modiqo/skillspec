@@ -7,7 +7,7 @@ example.
 
 SkillSpec v0 is a structured skill contract — routes, rules, elicitations, states, commands, imports, resources, code, artifacts, recipes, tests, and proof hooks — deliberately *not* an execution engine.
 
-Read this alongside [`../../spec/grammar.md`](../../spec/grammar.md). The
+Read this alongside [`spec/grammar.md`](../../../spec/grammar.md). The
 formal grammar, schema, Rust model, parser, and conformance fixtures are the
 source of truth; this atlas is explanatory.
 

@@ -4,8 +4,9 @@ This directory contains explanatory project docs. The formal contract remains in
 `../spec/`; the docs here explain purpose, comparisons, launch materials, and
 design rationale.
 
-Read the numbered root docs in filename order for the full narrative.
-Subdirectories keep their own indexes.
+The docs are grouped by reader intent. Keep `docs/pages/` in place because it is
+the GitHub Pages source; the other folders are maintained as the human-readable
+documentation catalog.
 
 ## Reader Paths
 
@@ -13,35 +14,68 @@ Use these paths when you do not need the whole sequence:
 
 | Reader | Start Here | Then Read |
 | --- | --- | --- |
-| Newcomer | [Detailed README](README_DETAILED.md) | [Reliability Gap](00-skills-reliability-gap.md), [Why SkillSpec](01-why-skillspec.md), [Prose Skills Vs SkillSpec-Backed Skills](02-prose-vs-skillspec.md), [visual explainers](design/explained/README.md) |
-| Skill author | [Why SkillSpec](01-why-skillspec.md) | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md), [Import To Release](design/explained/01-import-to-release.md), [Skill Authoring Lifecycle](design/04-skill-authoring-lifecycle.md), [Source Map Progressive Reader](design/18-source-map-progressive-reader.md) |
-| CLI tester | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | [Command Log](design/16-command-log.md), [Design Documentation QA Process](design/17-qa-process.md) |
-| Maintainer | [Design docs](design/README.md) | [Contract And Trace Methodology](08-contract-trace-methodology.md), [Command Log](design/16-command-log.md), [spec reference](../spec/README.md), [conformance fixtures](../conformance/) |
-| Visual reviewer | [Visual explainers](design/explained/README.md) | [Grammar atlas](grammar-atlas/README.md), [Grammar And Conformance](design/02-grammar-and-conformance.md) |
+| Newcomer | [Detailed README](overview/README_DETAILED.md) | [Reliability Gap](overview/00-skills-reliability-gap.md), [Why SkillSpec](overview/01-why-skillspec.md), [Prose Skills Vs SkillSpec-Backed Skills](overview/02-prose-vs-skillspec.md), [visual explainers](visuals/explainers/README.md) |
+| Skill author | [Why SkillSpec](overview/01-why-skillspec.md) | [Prompt Multiplexer Test Plan](runbooks/07-prompt-multiplexer-test-plan.md), [Import To Release](visuals/explainers/01-import-to-release.md), [Skill Authoring Lifecycle](design/authoring/04-skill-authoring-lifecycle.md), [Source Map Progressive Reader](design/authoring/18-source-map-progressive-reader.md) |
+| CLI tester | [Prompt Multiplexer Test Plan](runbooks/07-prompt-multiplexer-test-plan.md) | [Command Log](design/operations/16-command-log.md), [Design Documentation QA Process](design/operations/17-qa-process.md) |
+| Maintainer | [Design docs](design/README.md) | [Contract And Trace Methodology](overview/08-contract-trace-methodology.md), [Command Log](design/operations/16-command-log.md), [spec reference](../spec/README.md), [conformance fixtures](../conformance/) |
+| Visual reviewer | [Visual explainers](visuals/explainers/README.md) | [Grammar atlas](visuals/grammar-atlas/README.md), [Grammar And Conformance](design/core/02-grammar-and-conformance.md) |
 
-## Reading Order
+## Catalog
 
-| Order | Doc | Purpose |
-| --- | --- | --- |
-| 00 | [The Reliability Gap In Agent Skills](00-skills-reliability-gap.md) | Research framing for why prose skills need a checkable reliability layer. |
-| 01 | [Why SkillSpec](01-why-skillspec.md) | The core motivation and problem statement. |
-| 02 | [Prose Skills Vs SkillSpec-Backed Skills](02-prose-vs-skillspec.md) | A direct comparison between prose-only skills and SkillSpec-backed skills. |
-| 03 | [RFC: SkillSpec v0](03-rfc-v0.md) | The announcement-style RFC for the v0 contract. |
-| 04 | [Community Outreach](04-community-outreach.md) | Launch positioning, communities, and outreach steps. |
-| 05 | [Good First Issues](05-good-first-issues.md) | Starter work for contributors. |
-| 06 | [Community Post Drafts](06-community-posts.md) | Short-form launch and discussion drafts. |
-| 07 | [Prompt Multiplexer Test Plan](07-prompt-multiplexer-test-plan.md) | Reference runbook for testing the `/skillspec` setup multiplexer in Codex and Claude. |
-| 08 | [Contract And Trace Methodology](08-contract-trace-methodology.md) | Measurement methodology for static well-formedness, behavioral contracts, trace alignment, and unproven verdicts. |
+### Overview
 
-## Subdirectories
+| Doc | Purpose |
+| --- | --- |
+| [Detailed README](overview/README_DETAILED.md) | Full user-facing walkthrough. |
+| [The Reliability Gap In Agent Skills](overview/00-skills-reliability-gap.md) | Research framing for why prose skills need a checkable reliability layer. |
+| [Why SkillSpec](overview/01-why-skillspec.md) | Core motivation and problem statement. |
+| [Prose Skills Vs SkillSpec-Backed Skills](overview/02-prose-vs-skillspec.md) | Direct comparison between prose-only skills and SkillSpec-backed skills. |
+| [Contract And Trace Methodology](overview/08-contract-trace-methodology.md) | Measurement methodology for behavioral contracts, traces, and unproven verdicts. |
 
-- [Design docs](design/README.md): numbered maintainer docs for the contract,
-  runtime model, router mode, command surface, QA process, and the visual
-  explainers in `design/explained/`.
-- [Grammar atlas](grammar-atlas/README.md): visual plates for the grammar,
-  reference graph, semantics, and a worked example.
-- [Why SkillSpec demo package](why-skillspec-demo/README.md): runnable
-  side-by-side material that supports `01-why-skillspec.md`.
+### Community
+
+| Doc | Purpose |
+| --- | --- |
+| [RFC: SkillSpec v0](community/03-rfc-v0.md) | Announcement-style RFC for the v0 contract. |
+| [Community Outreach](community/04-community-outreach.md) | Launch positioning, communities, and outreach steps. |
+| [Good First Issues](community/05-good-first-issues.md) | Starter work for contributors. |
+| [Community Post Drafts](community/06-community-posts.md) | Short-form launch and discussion drafts. |
+
+### Runbooks
+
+| Doc | Purpose |
+| --- | --- |
+| [Prompt Multiplexer Test Plan](runbooks/07-prompt-multiplexer-test-plan.md) | Reference runbook for testing the `/skillspec` setup multiplexer in Codex and Claude. |
+
+### Design
+
+- [Design docs](design/README.md): maintainer catalog for contract, authoring,
+  runtime, router, and operations design records.
+- [Core contract docs](design/core/): grammar, package anatomy, rules, states,
+  imports, and tool boundaries.
+- [Authoring docs](design/authoring/): import, source mapping, workspace
+  authoring, one-shot porting, and shape-specific checklists.
+- [Runtime docs](design/runtime/): sensemaking, execution loops, traces,
+  alignment, capability bootstrap, trampoline, and progressive guidance.
+- [Router docs](design/router/): router behavior, guard hooks, duplicate-root
+  selection, execution policy boundaries, and policy profiles.
+- [Operations docs](design/operations/): command log, QA process, performance,
+  doctor risk, install/release, public reports, crate boundaries, and test
+  matrices.
+
+### Visuals And Examples
+
+- [Visual explainers](visuals/explainers/README.md): diagram-first workflow
+  explanations for import, runtime, router mode, and durable execution.
+- [Grammar atlas](visuals/grammar-atlas/README.md): visual plates for the
+  grammar, reference graph, semantics, and a worked example.
+- [Why SkillSpec demo package](examples/why-skillspec-demo/README.md): runnable
+  side-by-side material that supports
+  [Why SkillSpec](overview/01-why-skillspec.md).
+
+### Site Pages
+
+- `pages/`: GitHub Pages source. Keep this folder shape stable for deployment.
 
 ## Source Of Truth
 

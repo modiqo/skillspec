@@ -1797,63 +1797,63 @@ fn basis() -> Vec<DoctorBasis> {
             id: "reliability_gap_instruction_density".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md §3.1".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md §3.1".to_owned(),
             claim: "Large, dense activation bodies increase dropped-step risk and later instructions suffer primacy bias.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_metadata_context_pressure".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md §3.2".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md §3.2".to_owned(),
             claim: "Skill frontmatter metadata and activated bodies consume context; broad surfaces degrade routing and adherence.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_implicit_environment_contract".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md §3.3".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md §3.3".to_owned(),
             claim: "Scripts and snippets carry dependency contracts whether or not the skill declares them.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_no_execution_guarantees".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md §3.5".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md §3.5".to_owned(),
             claim: "Prose instructions and embedded snippets are guidance unless moved into checkable or enforced surfaces.".to_owned(),
         },
         DoctorBasis {
             id: "reliability_gap_unfilled_requirement".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md §5".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md §5".to_owned(),
             claim: "Reliable skills need a portable, machine-checkable account of intended behavior, dependencies, and proof.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_activation_adherence_enforcement".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Contract Trace Methodology".to_owned(),
-            source: "docs/08-contract-trace-methodology.md §3.1".to_owned(),
+            source: "docs/overview/08-contract-trace-methodology.md §3.1".to_owned(),
             claim: "Activation, adherence, and enforcement are separate gates; static prose mostly influences adherence, not enforcement.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_behavioral_contract".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Contract Trace Methodology".to_owned(),
-            source: "docs/08-contract-trace-methodology.md §4.1".to_owned(),
+            source: "docs/overview/08-contract-trace-methodology.md §4.1".to_owned(),
             claim: "A behavioral contract makes steering, dependencies, forbids, and tests statically checkable.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_static_well_formedness".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Contract Trace Methodology".to_owned(),
-            source: "docs/08-contract-trace-methodology.md §4.1".to_owned(),
+            source: "docs/overview/08-contract-trace-methodology.md §4.1".to_owned(),
             claim: "Reference closure, reachability, and typed structure are static pre-filters before execution.".to_owned(),
         },
         DoctorBasis {
             id: "contract_trace_unproven_verdict".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Contract Trace Methodology".to_owned(),
-            source: "docs/08-contract-trace-methodology.md §4.3".to_owned(),
+            source: "docs/overview/08-contract-trace-methodology.md §4.3".to_owned(),
             claim: "Missing trace evidence should be reported as unproven, not inferred as success.".to_owned(),
         },
         DoctorBasis {
@@ -1902,14 +1902,14 @@ fn basis() -> Vec<DoctorBasis> {
             id: "skillspec_local_reliability_gap".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Skills Reliability Gap".to_owned(),
-            source: "docs/00-skills-reliability-gap.md".to_owned(),
+            source: "docs/overview/00-skills-reliability-gap.md".to_owned(),
             claim: "Large activation bodies, implicit dependencies, mixed code/instructions, missing contracts, and missing proof surfaces create reliability debt.".to_owned(),
         },
         DoctorBasis {
             id: "skillspec_local_contract_trace".to_owned(),
             kind: "local_methodology".to_owned(),
             citation: "SkillSpec Contract Trace Methodology".to_owned(),
-            source: "docs/08-contract-trace-methodology.md".to_owned(),
+            source: "docs/overview/08-contract-trace-methodology.md".to_owned(),
             claim: "Route choice, forbids, dependencies, tool boundaries, tests, and trace/progress proof are the checkable surfaces that reduce drift.".to_owned(),
         },
     ]
@@ -2005,7 +2005,7 @@ fn next_steps(
         steps.push("Optionally publish the doctor baseline and alignment report with the skill repo so reviewers can compare current-shape risk with proven execution.".to_owned());
     } else {
         steps.push(format!(
-            "Capture this baseline before changing the skill: `skillspec doctor {source} --markdown > docs/skillspec-doctor-baseline.md`."
+            "Capture this baseline before changing the skill: `skillspec doctor {source} --markdown > .skillspec/reports/skillspec-doctor-baseline.md`."
         ));
         steps.push(
             "Install the `skillspec` skill into your harness if it is not already installed."

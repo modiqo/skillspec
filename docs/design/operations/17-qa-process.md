@@ -43,7 +43,7 @@ fixtures, `examples/*/skill.spec.yml`, generated `SKILL.md` loaders.
 
 `P3`: explanatory docs.
 
-Examples: `docs/01-why-skillspec.md`, `docs/02-prose-vs-skillspec.md`, RFC and
+Examples: `docs/overview/01-why-skillspec.md`, `docs/overview/02-prose-vs-skillspec.md`, RFC and
 community docs.
 
 Claims about accepted fields, validation, decision behavior, CLI behavior,

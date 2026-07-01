@@ -202,7 +202,7 @@ debugging, or proof gaps the user must understand.
 | `after-success-completed` | A scheduled closure completed. | `skillspec progress record .skillspec/traces/run-123 after-success-completed --id trace_align --status pass` |
 | `elicitation-answered` | A required elicitation was answered. | `skillspec progress record .skillspec/traces/run-123 elicitation-answered --id approve_scope --status pass` |
 | `elicitation-waived` | A required elicitation was explicitly waived. | `skillspec progress record .skillspec/traces/run-123 elicitation-waived --id approve_scope --status pass` |
-| `evidence-attached` | Extra evidence was attached to the run. | `skillspec progress record .skillspec/traces/run-123 evidence-attached --evidence-kind file --evidence-ref docs/design/16-command-log.md` |
+| `evidence-attached` | Extra evidence was attached to the run. | `skillspec progress record .skillspec/traces/run-123 evidence-attached --evidence-kind file --evidence-ref docs/design/operations/16-command-log.md` |
 | `handoff-started` | A declared handoff began. | `skillspec progress record .skillspec/traces/run-123 handoff-started browser_lookup` |
 | `handoff-completed` | A declared handoff completed. | `skillspec progress record .skillspec/traces/run-123 handoff-completed browser_lookup --status pass` |
 | `phase-completed` | A declared phase completed. | `skillspec progress record .skillspec/traces/run-123 phase-completed qa_and_proof --status pass` |

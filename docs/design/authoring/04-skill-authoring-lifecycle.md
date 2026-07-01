@@ -296,5 +296,5 @@ This doc is grounded in:
   `crates/skillspec-runtime/src/deps.rs`, and
   `crates/skillspec-runtime/src/align.rs`, which implement the runtime
   and review surfaces;
-- `docs/02-prose-vs-skillspec.md`, which states that import is conservative and
+- `docs/overview/02-prose-vs-skillspec.md`, which states that import is conservative and
   review-driven.

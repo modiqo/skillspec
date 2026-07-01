@@ -36,9 +36,9 @@ This design is grounded in the concerns documented in:
 - [11 Execution Progress Ledger](11-execution-progress-ledger.md)
 - [12 Traces And Alignment](12-traces-and-alignment.md)
 - [13 Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md)
-- [18 Source Map Progressive Reader](18-source-map-progressive-reader.md)
-- [20 Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md)
-- [22 Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md)
+- [18 Source Map Progressive Reader](../authoring/18-source-map-progressive-reader.md)
+- [20 Performance, Token Economy, And Incremental Processing](../operations/20-performance-token-speed.md)
+- [22 Doctor Agent Drift Risk](../operations/22-doctor-agent-drift-risk.md)
 - [23 Guided Run Loop From Doctor Dogfood](23-guided-run-loop-from-doctor-dogfood.md)
 - [24 Guided Trampoline](24-guided-trampoline.md)
 
@@ -103,8 +103,8 @@ This is the source-reading version of progressive disclosure. It protects token
 budget, avoids accidental summarization of important middle sections, and keeps
 the source map as evidence rather than scratch.
 
-See [18 Source Map Progressive Reader](18-source-map-progressive-reader.md) and
-[21 One-Shot Porting Workflow](21-one-shot-porting.md).
+See [18 Source Map Progressive Reader](../authoring/18-source-map-progressive-reader.md) and
+[21 One-Shot Porting Workflow](../authoring/21-one-shot-porting.md).
 
 ## Part 2: Using SkillSpec Progressively
 
@@ -257,8 +257,8 @@ print compact guidance into chat
 preserve complete evidence on disk
 ```
 
-See [19 Workspace Authoring Graph](19-workspace-authoring-graph.md) and
-[20 Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md).
+See [19 Workspace Authoring Graph](../authoring/19-workspace-authoring-graph.md) and
+[20 Performance, Token Economy, And Incremental Processing](../operations/20-performance-token-speed.md).
 
 ## Environmental Risks The Loop Addresses
 
@@ -272,7 +272,7 @@ phase, handle, requirement, or proof gap instead of relying on one large read.
 
 Relevant docs:
 
-- [22 Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md)
+- [22 Doctor Agent Drift Risk](../operations/22-doctor-agent-drift-risk.md)
 - [24 Guided Trampoline](24-guided-trampoline.md)
 
 ### Compaction
@@ -295,7 +295,7 @@ tokens where applicable. This is distinct from measured model API usage.
 Relevant docs:
 
 - [13 Completion Alignment And Token Reporting](13-completion-alignment-and-token-reporting.md)
-- [20 Performance, Token Economy, And Incremental Processing](20-performance-token-speed.md)
+- [20 Performance, Token Economy, And Incremental Processing](../operations/20-performance-token-speed.md)
 
 ### Execution Drift
 
@@ -306,8 +306,8 @@ alignment.
 
 Relevant docs:
 
-- [06 Rules, Routes, And Decision Algebra](06-rules-routes-and-decision-algebra.md)
-- [09 Phase Tool Boundaries](09-phase-tool-boundaries.md)
+- [06 Rules, Routes, And Decision Algebra](../core/06-rules-routes-and-decision-algebra.md)
+- [09 Phase Tool Boundaries](../core/09-phase-tool-boundaries.md)
 - [12 Traces And Alignment](12-traces-and-alignment.md)
 
 ## What Makes This Different From A Larger Prompt

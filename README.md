@@ -307,9 +307,9 @@ evaluation, and skill-metadata routing.
 The report is explicit about what is measured versus what is a policy
 threshold. Start here:
 
-- [Doctor Agent Drift Risk](https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md)
-- [Why SkillSpec](https://github.com/modiqo/skillspec/blob/main/docs/01-why-skillspec.md)
-- [Contract Trace Methodology](https://github.com/modiqo/skillspec/blob/main/docs/08-contract-trace-methodology.md)
+- [Doctor Agent Drift Risk](https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md)
+- [Why SkillSpec](https://github.com/modiqo/skillspec/blob/main/docs/overview/01-why-skillspec.md)
+- [Contract Trace Methodology](https://github.com/modiqo/skillspec/blob/main/docs/overview/08-contract-trace-methodology.md)
 
 The contract itself is a real spec: a typed Rust model, JSON Schema, reference
 grammar, and
@@ -318,8 +318,8 @@ grammar, and
 ## Learn More
 
 - [How it works](https://github.com/modiqo/skillspec/blob/main/docs/design/README.md)
-- [Command reference](https://github.com/modiqo/skillspec/blob/main/docs/design/16-command-log.md)
-- [Plugin marketplace install](https://github.com/modiqo/skillspec/blob/main/docs/design/26-plugin-marketplace-install.md)
+- [Command reference](https://github.com/modiqo/skillspec/blob/main/docs/design/operations/16-command-log.md)
+- [Plugin marketplace install](https://github.com/modiqo/skillspec/blob/main/docs/design/operations/26-plugin-marketplace-install.md)
 - [Request a public Doctor report](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)
 - [Contributing](https://github.com/modiqo/skillspec/blob/main/CONTRIBUTING.md)
 

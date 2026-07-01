@@ -7,7 +7,7 @@ have committed machine-readable baselines. Later phases should extend the same
 crate instead of adding broad CLI snapshot tests.
 
 This document proposes a no-Docker harness lab for turning more of
-`docs/design/30-testing-matrix.md` into deterministic local and CI automation.
+`docs/design/operations/30-testing-matrix.md` into deterministic local and CI automation.
 The goal is to test SkillSpec's harness-facing contracts without pretending that
 the repo can fully control Codex, Claude, or any other external agent runtime.
 

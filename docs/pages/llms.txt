@@ -94,9 +94,9 @@ When helping a user with SkillSpec:
 
 ## Source Material
 
-- Reliability gap: https://github.com/modiqo/skillspec/blob/main/docs/00-skills-reliability-gap.md
-- Contract trace methodology: https://github.com/modiqo/skillspec/blob/main/docs/08-contract-trace-methodology.md
-- Doctor risk model: https://github.com/modiqo/skillspec/blob/main/docs/design/22-doctor-agent-drift-risk.md
-- Router mode: https://github.com/modiqo/skillspec/blob/main/docs/design/explained/03-router-mode.md
-- Guided trampoline: https://github.com/modiqo/skillspec/blob/main/docs/design/24-guided-trampoline.md
-- Traces and alignment: https://github.com/modiqo/skillspec/blob/main/docs/design/12-traces-and-alignment.md
+- Reliability gap: https://github.com/modiqo/skillspec/blob/main/docs/overview/00-skills-reliability-gap.md
+- Contract trace methodology: https://github.com/modiqo/skillspec/blob/main/docs/overview/08-contract-trace-methodology.md
+- Doctor risk model: https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md
+- Router mode: https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/03-router-mode.md
+- Guided trampoline: https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/24-guided-trampoline.md
+- Traces and alignment: https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/12-traces-and-alignment.md

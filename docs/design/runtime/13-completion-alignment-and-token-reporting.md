@@ -339,6 +339,6 @@ This doc is grounded in:
   completion fields, token summaries, proof rows, and layer statuses;
 - `crates/skillspec-authoring/src/compiler.rs`, which emits loader instructions for
   alignment and token reporting;
-- `docs/design/12-traces-and-alignment.md`, which explains decision traces and
+- `docs/design/runtime/12-traces-and-alignment.md`, which explains decision traces and
   execution traces;
 - `spec/commandspec.md`, which documents `trace align`.

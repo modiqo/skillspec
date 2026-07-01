@@ -82,7 +82,7 @@ If output changes intentionally, update `fixtures/golden/import-fixtures-skill.s
 
 ## Write A Comparison Doc: Prose Skill Vs SkillSpec-Backed Skill
 
-Status: initial version exists at `docs/02-prose-vs-skillspec.md`.
+Status: initial version exists at `docs/overview/02-prose-vs-skillspec.md`.
 
 Next starter task:
 

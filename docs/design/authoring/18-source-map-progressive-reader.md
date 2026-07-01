@@ -130,7 +130,7 @@ Keep these surfaces aligned whenever the source-map workflow changes:
   `skillspec grammar sensemake`;
 - `crates/skillspec-cli/src/features/sensemake.rs` for navigation hints;
 - `spec/commandspec.md` for the formal command inventory;
-- `docs/design/16-command-log.md` for the quick command log;
+- `docs/design/operations/16-command-log.md` for the quick command log;
 - `skills/skillspec/source/SKILL_md.old` and `skills/skillspec/skill.spec.yml` for
   prompt-driven multiplexer behavior;
 - CLI tests in `crates/skillspec-cli/tests/cli/`.

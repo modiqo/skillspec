@@ -3,7 +3,7 @@
 Status: implemented on `doctor-agent-drift-risk`
 Owner: SkillSpec
 Related docs:
-- [22 Doctor Agent Drift Risk](22-doctor-agent-drift-risk.md)
+- [22 Doctor Agent Drift Risk](../operations/22-doctor-agent-drift-risk.md)
 - [24 Guided Trampoline](24-guided-trampoline.md)
 
 ## Purpose
