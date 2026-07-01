@@ -2485,14 +2485,15 @@ button:hover,
   gap: 40px;
   padding: 34px 38px;
   border-color: var(--line);
-  background: rgba(238, 230, 216, 0.42);
-  color: var(--ink);
+  background:
+    linear-gradient(135deg, #2b2118 0%, #3a2a1d 66%, #4a3324 100%);
+  color: var(--paper-soft);
 }
 
 .request-panel h2,
 .request-panel .eyebrow,
 .request-panel .request-form label {
-  color: var(--ink);
+  color: var(--paper-soft);
 }
 
 .request-panel .eyebrow::before {
@@ -2512,16 +2513,16 @@ button:hover,
 .request-panel p,
 .request-panel .input-help,
 .request-panel .form-message {
-  color: #544e47;
+  color: rgba(251, 248, 240, 0.78);
 }
 
 .request-panel input {
-  border-color: var(--line);
-  background: rgba(251, 248, 240, 0.92);
+  border-color: #201a15;
+  background: #fbf8ef;
 }
 
 .request-panel button {
-  border-color: var(--line);
+  border-color: #201a15;
   background: var(--ink);
   color: var(--paper-soft);
 }
