@@ -4,8 +4,8 @@ const REPORT_LABEL = "doctor-report";
 const REPORT_MARKER = "<!-- skillspec-doctor-report -->";
 const REPORT_WORKFLOW = "doctor-report.yml";
 const CACHE_TTL_MS = 60 * 60 * 1000;
-const REPORTS_CACHE_KEY = "skillspec.publicReports.v1";
-const RUNS_CACHE_KEY = "skillspec.workflowRuns.v1";
+const REPORTS_CACHE_KEY = "skillspec.publicReports.v2";
+const RUNS_CACHE_KEY = "skillspec.workflowRuns.v2";
 
 const form = document.querySelector("#doctor-form");
 const targetInput = document.querySelector("#target-url");
@@ -58,8 +58,8 @@ if (form && targetInput && formMessage) {
 
 if (refreshButton) {
   refreshButton.addEventListener("click", () => {
-    loadReports();
-    loadWorkflowRuns();
+    loadReports({ force: true });
+    loadWorkflowRuns({ force: true });
   });
 }
 
@@ -131,20 +131,24 @@ function showFormMessage(message, isError = false) {
   formMessage.classList.toggle("error", isError);
 }
 
-async function loadReports() {
+async function loadReports({ force = false } = {}) {
   if (!reportsGrid || !reportsStatus) {
     return;
   }
 
   const cached = readCache(REPORTS_CACHE_KEY);
-  if (isFreshCache(cached)) {
+  if (!force && isFreshCache(cached)) {
     reports = cached.data;
     renderCards();
     appendCacheNotice(reportsStatus, cached);
     return;
   }
 
-  reportsStatus.textContent = cached ? "Refreshing reports from GitHub..." : "Loading reports...";
+  reportsStatus.textContent = force
+    ? "Refreshing reports from GitHub..."
+    : cached
+      ? "Refreshing reports from GitHub..."
+      : "Loading reports...";
   reportsGrid.replaceChildren();
 
   try {
@@ -176,19 +180,23 @@ async function loadReports() {
   }
 }
 
-async function loadWorkflowRuns() {
+async function loadWorkflowRuns({ force = false } = {}) {
   if (!runsList || !runsStatus) {
     return;
   }
 
   const cached = readCache(RUNS_CACHE_KEY);
-  if (isFreshCache(cached)) {
+  if (!force && isFreshCache(cached)) {
     renderWorkflowRuns(cached.data);
     appendCacheNotice(runsStatus, cached);
     return;
   }
 
-  runsStatus.textContent = cached ? "Refreshing workflow runs from GitHub..." : "Loading workflow runs...";
+  runsStatus.textContent = force
+    ? "Refreshing workflow runs from GitHub..."
+    : cached
+      ? "Refreshing workflow runs from GitHub..."
+      : "Loading workflow runs...";
   runsList.replaceChildren();
 
   try {
