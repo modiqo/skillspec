@@ -560,6 +560,135 @@ description: PostHog integration for Node.
     assert!(text.contains("unique byte content"));
     assert!(text.contains("referentiable"));
     assert!(text.contains("source_content_ref"));
+    assert!(text
+        .contains("Assessment scope: plugin workspace plus full per-package raw skill profiles"));
+    assert!(text.contains("Risk interpretation: Plugin workspace risk is the maximum"));
+    assert!(text.contains("Package risk rollup:"));
+    Ok(())
+}
+
+#[test]
+fn doctor_workspace_rolls_up_full_package_risk_profiles(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let dir = TempDir::new("doctor-workspace-package-risk");
+    let root = dir.path().join("posthog-skills");
+    let package = root
+        .join("skills")
+        .join("posthog")
+        .join("tools-and-features")
+        .join("skills")
+        .join("hogql");
+    write_file(
+        &root.join(".agent-plugin").join("marketplace.json"),
+        r#"{"name":"posthog-skills","version":"1.0.0"}"#,
+    );
+    write_file(
+        &package.join("SKILL.md"),
+        r#"---
+name: hogql
+description: HogQL queries for PostHog analytics.
+---
+# HogQL
+
+Use Python, shell, and API calls to inspect analytics, run queries, fetch results, and write a final report.
+See [missing reference](missing.md) before using query examples.
+
+```python
+import posthog
+```
+
+```
+curl https://app.posthog.com/api/projects/
+```
+"#,
+    );
+    write_file(
+        &root
+            .join("skills")
+            .join("posthog")
+            .join("survey")
+            .join("skills")
+            .join("creator")
+            .join("SKILL.md"),
+        r#"---
+name: survey-creator
+description: Create PostHog surveys.
+---
+# Survey
+"#,
+    );
+
+    let standalone_output = Command::new(bin())
+        .arg("doctor")
+        .arg(&package)
+        .arg("--json")
+        .output()?;
+    assert_success(&standalone_output);
+    let standalone = json_stdout(&standalone_output);
+    let standalone_score = standalone["agent_drift_risk"]["score"]
+        .as_u64()
+        .ok_or_else(|| invalid_json_shape("missing standalone score"))?;
+    assert!(
+        standalone_score >= 75,
+        "fixture should exercise critical standalone risk, got {standalone_score}"
+    );
+
+    let workspace_output = Command::new(bin())
+        .arg("doctor")
+        .arg(&root)
+        .arg("--json")
+        .output()?;
+    assert_success(&workspace_output);
+    let workspace = json_stdout(&workspace_output);
+    assert_eq!(workspace["shape"]["kind"], "plugin_workspace");
+
+    let packages = workspace["packages"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing workspace packages"))?;
+    let hogql = packages
+        .iter()
+        .find(|package| {
+            package["path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with("hogql/SKILL.md"))
+        })
+        .ok_or_else(|| invalid_json_shape("missing hogql package profile"))?;
+    assert_eq!(
+        hogql["agent_drift_risk"]["score"].as_u64(),
+        Some(standalone_score)
+    );
+    assert_eq!(
+        hogql["agent_drift_risk"]["level"],
+        standalone["agent_drift_risk"]["level"]
+    );
+    assert_eq!(
+        hogql["risk_profile_source"].as_str(),
+        Some("full_package_analysis")
+    );
+    assert_eq!(
+        hogql["source_content_sha256"]
+            .as_str()
+            .ok_or_else(|| invalid_json_shape("missing source content hash"))?
+            .len(),
+        64
+    );
+    assert!(workspace["workspace_agent_drift_risk"]["score"]
+        .as_u64()
+        .is_some_and(|score| score >= standalone_score));
+    let conditions = workspace["workspace_agent_drift_risk"]["conditions"]
+        .as_array()
+        .ok_or_else(|| invalid_json_shape("missing workspace risk conditions"))?;
+    let rollup = conditions
+        .iter()
+        .find(|condition| condition["id"] == "workspace_package_risk_rollup")
+        .ok_or_else(|| invalid_json_shape("missing package risk rollup"))?;
+    assert_eq!(rollup["claim_scope"], "full_package_risk_rollup");
+    assert!(rollup["measurement"]["critical_package_count"]
+        .as_u64()
+        .is_some_and(|count| count >= 1));
+    assert!(rollup["measurement"]["top_packages"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty()));
     Ok(())
 }
 
@@ -586,6 +715,8 @@ description: Review one file and report risks.
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("SkillSpec Doctor"));
     assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Assessment scope: one atomic SKILL.md package"));
+    assert!(stdout.contains("Risk interpretation: A high score means this raw package"));
     assert!(stdout.contains("Current Skill Baseline"));
     assert!(stdout.contains("Agent follow-through risk:"));
     assert!(stdout.contains("Shape Contract"));
@@ -633,6 +764,8 @@ description: Review one file and report risks.
     assert!(stdout.contains("<title>SkillSpec Doctor Report</title>"));
     assert!(stdout.contains("class=\"hero\""));
     assert!(stdout.contains("What This Measures"));
+    assert!(stdout.contains("Assessment scope"));
+    assert!(stdout.contains("Risk interpretation"));
     assert!(stdout.contains("Agent follow-through risk"));
     assert!(stdout.contains("Shape Contract"));
     assert!(stdout.contains("Next Actions"));
@@ -669,6 +802,8 @@ description: Review one file and report risks.
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("# SkillSpec Doctor report"));
     assert!(stdout.contains("## What This Measures"));
+    assert!(stdout.contains("**Assessment scope:**"));
+    assert!(stdout.contains("**Risk interpretation:**"));
     assert!(stdout.contains("## Current Skill Baseline"));
     assert!(stdout.contains("**Agent follow-through risk:**"));
     assert!(stdout.contains("## Shape Contract"));

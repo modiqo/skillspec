@@ -1,3 +1,4 @@
+mod assessment_scope;
 mod shape_contract;
 mod workspace_identity;
 
@@ -6,6 +7,7 @@ use super::{
     ContractMitigationReport, DoctorIssue, DoctorPackageRiskReport, DoctorReport, SurfaceReport,
     WorkspaceIdentityReport,
 };
+use assessment_scope::{assessment_scope, package_risk_rollup, risk_interpretation, scope_label};
 use shape_contract::{
     render_shape_contract, render_shape_contract_html, render_shape_contract_markdown,
 };
@@ -34,6 +36,11 @@ pub fn render(report: &DoctorReport) -> String {
     output.push_str("\nWhat This Measures\n");
     output.push_str("------------------\n");
     output.push_str(&format!("{}\n", report.score_model.plain_language_summary));
+    output.push_str(&format!("Assessment scope: {}\n", assessment_scope(report)));
+    output.push_str(&format!(
+        "Risk interpretation: {}\n",
+        risk_interpretation(report)
+    ));
     output.push_str("This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness.\n");
     output.push_str("Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.\n");
 
@@ -56,6 +63,9 @@ pub fn render(report: &DoctorReport) -> String {
             "Agent follow-through risk: not evaluated ({})\n",
             report.analysis_status
         ));
+    }
+    if let Some(rollup) = package_risk_rollup(report) {
+        output.push_str(&format!("Package risk rollup: {rollup}\n"));
     }
     if let Some(frontmatter) = &report.frontmatter_discovery_risk {
         output.push_str(&format!(
@@ -230,6 +240,14 @@ pub fn render_markdown(report: &DoctorReport) -> String {
         "{}\n\n",
         markdown_text(&report.score_model.plain_language_summary)
     ));
+    output.push_str(&format!(
+        "**Assessment scope:** {}\n\n",
+        markdown_text(assessment_scope(report))
+    ));
+    output.push_str(&format!(
+        "**Risk interpretation:** {}\n\n",
+        markdown_text(&risk_interpretation(report))
+    ));
     output.push_str("This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness.\n\n");
     output.push_str("Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.\n\n");
 
@@ -253,6 +271,12 @@ pub fn render_markdown(report: &DoctorReport) -> String {
         output.push_str(&format!(
             "- **Agent follow-through risk:** not evaluated (`{}`)\n",
             markdown_text(&report.analysis_status)
+        ));
+    }
+    if let Some(rollup) = package_risk_rollup(report) {
+        output.push_str(&format!(
+            "- **Package risk rollup:** {}\n",
+            markdown_text(&rollup)
         ));
     }
     if let Some(frontmatter) = &report.frontmatter_discovery_risk {
@@ -468,6 +492,12 @@ pub fn render_html(report: &DoctorReport) -> String {
 
     output.push_str("<section class=\"cards\">\n");
     output.push_str(&metric_card(
+        "Assessment scope",
+        scope_label(report),
+        "shape-specific interpretation",
+        "neutral",
+    ));
+    output.push_str(&metric_card(
         "Follow-through readiness",
         &readiness_label,
         "current skill baseline",
@@ -503,6 +533,20 @@ pub fn render_html(report: &DoctorReport) -> String {
         "<p>{}</p>",
         escape_html(&report.score_model.plain_language_summary)
     ));
+    output.push_str(&format!(
+        "<p><strong>Assessment scope:</strong> {}</p>",
+        escape_html(assessment_scope(report))
+    ));
+    output.push_str(&format!(
+        "<p><strong>Risk interpretation:</strong> {}</p>",
+        escape_html(&risk_interpretation(report))
+    ));
+    if let Some(rollup) = package_risk_rollup(report) {
+        output.push_str(&format!(
+            "<p><strong>Package risk rollup:</strong> {}</p>",
+            escape_html(&rollup)
+        ));
+    }
     output.push_str("<p class=\"muted\">This is a baseline of the current skill shape at doctor time. It is not a grade of domain knowledge, human usefulness, author effort, or legal/medical correctness. Higher risk means a higher chance the agent skips, reorders, or improvises load-bearing instructions.</p>");
     output.push_str("</section>\n");
 

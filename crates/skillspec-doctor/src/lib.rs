@@ -9,6 +9,7 @@ mod renderer;
 mod risk;
 pub mod source_map;
 mod types;
+mod workspace_package_profile;
 mod workspace_report;
 
 pub use renderer::{render, render_html, render_markdown};

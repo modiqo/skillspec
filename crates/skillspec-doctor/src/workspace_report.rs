@@ -1,20 +1,20 @@
+use super::severity_rank;
 use super::types::{
     DoctorPackageRiskReport, RiskCondition, RiskConditionKind, RiskConfidence, RiskEvidence,
     RiskLevel, WorkspaceAgentDriftRiskReport,
 };
 use super::{
-    basis, display_list, frontmatter, issue, metrics, path_to_slash, shape_root, slugify,
-    with_location, DoctorIssue, DoctorReport, DoctorShapeReport, Error, Result,
-    ShapeClassification, SurfaceReport, WorkspaceFrontmatterNameRefReport, WorkspaceIdentityReport,
-    WorkspaceNamespaceIdentityReport, WorkspaceSourceContentRefReport, LARGE_BODY_LINES,
-    LARGE_BODY_TOKENS,
+    basis, display_list, issue, metrics, shape_root, with_location, DoctorIssue, DoctorReport,
+    DoctorShapeReport, Error, Result, ShapeClassification, SurfaceReport,
+    WorkspaceFrontmatterNameRefReport, WorkspaceIdentityReport, WorkspaceNamespaceIdentityReport,
+    WorkspaceSourceContentRefReport,
 };
-use super::{risk, severity_rank};
 use crate::remote_source;
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(super) fn inspect_local_target(
     path: &Path,
@@ -30,13 +30,14 @@ pub(super) fn inspect_local_target(
         })?;
         skill_texts.push((skill_file.clone(), content));
     }
-    Ok(report_from_skill_texts(
+    report_from_skill_texts(
         &path.display().to_string(),
         "local",
         None,
+        Some(&root),
         classification,
         skill_texts,
-    ))
+    )
 }
 
 pub(super) fn inspect_remote_target(
@@ -51,28 +52,28 @@ pub(super) fn inspect_remote_target(
             remote_source::git_show_text(checkout_dir, skill_file)?,
         ));
     }
-    Ok(report_from_skill_texts(
+    report_from_skill_texts(
         target,
         "remote_github",
         None,
+        Some(checkout_dir),
         classification,
         skill_texts,
-    ))
+    )
 }
 
 fn report_from_skill_texts(
     target: &str,
     source_kind: &str,
     staged_from: Option<String>,
+    source_root: Option<&Path>,
     classification: ShapeClassification,
     skill_texts: Vec<(String, String)>,
-) -> DoctorReport {
+) -> Result<DoctorReport> {
     let shape = classification.shape;
     let counts = classification.counts;
-    let package_reports = skill_texts
-        .iter()
-        .map(|(skill_path, content)| package_report(&shape, skill_path, content))
-        .collect::<Vec<_>>();
+    let package_reports =
+        super::workspace_package_profile::package_reports(&shape, source_root, &skill_texts)?;
     let workspace_identity = workspace_identity(&shape, &counts, &package_reports, &skill_texts);
 
     let mut issues = super::shape_issues(&shape, &counts);
@@ -98,7 +99,7 @@ fn report_from_skill_texts(
         Some(workspace_agent_drift_risk.level),
     );
 
-    DoctorReport {
+    Ok(DoctorReport {
         target: target.to_owned(),
         source_kind: source_kind.to_owned(),
         analysis_status: "workspace".to_owned(),
@@ -123,84 +124,7 @@ fn report_from_skill_texts(
         packages: package_reports,
         basis,
         suggested_next_steps,
-    }
-}
-
-fn package_report(
-    shape: &DoctorShapeReport,
-    skill_path: &str,
-    content: &str,
-) -> DoctorPackageRiskReport {
-    let sections = frontmatter::split_skill(content);
-    let frontmatter_risk = frontmatter::analyze(Path::new(skill_path), &sections);
-    let activation_estimated_tokens = metrics::estimate_tokens(&sections.body);
-    let activation_lines = sections.body.lines().count();
-    let package_issues = package_issues(skill_path, activation_estimated_tokens, activation_lines);
-    let package_penalty = package_issues
-        .iter()
-        .map(|issue| usize::from(issue.score_penalty))
-        .sum::<usize>()
-        .saturating_add(usize::from(frontmatter_risk.score.min(30)))
-        .min(100);
-    let structural_score = u8::try_from(100usize.saturating_sub(package_penalty)).unwrap_or(0);
-    let basis = basis();
-    let agent_drift_risk = risk::agent_report(
-        structural_score,
-        &package_issues,
-        Some(frontmatter_risk.clone()),
-        &basis,
-    );
-    let plugin_name = plugin_for_skill_path(shape, skill_path);
-    let public_name = frontmatter_risk
-        .fields
-        .name
-        .clone()
-        .unwrap_or_else(|| fallback_public_name(skill_path));
-    let install_slug = install_slug(plugin_name.as_deref(), skill_path, &public_name);
-    DoctorPackageRiskReport {
-        package_id: package_id(plugin_name.as_deref(), skill_path, &public_name),
-        public_name,
-        plugin_name,
-        install_slug,
-        path: skill_path.to_owned(),
-        shape_role: shape_role(shape, skill_path),
-        entrypoint: "SKILL.md".to_owned(),
-        structural_score,
-        activation_estimated_tokens,
-        activation_lines,
-        frontmatter_discovery_risk: frontmatter_risk,
-        agent_drift_risk,
-    }
-}
-
-fn package_issues(
-    skill_path: &str,
-    activation_estimated_tokens: usize,
-    activation_lines: usize,
-) -> Vec<DoctorIssue> {
-    let mut issues = Vec::new();
-    if activation_estimated_tokens > LARGE_BODY_TOKENS || activation_lines > LARGE_BODY_LINES {
-        issues.push(with_location(
-            issue(
-                "activation_token_load",
-                "high",
-                "Large activation-loaded instruction body",
-                format!(
-                    "Package activation body is {} lines / approximately {} tokens.",
-                    activation_lines, activation_estimated_tokens
-                ),
-                vec![
-                    "ruler_effective_context",
-                    "tiktoken_token_accounting",
-                    "skillsbench_focused_skills",
-                ],
-                "Move examples, references, and detailed procedures into deferred files or structured SkillSpec entries.",
-                18,
-            ),
-            skill_path.to_owned(),
-        ));
-    }
-    issues
+    })
 }
 
 fn workspace_surface(packages: &[DoctorPackageRiskReport]) -> SurfaceReport {
@@ -485,7 +409,7 @@ fn workspace_agent_drift_risk(
         .sum::<usize>()
         .min(100) as u8;
     let score = package_score.max(issue_score);
-    let conditions = issues
+    let mut conditions = issues
         .iter()
         .map(|issue| RiskCondition {
             id: issue.id.clone(),
@@ -510,11 +434,14 @@ fn workspace_agent_drift_risk(
             recommended_action: issue.remediation.clone(),
         })
         .collect::<Vec<_>>();
+    if let Some(condition) = package_risk_rollup_condition(shape, packages, package_score) {
+        conditions.push(condition);
+    }
     WorkspaceAgentDriftRiskReport {
         score,
         level: RiskLevel::from_score(score),
         summary: format!(
-            "{} package(s) analyzed under {}.",
+            "{} package(s) analyzed under {} with full per-package raw skill profiles.",
             packages.len(),
             shape.kind
         ),
@@ -522,59 +449,96 @@ fn workspace_agent_drift_risk(
     }
 }
 
-fn plugin_for_skill_path(shape: &DoctorShapeReport, skill_path: &str) -> Option<String> {
-    let path = Path::new(skill_path);
-    shape
-        .plugin_roots
+fn package_risk_rollup_condition(
+    shape: &DoctorShapeReport,
+    packages: &[DoctorPackageRiskReport],
+    package_score: u8,
+) -> Option<RiskCondition> {
+    if packages.is_empty() {
+        return None;
+    }
+    let mut by_score = packages.iter().collect::<Vec<_>>();
+    by_score.sort_by(|left, right| {
+        right
+            .agent_drift_risk
+            .score
+            .cmp(&left.agent_drift_risk.score)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    let top = by_score[0];
+    let critical_count = packages
         .iter()
-        .find(|plugin| path.starts_with(PathBuf::from(&plugin.path).join("skills")))
-        .map(|plugin| plugin.namespace.clone())
-}
-
-fn fallback_public_name(skill_path: &str) -> String {
-    Path::new(skill_path)
-        .parent()
-        .and_then(Path::file_name)
-        .and_then(|name| name.to_str())
-        .filter(|name| !name.is_empty())
-        .unwrap_or("skill")
-        .to_owned()
-}
-
-fn package_id(plugin_name: Option<&str>, skill_path: &str, public_name: &str) -> String {
-    plugin_name
-        .map(|plugin| format!("{plugin}:{}", path_package_id(skill_path)))
-        .unwrap_or_else(|| {
-            let package_id = path_package_id(skill_path);
-            if package_id.is_empty() {
-                public_name.to_owned()
-            } else {
-                package_id
-            }
+        .filter(|package| package.agent_drift_risk.level == RiskLevel::Critical)
+        .count();
+    let high_count = packages
+        .iter()
+        .filter(|package| package.agent_drift_risk.level == RiskLevel::High)
+        .count();
+    let medium_count = packages
+        .iter()
+        .filter(|package| package.agent_drift_risk.level == RiskLevel::Medium)
+        .count();
+    let low_count = packages
+        .iter()
+        .filter(|package| package.agent_drift_risk.level == RiskLevel::Low)
+        .count();
+    let top_packages = by_score
+        .iter()
+        .take(8)
+        .map(|package| {
+            json!({
+                "path": package.path,
+                "score": package.agent_drift_risk.score,
+                "level": package.agent_drift_risk.level.as_str(),
+                "risk_profile_source": package.risk_profile_source,
+                "canonical_risk_profile_path": package.canonical_risk_profile_path,
+            })
         })
-}
+        .collect::<Vec<_>>();
+    let mut measurement = BTreeMap::new();
+    measurement.insert("package_count".to_owned(), json!(packages.len()));
+    measurement.insert("max_package_score".to_owned(), json!(package_score));
+    measurement.insert("critical_package_count".to_owned(), json!(critical_count));
+    measurement.insert("high_package_count".to_owned(), json!(high_count));
+    measurement.insert("medium_package_count".to_owned(), json!(medium_count));
+    measurement.insert("low_package_count".to_owned(), json!(low_count));
+    measurement.insert("top_packages".to_owned(), json!(top_packages));
 
-fn path_package_id(skill_path: &str) -> String {
-    Path::new(skill_path)
-        .parent()
-        .map(path_to_slash)
-        .filter(|path| !path.is_empty())
-        .unwrap_or_else(|| "root".to_owned())
-}
-
-fn install_slug(plugin_name: Option<&str>, skill_path: &str, public_name: &str) -> String {
-    let raw = plugin_name
-        .map(|plugin| format!("{plugin}__{}", path_package_id(skill_path)))
-        .unwrap_or_else(|| public_name.to_owned());
-    slugify(&raw).replace('-', "__")
-}
-
-fn shape_role(shape: &DoctorShapeReport, skill_path: &str) -> String {
-    if shape.primary_skill.as_deref() == Some(skill_path) {
-        return "entry_skill".to_owned();
-    }
-    if plugin_for_skill_path(shape, skill_path).is_some() {
-        return "plugin_skill".to_owned();
-    }
-    "skill_package".to_owned()
+    Some(RiskCondition {
+        id: "workspace_package_risk_rollup".to_owned(),
+        kind: RiskConditionKind::WorkspaceAggregateRisk,
+        level: RiskLevel::from_score(package_score),
+        score_delta: package_score,
+        confidence: RiskConfidence::High,
+        measurement,
+        evidence: vec![RiskEvidence {
+            path: top.path.clone(),
+            line: None,
+            text_preview: format!(
+                "Highest package risk is {} ({}/100) at {}; critical={}, high={}, medium={}, low={}.",
+                top.agent_drift_risk.level.as_str(),
+                top.agent_drift_risk.score,
+                top.path,
+                critical_count,
+                high_count,
+                medium_count,
+                low_count
+            ),
+        }],
+        basis_ids: vec![
+            "skillspec_local_reliability_gap".to_owned(),
+            "contract_trace_behavioral_contract".to_owned(),
+            "contract_trace_unproven_verdict".to_owned(),
+        ],
+        claim_scope: "full_package_risk_rollup".to_owned(),
+        threshold_source: "skillspec_policy_v0".to_owned(),
+        consequence: format!(
+            "Workspace {} contains raw package risk up to {}.",
+            shape.kind,
+            RiskLevel::from_score(package_score).as_str()
+        ),
+        recommended_action:
+            "Do not treat workspace shape readiness as package trustworthiness; port and prove packages in risk order while preserving namespace/path identity."
+                .to_owned(),
+    })
 }

@@ -216,6 +216,10 @@ pub struct DoctorPackageRiskReport {
     pub plugin_name: Option<String>,
     pub install_slug: String,
     pub path: String,
+    pub source_content_sha256: String,
+    pub risk_profile_source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub canonical_risk_profile_path: Option<String>,
     pub shape_role: String,
     pub entrypoint: String,
     pub structural_score: u8,
