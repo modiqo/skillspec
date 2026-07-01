@@ -366,7 +366,7 @@ pre {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 14px;
-  background: #0f172a;
+  background: #2b2118;
   color: #e2e8f0;
   line-height: 1.55;
 }
@@ -1608,7 +1608,7 @@ h3 {
 
 .tax-card:nth-child(2) {
   border-color: var(--ink);
-  background: #111827;
+  background: #3a2a1d;
   color: #f8fafc;
 }
 
@@ -1845,7 +1845,7 @@ h3 {
 .operating-loop-section {
   margin-bottom: 30px;
   border: 2px solid var(--line);
-  background: #0f172a;
+  background: #2b2118;
   padding: 0;
   overflow: hidden;
 }
@@ -1856,7 +1856,7 @@ h3 {
   border-bottom: 0;
   padding: 38px 38px 10px;
   background:
-    linear-gradient(135deg, #0f172a 0%, #111827 62%, #10251f 100%);
+    linear-gradient(135deg, #2b2118 0%, #3a2a1d 62%, #4a3324 100%);
 }
 
 .operating-loop-section h2 {
@@ -1867,7 +1867,7 @@ h3 {
 }
 
 .operating-loop-section .eyebrow {
-  color: #7dd3fc;
+  color: #e6b46f;
 }
 
 .operating-loop-section .heading-link::after {
@@ -1878,7 +1878,7 @@ h3 {
   max-width: 980px;
   margin: 0;
   padding: 0 38px 34px;
-  background: #0f172a;
+  background: #2b2118;
   color: rgba(251, 248, 240, 0.78);
   font-size: 1.18rem;
   line-height: 1.72;
@@ -1898,7 +1898,7 @@ h3 {
   border-top: 1px solid rgba(251, 248, 240, 0.14);
   border-left: 0;
   padding: 22px;
-  background: #0f172a;
+  background: #2b2118;
 }
 
 .operating-loop-grid article {
@@ -1929,7 +1929,7 @@ h3 {
 
 .operating-loop-grid article:nth-child(3) {
   border-color: rgba(251, 248, 240, 0.18);
-  background: #111827;
+  background: #3a2a1d;
   color: #f8fafc;
 }
 
@@ -2050,8 +2050,8 @@ h3 {
 }
 
 .contrast-lane-risk {
-  border-color: #111827;
-  background: #111827;
+  border-color: #3a2a1d;
+  background: #3a2a1d;
   color: #f8fafc;
 }
 
@@ -2226,8 +2226,8 @@ h3 {
 }
 
 .contrast-lane-proof .spec-card {
-  border-color: #111827;
-  background: #111827;
+  border-color: #3a2a1d;
+  background: #3a2a1d;
 }
 
 .contrast-lane-proof .spec-card .file-title {
@@ -2768,7 +2768,7 @@ pre code {
   margin-top: 30px;
   padding: 0;
   overflow: hidden;
-  background: #0f172a;
+  background: #2b2118;
 }
 
 .personas-section .section-heading {
@@ -2777,7 +2777,7 @@ pre code {
   border-bottom: 0;
   padding: 38px 38px 24px;
   background:
-    linear-gradient(135deg, #0f172a 0%, #111827 68%, #1c1917 100%);
+    linear-gradient(135deg, #2b2118 0%, #3a2a1d 68%, #4a3324 100%);
 }
 
 .personas-section h2 {
@@ -2802,7 +2802,7 @@ pre code {
   border-top: 1px solid rgba(251, 248, 240, 0.14);
   border-left: 0;
   padding: 22px;
-  background: #0f172a;
+  background: #2b2118;
 }
 
 .persona-grid article {
@@ -2823,7 +2823,7 @@ pre code {
 
 .persona-grid article:nth-child(3) {
   border-color: rgba(251, 248, 240, 0.18);
-  background: #111827;
+  background: #3a2a1d;
   color: #f8fafc;
 }
 
@@ -3321,7 +3321,7 @@ pre code {
   border-left: 2px solid var(--line);
   border-radius: 0;
   padding: 46px 22px 22px;
-  background: #0f172a;
+  background: #2b2118;
   color: #d1fae5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
