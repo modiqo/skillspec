@@ -2919,7 +2919,7 @@ pre code {
 
 .dashboard-next-action {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
   border: 2px solid var(--line);
   background: #ffffff;
 }
@@ -2955,12 +2955,27 @@ pre code {
 }
 
 .dashboard-next-action pre {
+  min-width: 0;
+  max-width: 100%;
   border: 0;
   border-left: 2px solid var(--line);
   border-radius: 0;
-  padding: 22px;
+  padding: 46px 22px 22px;
   background: #0f172a;
   color: #d1fae5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-next-action pre code {
+  display: block;
+  overflow-x: visible;
+  color: inherit;
+  font-size: clamp(0.82rem, 1.3vw, 1rem);
+  line-height: 1.58;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .dashboard-metrics {
