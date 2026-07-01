@@ -454,6 +454,8 @@ fn workspace_import_fans_out_packages_under_build_root() {
     let root = dir.path().join("skills");
     let manifest = dir.path().join("build").join("skillspec.workspace.yml");
     let build = dir.path().join("workspace-build");
+    let home = dir.path().join("home");
+    fs::create_dir_all(home.join(".agents/skills")).unwrap();
     write_file(
         &root.join("coding-standards").join("SKILL.md"),
         r#"---
@@ -607,6 +609,7 @@ Read `../coding-standards/SKILL.md`.
 
     write_placeholder_loaders_for_all_workspace_specs(&build);
     let scaffold_install = Command::new(bin())
+        .env("HOME", &home)
         .arg("workspace")
         .arg("install")
         .arg(&manifest)
@@ -950,8 +953,6 @@ Read `../coding-standards/SKILL.md`.
         .join(".agents/skills/skills--code-review/SKILL.md")
         .is_file());
 
-    let home = dir.path().join("home");
-    fs::create_dir_all(home.join(".agents/skills")).unwrap();
     let install_dry_run = Command::new(bin())
         .env("HOME", &home)
         .arg("workspace")
