@@ -2917,6 +2917,31 @@ pre code {
   font-size: 1rem;
 }
 
+.dashboard-score-panel .dashboard-risk-explainer {
+  max-width: 25rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+  color: #334155;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.dashboard-score-panel a {
+  width: max-content;
+  max-width: 100%;
+  border-bottom: 2px solid var(--green);
+  color: var(--green);
+  font-size: 0.92rem;
+  font-weight: 840;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.dashboard-score-panel a:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 .dashboard-next-action {
   display: grid;
   grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);

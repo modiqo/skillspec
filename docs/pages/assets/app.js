@@ -6,6 +6,8 @@ const REPORT_WORKFLOW = "doctor-report.yml";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const REPORTS_CACHE_KEY = "skillspec.publicReports.v2";
 const RUNS_CACHE_KEY = "skillspec.workflowRuns.v2";
+const SCORE_MODEL_URL =
+  "https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md";
 
 const form = document.querySelector("#doctor-form");
 const targetInput = document.querySelector("#target-url");
@@ -689,6 +691,8 @@ function renderReportDashboard(model) {
     `<span>Follow-through risk</span>`,
     `<strong>${escapeHtml(scoreLabel)}</strong>`,
     `<p>${escapeHtml(model.risk.levelLabel)}</p>`,
+    `<p class="dashboard-risk-explainer">This estimates how likely an agent is to skip, reorder, improvise, or finish without proof when the current skill is used as raw prose.</p>`,
+    `<a href="${escapeAttribute(SCORE_MODEL_URL)}" target="_blank" rel="noreferrer">How this score is computed</a>`,
     `</div>`,
     `</section>`,
     renderNextAction(model),
