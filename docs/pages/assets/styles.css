@@ -1342,6 +1342,37 @@ h3 {
   line-height: 1.24;
 }
 
+.hero-subheading {
+  display: grid;
+  gap: 0.28em;
+}
+
+.hero-subheading > span {
+  display: block;
+}
+
+.hero-subheading code {
+  font-style: normal;
+}
+
+.squiggle-red,
+.squiggle-blue {
+  color: var(--ink);
+  font-style: normal;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 0.075em;
+  text-underline-offset: 0.17em;
+}
+
+.squiggle-red {
+  text-decoration-color: var(--red);
+}
+
+.squiggle-blue {
+  text-decoration-color: var(--blue);
+}
+
 .follow-through-wrap {
   position: relative;
   display: inline-block;
