@@ -1570,18 +1570,18 @@ fn install_report(
         .then(|| visibility_manifest_path(context.build_root, context.visibility_manifest))
         .flatten();
     let router_refresh_recommended = !context.dry_run && !installed.is_empty();
-    let next = install_next_steps(
+    let next = install_next_steps(InstallNextStepsContext {
         ok,
-        context.dry_run,
-        context.visibility_policy,
-        context.apply_visibility,
-        context.manifest_path,
-        &context.manifest.source_root,
-        context.build_root,
-        context.manifest.packages.len(),
-        blocked.len(),
-        missing.len(),
-    );
+        dry_run: context.dry_run,
+        visibility_policy: context.visibility_policy,
+        apply_visibility: context.apply_visibility,
+        manifest_path: context.manifest_path,
+        source_root: &context.manifest.source_root,
+        build_root: context.build_root,
+        package_count: context.manifest.packages.len(),
+        blocked_count: blocked.len(),
+        missing_count: missing.len(),
+    });
     WorkspaceInstallReport {
         ok,
         dry_run: context.dry_run,
@@ -1621,20 +1621,24 @@ fn install_report(
     }
 }
 
-fn install_next_steps(
+struct InstallNextStepsContext<'a> {
     ok: bool,
     dry_run: bool,
     visibility_policy: WorkspaceVisibilityPolicy,
     apply_visibility: bool,
-    manifest_path: &Path,
-    source_root: &str,
-    build_root: &Path,
+    manifest_path: &'a Path,
+    source_root: &'a str,
+    build_root: &'a Path,
     package_count: usize,
     blocked_count: usize,
     missing_count: usize,
-) -> Vec<String> {
-    if !ok {
-        if package_count > 0 && missing_count == package_count {
+}
+
+fn install_next_steps(context: InstallNextStepsContext<'_>) -> Vec<String> {
+    let manifest_path = context.manifest_path;
+    let build_root = context.build_root;
+    if !context.ok {
+        if context.package_count > 0 && context.missing_count == context.package_count {
             return vec![
                 format!(
                     "skillspec workspace import {} --out {} --summary",
@@ -1648,7 +1652,7 @@ fn install_next_steps(
                 ),
             ];
         }
-        if blocked_count > 0 {
+        if context.blocked_count > 0 {
             return vec![
                 format!(
                     "skillspec import checklist {} --build-root {} --stage loop --json",
@@ -1664,7 +1668,7 @@ fn install_next_steps(
             build_root.display()
         )];
     }
-    if dry_run {
+    if context.dry_run {
         return vec![
             "rerun the same command without --dry-run after reviewing planned writes and visibility targets".to_owned(),
         ];
@@ -1673,8 +1677,8 @@ fn install_next_steps(
     let mut next = vec![
         "inspect workspace-install.manifest.json for installed package ids, slugs, public names, visibility targets, and target paths".to_owned(),
     ];
-    if visibility_policy != WorkspaceVisibilityPolicy::None {
-        if apply_visibility {
+    if context.visibility_policy != WorkspaceVisibilityPolicy::None {
+        if context.apply_visibility {
             next.push(
                 "inspect workspace-visibility.manifest.json for reversible native visibility changes"
                     .to_owned(),
@@ -1687,7 +1691,7 @@ fn install_next_steps(
     }
     next.push("refresh router indexes separately if this harness uses router mode".to_owned());
     next.extend(git_context::workspace_pull_request_next_steps(
-        Path::new(source_root),
+        Path::new(context.source_root),
         build_root,
     ));
     next

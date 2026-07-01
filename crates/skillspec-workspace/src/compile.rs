@@ -168,16 +168,16 @@ pub fn compile_workspace(
     let skipped = package_ids_by_status(&package_reports, WorkspaceCompileStatus::Skipped);
     let report_path = build_root.join("workspace-compile.report.md");
     let ok = failed.is_empty() && blocked.is_empty() && missing.is_empty();
-    let next = compile_next_steps(
+    let next = compile_next_steps(CompileNextStepsContext {
         ok,
         manifest_path,
         build_root,
         target,
-        manifest.packages.len(),
-        failed.len(),
-        blocked.len(),
-        missing.len(),
-    );
+        package_count: manifest.packages.len(),
+        failed_count: failed.len(),
+        blocked_count: blocked.len(),
+        missing_count: missing.len(),
+    });
 
     let report = WorkspaceCompileReport {
         ok,
@@ -366,25 +366,29 @@ fn blocked_package_report(
     })
 }
 
-fn compile_next_steps(
+struct CompileNextStepsContext<'a> {
     ok: bool,
-    manifest_path: &Path,
-    build_root: &Path,
+    manifest_path: &'a Path,
+    build_root: &'a Path,
     target: Target,
     package_count: usize,
     failed_count: usize,
     blocked_count: usize,
     missing_count: usize,
-) -> Vec<String> {
-    if ok {
+}
+
+fn compile_next_steps(context: CompileNextStepsContext<'_>) -> Vec<String> {
+    let manifest_path = context.manifest_path;
+    let build_root = context.build_root;
+    if context.ok {
         return vec![format!(
             "skillspec workspace install {} --build-root {} --target {} --dry-run --summary",
             manifest_path.display(),
             build_root.display(),
-            install_target_for_loader(target)
+            install_target_for_loader(context.target)
         )];
     }
-    if package_count > 0 && missing_count == package_count {
+    if context.package_count > 0 && context.missing_count == context.package_count {
         return vec![
             format!(
                 "skillspec workspace import {} --out {} --summary",
@@ -398,7 +402,7 @@ fn compile_next_steps(
             ),
         ];
     }
-    if blocked_count > 0 {
+    if context.blocked_count > 0 {
         return vec![
             format!(
                 "skillspec import checklist {} --build-root {} --stage loop --json",
@@ -408,7 +412,7 @@ fn compile_next_steps(
             "continue package promotion until the checklist reports complete; scaffold blockers are recoverable work, not terminal final-response blockers".to_owned(),
         ];
     }
-    if failed_count > 0 || missing_count > 0 {
+    if context.failed_count > 0 || context.missing_count > 0 {
         return vec![
             format!(
                 "repair only the failed or missing package drafts, then run `skillspec workspace converge {} --build-root {} --summary`",
@@ -419,7 +423,7 @@ fn compile_next_steps(
                 "skillspec workspace compile {} --build-root {} --target {} --summary",
                 manifest_path.display(),
                 build_root.display(),
-                target_name(target)
+                target_name(context.target)
             ),
         ];
     }
