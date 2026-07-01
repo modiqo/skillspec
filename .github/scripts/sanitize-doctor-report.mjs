@@ -5,11 +5,17 @@ const sourceDir = process.env.DOCTOR_REPORT_DIR || "doctor-report";
 const outputDir = process.env.PUBLIC_REPORT_DIR || "doctor-report-public";
 const target = process.env.TARGET || "";
 const displayTarget = process.env.DISPLAY_TARGET || displayForTarget(target);
+const replacementTargets = new Set(
+  [target, process.env.DOCTOR_TARGET || "", process.env.STAGED_SOURCE_PATH || ""].filter(Boolean),
+);
 
 fs.rmSync(outputDir, { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 
 const reportFiles = [
+  "source-stage.json",
+  "shape-gate.json",
+  "shape-gate.md",
   "doctor-report.txt",
   "doctor-report.md",
   "doctor-report.html",
@@ -31,9 +37,11 @@ fs.writeFileSync(path.join(outputDir, "target.txt"), `${displayTarget}\n`);
 
 function sanitize(content) {
   let output = content;
-  if (target && displayTarget) {
-    output = output.split(target).join(displayTarget);
-    output = output.split(encodeURI(target)).join(encodeURI(displayTarget));
+  if (displayTarget) {
+    for (const value of replacementTargets) {
+      output = output.split(value).join(displayTarget);
+      output = output.split(encodeURI(value)).join(encodeURI(displayTarget));
+    }
   }
 
   return output

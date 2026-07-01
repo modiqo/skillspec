@@ -219,8 +219,8 @@ jobs:
         if: steps.visibility.outputs.public == 'true'
         run: cargo build --locked -p skillspec
 
-      - name: Run doctor
-        id: doctor
+      - name: Assess source shape
+        id: shape
         if: steps.visibility.outputs.public == 'true'
         shell: bash
         env:
@@ -229,17 +229,31 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p doctor-report
+          target/debug/skillspec source stage "${TARGET}" --out doctor-source-stage --json > doctor-report/source-stage.json
+          node .github/scripts/doctor-shape-gate.mjs
+
+      - name: Run doctor
+        id: doctor
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        shell: bash
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
+          DOCTOR_TARGET: ${{ steps.shape.outputs.staged_source_path }}
+        run: |
+          set -euo pipefail
+          mkdir -p doctor-report
 
           set +e
-          target/debug/skillspec doctor "${TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
+          target/debug/skillspec doctor "${DOCTOR_TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
           status=$?
           set -e
           echo "status=${status}" >> "${GITHUB_OUTPUT}"
 
           if [ "${status}" -eq 0 ]; then
-            target/debug/skillspec doctor "${TARGET}" --markdown > doctor-report/doctor-report.md
-            target/debug/skillspec doctor "${TARGET}" --html > doctor-report/doctor-report.html
-            target/debug/skillspec doctor "${TARGET}" --json > doctor-report/doctor-report.json
+            target/debug/skillspec doctor "${DOCTOR_TARGET}" --markdown > doctor-report/doctor-report.md
+            target/debug/skillspec doctor "${DOCTOR_TARGET}" --html > doctor-report/doctor-report.html
+            target/debug/skillspec doctor "${DOCTOR_TARGET}" --json > doctor-report/doctor-report.json
           fi
 
       - name: Prepare public doctor artifacts
@@ -248,14 +262,24 @@ jobs:
         env:
           TARGET: ${{ steps.parse.outputs.target }}
           DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
+          DOCTOR_TARGET: ${{ steps.shape.outputs.staged_source_path }}
+          STAGED_SOURCE_PATH: ${{ steps.shape.outputs.staged_source_path }}
         run: node .github/scripts/sanitize-doctor-report.mjs
 
       - name: Add doctor report to run summary
-        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
+        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0') }}
         shell: bash
         run: |
           set -euo pipefail
           max_report_chars=52000
+          if [ "${{ steps.shape.outputs.run_full_doctor }}" = "true" ]; then
+            {
+              cat doctor-report-public/shape-gate.md
+              echo
+              echo "---"
+              echo
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
           report_bytes=$(wc -c < doctor-report-public/doctor-report.md | tr -d ' ')
 
           {
@@ -272,7 +296,7 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Add doctor failure to run summary
-        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status != '0'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.doctor.outputs.status != '0'
         shell: bash
         env:
           DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
@@ -314,19 +338,26 @@ jobs:
           if-no-files-found: error
 
       - name: Comment with doctor report
-        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status == '0'
+        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0') }}
         uses: actions/github-script@v7
         env:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          RUN_FULL_DOCTOR: ${{ steps.shape.outputs.run_full_doctor }}
         with:
           script: |
             const fs = require("fs");
             const marker = "<!-- skillspec-doctor-report -->";
             const report = fs.readFileSync("doctor-report-public/doctor-report.md", "utf8");
+            const shapeGate = fs.existsSync("doctor-report-public/shape-gate.md")
+              ? fs.readFileSync("doctor-report-public/shape-gate.md", "utf8")
+              : "";
             const maxReportChars = 52000;
-            const renderedReport = report.length > maxReportChars
-              ? `${report.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
+            const fullReport = process.env.RUN_FULL_DOCTOR === "true" && shapeGate
+              ? `${shapeGate}\n\n---\n\n${report}`
               : report;
+            const renderedReport = fullReport.length > maxReportChars
+              ? `${fullReport.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
+              : fullReport;
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
@@ -340,6 +371,9 @@ jobs:
               "- `doctor-report.md`",
               "- `doctor-report.html`",
               "- `doctor-report.json`",
+              "- `shape-gate.md`",
+              "- `shape-gate.json`",
+              "- `source-stage.json`",
               "- `target.txt`",
             ].join("\n");
 
@@ -366,7 +400,7 @@ jobs:
             }
 
       - name: Comment with doctor failure
-        if: steps.visibility.outputs.public == 'true' && steps.doctor.outputs.status != '0'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.doctor.outputs.status != '0'
         uses: actions/github-script@v7
         env:
           DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}

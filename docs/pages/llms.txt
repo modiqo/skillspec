@@ -4,6 +4,7 @@ SkillSpec is an open-source CLI and open-standard contract format for verifiable
 
 Primary site: https://skillspec.sh/
 Research explainer: https://skillspec.sh/why-skillspec.html
+Public Doctor reports: https://skillspec.sh/reports.html
 GitHub repository: https://github.com/modiqo/skillspec
 Crates.io package: https://crates.io/crates/skillspec
 Install script: https://skillspec.sh/install.sh
@@ -28,7 +29,9 @@ License: Apache 2.0
 - Current skills versus SkillSpec: https://skillspec.sh/#what-changes
 - Personas: https://skillspec.sh/#who-it-is-for
 - Adoption path: https://skillspec.sh/#adoption-path
-- Recent Doctor reports: https://skillspec.sh/#recent-doctor-reports
+- Recent Doctor reports: https://skillspec.sh/reports.html#recent-doctor-reports
+- Doctor runs: https://skillspec.sh/reports.html#doctor-runs
+- Doctor score model: https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md
 - Why SkillSpec exists: https://skillspec.sh/why-skillspec.html#why-skillspec
 - Research abstract: https://skillspec.sh/why-skillspec.html#abstract
 - Skill packaging layer: https://skillspec.sh/why-skillspec.html#skills

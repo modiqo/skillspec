@@ -25,39 +25,43 @@ const runRowTemplate = document.querySelector("#run-row-template");
 let reports = [];
 let activeFilter = "all";
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const validation = validateGitHubUrl(targetInput.value);
-  if (!validation.ok) {
-    showFormMessage(validation.message, true);
-    return;
-  }
+if (form && targetInput && formMessage) {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const validation = validateGitHubUrl(targetInput.value);
+    if (!validation.ok) {
+      showFormMessage(validation.message, true);
+      return;
+    }
 
-  const url = validation.url;
-  const issueUrl = new URL(`https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new`);
-  issueUrl.searchParams.set("title", "Doctor report: request");
-  issueUrl.searchParams.set("labels", REPORT_LABEL);
-  issueUrl.searchParams.set(
-    "body",
-    [
-      "### Public GitHub skill URL",
-      "",
-      url,
-      "",
-      "### Notes",
-      "",
-      "Submitted from the public SkillSpec Doctor page.",
-    ].join("\n"),
-  );
+    const url = validation.url;
+    const issueUrl = new URL(`https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new`);
+    issueUrl.searchParams.set("title", "Doctor report: request");
+    issueUrl.searchParams.set("labels", REPORT_LABEL);
+    issueUrl.searchParams.set(
+      "body",
+      [
+        "### Public GitHub skill URL",
+        "",
+        url,
+        "",
+        "### Notes",
+        "",
+        "Submitted from the public SkillSpec Doctor page.",
+      ].join("\n"),
+    );
 
-  showFormMessage("Opening a prefilled GitHub issue request...");
-  window.location.href = issueUrl.toString();
-});
+    showFormMessage("Opening a prefilled GitHub issue request...");
+    window.location.href = issueUrl.toString();
+  });
+}
 
-refreshButton.addEventListener("click", () => {
-  loadReports();
-  loadWorkflowRuns();
-});
+if (refreshButton) {
+  refreshButton.addEventListener("click", () => {
+    loadReports();
+    loadWorkflowRuns();
+  });
+}
 
 document.querySelectorAll(".filter").forEach((button) => {
   button.addEventListener("click", () => {
@@ -69,10 +73,12 @@ document.querySelectorAll(".filter").forEach((button) => {
   });
 });
 
-closeViewer.addEventListener("click", () => {
-  reportViewer.hidden = true;
-  reportContent.replaceChildren();
-});
+if (closeViewer && reportViewer && reportContent) {
+  closeViewer.addEventListener("click", () => {
+    reportViewer.hidden = true;
+    reportContent.replaceChildren();
+  });
+}
 
 function validateGitHubUrl(rawValue) {
   const raw = rawValue.trim();
@@ -126,6 +132,10 @@ function showFormMessage(message, isError = false) {
 }
 
 async function loadReports() {
+  if (!reportsGrid || !reportsStatus) {
+    return;
+  }
+
   const cached = readCache(REPORTS_CACHE_KEY);
   if (isFreshCache(cached)) {
     reports = cached.data;
@@ -167,6 +177,10 @@ async function loadReports() {
 }
 
 async function loadWorkflowRuns() {
+  if (!runsList || !runsStatus) {
+    return;
+  }
+
   const cached = readCache(RUNS_CACHE_KEY);
   if (isFreshCache(cached)) {
     renderWorkflowRuns(cached.data);
@@ -307,6 +321,10 @@ function compactWorkflowRun(run) {
 }
 
 function renderWorkflowRuns(workflowRuns) {
+  if (!runsList || !runsStatus || !runRowTemplate) {
+    return;
+  }
+
   runsList.replaceChildren();
   if (workflowRuns.length === 0) {
     runsStatus.textContent = "No workflow runs found yet.";
@@ -405,6 +423,10 @@ async function loadIssueReport(issue) {
 }
 
 function renderCards() {
+  if (!reportsGrid || !reportsStatus || !cardTemplate) {
+    return;
+  }
+
   reportsGrid.replaceChildren();
   const visibleReports = reports.filter((report) => {
     return activeFilter === "all" || report.status === activeFilter;
@@ -436,12 +458,14 @@ function renderCards() {
     node.querySelector('[data-field="risk"]').textContent = report.risk;
     issueLink.href = report.issue.html_url;
 
-    viewButton.addEventListener("click", () => {
-      viewerTitle.textContent = `Report #${report.issue.number}`;
-      reportContent.innerHTML = renderMarkdown(report.markdown);
-      reportViewer.hidden = false;
-      reportViewer.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    if (viewButton && viewerTitle && reportContent && reportViewer) {
+      viewButton.addEventListener("click", () => {
+        viewerTitle.textContent = `Report #${report.issue.number}`;
+        reportContent.innerHTML = renderMarkdown(report.markdown);
+        reportViewer.hidden = false;
+        reportViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
 
     reportsGrid.appendChild(node);
   }
@@ -451,14 +475,15 @@ function parseSummary(markdown) {
   const target = matchLine(markdown, /\*\*Target:\*\*\s+(.*)/);
   const shape = matchLine(markdown, /\*\*Shape:\*\*\s+`?([^`\n-]+)`?/);
   const verdict = matchLine(markdown, /- \*\*Verdict:\*\*\s+(.+)/);
+  const decision = matchLine(markdown, /- \*\*Decision:\*\*\s+(.+)/);
   const risk =
     matchLine(markdown, /- \*\*Agent follow-through risk:\*\*\s+(.+)/) ||
     matchLine(markdown, /- \*\*Follow-through risk:\*\*\s+(.+)/);
   return {
     target: stripMarkdown(target),
     shape: stripMarkdown(shape),
-    verdict: stripMarkdown(verdict),
-    risk: stripMarkdown(risk),
+    verdict: stripMarkdown(verdict || decision),
+    risk: stripMarkdown(risk || (decision ? "shape gate" : "")),
   };
 }
 
@@ -660,5 +685,10 @@ function escapeAttribute(value) {
   return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
-loadReports();
-loadWorkflowRuns();
+if (reportsGrid) {
+  loadReports();
+}
+
+if (runsList) {
+  loadWorkflowRuns();
+}

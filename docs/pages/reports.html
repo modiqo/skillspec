@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Public SkillSpec Doctor reports, shape-aware risk summaries, workflow runs, and a plain-language guide to how Doctor scores skill reliability risk."
+    >
+    <title>SkillSpec Doctor Reports</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
+    <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260630-shape-reports">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-brand" href="./index.html" aria-label="SkillSpec home">
+        <img src="./assets/skillspec-wordmark.svg" alt="">
+      </a>
+      <form
+        class="header-search"
+        action="https://github.com/modiqo/skillspec/search"
+        method="get"
+        target="_blank"
+        role="search"
+      >
+        <input type="hidden" name="type" value="code">
+        <label class="sr-only" for="reports-site-search">Search SkillSpec on GitHub</label>
+        <input id="reports-site-search" name="q" type="search" placeholder="Search">
+      </form>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="./index.html#assess">Assess your skill</a>
+        <a href="./index.html#install">Install</a>
+        <a href="./index.html#who-it-is-for">Who it is for</a>
+        <a href="./why-skillspec.html">Why SkillSpec</a>
+        <a href="./reports.html" aria-current="page">Reports</a>
+        <a
+          class="github-link star-link"
+          href="https://github.com/modiqo/skillspec"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Star SkillSpec on GitHub"
+        >
+          <span>GitHub</span>
+          <span class="star-badge" aria-hidden="true">&#9733; <span data-github-stars>Star</span></span>
+        </a>
+        <a href="https://crates.io/crates/skillspec" target="_blank" rel="noreferrer">Crates.io</a>
+      </nav>
+    </header>
+
+    <main class="shell reports-shell">
+      <section id="reports-home" class="reports-hero" aria-labelledby="reports-page-title">
+        <div>
+          <p class="eyebrow">Public Doctor reports</p>
+          <h1 id="reports-page-title">
+            <a class="heading-link" href="#reports-home">Readable risk evidence before install.</a>
+          </h1>
+          <p class="lede">
+            Doctor first identifies the submitted GitHub shape, then reports the
+            reliability risks that matter for that shape: one skill, many skill
+            folders, a plugin workspace, or a source repo with no importable
+            skill package.
+          </p>
+        </div>
+        <div class="score-explainer-panel" aria-labelledby="score-explainer-title">
+          <p class="eyebrow">How the score works</p>
+          <h2 id="score-explainer-title">Static signals, cited basis, clear limits.</h2>
+          <p>
+            The score is a deterministic heuristic. It adds source findings such
+            as broad activation text, buried obligations, implicit dependencies,
+            missing proof surfaces, and namespace hazards. It does not claim a
+            runtime failure or judge domain quality.
+          </p>
+          <a
+            href="https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md"
+            target="_blank"
+            rel="noreferrer"
+          >Read the score model</a>
+        </div>
+      </section>
+
+      <section class="shape-cue-grid" aria-label="Shape-specific report interpretation">
+        <article>
+          <span>Simple</span>
+          <strong>One SKILL.md</strong>
+          <p>Direct package risk: frontmatter, activation body, dependencies, references, tests, and proof.</p>
+        </article>
+        <article>
+          <span>Multi</span>
+          <strong>Many skill folders</strong>
+          <p>Workspace risk rolls up per-package profiles while keeping every path as package identity.</p>
+        </article>
+        <article>
+          <span>Plugin</span>
+          <strong>Namespaced workspace</strong>
+          <p>Plugin roots, repeated names, and repeated content are valid only when namespace/path identity survives.</p>
+        </article>
+        <article>
+          <span>Source</span>
+          <strong>No skill found</strong>
+          <p>Doctor stops at shape guidance so public CI does not spend cycles analyzing an arbitrary code repo.</p>
+        </article>
+      </section>
+
+      <section id="recent-doctor-reports" class="reports-section" aria-labelledby="reports-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Public proof</p>
+            <h2 id="reports-title">
+              <a class="heading-link" href="#recent-doctor-reports">Recent Doctor reports</a>
+            </h2>
+          </div>
+          <div class="toolbar">
+            <button class="filter active" type="button" data-filter="all">All</button>
+            <button class="filter" type="button" data-filter="success">Success</button>
+            <button class="filter" type="button" data-filter="error">Error</button>
+            <button id="refresh-reports" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="reports-status" class="reports-status" role="status" aria-live="polite">
+          Loading reports...
+        </div>
+        <div id="reports-grid" class="reports-grid"></div>
+      </section>
+
+      <section id="report-viewer" class="report-viewer" aria-labelledby="viewer-title" hidden>
+        <div class="viewer-header">
+          <div>
+            <p class="eyebrow">Rendered report</p>
+            <h2 id="viewer-title">
+              <a class="heading-link" href="#report-viewer">Report</a>
+            </h2>
+          </div>
+          <button id="close-viewer" type="button">Close</button>
+        </div>
+        <article id="report-content" class="report-content"></article>
+      </section>
+
+      <section id="doctor-runs" class="runs-section" aria-labelledby="runs-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Public automation</p>
+            <h2 id="runs-title">
+              <a class="heading-link" href="#doctor-runs">Doctor runs</a>
+            </h2>
+          </div>
+        </div>
+        <div id="runs-status" class="reports-status" role="status" aria-live="polite">
+          Loading workflow runs...
+        </div>
+        <div id="runs-list" class="runs-list"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p class="site-credit">
+        &copy; 2026 SkillSpec &middot; Built by the
+        <a href="https://modiqo.ai" target="_blank" rel="noreferrer">Modiqo team</a>
+        &middot; Open Source under Apache 2.0 License
+      </p>
+    </footer>
+
+    <template id="report-card-template">
+      <article class="report-card">
+        <div class="card-topline">
+          <span class="status-pill"></span>
+          <span class="issue-number"></span>
+        </div>
+        <h3></h3>
+        <dl>
+          <div>
+            <dt>Verdict</dt>
+            <dd data-field="verdict"></dd>
+          </div>
+          <div>
+            <dt>Shape</dt>
+            <dd data-field="shape"></dd>
+          </div>
+          <div>
+            <dt>Risk</dt>
+            <dd data-field="risk"></dd>
+          </div>
+        </dl>
+        <div class="card-actions">
+          <button type="button" data-action="view">View report</button>
+          <a data-action="issue" target="_blank" rel="noreferrer">GitHub issue</a>
+        </div>
+      </article>
+    </template>
+
+    <template id="run-row-template">
+      <article class="run-row">
+        <span class="status-pill"></span>
+        <div>
+          <h3></h3>
+          <p></p>
+        </div>
+        <a target="_blank" rel="noreferrer">View run</a>
+      </article>
+    </template>
+
+    <script src="./assets/site.js?v=20260628-risk-star"></script>
+    <script src="./assets/app.js?v=20260630-shape-reports"></script>
+  </body>
+</html>

@@ -2644,6 +2644,174 @@ pre code {
   color: var(--green);
 }
 
+.reports-shell {
+  width: min(1280px, calc(100% - 32px));
+}
+
+.reports-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 28px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.reports-hero h1 {
+  max-width: 880px;
+}
+
+.score-explainer-panel {
+  border: 2px solid var(--line);
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.score-explainer-panel h2 {
+  max-width: 16ch;
+  margin-bottom: 14px;
+  font-size: 1.36rem;
+}
+
+.score-explainer-panel p {
+  margin-bottom: 18px;
+  color: #504a43;
+  line-height: 1.62;
+}
+
+.score-explainer-panel a {
+  display: inline-flex;
+  align-items: center;
+  border: 2px solid var(--line);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.score-explainer-panel a:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.shape-cue-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 2px solid var(--line);
+  border-left: 2px solid var(--line);
+  margin-bottom: 30px;
+}
+
+.shape-cue-grid article {
+  min-width: 0;
+  border-right: 2px solid var(--line);
+  border-bottom: 2px solid var(--line);
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.shape-cue-grid span {
+  display: inline-flex;
+  margin-bottom: 18px;
+  color: var(--blue);
+  font-size: 0.76rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.shape-cue-grid strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.05rem;
+}
+
+.shape-cue-grid p {
+  margin: 0;
+  color: #5a534b;
+  line-height: 1.56;
+}
+
+.reports-shell .reports-section,
+.reports-shell .runs-section,
+.reports-shell .report-viewer {
+  background: rgba(255, 255, 255, 0.70);
+}
+
+.reports-shell .reports-grid {
+  gap: 14px;
+}
+
+.reports-shell .report-card {
+  border: 2px solid var(--line);
+  padding: 18px;
+  background: #ffffff;
+}
+
+.reports-shell .report-card:first-child,
+.reports-shell .run-row:first-child {
+  border-top: 2px solid var(--line);
+}
+
+.reports-shell .report-card dl div {
+  border-left: 2px solid var(--line-soft);
+  background: rgba(247, 248, 251, 0.78);
+  padding: 12px;
+}
+
+.reports-shell .report-card dt {
+  color: #6b6259;
+  font-size: 0.76rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.reports-shell .report-card dd {
+  color: var(--ink);
+  font-size: 1.02rem;
+}
+
+.reports-shell .card-topline {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  margin: 0;
+}
+
+.reports-shell .card-actions {
+  align-content: stretch;
+}
+
+.reports-shell .card-actions button,
+.reports-shell .card-actions a {
+  min-height: 44px;
+}
+
+.reports-shell .report-viewer {
+  border-color: var(--green);
+}
+
+.reports-shell .report-content {
+  max-width: none;
+}
+
+.reports-shell .report-content > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.reports-shell .report-content > ul > li {
+  border: 1px solid var(--line-soft);
+  padding: 12px;
+  background: rgba(247, 248, 251, 0.78);
+}
+
+.reports-shell .report-content > ul > li::marker {
+  content: "";
+}
+
 .page-nav {
   justify-content: flex-start;
   margin-bottom: 34px;
@@ -2793,7 +2961,8 @@ pre code {
   .request-panel,
   .private-note,
   .article-layout,
-  .abstract-panel {
+  .abstract-panel,
+  .reports-hero {
     grid-template-columns: 1fr;
   }
 
@@ -2857,6 +3026,10 @@ pre code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .shape-cue-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tax-grid,
   .load-bearing-grid,
   .boom-sources ol {
@@ -2916,7 +3089,8 @@ pre code {
   }
 
   .shell,
-  .article-shell {
+  .article-shell,
+  .reports-shell {
     width: min(100% - 28px, 1360px);
     padding-top: 34px;
   }
@@ -2976,6 +3150,14 @@ pre code {
   .report-card,
   .run-row {
     grid-template-columns: 1fr;
+  }
+
+  .shape-cue-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .score-explainer-panel {
+    padding: 20px;
   }
 
   .flow-row,
@@ -3060,7 +3242,8 @@ pre code {
 
 @media (max-width: 520px) {
   .shell,
-  .article-shell {
+  .article-shell,
+  .reports-shell {
     width: calc(100% - 20px);
     padding-bottom: 48px;
   }
