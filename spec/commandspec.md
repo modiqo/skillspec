@@ -1629,7 +1629,7 @@ skillspec router <COMMAND>
 
 Subcommands:
 
-- `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--json]`
+- `install --roots <path>... --index <index-file-or-router-dir> [--manifest <path>] [--router-name <name>] [--dry-run] [--force] [--json]`
 - `update [--backup-dir <path>] [--dry-run] [--json]`
 - `enable [--dry-run] [--json]`
 - `disable [--dry-run] [--json]`
@@ -1659,6 +1659,14 @@ durable first-hop execution is unavailable until durable-executor is installed
 separately. After building the index, install runs `index status` internally and
 reports preparedness; a prepared router has a present, non-stale index whose
 indexed skill count matches the discovered skill count.
+
+If `--index` points at an existing file where the router config directory must be
+created, install fails with an explicit legacy-index error instead of overwriting
+or flattening the path. This commonly happens when an older install used
+`~/.skillspec/router` directly as the SQLite index file. Re-run with `--force`
+only after accepting the migration; the legacy file is moved to
+`<router-dir>/skill-index.sqlite`, then router config is written under the same
+directory.
 
 `router enable` is the reversible switch-on path for an installed router. It
 reads router config, refreshes every managed `skill-router` package, applies

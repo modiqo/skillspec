@@ -60,13 +60,16 @@ Grounded command:
 ```sh
 skillspec router install \
   --roots <skill-root>... \
-  --index <router-index>
+  --index <router-index> \
+  [--force]
 ```
 
 Review check:
 
 - Router skill is generated in each configured root.
 - Router config records managed roots and router skill dirs.
+- `--force` is only for accepted migration of a legacy router SQLite index file
+  into `<router-index>/skill-index.sqlite`.
 - Visibility is manifest-backed for restore.
 - After harness restart, the router is the implicit first hop for every request
   in managed roots.

@@ -26,6 +26,9 @@ pub(in crate::cli) enum RouterCommand {
         /// Show changes without writing files, index, manifest, or config.
         #[arg(long)]
         dry_run: bool,
+        /// Migrate a legacy router SQLite file that blocks the router config directory.
+        #[arg(long)]
+        force: bool,
         /// Emit JSON instead of a concise human report.
         #[arg(long)]
         json: bool,

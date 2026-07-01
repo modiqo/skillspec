@@ -133,7 +133,7 @@ routes:
             - show_router_lifecycle_plan
         - id: apply_lifecycle_change
           owner_skill: {router_skill}
-          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
+          description: Run router install, enable, disable, update, uninstall, guard, index refresh, or index status commands. Install/enable/update manage prompt guard hooks. If install reports that the index path is a legacy router SQLite file blocking the config directory, rerun install with --force only after accepting migration to skill-index.sqlite. Disable removes managed guard hooks, makes the router explicit-only, and restores routed skills to implicit/default without deleting router files.
           requires:
             - run_router_lifecycle_command
         - id: verify_lifecycle_change
@@ -241,8 +241,8 @@ commands:
     safety: local_read
 
   run_router_lifecycle_command:
-    description: Apply the requested router lifecycle command. Use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
-    template: 'skillspec router install|enable|disable|update|uninstall|guard|index refresh|index status'
+    description: Apply the requested router lifecycle command. Use router install --force only to migrate an accepted legacy SQLite index file into the router config directory; use guard to verify first_hop_ready and repair visibility/index drift; use enable to reapply explicit invocation controls, install guard hooks, and rebuild the index after router mode was disabled; use disable to remove managed guard hooks.
+    template: 'skillspec router install [--force]|enable|disable|update|uninstall|guard|index refresh|index status'
     safety: local_write
 
   run_visibility_plan:

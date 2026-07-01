@@ -37,7 +37,7 @@ skillspec skills set-visibility <skill> manual-only --roots <skill-root>... --ma
 skillspec skills disable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec skills enable <skill> --roots <skill-root>... --manifest <manifest>
 skillspec status [--roots <skill-root>...] [--json]
-skillspec router install --roots <skill-root>... --index <index-file-or-router-dir>
+skillspec router install --roots <skill-root>... --index <index-file-or-router-dir> [--force]
 skillspec router enable
 skillspec router disable
 skillspec router update [--backup-dir <backup-dir>]
@@ -65,6 +65,12 @@ skillspec durable-executor delete # alias: uninstall
 
 Any index argument can be either the SQLite file itself or the router directory;
 directory paths resolve to `skill-index.sqlite`.
+
+If an older local install used `~/.skillspec/router` as a SQLite index file,
+`router install --index ~/.skillspec/router` cannot also create
+`~/.skillspec/router/config.json`. In that case install reports a legacy-index
+collision and asks for `--force`; the forced path moves the old file to
+`~/.skillspec/router/skill-index.sqlite` before creating router config.
 
 Router mode is the managed state created by `skillspec router install`:
 

@@ -537,7 +537,7 @@ description: Router lifecycle fixture.
 commands:
   router_install:
     description: Install router mode.
-    template: skillspec router install --roots <skill-roots> --index <router-index>
+    template: skillspec router install --roots <skill-roots> --index <router-index> [--force]
     safety: local_write
   router_enable:
     description: Enable router mode.
@@ -561,6 +561,10 @@ commands:
         .unwrap();
     assert_success(&output);
     let out = stdout(&output);
+    assert!(out
+        .contains("skillspec router install --roots <skill-roots> --index <router-index> --json"));
+    assert!(out.contains("legacy router SQLite file"));
+    assert!(out.contains("--force"));
     assert!(out.contains("direct `skillspec index`"));
     assert!(out.contains("router-specific catalog construction"));
     assert!(

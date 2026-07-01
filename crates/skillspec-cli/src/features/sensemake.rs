@@ -496,6 +496,10 @@ fn navigation(spec: &SkillSpec, spec_path: &str) -> Vec<NavigationHint> {
     if has_router_lifecycle(spec) {
         hints.extend([
             NavigationHint {
+                intent: "install router mode",
+                command: "skillspec router install --roots <skill-roots> --index <router-index> --json # if the index path is a legacy router SQLite file, rerun with --force to migrate it".to_owned(),
+            },
+            NavigationHint {
                 intent: "inspect installed lifecycle, roots, index, and skill inventory status",
                 command: "skillspec status --json".to_owned(),
             },

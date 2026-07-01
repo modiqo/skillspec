@@ -1120,6 +1120,79 @@ routes:
 }
 
 #[test]
+fn router_install_reports_legacy_index_collision_and_force_migrates() {
+    let dir = TempDir::new("router-legacy-index");
+    let home = dir.path().join("home");
+    let skillspec_home = dir.path().join("skillspec-home");
+    let root = home.join(".agents/skills");
+    let legacy_index = skillspec_home.join("router");
+
+    write_file(
+        &root.join("pdf/SKILL.md"),
+        r#"---
+name: pdf
+description: Use when extracting PDF text, tables, and images.
+---
+# PDF
+"#,
+    );
+
+    let build_legacy_index = Command::new(bin())
+        .arg("index")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--out")
+        .arg(&legacy_index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&build_legacy_index);
+    assert!(legacy_index.is_file());
+
+    let blocked = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&legacy_index)
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_failure(&blocked);
+    let blocked_error = stderr(&blocked);
+    assert!(blocked_error.contains("legacy router SQLite index"));
+    assert!(blocked_error.contains("--force"));
+    assert!(blocked_error.contains("skill-index.sqlite"));
+    assert!(legacy_index.is_file());
+    assert!(!root.join("skill-router/SKILL.md").exists());
+
+    let forced = Command::new(bin())
+        .env("HOME", &home)
+        .env("SKILLSPEC_HOME", &skillspec_home)
+        .arg("router")
+        .arg("install")
+        .arg("--roots")
+        .arg(&root)
+        .arg("--index")
+        .arg(&legacy_index)
+        .arg("--force")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert_success(&forced);
+    let report = json_stdout(&forced);
+    let migrated_index = legacy_index.join("skill-index.sqlite");
+    assert_eq!(report["index"], migrated_index.to_string_lossy().as_ref());
+    assert!(legacy_index.is_dir());
+    assert!(migrated_index.is_file());
+    assert!(legacy_index.join("config.json").is_file());
+    assert!(root.join("skill-router/SKILL.md").is_file());
+}
+
+#[test]
 #[cfg(unix)]
 fn router_install_tracks_symlinked_harness_roots_and_uninstalls_all() {
     let dir = TempDir::new("router-symlink-roots");

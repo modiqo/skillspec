@@ -15,6 +15,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
             manifest,
             router_name,
             dry_run,
+            force,
             json,
         } => {
             let report = harness::install_router(harness::RouterInstallOptions {
@@ -23,6 +24,7 @@ pub(super) fn run(command: RouterCommand) -> Result<()> {
                 manifest,
                 router_name: Some(router_name),
                 dry_run,
+                force,
             })?;
             if json {
                 report::json(&report)?;

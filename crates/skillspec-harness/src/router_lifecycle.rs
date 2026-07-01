@@ -19,6 +19,7 @@ pub struct RouterInstallOptions {
     pub manifest: Option<PathBuf>,
     pub router_name: Option<String>,
     pub dry_run: bool,
+    pub force: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -331,18 +332,18 @@ pub fn install(options: RouterInstallOptions) -> Result<RouterInstallReport> {
             message: "router install requires at least one --roots path".to_owned(),
         });
     }
-    let index = router::normalize_index_path(options.index);
     let router_name = options
         .router_name
         .unwrap_or_else(|| DEFAULT_ROUTER_NAME.to_owned());
     validate_router_name(&router_name)?;
+    let config = config_path()?;
+    let index = prepare_install_index_path(options.index, &config, options.force, options.dry_run)?;
     let router_skill_dirs = router_skill_dirs_for_roots(&options.roots, &router_name);
     let router_skill_dir = router_skill_dirs[0].clone();
     let manifest = options
         .manifest
         .clone()
         .unwrap_or_else(|| default_manifest_for_index(&index));
-    let config = config_path()?;
     let durable_executor = inspect_durable_executor(&options.roots)?;
 
     let router_skill_reports =
@@ -859,6 +860,85 @@ pub use render::{
 
 fn router_skill_dirs_for_roots(roots: &[PathBuf], router_name: &str) -> Vec<PathBuf> {
     roots.iter().map(|root| root.join(router_name)).collect()
+}
+
+fn prepare_install_index_path(
+    requested_index: PathBuf,
+    config_path: &Path,
+    force: bool,
+    dry_run: bool,
+) -> Result<PathBuf> {
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
+    if !config_dir.is_file() {
+        return Ok(router::normalize_index_path(requested_index));
+    }
+
+    let legacy_destination = config_dir.join(router::DEFAULT_INDEX_FILE);
+    if !force {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "router install cannot create config directory {} because an existing file is there. This is usually a legacy router SQLite index. Re-run with `--force` to migrate it to {}, or move the file yourself and retry.",
+                config_dir.display(),
+                legacy_destination.display()
+            ),
+        });
+    }
+
+    if dry_run {
+        if requested_index == config_dir {
+            return Ok(legacy_destination);
+        }
+        return Ok(router::normalize_index_path(requested_index));
+    }
+
+    migrate_legacy_router_index(config_dir, &legacy_destination)?;
+    if requested_index == config_dir {
+        Ok(legacy_destination)
+    } else {
+        Ok(router::normalize_index_path(requested_index))
+    }
+}
+
+fn migrate_legacy_router_index(legacy_path: &Path, destination: &Path) -> Result<()> {
+    let backup_path = legacy_path.with_file_name(format!(
+        "{}.legacy-index-{}-{}.sqlite",
+        legacy_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("router"),
+        now_unix(),
+        std::process::id()
+    ));
+    fs::rename(legacy_path, &backup_path).map_err(|source| Error::Write {
+        path: legacy_path.to_path_buf(),
+        source,
+    })?;
+    if let Err(source) = fs::create_dir_all(legacy_path) {
+        let _ = fs::rename(&backup_path, legacy_path);
+        return Err(Error::Write {
+            path: legacy_path.to_path_buf(),
+            source,
+        });
+    }
+    if destination.exists() {
+        let _ = fs::remove_dir(legacy_path);
+        let _ = fs::rename(&backup_path, legacy_path);
+        return Err(Error::InvalidInput {
+            message: format!(
+                "router install --force could not migrate legacy index because {} already exists",
+                destination.display()
+            ),
+        });
+    }
+    if let Err(source) = fs::rename(&backup_path, destination) {
+        let _ = fs::remove_dir(legacy_path);
+        let _ = fs::rename(&backup_path, legacy_path);
+        return Err(Error::Write {
+            path: destination.to_path_buf(),
+            source,
+        });
+    }
+    Ok(())
 }
 
 fn install_router_skills(
