@@ -1,9 +1,9 @@
 # Doctor Agent Drift Risk
 
-Status: implemented in part on `doctor-agent-drift-risk`; extended model design
+Status: implemented in part; extended model design
 Owner: SkillSpec
 Source design: `~/tulving/design/skillspec-agent-drift-risk/README.md`
-Last synchronized: 2026-06-27
+Last synchronized: 2026-07-01
 
 ## Purpose
 
@@ -86,6 +86,202 @@ Future sections in this document intentionally go beyond the current
 implementation where they describe tokenizers, model/harness profiles,
 compaction inputs, and calibrated scoring. Those sections are design
 requirements for the next doctor iterations.
+
+## Implemented Algorithm
+
+The implemented score is a deterministic static heuristic. It is not a neural
+model, probability model, or execution trace result. It converts observable
+source findings into issue penalties, caps the total at 100, and reports the
+result as agent follow-through risk.
+
+High-level flow:
+
+```text
+inspect target
+  classify shape
+  if no SKILL.md:
+    return shape-only non-skill report
+  if one atomic SKILL.md:
+    run full single-package doctor
+  otherwise:
+    run workspace doctor
+      preserve path/plugin identity
+      build one package risk profile per SKILL.md
+      reuse identical package fingerprints for speed, not for identity collapse
+      roll package risks up to the workspace
+```
+
+For one atomic skill package, doctor computes:
+
+```text
+source_map = build package map
+frontmatter = parse and score SKILL.md frontmatter
+surface = measure activation body, deferred files, unmapped files
+counts = count modal obligations, numbered steps, code fences,
+         dependency mentions, missing local references, manifests, code files
+contract = load skill.spec.yml if present and valid
+
+issues =
+  invalid contract, if present
+  frontmatter discovery findings
+  activation size and activation-surface findings
+  instruction density findings
+  late modal-obligation findings
+  code-in-prose and unlabeled-code-fence findings
+  operational prose without structured contract findings
+  implicit dependency findings
+  missing local reference and unmapped-surface findings
+  missing behavior-contract findings
+  missing trace/proof-surface findings
+
+penalty = min(100, sum(issue.score_penalty))
+structural_score = 100 - penalty
+agent_drift_risk.score = 100 - structural_score
+agent_drift_risk.level = policy_band(agent_drift_risk.score)
+```
+
+Policy bands are:
+
+```text
+0-24   low
+25-49  medium
+50-74  high
+75-100 critical
+```
+
+If a valid `skill.spec.yml` is present, doctor also reports contract
+mitigation. The mitigation level is based on whether the contract contains the
+main checkable surfaces:
+
+- routes;
+- rules;
+- commands;
+- dependencies;
+- tests.
+
+All five surfaces give strong mitigation and subtract 30 points from raw risk.
+Three or four give partial mitigation and subtract 18 points. Fewer give weak
+mitigation and subtract 8 points. Mitigation never reduces risk below zero and
+does not erase activation risk, because the loaded `SKILL.md` still competes
+for attention.
+
+For workspace, multi-skill, and plugin-shaped sources, doctor first preserves
+source identity:
+
+- each `SKILL.md` path remains a distinct package identity;
+- plugin namespace is part of the package/install identity when present;
+- byte-identical or package-identical content can reuse a canonical risk
+  profile for compute efficiency;
+- reused profiles do not imply duplicate packages are safe to flatten.
+
+Workspace risk is then:
+
+```text
+package_score = max(package.agent_drift_risk.score for every package)
+issue_score = min(100, sum(workspace_shape_issue.score_penalty))
+workspace_agent_drift_risk.score = max(package_score, issue_score)
+```
+
+The report includes a `workspace_package_risk_rollup` condition with package
+counts by level, the highest-risk packages, and canonical profile reuse
+metadata. This prevents a low workspace-shape verdict from hiding a critical
+raw package.
+
+## Heuristic Signal Groups
+
+Doctor uses static findings because the failure mode being estimated is also
+static at install/import time: the skill text contains more behavior than the
+harness can check. The current signal groups are:
+
+| Group | Example current findings | Why it matters |
+| --- | --- | --- |
+| Discovery risk | Missing YAML frontmatter, very short descriptions, overbroad descriptions, listing-budget pressure. | A skill can fail before activation if the harness cannot select it reliably, or can over-trigger if metadata is too broad. |
+| Context pressure | Large activation body, high percentage of package text loaded by `SKILL.md`. | More active prose means more competition for attention and less space for task state, evidence, and tool output. |
+| Position risk | Modal obligations after the configured late-body threshold. | Load-bearing instructions buried late are more likely to be skipped than rules promoted into early summaries or structured checks. |
+| Instruction density | Many modal obligations or numbered steps. | A model must satisfy many independent constraints from memory unless they are made checkable. |
+| Execution ambiguity | Operational verbs without routes, commands, tool boundaries, or trace vocabulary. | The model may improvise tools, skip setup, or report success without proving required steps. |
+| Dependency ambiguity | Dependency mentions, code files, manifests, or code fences without `deps.toml` or structured dependencies. | Install/runtime assumptions become invisible and are easy to misclassify. |
+| Source integrity | Missing local Markdown references or package files not reachable from explicit references. | The agent may be told to load guidance that is absent or miss package-local material during import. |
+| Proof gap | No valid `skill.spec.yml`, tests, `.skillspec` evidence, trace, or progress surface. | There is no falsifiable record of route choice, constraints, or completed obligations. |
+| Workspace identity | Multi-skill or plugin shape with repeated names/content. | Shape can be healthy only if path and namespace identity survive mapping, compile, and install. |
+
+Each finding carries:
+
+- an issue id;
+- severity;
+- score penalty;
+- evidence path/preview;
+- basis ids;
+- remediation;
+- claim scope;
+- threshold source.
+
+The basis ids justify the direction of risk. The score penalty is SkillSpec
+policy v0 unless an implementation explicitly says otherwise.
+
+## Transformer And Compaction Assumptions
+
+Doctor's risk model is built around a narrow claim about transformer-based
+agent runs: load-bearing prose is not a reliable enforcement layer once it is
+mixed into a long, evolving context.
+
+The citations support this direction of risk:
+
+- `lost_middle_position_effect`: long-context models do not use information
+  uniformly across positions. This motivates position-risk findings for buried
+  obligations.
+- `ruler_effective_context`: advertised context length is not the same as
+  reliable usable context. This motivates context-pressure findings rather than
+  treating a large token window as free capacity.
+- `ifeval_verifiable_instructions`: instruction following can be evaluated with
+  checkable constraints. This motivates tests, route decisions, closures, and
+  explicit forbids instead of relying on prose alone.
+- `agentboard_process_metrics`: agent quality needs process evidence, not only
+  final answers. This motivates trace/progress proof surfaces.
+- `anthropic_context_management` and `governance_decay_compaction`: compaction
+  and summarization can drop or weaken older constraints. This motivates
+  durable state, thin trampolines, externalized checklists, and structured proof
+  requirements.
+- `skillspec_local_reliability_gap` and `skillspec_local_contract_trace`: local
+  engineering methodology ties those findings to the concrete SkillSpec
+  surfaces that can be checked.
+
+Doctor does not inspect transformer attention weights, simulate a specific
+model, or claim a specific probability of failure. It uses observable source
+shape as a proxy for the amount of behavior a model would have to remember,
+retrieve, order, and prove after activation and after possible compaction.
+
+Context compaction is especially important for long-running agent work because
+the active conversation is not a stable append-only record from the model's
+point of view. After interruption, summarization, or harness compaction, the
+model may receive only a compressed account of prior work. If safety gates,
+dependency decisions, source-shape findings, or "do not" rules lived only in
+ordinary prose, they can be omitted or weakened by that compression cycle.
+SkillSpec's response is to put load-bearing behavior into durable, queryable
+surfaces: spec fields, source maps, dependency ledgers, run-loop guide state,
+progress ledgers, tests, and alignment reports.
+
+## Current Shortcomings
+
+The implemented algorithm is intentionally conservative and explainable, but it
+has important limits:
+
+- It is static. It does not prove the skill failed or succeeded at runtime.
+- It is not calibrated to empirical pass/fail traces yet.
+- Numeric thresholds and score deltas are SkillSpec policy v0, not paper-derived
+  probabilities.
+- Current token counts are estimates unless a future tokenizer/model profile is
+  supplied.
+- Current compaction risk is mostly structural. Without current-session token
+  counts and harness thresholds, doctor cannot claim that a specific run is near
+  compaction.
+- Domain correctness is out of scope. A low-risk legal, medical, financial, or
+  engineering skill can still be wrong in substance.
+- Full workspace package profiling reduces shallow rollups, but it still relies
+  on static source features and cannot prove semantic completeness of a port.
+- External citation coverage and implemented basis ids must stay synchronized.
+  When a condition is backed only by local methodology, the report should not
+  present it as externally validated.
 
 ## Research Basis
 
