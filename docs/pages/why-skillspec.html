@@ -5,26 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Context Insolvency: a SkillSpec research paper on discovery economics, follow-through decay, and behavioral contracts in agent skill ecosystems."
+      content="Why SkillSpec exists: a research-style explanation of agent skills, attention pressure, Doctor risk analysis, structured contracts, routing, proof, and durable execution."
     >
-    <title>Context Insolvency - SkillSpec Research</title>
+    <title>Why SkillSpec Exists</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Antic&display=swap" rel="stylesheet">
     <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260702-context-insolvency-research">
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [["\\(", "\\)"]],
-          displayMath: [["\\[", "\\]"]],
-          processEscapes: true
-        },
-        svg: { fontCache: "global" },
-        options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
-      };
-    </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <link rel="stylesheet" href="./assets/styles.css?v=20260702-research-page-split">
   </head>
   <body>
     <header class="site-header">
@@ -47,6 +35,7 @@
         <a href="./index.html#install">Install</a>
         <a href="./index.html#who-it-is-for">Who it is for</a>
         <a href="./why-skillspec.html" aria-current="page">Why SkillSpec</a>
+        <a href="./research.html">Research</a>
         <a href="./reports.html">Reports</a>
         <a
           class="github-link star-link"
@@ -58,393 +47,444 @@
           <span>GitHub</span>
           <span class="star-badge" aria-hidden="true">&#9733; <span data-github-stars>Star</span></span>
         </a>
-        <a href="#research">Research</a>
       </nav>
     </header>
-    <main class="shell article-shell research-shell">
-      <section id="research" class="article-hero research-hero" aria-labelledby="research-page-title">
+    <main class="shell article-shell">
+      <section id="why-skillspec" class="article-hero" aria-labelledby="article-title">
         <div>
-          <p class="eyebrow">Research</p>
-          <h1 id="research-page-title">
-            <a class="heading-link" href="#research">Context Insolvency: Discovery Economics, Follow-Through Decay, and the Case for Behavioral Contracts in Agent Skill Ecosystems</a>
+          <p class="eyebrow">Research note</p>
+          <h1 id="article-title">
+            <a class="heading-link" href="#why-skillspec">Why SkillSpec exists</a>
           </h1>
-        </div>
-        <aside class="research-masthead" aria-label="Paper details">
-          <p class="research-meta">
-            <span><strong>Chetan Conikee</strong> — Modiqo Research</span>
-            <span>Draft v0.1 — July 2026</span>
+          <p class="lede">
+            Skills made agent knowledge portable. SkillSpec makes important
+            skills followable, testable, and provable without forcing the agent
+            to keep the whole operating manual in working memory.
           </p>
-          <a class="research-start" href="#research-abstract">Start reading</a>
-        </aside>
+        </div>
+        <figure class="article-figure">
+          <img
+            src="./assets/skillspec-layer-stack.svg"
+            alt="Concentric diagram showing models, the agent harness, SkillSpec, and skills."
+          >
+          <figcaption>
+            SkillSpec sits inside the skills layer: close enough to travel with
+            the skill, structured enough for the harness and CLI to check.
+          </figcaption>
+        </figure>
       </section>
 
-      <div class="article-layout research-layout">
-        <aside class="article-toc research-toc" aria-label="Research sections">
-          <a href="#research-abstract">Abstract</a>
-          <a href="#research-1-introduction">Introduction</a>
-          <a href="#research-2-the-morphology-of-the-agent-stack">The Morphology of the Agent Stack</a>
-          <a href="#research-3-a-cost-model-of-discovery-and-follow-through">A Cost Model of Discovery and Follow-Through</a>
-          <a href="#research-4-invocation-semantics-the-residency-trigger-distinction">Invocation Semantics: The Residency–Trigger Distinction</a>
-          <a href="#research-5-the-accumulation-regime-a-crystal-ball-extrapolation">The Accumulation Regime: A Crystal-Ball Extrapolation</a>
-          <a href="#research-6-why-model-scale-remedies-do-not-close-the-gap">Why Model-Scale Remedies Do Not Close the Gap</a>
-          <a href="#research-7-skillspec-a-contract-layer-between-prose-and-execution">SkillSpec: A Contract Layer Between Prose and Execution</a>
-          <a href="#research-8-compiling-discovery-restoring-solvency">Compiling Discovery: Restoring Solvency</a>
-          <a href="#research-9-beyond-the-loop-utility-agnostic-of-harness-and-model">Beyond the Loop: Utility Agnostic of Harness and Model</a>
-          <a href="#research-10-limitations-and-open-problems">Limitations and Open Problems</a>
-          <a href="#research-11-related-work">Related Work</a>
-          <a href="#research-12-conclusion">Conclusion</a>
-          <a href="#research-references">References</a>
+      <section id="abstract" class="article-panel abstract-panel" aria-labelledby="abstract-title">
+        <div>
+          <p class="eyebrow">Abstract</p>
+          <h2 id="abstract-title">
+            <a class="heading-link" href="#abstract">The problem is not that skills are weak.</a>
+          </h2>
+        </div>
+        <div class="abstract-copy">
+          <p>
+            The problem is that the most important skills become load-bearing
+            prose.
+          </p>
+          <p>
+            They start as clean instructions, then grow into state machines,
+            dependency notes, tool policies, code snippets, references, and
+            release checks.
+          </p>
+          <ul class="prose-points">
+            <li>One axis makes each skill longer.</li>
+            <li>The other makes the skill library wider.</li>
+            <li>Both compete for model attention.</li>
+          </ul>
+          <p>
+            SkillSpec is the answer we arrived at after measuring that pressure:
+            keep prose for judgment, but move the parts that must be followed
+            into a small, portable behavior contract.
+          </p>
+          <p>
+            The contract says when the skill applies, which route to choose,
+            what steps to run, what tools are allowed, what checks must pass,
+            and what proof should exist at the end.
+          </p>
+        </div>
+      </section>
+
+      <div class="article-layout">
+        <aside class="article-toc" aria-label="Article sections">
+          <a href="#skills">1. What skills changed</a>
+          <a href="#attention">2. The attention problem</a>
+          <a href="#model">3. Why better models are not enough</a>
+          <a href="#skillspec">4. The SkillSpec move</a>
+          <a href="#operator-model">5. The operating model</a>
+          <a href="#proof">6. Proof instead of vibes</a>
+          <a href="#sources">Sources</a>
         </aside>
 
-        <article class="article-body research-paper">
-          <section class="research-paper-card" aria-label="Full research paper">
-              <h2 id="research-abstract"><a class="heading-link" href="#research-abstract">Abstract</a></h2>
-
-              <p>The architecture of LLM-based agents has evolved through five distinct morphologies in four years: the prompt, the tool-calling agent, the agent loop, the harness with hooks and subagents, and finally the skill- and plugin-extended harness. Each stage solved the preceding stage&#39;s binding constraint and created the next one. We argue that the current stage has a constraint that is <em>economic</em> rather than architectural: every installed capability must purchase residency in a fixed context budget before it can influence behavior, and the ecosystem&#39;s distribution mechanisms (plugins, marketplaces, one-line installs) are compounding while the discovery budget is not. We formalize this as a solvency problem — the total description mass of installed capabilities exceeding the context quota allocated to discovery — and show that its failure modes (arbitrary capability loss, nondeterministic selection, follow-through decay, contradictory obligations, and unauditable execution) are already measurable at present scale and become dominant at the plugin densities projected within months. We show that the distinction between implicit and explicit invocation, widely assumed to mitigate the problem, does not: invocation mode gates <em>triggering</em>, not <em>context residency</em>. We further argue that foreseeable model-side advances — parameter-efficient task adapters, attention improvements, and longer context windows — do not close the gap, because the problem is one of allocation, verification, and portability rather than capacity. We then describe SkillSpec, an open-source contract layer that treats discovery as a compile-time problem and execution as a gated, evidenced walk: a static risk auditor, a typed behavioral contract co-resident with prose skills, a stateful CLI guide that serves one gate at a time in <span class="math-inline">\(O(1)\)</span> context, cryptographically fingerprinted decision traces with post-hoc alignment, and a compiled discovery layer (distilled descriptions, domain facades, tiered visibility, pull-based routing) whose context cost is bounded by the number of <em>domains</em> rather than the number of <em>skills</em>. We close with honest limitations: the contract is advisory rather than enforced, hookless discovery is probabilistic, and the central efficacy claim awaits controlled benchmarking.</p>
-
-              <hr>
-
-              <h2 id="research-1-introduction"><a class="heading-link" href="#research-1-introduction">1. Introduction</a></h2>
-
-              <p>A <code>SKILL.md</code> file is a promising and fragile object. It is promising because it packages procedural knowledge — how to fill a PDF form, how to review a pull request, how to run a company&#39;s deploy checklist — into a portable folder that any compliant agent can discover and load [3, 4]. It is fragile because, the moment it activates, it is a prompt again, and it inherits every reliability pathology that prompts have: position-dependent attention [7], degradation with input length [8, 11], sensitivity to formatting [9], and instruction-following rates that decay predictably as obligations accumulate [10].</p>
-
-              <p>The ecosystem&#39;s answer to prompt fragility was structure at the <em>packaging</em> layer: progressive disclosure, frontmatter metadata, bundled scripts [3, 4]. The packaging succeeded — the Agent Skills format is now implemented by dozens of independent harnesses [4] — and its success created a new problem that packaging cannot solve. Skills are cheap to install and non-rival to distribute, so they accumulate. Each installed skill&#39;s name and description must occupy context at session start in order to be discoverable at all. The context allocated to this inventory is a small, fixed fraction of the window. Distribution compounds; the budget does not. The curves cross.</p>
-
-              <p>This paper does three things. First (§2–§5), it maps the evolution that produced the current agent stack, formalizes the shapes of its components, and derives a first-order cost model of discovery and follow-through that locates the crossing point — the regime we call <em>context insolvency</em> — and describes, concretely, what an ordinary machine with twenty plugins looks like after the crossing. Second (§6), it argues that this regime is robust to foreseeable model-side improvement: it is a systems problem that scaling laws route around rather than through. Third (§7–§9), it describes a working artifact — SkillSpec [18] — built on the position that the load-bearing parts of a skill should be moved out of prose into a typed, testable, traceable contract, and that discovery should be <em>compiled</em> rather than <em>hoped for</em>. Throughout, we distinguish measured claims from design claims, and we state plainly where the artifact&#39;s central hypothesis remains unproven.</p>
-
-              <hr>
-
-              <h2 id="research-2-the-morphology-of-the-agent-stack"><a class="heading-link" href="#research-2-the-morphology-of-the-agent-stack">2. The Morphology of the Agent Stack</a></h2>
-
-              <h3 id="research-2-1-five-stages-each-solving-the-last-one-s-constraint"><a class="heading-link" href="#research-2-1-five-stages-each-solving-the-last-one-s-constraint">2.1 Five stages, each solving the last one&#39;s constraint</a></h3>
-
-              <p><strong>Stage 1: The prompt.</strong> A single context window, a single completion. The binding constraint is statelessness: nothing persists, nothing acts.</p>
-
-              <p><strong>Stage 2: The tool-calling agent.</strong> ReAct-style interleaving of reasoning and action [1] gave the model hands: emit a structured action, observe the result, continue. The constraint becomes orchestration — one reasoning thread, ad-hoc control flow, no lifecycle.</p>
-
-              <p><strong>Stage 3: The agent loop.</strong> The loop formalizes stage 2 into a runtime: a conversation state, a tool registry, permission checks, retry semantics. The constraint becomes <em>extensibility and safety</em>: how does the loop acquire new capabilities, and how does its operator constrain them?</p>
-
-              <p><strong>Stage 4: The harness.</strong> The loop grows an ecosystem around itself: lifecycle <strong>hooks</strong> (pre-prompt, pre-tool-use, post-tool-use, session start) that let deterministic code intercept the probabilistic core; <strong>subagents</strong> that fan work out to isolated contexts; configuration layers; permission modes. The harness is the point where the agent stops being a program and becomes a <em>platform</em>. Its constraint: capabilities are still bespoke — every team re-teaches every agent the same procedures in prose.</p>
-
-              <p><strong>Stage 5: Skills and plugins.</strong> The Agent Skills format [3, 4] answers stage 4&#39;s constraint with portable procedural knowledge: a folder with a <code>SKILL.md</code>, loaded by progressive disclosure. <strong>Plugins</strong> bundle skills, commands, and agents into distributable units with marketplaces and one-line installs. The constraint this stage creates — the subject of this paper — is that every installed capability competes for a fixed discovery budget, and nothing in the format governs what happens when the competition is oversubscribed.</p>
-
-              <p>Each transition has the same signature: the previous stage&#39;s <em>content</em> problem becomes the next stage&#39;s <em>coordination</em> problem. Skills solved &quot;how do I tell the agent how we do things here.&quot; They did not solve &quot;which of the eight hundred things it has been told applies now, and did it actually follow the one that applied.&quot;</p>
-
-              <h3 id="research-2-2-the-shape-of-a-loop-with-hooks"><a class="heading-link" href="#research-2-2-the-shape-of-a-loop-with-hooks">2.2 The shape of a loop with hooks</a></h3>
-
-              <p>An agent loop with hooks can be written as a tuple</p>
-
-              <div class="math-display">\[
-              \mathcal{L} = \langle M, \; C, \; T, \; H_{\text{pre}}, \; H_{\text{tool}}, \; H_{\text{post}} \rangle
-              \]</div>
-
-              <p>where <span class="math-inline">\(M\)</span> is the model, <span class="math-inline">\(C\)</span> the context assembly function, <span class="math-inline">\(T\)</span> the tool registry, and the <span class="math-inline">\(H\)</span> are deterministic hook sets that may inject context, block actions, or transform results. One turn is:</p>
-
-              <div class="math-display">\[
-              a_{t+1} = M\big(C(\text{sys}, \text{inv}, \text{hist}_t, H_{\text{pre}}(u_t))\big), \qquad
-              r_{t+1} = H_{\text{post}}\big(T\big(H_{\text{tool}}(a_{t+1})\big)\big)
-              \]</div>
-
-              <p>The decomposition matters for one reason: <strong>hooks are the only deterministic surface in the loop.</strong> Everything the model does is probabilistic; everything a hook does is code. Any reliability property one wants to <em>guarantee</em> — rather than encourage — must live in <span class="math-inline">\(H\)</span>, in <span class="math-inline">\(T\)</span>&#39;s permission layer, or outside the loop entirely. This observation recurs in §7 and §9.</p>
-
-              <p>Note the term <span class="math-inline">\(\text{inv}\)</span> in the context assembly: the <em>inventory</em> — the list of installed capabilities (skill names and descriptions, tool schemas) that the model must see to know what it can do. The inventory is paid on every turn of every session, whether or not any capability is used. It is the rent line in the context budget, and it is where insolvency begins.</p>
-
-              <h3 id="research-2-3-the-shape-of-a-skill"><a class="heading-link" href="#research-2-3-the-shape-of-a-skill">2.3 The shape of a skill</a></h3>
-
-              <p>A skill under the open format [4] is a staged object:</p>
-
-              <div class="math-display">\[
-              S = \langle \underbrace{(n, d)}_{\text{discovery}}, \; \underbrace{B}_{\text{instruction}}, \; \underbrace{R}_{\text{execution}} \rangle
-              \]</div>
-
-              <p>with name <span class="math-inline">\(n\)</span> and description <span class="math-inline">\(d\)</span> loaded for <em>every</em> installed skill at session start; body <span class="math-inline">\(B\)</span> loaded on activation; and references/scripts <span class="math-inline">\(R\)</span> loaded only when execution reaches them. Progressive disclosure is genuinely sound information architecture — the design intent is that a large library is carried at small context cost because only <span class="math-inline">\((n,d)\)</span> is always resident [3, 4].</p>
-
-              <p>Two properties of this shape are load-bearing for what follows. First, <span class="math-inline">\((n, d)\)</span> is simultaneously the <em>index entry</em>, the <em>routing function</em>, and the <em>advertisement</em> — one prose string doing three jobs, written by parties with varying skill and varying incentives [14]. Second, once <span class="math-inline">\(B\)</span> is in context it is guidance, not contract: the model may follow it fully, partially, out of order, or not at all, and the format provides no mechanism to detect which occurred.</p>
-
-              <h3 id="research-2-4-the-shape-of-a-plugin"><a class="heading-link" href="#research-2-4-the-shape-of-a-plugin">2.4 The shape of a plugin</a></h3>
-
-              <p>A plugin is a distribution morphism, not a discovery unit:</p>
-
-              <div class="math-display">\[
-              P = \{S_1, \dots, S_k\} \cup \{\text{commands}, \text{agents}, \text{hooks}\}
-              \]</div>
-
-              <p>Installing <span class="math-inline">\(P\)</span> inserts <em>all</em> of its skills&#39; <span class="math-inline">\((n_i, d_i)\)</span> pairs into the inventory in one action. The unit of user intent (&quot;I want the Acme suite&quot;) and the unit of context cost (<span class="math-inline">\(k\)</span> description entries, forever) are mismatched by a factor of <span class="math-inline">\(k\)</span>. Marketplaces make acquiring <span class="math-inline">\(P\)</span> a one-line operation. Nothing in the current stack makes the resulting inventory obligation visible, priced, or reversible with equal ease. This asymmetry — frictionless acquisition, invisible recurring cost — is the mechanism by which insolvency arrives not through any single bad decision but through the accumulation of individually reasonable ones.</p>
-
-              <hr>
-
-              <h2 id="research-3-a-cost-model-of-discovery-and-follow-through"><a class="heading-link" href="#research-3-a-cost-model-of-discovery-and-follow-through">3. A Cost Model of Discovery and Follow-Through</a></h2>
-
-              <p>We now make the constraint quantitative. The model below is deliberately first-order — its purpose is to locate regimes and crossings, not to fit curves.</p>
-
-              <h3 id="research-3-1-the-discovery-budget"><a class="heading-link" href="#research-3-1-the-discovery-budget">3.1 The discovery budget</a></h3>
-
-              <p>Let <span class="math-inline">\(C\)</span> be the context window and <span class="math-inline">\(\varepsilon\)</span> the fraction a harness allocates to the skill inventory. Harness implementations bound this region through per-description character caps and total-budget truncation; a working value consistent with observed behavior is <span class="math-inline">\(\varepsilon \approx 0.02\)</span>. The discovery budget is</p>
-
-              <div class="math-display">\[
-              Q = \varepsilon \cdot C \;\; \approx \;\; 0.02 \times 200{,}000 = 4{,}000 \text{ tokens.}
-              \]</div>
-
-              <p>With <span class="math-inline">\(N\)</span> installed skills of mean description length <span class="math-inline">\(\bar{d}\)</span> tokens, the inventory demands <span class="math-inline">\(T_{\text{inv}} = N\bar{d}\)</span>. Define the <strong>visibility fraction</strong></p>
-
-              <div class="math-display">\[
-              \varphi(N) = \min\!\left(1, \; \frac{Q}{N \bar{d}}\right).
-              \]</div>
-
-              <p>Measured description lengths in the wild run <span class="math-inline">\(\bar{d} \approx 100\text{–}250\)</span> tokens (skill authors write descriptions as advertisements and trigger nets, not index entries; we measured managed skills at the top of that range in a live harness). At <span class="math-inline">\(\bar{d} = 120\)</span>:</p>
-
-              <div class="research-table-wrap"><table class="research-table">
-                <thead>
-                  <tr><th><span class="math-inline">\(N\)</span> (skills)</th><th><span class="math-inline">\(T_{\text{inv}}\)</span> (tokens)</th><th><span class="math-inline">\(\varphi(N)\)</span></th><th>Regime</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>25</td><td>3,000</td><td>1.00</td><td>solvent</td></tr>
-                  <tr><td>33</td><td>4,000</td><td>1.00</td><td>at the boundary</td></tr>
-                  <tr><td>100</td><td>12,000</td><td>0.33</td><td>insolvent</td></tr>
-                  <tr><td>800</td><td>96,000</td><td><strong>0.04</strong></td><td>deeply insolvent</td></tr>
-                </tbody>
-              </table></div>
-
-              <p>Beyond the boundary, the harness must truncate descriptions, cap the list, or drop skills — and the drop criterion available to it (load order, registration sequence, alphabetization) is uncorrelated with relevance, quality, or usage. <strong>&quot;Installed&quot; and &quot;available&quot; become unrelated properties</strong>, and no signal reports the divergence.</p>
-
-              <p>Note that <span class="math-inline">\(\bar{d} \approx 25\)</span> tokens — achievable by deliberate compression — moves the boundary to <span class="math-inline">\(N \approx 160\)</span>. Description mass, not skill count, is the first-order variable. This observation grounds the distillation primitive of §8.</p>
-
-              <h3 id="research-3-2-selection-degrades-before-the-budget-is-exhausted"><a class="heading-link" href="#research-3-2-selection-degrades-before-the-budget-is-exhausted">3.2 Selection degrades before the budget is exhausted</a></h3>
-
-              <p>Even inside the solvent regime, selection is a retrieval task over <span class="math-inline">\(N\)</span> prose distractors embedded mid-context — the region where models attend worst [7], at input lengths where performance is already declining on far simpler tasks [8, 11]. The most direct external evidence comes from the adjacent tool-selection setting: as registries scale to thousands of entries, baseline selection accuracy collapses (13.6% in one MCP-scale benchmark), while offloading selection to an external retrieval index more than triples it and halves prompt tokens [12]. The mechanism is identical for skills: a flat prose inventory is the wrong data structure for a growing capability corpus, independent of model quality. Formatting sensitivity compounds the problem: near-meaning-preserving differences in how descriptions are phrased shift selection behavior by large margins [9], which means selection at scale is not merely inaccurate but <em>unstable across sessions</em>.</p>
-
-              <h3 id="research-3-3-follow-through-decay-after-activation"><a class="heading-link" href="#research-3-3-follow-through-decay-after-activation">3.3 Follow-through decay after activation</a></h3>
-
-              <p>Activation loads a body <span class="math-inline">\(B\)</span> carrying <span class="math-inline">\(m\)</span> obligations (steps, forbids, gates). If obligation <span class="math-inline">\(i\)</span> is independently followed with probability <span class="math-inline">\(p_i\)</span>, the probability of full follow-through is</p>
-
-              <div class="math-display">\[
-              P_{\text{follow}}(m) \;=\; \prod_{i=1}^{m} p_i \;\lesssim\; \bar{p}^{\,m},
-              \]</div>
-
-              <p>exponentially decaying in obligation count even for high <span class="math-inline">\(\bar{p}\)</span>. This is not hypothetical: controlled measurement at increasing instruction densities finds even frontier models at 68% adherence by 500 concurrent instructions, with earlier-instruction bias and three characteristic decay shapes (threshold, linear, exponential) across model families [10]. Position effects give the per-obligation probability structure: <span class="math-inline">\(p_i\)</span> is a decreasing function of the obligation&#39;s depth into a long body [7]. The practical corollary practitioners recognize immediately: <strong>the &quot;never do X&quot; on line 400 is precisely the instruction most likely to be skipped</strong>, and each miss, patched with another paragraph, increases <span class="math-inline">\(m\)</span> and lowers <span class="math-inline">\(P_{\text{follow}}\)</span> for the next run — a structural ratchet.</p>
-
-              <h3 id="research-3-4-compaction-as-a-lossy-channel"><a class="heading-link" href="#research-3-4-compaction-as-a-lossy-channel">3.4 Compaction as a lossy channel</a></h3>
-
-              <p>Long sessions compact. Compaction is a lossy summarization channel: skill bodies, mid-session decisions, and partially-completed step state are compressed by a mechanism that does not know which sentence was load-bearing. Harnesses mitigate by re-attaching recent skill content within a bounded budget, but re-attachment competes across all active skills and restores <em>text</em>, not <em>execution state</em> — which step was completed, which check passed, which forbid is in force. Any reliability architecture that keeps run state only in the window is betting against the channel. (§7.4 returns to this with state that lives outside the window by construction.)</p>
-
-              <h3 id="research-3-5-the-follow-through-budget"><a class="heading-link" href="#research-3-5-the-follow-through-budget">3.5 The follow-through budget</a></h3>
-
-              <p>Summing: a task&#39;s reliability under the current stack is bounded by the product of a selection term, a follow-through term, and a compaction-survival term,</p>
-
-              <div class="math-display">\[
-              P_{\text{task}} \;\le\; P_{\text{select}}(N) \;\cdot\; P_{\text{follow}}(m) \;\cdot\; P_{\text{survive}}(L),
-              \]</div>
-
-              <p>with the three factors respectively decreasing in library size, obligation count, and session length. All three trends are empirically documented [7, 8, 10, 11, 12]. Nothing in the current format arrests any of the three; and — the governance point — <strong>the operator controls none of the three at request time.</strong> You ask; what is invoked is a function of description prose you did not write, competing entries you did not audit, and position effects you cannot see. The descriptions may be duplicative (twenty plugins ship four PDF skills), contradictory (one mandates a tool another forbids), or complementary — and the stack treats all three cases identically.</p>
-
-              <hr>
-
-              <h2 id="research-4-invocation-semantics-the-residency-trigger-distinction"><a class="heading-link" href="#research-4-invocation-semantics-the-residency-trigger-distinction">4. Invocation Semantics: The Residency–Trigger Distinction</a></h2>
-
-              <p>A widely-held intuition says explicit invocation solves the budget problem: mark skills user-invocable-only, and they stop consuming resources until called. The intuition confuses two different gates.</p>
-
-              <p><strong>Definition.</strong> A skill&#39;s <em>invocation mode</em> determines <strong>who may trigger</strong> activation (the model, on description match; or the user, by explicit command). A skill&#39;s <em>context residency</em> determines <strong>whether its <span class="math-inline">\((n, d)\)</span> occupies the inventory</strong>.</p>
-
-              <p><strong>Observation (mode gates trigger, not residency).</strong> In current harness implementations, skills flipped to explicit-only remain listed in the inventory with full descriptions — the harness must render the catalog so that slash-commands can be dispatched and recognized. We verified this directly in a live session: skills set to <code>user-invocable-only</code> through native visibility overrides continued to occupy the model-visible inventory at full description length. The quota is charged per <em>listed</em> skill, regardless of mode.</p>
-
-              <p>Two corollaries follow. First, <strong>explicit invocation does not restore solvency</strong>; it changes who pulls the trigger while the rent is paid either way. Second, the description of an explicit-only skill is almost pure waste: descriptions exist to inform <em>selection</em>, and an explicit-only skill has opted out of selection — the model needs only <span class="math-inline">\(n \to\)</span> dispatch. The economically correct listing for a manual-only skill is name-only, a state the format can express conceptually but current harnesses do not natively honor. Until they do, the only levers that actually reclaim budget are <em>fewer entries</em> and <em>shorter entries</em> — which is why §8 treats discovery as a compilation target rather than a visibility flag.</p>
-
-              <p>There is also a human ceiling: explicit invocation presumes the user remembers what is installed. No operator recalls eight hundred slash-commands; the help surface becomes a phone book. Explicitness relocates the discovery problem from the model to the person without shrinking it.</p>
-
-              <hr>
-
-              <h2 id="research-5-the-accumulation-regime-a-crystal-ball-extrapolation"><a class="heading-link" href="#research-5-the-accumulation-regime-a-crystal-ball-extrapolation">5. The Accumulation Regime: A Crystal-Ball Extrapolation</a></h2>
-
-              <p>Consider a machine — months away, not years, at current plugin-marketplace growth — with 20 installed plugins averaging 40 skills each: <span class="math-inline">\(N = 800\)</span>.</p>
-
-              <p><strong>The arithmetic.</strong> At <span class="math-inline">\(\bar{d} = 120\)</span>: <span class="math-inline">\(T_{\text{inv}} = 96{,}000\)</span> tokens against <span class="math-inline">\(Q = 4{,}000\)</span> — 24× oversubscribed, <span class="math-inline">\(\varphi = 0.04\)</span>. The model can see perhaps 3–5% of installed capability, the surviving subset chosen by mechanisms uncorrelated with value. This is not degraded discovery; it is <em>arbitrary</em> discovery, silently applied.</p>
-
-              <p><strong>Selection instability.</strong> Twenty vendors guarantee semantic pile-ups — every serious plugin ships its own &quot;review,&quot; &quot;deploy,&quot; &quot;pdf,&quot; &quot;test.&quot; If a fraction <span class="math-inline">\(p_{\text{dup}}\)</span> of skill pairs have materially overlapping trigger surfaces, expected collisions scale as <span class="math-inline">\(\binom{N}{2} p_{\text{dup}} \approx \tfrac{N^2}{2} p_{\text{dup}}\)</span> — quadratic in library size. Selection among near-duplicates inherits the formatting instability of §3.2: same prompt, different skill on different days [9, 12].</p>
-
-              <p><strong>Composition becomes the attack surface.</strong> Beyond individual skill quality, 2026 measurements show that skills benign in isolation become harmful in composition — outputs, trust signals, and authorization cues from one skill steering later invocations — with composed-path attack success rates of 33.6% against near-zero for isolated evaluation [17]. Semantic supply-chain attacks target exactly the metadata layer that drives selection [14]. Eight hundred prose instruction files from twenty vendors, none of which passed any acceptance gate, co-resident in one machine&#39;s trust domain [6, 14, 17].</p>
-
-              <p><strong>Contradiction without adjudication.</strong> Skill A mandates <code>qpdf</code>; skill B forbids it. When both bodies are active, behavior is undefined and unreproducible. The format has no notion of conflicting obligations, so the conflict is discovered — if ever — as a mysterious intermittent failure.</p>
-
-              <p><strong>Skill debt without garbage collection.</strong> No record exists of which skills fired, which were dead weight, which failed silently. Curation is manual guesswork over an inventory too large to audit by hand. The realistic operator response — already observable — is wholesale plugin disabling and retreat to a hand-tended working set of ~15 skills, at which point <strong>the ecosystem&#39;s growth has destroyed the ecosystem&#39;s value</strong>: every additional installed plugin lowers the probability that any given capability is seen, selected, and followed.</p>
-
-              <p>The endgame of the current trajectory is not a crash. It is quieter: an inventory of eight hundred capabilities, five percent visible, selected nondeterministically, followed partially, verified never.</p>
-
-              <hr>
-
-              <h2 id="research-6-why-model-scale-remedies-do-not-close-the-gap"><a class="heading-link" href="#research-6-why-model-scale-remedies-do-not-close-the-gap">6. Why Model-Scale Remedies Do Not Close the Gap</a></h2>
-
-              <p>It is tempting to file all of this under &quot;wait for better models.&quot; We consider the three standard candidates and argue each addresses capacity when the binding constraints are allocation, verification, and portability.</p>
-
-              <p><strong>Task-adapted parameters (LoRA-class adapters [2], skill-specific fine-tunes).</strong> Adapters internalize procedures into weights, removing them from context. But (i) the skill corpus is heterogeneous, versioned, org-specific, and changes weekly — retraining cadence cannot track a registry; (ii) internalized behavior is <em>less</em> auditable than prose, not more: there is no artifact to review, no diff between versions, no way to attest which procedure ran; (iii) adapters bind capability to a specific model, destroying exactly the cross-harness, cross-model portability that made the skill format succeed [4]. Adapters are a caching layer for <em>stable, verified</em> procedures — which presupposes the contract-and-evidence layer this paper argues for, rather than replacing it.</p>
-
-              <p><strong>Better attention / mitigated position effects.</strong> Suppose lost-in-the-middle [7] were fully solved. Selection over <span class="math-inline">\(N\)</span> near-duplicate prose descriptions remains a retrieval problem whose difficulty grows with <span class="math-inline">\(N\)</span> and with distractor similarity — and <span class="math-inline">\(N\)</span> grows without bound while the inventory remains a flat list. The tool-selection evidence is instructive: the fix that worked was not a better model but a better <em>data structure</em> — an external index queried at need [12]. Attention improvements raise the constants; they do not change the asymptotics of flat-list discovery.</p>
-
-              <p><strong>Longer context windows.</strong> Two failures. Empirically, usable context lags advertised context and degrades with length on even trivial tasks [8, 11], so a 10× window does not deliver 10× reliable inventory. Economically, capability supply is elastic: any budget increase is absorbed by ecosystem growth (the induced-demand dynamic familiar from road capacity). <span class="math-inline">\(\varepsilon C\)</span> rising from 4k to 40k tokens moves the insolvency boundary from ~33 skills to ~330 at current description mass — a regime the 800-skill machine has already passed, with marketplaces still accelerating. A widening window changes <em>when</em> the curves cross, not <em>whether</em>.</p>
-
-              <p>And none of the three touches the verification gap. A model that selects perfectly and follows perfectly still leaves no <em>record</em> — no artifact by which an operator, an auditor, or the next model version can confirm which route ran, which forbid held, which check passed. Recent security work names this precisely: the <strong>audit–runtime gap</strong>, the absence of binding between what a skill was reviewed to be and what executed [16]. Capacity does not produce evidence. Evidence requires machinery outside the model.</p>
-
-              <hr>
-
-              <h2 id="research-7-skillspec-a-contract-layer-between-prose-and-execution"><a class="heading-link" href="#research-7-skillspec-a-contract-layer-between-prose-and-execution">7. SkillSpec: A Contract Layer Between Prose and Execution</a></h2>
-
-              <h3 id="research-7-1-origin-honestly-stated"><a class="heading-link" href="#research-7-1-origin-honestly-stated">7.1 Origin, honestly stated</a></h3>
-
-              <p>SkillSpec [18] did not begin as a grand design. It began as dogfood irritation: good skills kept becoming long Markdown files with buried decisions, and their agents kept skipping the late safety rule, grabbing an undeclared tool, and reporting &quot;done&quot; with no proof. The project&#39;s own reliability-gap analysis concluded that every mitigation the field had converged on — shorter bodies, numbered steps, dependency fields, invocation toggles — moved load-bearing logic in the same direction: <em>off the natural-language layer, toward something a machine can check</em> [15 provides the corpus-level motivation: curated procedural structure lifts agent task pass rates from 33.9% to 50.5%, but only when the structure is actually followed]. SkillSpec is a bet on completing that motion as a <em>layer</em> rather than as point fixes: keep the prose for judgment and tone; move routing, prohibition, dependency, and completion semantics into a typed contract that validators, compilers, tests, and traces share. The instructive embarrassment: the project&#39;s own <code>SKILL.md</code> grew to 5,885 tokens and 40 modal obligations and scored <em>critical</em> on its own drift auditor — the disease reproducing inside the treatment — which forced the guided-trampoline architecture of §7.4. We report this because it is evidence for the thesis: prose accretes obligations by default, even when its authors are professionally paranoid about exactly that failure mode.</p>
-
-              <h3 id="research-7-2-the-measurement-primitive-a-static-risk-auditor"><a class="heading-link" href="#research-7-2-the-measurement-primitive-a-static-risk-auditor">7.2 The measurement primitive: a static risk auditor</a></h3>
-
-              <p><code>skillspec doctor</code> inspects any skill folder or public repository URL and emits an <strong>agent follow-through risk score</strong>: a transparent penalty model over measured structural signals — activation body size and its share of loaded text, modal-obligation count and <em>position</em> (obligations past the 60% mark are penalized per §3.3&#39;s position term), unlabeled operational prose, undeclared dependencies inferred from command blocks, missing behavior contract, missing test/trace surface, and frontmatter discovery risk (description length, genericity, truncation exposure). Every penalty cites either published measurement [7, 8, 10, 13, 14] or a named local methodology, and the report separates what is measured from what is a policy threshold. The auditor is deliberately standalone — no adoption of the rest of the system required — because measurement is the honest first move: it converts &quot;prose skills feel unreliable&quot; into per-skill, per-finding, remediable evidence.</p>
-
-              <h3 id="research-7-3-the-contract-primitive-skill-spec-yml"><a class="heading-link" href="#research-7-3-the-contract-primitive-skill-spec-yml">7.3 The contract primitive: <code>skill.spec.yml</code></a></h3>
-
-              <p>Beside the prose <code>SKILL.md</code> sits a typed contract declaring:</p>
-
-              <ul>
-                <li><strong>routes</strong> — named strategies with ranked applicability and optional phased execution plans;</li>
-                <li><strong>rules</strong> — predicates over the task that select routes, and crucially carry <strong>forbids with narrow allows</strong>: &quot;prefer the browser route; forbid native-search-as-answer; allow native search for URL discovery only.&quot; Negative steering with scoped exceptions is the semantic that prose cannot carry reliably and that drift exploits;</li>
-                <li><strong>dependencies</strong> — CLIs, packages, services, credentials, with provisioning options and permission gates, checkable <em>before</em> execution rather than discoverable mid-task;</li>
-                <li><strong>tool boundaries</strong> — per-phase allow/forbid/permission-required lists over tools, substrates, and data sources;</li>
-                <li><strong>scenario tests</strong> — assertions that given inputs select given routes, add given forbids, request given elicitations: the contract is <em>regression-testable steering</em>;</li>
-                <li><strong>trace requirements</strong> — which decision events must be recorded.</li>
-              </ul>
-
-              <p>The contract is a real specification: a typed model, a JSON Schema, a reference grammar, and a conformance suite of valid/invalid fixtures [18]. An importer mechanically drafts contracts from existing prose skills, quarantining low-confidence inferences as <code>review_required</code> rather than flattening ambiguity into fake confidence.</p>
-
-              <h3 id="research-7-4-the-execution-primitive-a-guided-trampoline-in-context"><a class="heading-link" href="#research-7-4-the-execution-primitive-a-guided-trampoline-in-context">7.4 The execution primitive: a guided trampoline in <span class="math-inline">\(O(1)\)</span> context</a></h3>
-
-              <p>The runtime inverts the skill-loading economics. The installed <code>SKILL.md</code> shrinks to a <em>boot pointer</em> (~500 tokens): start or resume the CLI guide. The guide (<code>run-loop --guide agent</code>) loads the spec, selects the route, opens a run directory, and serves exactly <strong>one gate at a time</strong>: current phase, open requirements, do-now, do-not, allowed commands, and when-to-advance. The gate is <em>derived from ledger state</em>, not scripted — a phase remains current until <code>requirement_satisfied</code> / <code>phase_completed</code> events land in an append-only execution ledger, so checkpoints cannot be skipped by momentum, only explicitly failed or blocked.</p>
-
-              <p>The context accounting is the point. Under prose skills, per-task instruction cost is <span class="math-inline">\(O(|B|)\)</span> — the whole body, with <span class="math-inline">\(P_{\text{follow}}\)</span> decaying in its obligation count (§3.3). Under the guide it is</p>
-
-              <div class="math-display">\[
-              E[C_{\text{task}}] \;=\; G \cdot |g| \;=\; O(1) \text{ per gate},
-              \]</div>
-
-              <p>where <span class="math-inline">\(G\)</span> is the number of phases and <span class="math-inline">\(|g| \approx\)</span> a few hundred tokens: each gate arrives <em>freshest in context</em>, at the position models attend to best [7], carrying only the obligations active <em>now</em> — directly attacking the <span class="math-inline">\(\bar{p}^m\)</span> decay by keeping effective <span class="math-inline">\(m\)</span> per decision small. Compaction resilience follows from the same move: run state (<code>guide-state.json</code>, the ledger, a compact human summary) lives on disk, not in the window; resume recovers the task from the trace and revalidates it against a three-level fingerprint ladder — input hash, spec fingerprint, and a <em>decision fingerprint</em> over only the active contract (selected route, phase order, requirements, forbids) — so an irrelevant spec edit warns while a contract-changing edit forces replanning. The model&#39;s memory is never the system of record.</p>
-
-              <h3 id="research-7-5-the-evidence-primitive-traces-and-alignment"><a class="heading-link" href="#research-7-5-the-evidence-primitive-traces-and-alignment">7.5 The evidence primitive: traces and alignment</a></h3>
-
-              <p>Every guided run leaves a decision trace (hashed, append-only, spec-fingerprinted) and an execution ledger of typed proof events. <code>trace align</code> replays the decision against the current spec and evaluates the derived obligations against recorded evidence, yielding <code>pass</code>, <code>fail</code>, or — deliberately — <strong><code>unproven</code></strong>: absence of evidence is reported as absence, never inferred as success, and the runtime explicitly prohibits manufacturing proof rows after the fact. We state the honest boundary plainly, because the field&#39;s credibility depends on it: <strong>this is post-hoc verification, not runtime enforcement.</strong> The agent cooperates voluntarily; a violation is made <em>visible</em>, not <em>impossible</em>. Enforcement of tool boundaries belongs to the harness (§2.2&#39;s deterministic surface), and §9 describes the planned compilation of contract boundaries into harness pre-tool-use hooks — the mechanism by which the audit–runtime gap [16] narrows from &quot;reviewed then hoped&quot; to &quot;reviewed then gated,&quot; without ever claiming the CLI is a security sandbox.</p>
-
-              <hr>
-
-              <h2 id="research-8-compiling-discovery-restoring-solvency"><a class="heading-link" href="#research-8-compiling-discovery-restoring-solvency">8. Compiling Discovery: Restoring Solvency</a></h2>
-
-              <p>The router problem of §3–§5 admits a reframe that changes its complexity class: <strong>the installed skill set changes on install/update; the task changes per turn. Discovery is therefore a compile-time problem, and per-prompt routing machinery is dynamic overhead applied to static structure.</strong> SkillSpec&#39;s discovery layer compiles the inventory into tiers, using only native format mechanisms — no persistent prompt hook required.</p>
-
-              <p><strong>Tier 0 — distillation.</strong> Each skill receives a description budget <span class="math-inline">\(Q / (|H| + K)\)</span> and the compiler emits a trigger-dense entry from material the index already extracts (activation keywords, tags, route labels), deduplicating cross-skill boilerplate. Since the boundary scales as <span class="math-inline">\(Q / \bar{d}\)</span>, cutting <span class="math-inline">\(\bar{d}\)</span> from 120 to 25 tokens quintuples solvent capacity before any structural change. The static auditor enforces the budget as a workspace check.</p>
-
-              <p><strong>Tier 1 — domain facades.</strong> When distilled inventory still exceeds <span class="math-inline">\(Q\)</span>, shard the trigger surface: cluster the index into <span class="math-inline">\(K\)</span> <em>capability-domain</em> gateways (documents, review, browser-automation — pointedly <em>not</em> per-vendor), each an ordinary implicit skill whose ~30-token description covers its cluster and whose generated body is a compact catalog of members with load instructions. Members flip to manual-only. Discovery cost becomes</p>
-
-              <div class="math-display">\[
-              T_{\text{tiered}} \;=\; \underbrace{\textstyle\sum_{i \in H} |\tilde d_i|}_{\text{hot set, usage-chosen}} \;+\; \underbrace{K \cdot |d_f|}_{\text{facades}} \;+\; \underbrace{0}_{\text{cold tail}} \;=\; O(|H| + K),
-              \]</div>
-
-              <p><strong>bounded by the number of domains, which saturates, rather than the number of skills, which does not.</strong> For the §5 machine: ~12 hot skills (350 tokens) + ~20 facades (600 tokens) ≈ <strong>1,000 tokens carrying 800 skills</strong> — 1% of the naive inventory cost, inside a 4k budget with headroom, at the price of one extra load hop paid only when a warm skill is actually needed. This is the RAG-MCP result [12] applied one layer up, and it is progressive disclosure [3] applied to <em>discovery itself</em>.</p>
-
-              <p><strong>Tier 2 — pull routing.</strong> The cold tail lives in a local SQLite index (BM25 over names, triggers, activation keywords, with duplicate-install collapse to logical identity). Facade bodies carry the instruction to query it when the task&#39;s domain is not covered — routing round-trips are paid on suspected matches, not on every prompt. Where an operator wants deterministic first-hop routing, an opt-in hook mode performs the route <em>inside</em> the prompt hook (which already receives the prompt text) with banded emission — a directive when confident, a two-line candidate hint when ambiguous (the main model, already reading the prompt, is the cheapest competent semantic reranker), and <strong>silence on bypass</strong>, so the common case costs zero tokens and zero round-trips.</p>
-
-              <p><strong>The closed loop.</strong> Run traces and ledgers record which skills actually fire per project; tier assignment becomes cache policy with real eviction data — used recently → hot; discovery-miss (a task matched a skill that never loaded, detectable from alignment) → promote; unfired in <span class="math-inline">\(N\)</span> days → cold, surfaced in a dead-weight report. Skill debt [§5] acquires a garbage collector. Around the whole pipeline sits an admission gate: doctor risk report, budget-fit check, collision detection, and (planned) cross-contract conflict lint at plugin install time — converting §5&#39;s silent arbitrary capability loss into explicit, reviewable admission decisions.</p>
-
-              <p>Honest tradeoff: hookless discovery is probabilistic — it depends on the model noticing a facade — where the mandatory first hop was deterministic. The mitigations are that facade descriptions are precisely the artifact the auditor optimizes, and that discovery misses are <em>measured</em> (the ledger sees them) rather than silent. Determinism remains available as policy; it is no longer the architecture.</p>
-
-              <hr>
-
-              <h2 id="research-9-beyond-the-loop-utility-agnostic-of-harness-and-model"><a class="heading-link" href="#research-9-beyond-the-loop-utility-agnostic-of-harness-and-model">9. Beyond the Loop: Utility Agnostic of Harness and Model</a></h2>
-
-              <p>The design center of everything in §7–§8 is a single principle: <strong>keep the system of record outside the model and outside any particular harness.</strong> Concretely:</p>
-
-              <ul>
-                <li><strong>State on disk, not in the window.</strong> Run directories, ledgers, guide state, fingerprints. Sessions crash, compact, and migrate; the contract walk resumes from disk under any model, including a <em>different</em> model mid-task — the resume validates fingerprints, not vibes. Model switches become a non-event by construction.</li>
-                <li><strong>One contract, many targets.</strong> The spec compiles to thin loaders per harness (Claude Code, Codex, generic Markdown) with identical semantics; the conformance suite, not any harness&#39;s behavior, defines the format. When a harness adds native support for a control (name-only listing, invocation gating), the compiler emits it; where support is missing, the loader emulates. The contract outlives harness churn the way OpenAPI outlived HTTP client churn.</li>
-                <li><strong>Determinism migrates to hooks.</strong> Per §2.2, guarantees live in the deterministic surface. The planned enforcement path compiles a run&#39;s active tool boundary into <em>scoped, run-lifetime</em> harness pre-tool-use hooks — forbidden substrates fail at the harness, not on the honor system — installed at run start, removed at run end, never resident globally. This narrows the audit–runtime gap [16] with local mechanisms and no new trust infrastructure, while the trace remains the audit artifact.</li>
-                <li><strong>Vendor-neutral by boundary.</strong> The router answers only &quot;which local skill, if any&quot;; execution-substrate policy belongs to the selected skill&#39;s own contract. A project adopts the discovery and evidence layers without inheriting anyone&#39;s runtime.</li>
-                <li><strong>The human channel is part of the contract.</strong> Gates carry not only <em>do-now</em> but a user-register status line, and completion reporting is a contract surface (result, evidence paths, alignment status, token economics) — because a system whose proof is unreadable gets its proof ignored.</li>
-              </ul>
-
-              <p>The through-line: models will keep changing, harnesses will keep absorbing features, and context windows will keep growing. A contract-and-evidence layer that lives in files, compiles to whatever the harness natively honors, and measures its own efficacy is the part of the stack designed to still be true after each of those shifts.</p>
-
-              <hr>
-
-              <h2 id="research-10-limitations-and-open-problems"><a class="heading-link" href="#research-10-limitations-and-open-problems">10. Limitations and Open Problems</a></h2>
-
-              <p>We state these without hedging, because the field&#39;s pattern of over-claiming is itself one of the failure modes this paper catalogs.</p>
-
-              <ol>
-                <li><strong>Advisory, not enforced (yet).</strong> The contract constrains a cooperative agent and <em>evidences</em> an uncooperative one. Until boundary-to-hook compilation ships, a model can ignore every forbid and the system can only report it afterward. The honest description is &quot;auditable,&quot; not &quot;guaranteed.&quot;</li>
-                <li><strong>The efficacy claim is unbenchmarked.</strong> The central hypothesis — spec-backed skills route better, drift less, and cost fewer tokens than prose skills on identical tasks — rests on dogfood evidence and the cited external measurements, not on controlled side-by-side runs. SkillsBench-style task suites [15] make this measurable; publishing the misses matters more than publishing the wins, because the misses locate where the grammar is vague.</li>
-                <li><strong>Probabilistic hookless discovery.</strong> Facade-mediated discovery can miss; the measured discovery-miss rate is the architecture&#39;s health metric and its honest report card.</li>
-                <li><strong>Contract-authoring cost.</strong> A ~100-type spec grammar risks recreating, at the schema layer, the very density problem it solves at the prose layer. The core steering subset (routes, rules, forbids, dependencies, tests, traces) must stay learnable in an afternoon; everything else belongs behind profiles.</li>
-                <li><strong>The evidence channel trusts the reporter.</strong> Ledger events are written by the same agent being audited; the runtime forbids retroactive proof manufacture, but detection of <em>fabricated contemporaneous</em> evidence requires the hook-level attestation of §9 or external binding of the SIGIL variety [16].</li>
-                <li><strong>Platform absorption.</strong> Harness vendors may natively absorb routing, budgets, and enforcement. The durable positions are the portable contract, the conformance authority, and the audit trail — the runtime loop is the layer most exposed.</li>
-                <li><strong>Composition semantics are open.</strong> Cross-skill contract conflicts (§5) are detectable in principle by workspace lint; merge semantics for composed specs (inheritance, includes, safety-weakening review gates) are designed but unimplemented — and composition is where the 2026 attack literature points [17].</li>
-              </ol>
-
-              <hr>
-
-              <h2 id="research-11-related-work"><a class="heading-link" href="#research-11-related-work">11. Related Work</a></h2>
-
-              <p><strong>Format and platform.</strong> The Agent Skills format and its progressive-disclosure model [3, 4]; harness-level skill management, invocation control, and command unification [5]. SkillSpec builds <em>on</em> the format rather than replacing it: the contract co-resides with <code>SKILL.md</code>.</p>
-
-              <p><strong>Degradation measurement.</strong> Position effects [7]; effective-versus-advertised context [8]; length-dependent degradation across 18 frontier models [11]; formatting sensitivity [9]; instruction-density decay with primacy bias [10]. These jointly supply the empirical basis for §3&#39;s cost model.</p>
-
-              <p><strong>Selection at scale.</strong> Retrieval-offloaded tool selection against prompt bloat [12] is the closest structural precedent for §8&#39;s compiled discovery; package-management approaches to skill distribution with format validation [13] address the registry layer.</p>
-
-              <p><strong>Skill ecosystems and security.</strong> Benchmarking skill efficacy at corpus scale [15]; semantic supply-chain attacks on skill metadata [14]; compositional risk in skill ecosystems [17]; cryptographic binding of audited skills to runtime [16]; prompt-injection taxonomy and mitigations [6]. SkillSpec&#39;s admission gate, provenance marks, and trace/alignment machinery are complementary local mechanisms to [16]&#39;s registry-level binding.</p>
-
-              <p><strong>Model-side adaptation.</strong> Parameter-efficient task adaptation [2] as the internalization endpoint for <em>stabilized</em> procedures — downstream of, not a substitute for, contract verification (§6).</p>
-
-              <hr>
-
-              <h2 id="research-12-conclusion"><a class="heading-link" href="#research-12-conclusion">12. Conclusion</a></h2>
-
-              <p>The agent stack evolved by moving each era&#39;s chaos into the next era&#39;s structure: prompts into loops, loops into harnesses, bespoke instructions into portable skills. Each move succeeded, and each success shifted the binding constraint upward. The current constraint is a budget: capabilities multiply freely while the context that makes them discoverable, selectable, and followable does not. Left alone, the arithmetic ends in context insolvency — installed capability that is invisible, selection that is arbitrary, follow-through that decays exponentially in obligations, and execution that leaves no evidence. Model-side progress relocates the boundary; it does not remove it, because allocation, verification, and portability are not capacity problems.</p>
-
-              <p>The response this paper describes is unglamorous by design: measure the risk statically, move the load-bearing decisions into a typed contract, walk execution one evidenced gate at a time with state on disk, verify alignment after the fact and say <em>unproven</em> when it is unproven, and compile discovery so its cost is bounded by the number of domains rather than the number of skills. None of this requires a new runtime, a new model, or anyone&#39;s permission. It requires treating skills the way the last four decades taught us to treat every other artifact that mattered: with contracts, tests, budgets, and audit trails — because &quot;hope&quot; was never a plan, and at eight hundred skills it stops even being a pretense.</p>
-
-              <hr>
-
-              <h2 id="research-references"><a class="heading-link" href="#research-references">References</a></h2>
-
-              <p>[1] S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. Narasimhan, Y. Cao. <em>ReAct: Synergizing Reasoning and Acting in Language Models.</em> ICLR 2023. <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noreferrer">https://arxiv.org/abs/2210.03629</a></p>
-
-              <p>[2] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen. <em>LoRA: Low-Rank Adaptation of Large Language Models.</em> ICLR 2022. <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">https://arxiv.org/abs/2106.09685</a></p>
-
-              <p>[3] Anthropic. <em>Equipping agents for the real world with Agent Skills.</em> Engineering blog, October 16, 2025. <a href="https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills" target="_blank" rel="noreferrer">https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills</a></p>
-
-              <p>[4] Agent Skills: an open format for extending AI agents. Specification and adopter registry. <a href="https://agentskills.io/" target="_blank" rel="noreferrer">https://agentskills.io/</a></p>
-
-              <p>[5] Anthropic. <em>Extend Claude with skills.</em> Claude Code documentation. <a href="https://code.claude.com/docs/en/skills" target="_blank" rel="noreferrer">https://code.claude.com/docs/en/skills</a></p>
-
-              <p>[6] OWASP GenAI Security Project. <em>LLM01:2025 Prompt Injection.</em> <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/" target="_blank" rel="noreferrer">https://genai.owasp.org/llmrisk/llm01-prompt-injection/</a></p>
-
-              <p>[7] N. F. Liu, K. Lin, J. Hewitt, A. Paranjape, M. Bevilacqua, F. Petroni, P. Liang. <em>Lost in the Middle: How Language Models Use Long Contexts.</em> TACL 2024. <a href="https://arxiv.org/abs/2307.03172" target="_blank" rel="noreferrer">https://arxiv.org/abs/2307.03172</a></p>
-
-              <p>[8] C.-P. Hsieh, S. Sun, S. Kriman, S. Acharya, D. Rekesh, F. Jia, Y. Zhang, B. Ginsburg. <em>RULER: What&#39;s the Real Context Size of Your Long-Context Language Models?</em> COLM 2024. <a href="https://arxiv.org/abs/2404.06654" target="_blank" rel="noreferrer">https://arxiv.org/abs/2404.06654</a></p>
-
-              <p>[9] M. Sclar, Y. Choi, Y. Tsvetkov, A. Suhr. <em>Quantifying Language Models&#39; Sensitivity to Spurious Features in Prompt Design.</em> ICLR 2024. <a href="https://arxiv.org/abs/2310.11324" target="_blank" rel="noreferrer">https://arxiv.org/abs/2310.11324</a></p>
-
-              <p>[10] D. Jaroslawicz et al. <em>How Many Instructions Can LLMs Follow at Once?</em> 2025. <a href="https://arxiv.org/abs/2507.11538" target="_blank" rel="noreferrer">https://arxiv.org/abs/2507.11538</a></p>
-
-              <p>[11] Chroma. <em>Context Rot: How Increasing Input Tokens Impacts LLM Performance.</em> Technical report, July 14, 2025. <a href="https://www.trychroma.com/research/context-rot" target="_blank" rel="noreferrer">https://www.trychroma.com/research/context-rot</a></p>
-
-              <p>[12] T. Gan et al. <em>RAG-MCP: Mitigating Prompt Bloat in LLM Tool Selection via Retrieval-Augmented Generation.</em> 2025. <a href="https://arxiv.org/abs/2505.03275" target="_blank" rel="noreferrer">https://arxiv.org/abs/2505.03275</a></p>
-
-              <p>[13] S. Saha, P. Hemanth. <em>Skilldex: A Package Manager and Registry for Agent Skill Packages with Hierarchical Scope-Based Distribution.</em> 2026. <a href="https://arxiv.org/abs/2604.16911" target="_blank" rel="noreferrer">https://arxiv.org/abs/2604.16911</a></p>
-
-              <p>[14] S. Saha, K. Faghih, S. Feizi. <em>Under the Hood of SKILL.md: Semantic Supply-chain Attacks on AI Agent Skill Registry.</em> 2026. <a href="https://arxiv.org/abs/2605.11418" target="_blank" rel="noreferrer">https://arxiv.org/abs/2605.11418</a></p>
-
-              <p>[15] X. Li et al. <em>SkillsBench: Benchmarking How Well Agent Skills Work Across Diverse Tasks.</em> 2026. <a href="https://arxiv.org/abs/2602.12670" target="_blank" rel="noreferrer">https://arxiv.org/abs/2602.12670</a></p>
-
-              <p>[16] T. Shen, Y. Feng, K. Zhu, X. Jia, Y. Liu, L. Zhang. <em>Sealing the Audit-Runtime Gap for LLM Skills.</em> 2026. <a href="https://arxiv.org/abs/2605.05274" target="_blank" rel="noreferrer">https://arxiv.org/abs/2605.05274</a></p>
-
-              <p>[17] Y. Xie, J. Du, Y. Cheng, J. Zhou, Z. Yin. <em>Benign in Isolation, Harmful in Composition: Security Risks in Agent Skill Ecosystems.</em> 2026. <a href="https://arxiv.org/abs/2606.15242" target="_blank" rel="noreferrer">https://arxiv.org/abs/2606.15242</a></p>
-
-              <p>[18] Modiqo. <em>SkillSpec: skills that agents can actually follow.</em> Open-source (MIT/Apache-2.0). <a href="https://github.com/modiqo/skillspec" target="_blank" rel="noreferrer">https://github.com/modiqo/skillspec</a> · <a href="https://skillspec.sh/" target="_blank" rel="noreferrer">https://skillspec.sh/</a></p>
-
-              <hr>
-
-              <p><em>All URLs verified live as of July 2, 2026. Formulas render under MathJax (<code>$…$</code> inline, <code>$$…$$</code> display).</em></p>
+        <article class="article-body">
+          <section id="skills">
+            <p class="section-kicker">1. Skills</p>
+            <h2>
+              <a class="heading-link" href="#skills">Skills are becoming the packaging layer for tacit domain knowledge.</a>
+            </h2>
+            <p>
+              A prompt is usually a one-off instruction. A skill is a reusable
+              package: frontmatter for discovery, a <code>SKILL.md</code> body
+              for instructions, and optional resources such as examples,
+              scripts, reference files, and checklists. That packaging matters
+              because it lets an agent carry specialized ways of working across
+              tasks and harnesses.
+            </p>
+            <p>
+              In practice, skills are becoming the place where teams write down
+              tacit operating knowledge: how to use a product, how to review a
+              legal clause, how to call a CLI safely, how to sequence a release,
+              or how to keep an agent aligned with a desired outcome. The format
+              emerged from prompts, but the intent is larger than prompting. It
+              is a way to ship capability.
+            </p>
+            <p>
+              This became more important as agent harnesses evolved. Early
+              models already knew common internet and programming patterns from
+              training. Modern harnesses then gave agents access to files,
+              shells, browsers, APIs, MCP servers, and local tools. Some of
+              those tools are natural to a model. Others are private, new,
+              domain-specific, or company-specific. Skills became the teaching
+              layer that tells the agent how to use those tools in the right
+              order for a real outcome.
+            </p>
+            <div class="callout-grid">
+              <div class="callout-card">
+                <strong>Prompt</strong>
+                <span>A transient instruction inside one conversation.</span>
+              </div>
+              <div class="callout-card">
+                <strong>Skill</strong>
+                <span>A portable package of instructions, resources, scripts, and examples.</span>
+              </div>
+              <div class="callout-card">
+                <strong>SkillSpec</strong>
+                <span>A checkable contract beside the skill for route, steps, limits, checks, and proof.</span>
+              </div>
+            </div>
+            <p>
+              The original skill architecture was a real advance because it
+              used progressive disclosure: load a small description first, load
+              the full body when relevant, and load references only when needed.
+              That solves the catalog problem better than dumping every prompt
+              into context. But after activation, the skill body is still prose.
+              It can be skipped, reordered, partially followed, or interpreted
+              differently by another model or harness.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/overview/00-skills-reliability-gap.md"
+                target="_blank"
+                rel="noreferrer"
+              >Reliability gap paper</a>
+            </p>
+          </section>
+
+          <section id="attention">
+            <p class="section-kicker">2. Attention</p>
+            <h2>
+              <a class="heading-link" href="#attention">Skill growth creates two kinds of pressure.</a>
+            </h2>
+            <p>
+              Longitudinal pressure is what happens inside one skill over time.
+              The skill starts short. Then it gains a decision tree, safety
+              rules, setup steps, examples, dependency notes, code snippets,
+              references, exceptions, and final reporting requirements. The file
+              is more complete, but the agent now has more instructions to hold
+              and sequence.
+            </p>
+            <p>
+              Lateral pressure is what happens across the skill library. As
+              agents reach deeper into a user's environment, every useful CLI,
+              API, MCP server, browser flow, and domain workflow wants a skill.
+              More skills means more discovery metadata, more routing ambiguity,
+              and more pressure on the harness budget reserved for skills.
+            </p>
+
+            <div class="pressure-diagram" aria-label="Skill attention pressure">
+              <div>
+                <span class="axis-label">Longitudinal</span>
+                <strong>One skill gets deeper</strong>
+                <p>Instructions become plans, state, rules, snippets, references, and proof demands.</p>
+              </div>
+              <div>
+                <span class="axis-label">Lateral</span>
+                <strong>The library gets wider</strong>
+                <p>More tools and domains create more skill descriptions competing for selection.</p>
+              </div>
+              <div class="pressure-result">
+                <strong>Result</strong>
+                <p>The agent must select the right skill, then follow the right slice of it, without losing steps.</p>
+              </div>
+            </div>
+
+            <p>
+              Doctor was built to make this visible. It classifies the shape of
+              a skill or workspace, measures activation-loaded text, dependency
+              and proof surfaces, frontmatter discovery risk, and agent drift
+              risk. The score is not a grade of domain quality. It is a static
+              estimate of follow-through pressure: how likely the current shape
+              is to make an agent skip, distort, over-trigger, under-trigger, or
+              finish without proof.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md"
+                target="_blank"
+                rel="noreferrer"
+              >Doctor risk model</a>
+            </p>
+          </section>
+
+          <section id="model">
+            <p class="section-kicker">3. Model limits</p>
+            <h2>
+              <a class="heading-link" href="#model">Better models help, but they do not remove the follow-through problem.</a>
+            </h2>
+            <p>
+              A stronger model can read more, reason better, and recover from
+              more ambiguity. That still does not turn prose into a guarantee.
+              If a skill says "never use tool X before approval," that sentence
+              is only as strong as the model's attention to it at the moment of
+              action. If a later phase says "run tests before release," the run
+              still needs evidence that tests actually ran.
+            </p>
+            <p>
+              The design docs make a narrow claim: long context and compaction
+              are not free. Token windows are large, but usable attention is not
+              uniform, and summarized context can drop governance constraints.
+              Doctor treats these as directional risk signals, not exact
+              probabilities. The report cites its basis so the user can see what
+              is measured, what is policy, and what is still a hypothesis.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/operations/20-performance-token-speed.md"
+                target="_blank"
+                rel="noreferrer"
+              >Token economy design</a>
+            </p>
+          </section>
+
+          <section id="skillspec">
+            <p class="section-kicker">4. The move</p>
+            <h2>
+              <a class="heading-link" href="#skillspec">SkillSpec keeps prose, but stops making prose carry everything.</a>
+            </h2>
+            <p>
+              The goal is not to replace skills. A good skill still needs
+              human-readable explanation, examples, references, and judgment.
+              The move is to place a small contract next to that prose for the
+              parts that matter most.
+            </p>
+            <div class="contract-flow" aria-label="SkillSpec contract flow">
+              <div>
+                <strong>Assess</strong>
+                <span>Doctor measures the current skill before changing it.</span>
+              </div>
+              <div>
+                <strong>Port</strong>
+                <span>Source maps and import scaffolds turn prose into a reviewed contract.</span>
+              </div>
+              <div>
+                <strong>Guide</strong>
+                <span>Run-loop serves the current route and phase instead of the whole spec.</span>
+              </div>
+              <div>
+                <strong>Prove</strong>
+                <span>Trace alignment compares what was planned with what has evidence.</span>
+              </div>
+            </div>
+            <p>
+              This is why SkillSpec is a CLI plus a structured skill plan. The
+              CLI does the mechanical work: map, validate, test, compile, plan,
+              record progress, and align traces. The skill plan carries the
+              intended behavior: routes, phases, tool boundaries, dependencies,
+              checks, tests, and proof obligations. The installed loader stays
+              small so the agent can ask the CLI for the next slice instead of
+              loading the whole operating manual.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/24-guided-trampoline.md"
+                target="_blank"
+                rel="noreferrer"
+              >Guided trampoline design</a>
+            </p>
+            <p>
+              That boundary matters. If follow-through optimizations live only
+              inside one harness, the skill becomes less portable the moment it
+              moves. SkillSpec keeps the optimization beside the skill itself:
+              the prose, the contract, the tests, and the proof model travel
+              together.
+            </p>
+          </section>
+
+          <section id="operator-model">
+            <p class="section-kicker">5. Operating model</p>
+            <h2>
+              <a class="heading-link" href="#operator-model">What SkillSpec gives an agent operator.</a>
+            </h2>
+            <div class="solution-grid">
+              <article>
+                <span>01</span>
+                <h3>Measure the existing skill</h3>
+                <p>
+                  Run Doctor before porting. It tells you whether the current
+                  shape is a simple skill, multi-skill workspace, plugin-shaped
+                  workspace, or non-skill repository. It also explains where
+                  follow-through risk comes from.
+                </p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Derive a contract from prose</h3>
+                <p>
+                  Import starts with source mapping, not guesswork. The agent
+                  reviews handles, headings, code blocks, dependencies, and
+                  review-required spans before promoting prose into structured
+                  routes, rules, checks, and proof.
+                </p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Run with progressive guidance</h3>
+                <p>
+                  The run loop selects the route, prints the current gate,
+                  records progress, and resumes from a persisted trace after
+                  interruption or compaction.
+                </p>
+              </article>
+              <article>
+                <span>04</span>
+                <h3>Route large skill libraries</h3>
+                <p>
+                  Router mode moves broad discovery into a local index. The
+                  prompt sees the selected candidates, not every installed skill
+                  description.
+                </p>
+              </article>
+              <article>
+                <span>05</span>
+                <h3>Create skills from observed work</h3>
+                <p>
+                  Durable execution, powered by Modiqo Rote when installed,
+                  captures real interaction evidence so tacit workflow knowledge
+                  can become an explicit SkillSpec-backed skill.
+                </p>
+              </article>
+            </div>
+            <p>
+              The implementation details are intentionally split by concern:
+              import and release flow,
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/01-import-to-release.md"
+                target="_blank"
+                rel="noreferrer"
+              >porting</a>
+              router mode for broad catalogs,
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/03-router-mode.md"
+                target="_blank"
+                rel="noreferrer"
+              >routing</a>
+              and durable execution for observed tool-backed work.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/04-durable-executor.md"
+                target="_blank"
+                rel="noreferrer"
+              >durable execution</a>
+            </p>
+          </section>
+
+          <section id="proof">
+            <p class="section-kicker">6. Proof</p>
+            <h2>
+              <a class="heading-link" href="#proof">The final answer should not be the only artifact you trust.</a>
+            </h2>
+            <p>
+              SkillSpec separates decision evidence from execution evidence. A
+              decision trace can prove which route was selected. A progress
+              ledger can prove which requirements were satisfied. Alignment
+              compares those records against the current contract and reports
+              pass, partial, or fail.
+            </p>
+            <div class="proof-table" role="table" aria-label="SkillSpec proof surfaces">
+              <div role="row">
+                <strong role="cell">Decision trace</strong>
+                <span role="cell">What route and rules were selected for the task.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Progress ledger</strong>
+                <span role="cell">What the agent recorded as completed, with evidence references.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Alignment report</strong>
+                <span role="cell">What is proven, missing, forbidden, or contradicted.</span>
+              </div>
+              <div role="row">
+                <strong role="cell">Token metrics</strong>
+                <span role="cell">What was measured, estimated, or explicitly not recorded.</span>
+              </div>
+            </div>
+            <p>
+              This is the scientific posture of the project: do not infer
+              success from a polished answer. Ask what route was selected, what
+              checks passed, what proof exists, and what remains unproven.
+              <a
+                class="cite-link"
+                href="https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/12-traces-and-alignment.md"
+                target="_blank"
+                rel="noreferrer"
+              >Traces and alignment</a>
+            </p>
+          </section>
+
+          <section id="sources" class="sources-section">
+            <p class="section-kicker">Sources</p>
+            <h2>
+              <a class="heading-link" href="#sources">Design material behind this article.</a>
+            </h2>
+            <p>
+              These links open the implementation and design notes used to write
+              this page. They are intentionally public so the claims can be
+              checked against the project source.
+            </p>
+            <div class="source-list">
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/overview/00-skills-reliability-gap.md" target="_blank" rel="noreferrer">
+                Reliability gap in agent skills
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md" target="_blank" rel="noreferrer">
+                Doctor agent drift risk model
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/01-import-to-release.md" target="_blank" rel="noreferrer">
+                Import to release explainer
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/24-guided-trampoline.md" target="_blank" rel="noreferrer">
+                Guided trampoline design
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/12-traces-and-alignment.md" target="_blank" rel="noreferrer">
+                Traces and alignment
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/13-completion-alignment-and-token-reporting.md" target="_blank" rel="noreferrer">
+                Completion alignment and token reporting
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/03-router-mode.md" target="_blank" rel="noreferrer">
+                Router mode
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/04-durable-executor.md" target="_blank" rel="noreferrer">
+                Durable executor
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/authoring/19-workspace-authoring-graph.md" target="_blank" rel="noreferrer">
+                Workspace authoring graph
+              </a>
+              <a href="https://github.com/modiqo/skillspec/blob/main/docs/design/operations/20-performance-token-speed.md" target="_blank" rel="noreferrer">
+                Performance and token economy
+              </a>
+            </div>
           </section>
         </article>
       </div>
