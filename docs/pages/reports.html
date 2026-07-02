@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
     <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260701-remove-hero-squiggles">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260702-report-share-sha">
   </head>
   <body>
     <header class="site-header">
@@ -133,7 +133,10 @@
               <a class="heading-link" href="#report-viewer">Report</a>
             </h2>
           </div>
-          <button id="close-viewer" type="button">Close</button>
+          <div class="viewer-actions">
+            <button id="share-viewer" type="button" disabled>Copy share link</button>
+            <button id="close-viewer" type="button">Close</button>
+          </div>
         </div>
         <article id="report-content" class="report-content"></article>
       </section>
@@ -185,6 +188,7 @@
         </dl>
         <div class="card-actions">
           <button type="button" data-action="view">View report</button>
+          <button type="button" data-action="share">Share</button>
           <a data-action="issue" target="_blank" rel="noreferrer">GitHub issue</a>
         </div>
       </article>
@@ -202,6 +206,6 @@
     </template>
 
     <script src="./assets/site.js?v=20260628-risk-star"></script>
-    <script src="./assets/app.js?v=20260701-risk-explainer"></script>
+    <script src="./assets/app.js?v=20260702-report-share-sha"></script>
   </body>
 </html>

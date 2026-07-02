@@ -56,13 +56,15 @@ Public GitHub skill URL
 ```
 
 Requests are recognized by either the `doctor-report` label or a title that
-starts with `Doctor report:`. The public page and issue template use the generic
-title `Doctor report: request` so submitted URLs do not appear in issue lists,
-workflow run titles, or report-history headings. The label is still attached by
-the issue template when the repository label exists, but the workflow also
-accepts the title prefix so first-time setup mistakes and label-prefill limits
-do not silently skip public requests. The parser prefers the issue-form body and
-falls back to a GitHub URL in the title only for older manual requests.
+starts with `Doctor report:`. The public page resolves the submitted public
+target to `owner/repo@shortsha` when GitHub's public API is available, keeping
+the path out of issue lists while making repeated reports distinguishable. The
+issue template still uses the generic title `Doctor report: request`. The label
+is still attached by the issue template when the repository label exists, but
+the workflow also accepts the title prefix so first-time setup mistakes and
+label-prefill limits do not silently skip public requests. The parser prefers
+the issue-form body and falls back to a GitHub URL in the title only for older
+manual requests.
 
 The workflow accepts only normalized `https://github.com/<owner>/<repo>` URLs
 and public GitHub folder URLs under them. Canonical GitHub folder URLs use
@@ -156,7 +158,9 @@ The Pages source lives under `docs/pages/` and is deployed by
 `.github/workflows/pages.yml`. It is a static client-side app:
 
 - The request form accepts only public `https://github.com/...` URLs and opens a
-  prefilled `Doctor report: request` issue with a generic title.
+  prefilled issue titled `Doctor report: owner/repo@shortsha` when the public
+  commit can be resolved, falling back to the owner/repo label without exposing
+  the submitted folder path.
 - The landing page keeps assessment submission focused; the report gallery lives
   on `reports.html` so browsing public reports does not dominate the main page.
 - The report gallery explains shape-specific interpretation and links to

@@ -262,6 +262,13 @@ button:hover,
   background: #273141;
 }
 
+button:disabled,
+button:disabled:hover {
+  background: #f1f5f9;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 button:focus-visible,
 .card-actions a:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.25);
@@ -583,6 +590,17 @@ code {
   background: #ffffff;
   color: var(--ink);
   border-color: var(--line);
+}
+
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.viewer-actions button {
+  min-height: 42px;
 }
 
 .report-content {
@@ -3085,11 +3103,16 @@ pre code {
 
 .reports-shell .card-actions {
   align-content: stretch;
+  grid-template-columns: 1fr;
 }
 
 .reports-shell .card-actions button,
 .reports-shell .card-actions a {
   min-height: 44px;
+}
+
+.reports-shell .card-actions > * + * {
+  border-top: 0;
 }
 
 .reports-shell .report-viewer {

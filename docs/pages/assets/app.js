@@ -3,6 +3,8 @@ const REPO_NAME = "skillspec";
 const REPORT_LABEL = "doctor-report";
 const REPORT_MARKER = "<!-- skillspec-doctor-report -->";
 const REPORT_WORKFLOW = "doctor-report.yml";
+const REPORT_QUERY_PARAM = "report";
+const REPORT_SHARE_HASH = "report-viewer";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const REPORTS_CACHE_KEY = "skillspec.publicReports.v2";
 const RUNS_CACHE_KEY = "skillspec.workflowRuns.v2";
@@ -21,14 +23,16 @@ const reportViewer = document.querySelector("#report-viewer");
 const reportContent = document.querySelector("#report-content");
 const viewerTitle = document.querySelector("#viewer-title");
 const closeViewer = document.querySelector("#close-viewer");
+const shareViewerButton = document.querySelector("#share-viewer");
 const cardTemplate = document.querySelector("#report-card-template");
 const runRowTemplate = document.querySelector("#run-row-template");
 
 let reports = [];
 let activeFilter = "all";
+let activeReport = null;
 
 if (form && targetInput && formMessage) {
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const validation = validateGitHubUrl(targetInput.value);
     if (!validation.ok) {
@@ -37,8 +41,15 @@ if (form && targetInput && formMessage) {
     }
 
     const url = validation.url;
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    showFormMessage("Resolving the public repository commit...");
+    const issueTitle = await buildIssueTitle(url);
     const issueUrl = new URL(`https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new`);
-    issueUrl.searchParams.set("title", "Doctor report: request");
+    issueUrl.searchParams.set("title", issueTitle);
     issueUrl.searchParams.set("labels", REPORT_LABEL);
     issueUrl.searchParams.set(
       "body",
@@ -77,10 +88,21 @@ document.querySelectorAll(".filter").forEach((button) => {
 
 if (closeViewer && reportViewer && reportContent) {
   closeViewer.addEventListener("click", () => {
-    reportViewer.hidden = true;
-    reportContent.replaceChildren();
+    closeReportViewer({ clearUrl: true });
   });
 }
+
+if (shareViewerButton) {
+  shareViewerButton.addEventListener("click", () => {
+    if (activeReport) {
+      copyReportShareUrl(activeReport, shareViewerButton);
+    }
+  });
+}
+
+window.addEventListener("popstate", () => {
+  syncReportViewerToLocation({ scroll: false });
+});
 
 function validateGitHubUrl(rawValue) {
   const raw = rawValue.trim();
@@ -133,6 +155,84 @@ function showFormMessage(message, isError = false) {
   formMessage.classList.toggle("error", isError);
 }
 
+async function buildIssueTitle(targetUrl) {
+  const target = parseGitHubTarget(targetUrl);
+  if (!target) {
+    return "Doctor report: request";
+  }
+
+  const label = `${target.owner}/${target.repo}`;
+  const shortSha = await fetchTargetShortSha(target).catch(() => "");
+  return `Doctor report: ${label}${shortSha ? `@${shortSha}` : ""}`;
+}
+
+function parseGitHubTarget(targetUrl) {
+  try {
+    const url = new URL(targetUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (url.hostname.toLowerCase() !== "github.com" || parts.length < 2) {
+      return null;
+    }
+
+    return {
+      owner: decodePathPart(parts[0]),
+      repo: decodePathPart(parts[1]).replace(/\.git$/, ""),
+      ref: extractGitHubRef(parts.slice(2)),
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function extractGitHubRef(restParts) {
+  if (/^(tree|blob)$/i.test(restParts[0] || "") && restParts[1]) {
+    return decodePathPart(restParts[1]);
+  }
+  return "";
+}
+
+function decodePathPart(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return value;
+  }
+}
+
+async function fetchTargetShortSha(target) {
+  const refs = [];
+  if (target.ref) {
+    refs.push(target.ref);
+  }
+
+  if (refs.length === 0) {
+    const repository = await fetchJson(
+      new URL(`https://api.github.com/repos/${target.owner}/${target.repo}`),
+      { timeoutMs: 3500 },
+    );
+    if (repository.default_branch) {
+      refs.push(repository.default_branch);
+    }
+  }
+
+  for (const ref of refs) {
+    const sha = await fetchCommitSha(target, ref).catch(() => "");
+    if (sha) {
+      return sha.slice(0, 7);
+    }
+  }
+
+  return "";
+}
+
+async function fetchCommitSha(target, ref) {
+  const commitUrl = new URL(
+    `https://api.github.com/repos/${target.owner}/${target.repo}/commits/${encodeURIComponent(ref)}`,
+  );
+  const commit = await fetchJson(commitUrl, { timeoutMs: 3500 });
+  return typeof commit.sha === "string" ? commit.sha : "";
+}
+
 async function loadReports({ force = false } = {}) {
   if (!reportsGrid || !reportsStatus) {
     return;
@@ -142,6 +242,7 @@ async function loadReports({ force = false } = {}) {
   if (!force && isFreshCache(cached)) {
     reports = cached.data;
     renderCards();
+    syncReportViewerToLocation({ scroll: true });
     appendCacheNotice(reportsStatus, cached);
     return;
   }
@@ -167,12 +268,14 @@ async function loadReports({ force = false } = {}) {
       .map(compactReport);
     const cache = writeCache(REPORTS_CACHE_KEY, reports);
     renderCards();
+    syncReportViewerToLocation({ scroll: true });
     appendCacheNotice(reportsStatus, cache);
   } catch (error) {
     if (cached) {
       const checkedCache = touchCache(REPORTS_CACHE_KEY, cached);
       reports = checkedCache.data;
       renderCards();
+      syncReportViewerToLocation({ scroll: true });
       reportsStatus.textContent = `Showing cached reports from ${formatCacheTimestamp(checkedCache.cachedAt)} because GitHub refresh failed: ${error.message}. Next GitHub refresh after ${formatCacheExpiry(checkedCache)}.`;
       return;
     }
@@ -456,6 +559,7 @@ function renderCards() {
     const issueNumber = node.querySelector(".issue-number");
     const title = node.querySelector("h3");
     const viewButton = node.querySelector('[data-action="view"]');
+    const shareButton = node.querySelector('[data-action="share"]');
     const issueLink = node.querySelector('[data-action="issue"]');
 
     status.textContent = report.status;
@@ -468,18 +572,142 @@ function renderCards() {
     node.querySelector('[data-field="risk"]').textContent = report.risk;
     issueLink.href = report.issue.html_url;
 
-    if (viewButton && viewerTitle && reportContent && reportViewer) {
+    if (viewButton) {
       viewButton.addEventListener("click", () => {
-        const model = buildReportModel(report);
-        viewerTitle.textContent = model.viewerTitle;
-        reportContent.innerHTML = renderReportDashboard(model);
-        reportViewer.hidden = false;
-        reportViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+        openReportViewer(report, { updateUrl: true, scroll: true });
+      });
+    }
+    if (shareButton) {
+      shareButton.addEventListener("click", () => {
+        copyReportShareUrl(report, shareButton);
       });
     }
 
     reportsGrid.appendChild(node);
   }
+}
+
+function openReportViewer(report, { updateUrl = false, scroll = true } = {}) {
+  if (!viewerTitle || !reportContent || !reportViewer) {
+    return;
+  }
+
+  const model = buildReportModel(report);
+  viewerTitle.textContent = model.viewerTitle;
+  reportContent.innerHTML = renderReportDashboard(model);
+  reportViewer.hidden = false;
+  activeReport = report;
+  if (shareViewerButton) {
+    shareViewerButton.disabled = false;
+    shareViewerButton.textContent = "Copy share link";
+  }
+  if (updateUrl) {
+    replaceCurrentUrl(reportShareUrl(report));
+  }
+  if (scroll) {
+    reportViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function closeReportViewer({ clearUrl = false } = {}) {
+  if (!reportViewer || !reportContent) {
+    return;
+  }
+
+  reportViewer.hidden = true;
+  reportContent.replaceChildren();
+  activeReport = null;
+  if (shareViewerButton) {
+    shareViewerButton.disabled = true;
+    shareViewerButton.textContent = "Copy share link";
+  }
+  if (clearUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(REPORT_QUERY_PARAM);
+    url.hash = "recent-doctor-reports";
+    replaceCurrentUrl(url.toString());
+  }
+}
+
+function syncReportViewerToLocation({ scroll = false } = {}) {
+  const requested = requestedReportNumber();
+  if (!requested) {
+    if (activeReport) {
+      closeReportViewer({ clearUrl: false });
+    }
+    return;
+  }
+
+  const report = reports.find((item) => String(item.issue.number) === requested);
+  if (report) {
+    openReportViewer(report, { updateUrl: false, scroll });
+  } else if (reportsStatus) {
+    reportsStatus.textContent = `${reportsStatus.textContent} Report #${requested} was not found in the latest public issue list.`;
+  }
+}
+
+function requestedReportNumber() {
+  try {
+    return new URL(window.location.href).searchParams.get(REPORT_QUERY_PARAM);
+  } catch (_error) {
+    return "";
+  }
+}
+
+function reportShareUrl(report) {
+  const url = new URL("reports.html", window.location.href);
+  url.searchParams.set(REPORT_QUERY_PARAM, String(report.issue.number));
+  url.hash = REPORT_SHARE_HASH;
+  return url.toString();
+}
+
+function replaceCurrentUrl(nextUrl) {
+  if (!window.history || !window.history.replaceState) {
+    return;
+  }
+  window.history.replaceState(null, "", nextUrl);
+}
+
+async function copyReportShareUrl(report, button) {
+  const shareUrl = reportShareUrl(report);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+    } else {
+      fallbackCopyText(shareUrl);
+    }
+    showTemporaryButtonLabel(button, "Copied");
+  } catch (_error) {
+    showTemporaryButtonLabel(button, "Copy failed");
+  }
+}
+
+function fallbackCopyText(value) {
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) {
+    throw new Error("Copy command failed.");
+  }
+}
+
+function showTemporaryButtonLabel(button, label) {
+  if (!button) {
+    return;
+  }
+
+  const original = button.dataset.originalLabel || button.textContent;
+  button.dataset.originalLabel = original;
+  button.textContent = label;
+  window.setTimeout(() => {
+    button.textContent = button.dataset.originalLabel || original;
+  }, 1800);
 }
 
 function parseSummary(markdown) {
@@ -583,12 +811,27 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.github+json",
-    },
-  });
+async function fetchJson(url, { timeoutMs = 0 } = {}) {
+  const canAbort = timeoutMs > 0 && typeof AbortController !== "undefined";
+  const controller = canAbort ? new AbortController() : null;
+  const timeout = controller
+    ? window.setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+      signal: controller ? controller.signal : undefined,
+    });
+  } finally {
+    if (timeout !== null) {
+      window.clearTimeout(timeout);
+    }
+  }
+
   if (!response.ok) {
     if (response.status === 403) {
       throw new Error("GitHub API rate limit reached. Try again later.");

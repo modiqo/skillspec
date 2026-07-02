@@ -19,7 +19,7 @@ concurrency:
 jobs:
   doctor-report:
     name: Generate doctor report
-    if: contains(github.event.issue.labels.*.name, 'doctor-report') || startsWith(github.event.issue.title, 'Doctor report:')
+    if: github.actor != 'github-actions[bot]' && (contains(github.event.issue.labels.*.name, 'doctor-report') || startsWith(github.event.issue.title, 'Doctor report:'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -144,6 +144,50 @@ jobs:
                 core.setOutput("reason", `GitHub API could not verify the repository: ${error.message}`);
               }
             }
+
+      - name: Resolve request commit
+        id: request_commit
+        if: steps.visibility.outputs.public == 'true'
+        uses: actions/github-script@v7
+        env:
+          TARGET: ${{ steps.parse.outputs.target }}
+          TARGET_OWNER: ${{ steps.parse.outputs.owner }}
+          TARGET_REPO: ${{ steps.parse.outputs.repo }}
+        with:
+          script: |
+            const target = process.env.TARGET;
+            const owner = process.env.TARGET_OWNER;
+            const repo = process.env.TARGET_REPO;
+            let ref = "";
+            let shortSha = "";
+
+            try {
+              const url = new URL(target);
+              const parts = url.pathname.split("/").filter(Boolean);
+              const rest = parts.slice(2);
+              if (/^(tree|blob)$/i.test(rest[0] || "") && rest[1]) {
+                ref = decodeURIComponent(rest[1]);
+              }
+            } catch (error) {
+              core.warning(`Could not parse target ref for title normalization: ${error.message}`);
+            }
+
+            if (!ref) {
+              const repository = await github.rest.repos.get({ owner, repo });
+              ref = repository.data.default_branch || "";
+            }
+
+            if (ref) {
+              try {
+                const commit = await github.rest.repos.getCommit({ owner, repo, ref });
+                shortSha = (commit.data.sha || "").slice(0, 7);
+              } catch (error) {
+                core.warning(`Could not resolve commit ${ref} for issue title: ${error.message}`);
+              }
+            }
+
+            core.setOutput("short_sha", shortSha);
+            core.setOutput("title_label", `${owner}/${repo}${shortSha ? `@${shortSha}` : ""}`);
 
       - name: Comment with local-run instructions
         if: steps.parse.outputs.valid != 'true' || steps.visibility.outputs.public != 'true'
@@ -463,3 +507,26 @@ jobs:
                 body,
               });
             }
+
+      - name: Normalize issue title
+        if: always() && steps.parse.outputs.valid == 'true' && steps.visibility.outputs.public == 'true'
+        uses: actions/github-script@v7
+        env:
+          TITLE_LABEL: ${{ steps.request_commit.outputs.title_label }}
+        with:
+          script: |
+            const label = process.env.TITLE_LABEL;
+            if (!label) {
+              return;
+            }
+
+            const desiredTitle = `Doctor report: ${label}`;
+            if (context.payload.issue.title === desiredTitle) {
+              return;
+            }
+
+            await github.rest.issues.update({
+              ...context.repo,
+              issue_number: context.issue.number,
+              title: desiredTitle,
+            });
