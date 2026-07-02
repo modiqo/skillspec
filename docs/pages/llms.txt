@@ -3,10 +3,9 @@
 SkillSpec is an open-source CLI and open-standard contract format for verifiable `SKILL.md` execution. It helps agents assess, import, route, execute, and prove skills using a small machine-checkable `skill.spec.yml` beside the existing prose skill.
 
 Primary site: https://skillspec.sh/
-Research explainer: https://skillspec.sh/why-skillspec.html
+Research paper: https://skillspec.sh/why-skillspec.html#research
 Public Doctor reports: https://skillspec.sh/reports.html
 GitHub repository: https://github.com/modiqo/skillspec
-Crates.io package: https://crates.io/crates/skillspec
 Install script: https://skillspec.sh/install.sh
 License: Apache 2.0
 
@@ -32,15 +31,14 @@ License: Apache 2.0
 - Recent Doctor reports: https://skillspec.sh/reports.html#recent-doctor-reports
 - Doctor runs: https://skillspec.sh/reports.html#doctor-runs
 - Doctor score model: https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md
-- Why SkillSpec exists: https://skillspec.sh/why-skillspec.html#why-skillspec
-- Research abstract: https://skillspec.sh/why-skillspec.html#abstract
-- Skill packaging layer: https://skillspec.sh/why-skillspec.html#skills
-- Attention pressure: https://skillspec.sh/why-skillspec.html#attention
-- Model limits: https://skillspec.sh/why-skillspec.html#model
-- SkillSpec move: https://skillspec.sh/why-skillspec.html#skillspec
-- Operating model: https://skillspec.sh/why-skillspec.html#operator-model
-- Proof model: https://skillspec.sh/why-skillspec.html#proof
-- Sources: https://skillspec.sh/why-skillspec.html#sources
+- Research paper: https://skillspec.sh/why-skillspec.html#research
+- Research abstract: https://skillspec.sh/why-skillspec.html#research-abstract
+- Context insolvency introduction: https://skillspec.sh/why-skillspec.html#research-1-introduction
+- Discovery and follow-through cost model: https://skillspec.sh/why-skillspec.html#research-3-a-cost-model-of-discovery-and-follow-through
+- Invocation semantics: https://skillspec.sh/why-skillspec.html#research-4-invocation-semantics-the-residency-trigger-distinction
+- SkillSpec contract layer: https://skillspec.sh/why-skillspec.html#research-7-skillspec-a-contract-layer-between-prose-and-execution
+- Compiling discovery: https://skillspec.sh/why-skillspec.html#research-8-compiling-discovery-restoring-solvency
+- References: https://skillspec.sh/why-skillspec.html#research-references
 
 ## Common Commands
 
