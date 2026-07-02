@@ -3111,6 +3111,17 @@ pre code {
   min-height: 44px;
 }
 
+.reports-shell .card-actions [data-action="share"] {
+  border-color: var(--green);
+  background: var(--green);
+  color: #ffffff;
+}
+
+.reports-shell .card-actions [data-action="share"]:hover {
+  border-color: #0b7f58;
+  background: #0b7f58;
+}
+
 .reports-shell .card-actions > * + * {
   border-top: 0;
 }
