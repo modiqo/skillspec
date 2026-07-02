@@ -1367,65 +1367,6 @@ h3 {
   font-style: normal;
 }
 
-.squiggle-red,
-.squiggle-blue {
-  color: var(--ink);
-  font-style: normal;
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
-  text-decoration-thickness: 0.075em;
-  text-underline-offset: 0.17em;
-}
-
-.squiggle-red {
-  text-decoration-color: var(--red);
-}
-
-.squiggle-blue {
-  text-decoration-color: var(--blue);
-}
-
-.follow-through-wrap {
-  position: relative;
-  display: inline-block;
-  padding-top: 1.45em;
-  vertical-align: baseline;
-  white-space: nowrap;
-}
-
-.follow-through-mark {
-  color: var(--ink);
-  font-style: normal;
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
-  text-decoration-color: var(--amber);
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.18em;
-}
-
-.follow-through-note {
-  position: absolute;
-  top: 0;
-  left: 0.02em;
-  width: max-content;
-  max-width: min(34rem, 76vw);
-  color: var(--green);
-  font-family: var(--font-ui);
-  font-size: 0.4em;
-  font-style: normal;
-  letter-spacing: 0.01em;
-  line-height: 1.24;
-  transform: rotate(-1deg);
-  white-space: normal;
-}
-
-.follow-through-note::before {
-  display: inline-block;
-  margin-right: 0.45em;
-  color: var(--amber);
-  content: "↳";
-}
-
 .hero-visual,
 .article-figure,
 .request-panel,
@@ -4089,19 +4030,6 @@ pre code {
   .lede {
     margin-bottom: 36px;
     font-size: 1.28rem;
-  }
-
-  .follow-through-wrap {
-    padding-top: 1.55em;
-    white-space: normal;
-  }
-
-  .follow-through-note {
-    top: 0;
-    left: 0;
-    max-width: calc(100vw - 36px);
-    font-size: 0.48em;
-    transform: none;
   }
 
   .request-panel,
