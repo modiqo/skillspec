@@ -1,8 +1,8 @@
-use super::types::{AgentDriftRiskReport, DoctorPackageRiskReport};
+use super::scoring::{penalty, Penalties, StructuralScore};
+use super::types::{AgentDriftRiskReport, DoctorPackageRiskReport, Severity};
 use super::{
-    basis, frontmatter, issue, metrics, path_to_slash, risk, severity_rank, slugify, with_location,
-    DoctorIssue, DoctorReport, DoctorShapeReport, Error, Result, LARGE_BODY_LINES,
-    LARGE_BODY_TOKENS,
+    basis, frontmatter, issue, metrics, path_to_slash, risk, slugify, with_location, DoctorIssue,
+    DoctorReport, DoctorShapeReport, Error, Result, LARGE_BODY_LINES, LARGE_BODY_TOKENS,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 struct RiskProfile {
-    structural_score: u8,
+    structural_score: StructuralScore,
     activation_estimated_tokens: usize,
     activation_lines: usize,
     frontmatter_discovery_risk: super::FrontmatterDiscoveryRiskReport,
@@ -156,13 +156,13 @@ fn fallback_profile_from_text(skill_path: &str, content: &str) -> RiskProfile {
     let activation_lines = sections.body.lines().count();
     let package_issues =
         fallback_package_issues(skill_path, activation_estimated_tokens, activation_lines);
-    let package_penalty = package_issues
-        .iter()
-        .map(|issue| usize::from(issue.score_penalty))
-        .sum::<usize>()
-        .saturating_add(usize::from(frontmatter_risk.score.min(30)))
-        .min(100);
-    let structural_score = u8::try_from(100usize.saturating_sub(package_penalty)).unwrap_or(0);
+    let structural_score =
+        Penalties::from_deltas(package_issues.iter().map(|issue| issue.score_penalty))
+            .plus_capped(
+                frontmatter_risk.score.get(),
+                penalty::FRONTMATTER_PROFILE_RISK_CAP,
+            )
+            .structural_score();
     let basis = basis();
     let agent_drift_risk = risk::agent_report(
         structural_score,
@@ -192,7 +192,7 @@ fn fallback_package_issues(
         issues.push(with_location(
             issue(
                 "activation_token_load",
-                "high",
+                Severity::High,
                 "Large activation-loaded instruction body",
                 format!(
                     "Package activation body is {} lines / approximately {} tokens.",
@@ -204,12 +204,12 @@ fn fallback_package_issues(
                     "skillsbench_focused_skills",
                 ],
                 "Move examples, references, and detailed procedures into deferred files or structured SkillSpec entries.",
-                18,
+                penalty::FALLBACK_ACTIVATION_TOKEN_LOAD,
             ),
             skill_path.to_owned(),
         ));
     }
-    issues.sort_by_key(|issue| severity_rank(&issue.severity));
+    issues.sort_by_key(|issue| issue.severity);
     issues
 }
 

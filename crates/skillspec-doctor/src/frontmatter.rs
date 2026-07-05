@@ -1,4 +1,5 @@
 use super::metrics;
+use super::scoring::{penalty, Penalties};
 use super::types::{
     FrontmatterDiscoveryFields, FrontmatterDiscoveryRiskReport, FrontmatterParseStatus,
     RiskCondition, RiskConditionKind, RiskConfidence, RiskEvidence, RiskLevel,
@@ -149,14 +150,11 @@ pub(super) fn analyze(path: &Path, sections: &SkillSections) -> FrontmatterDisco
     };
 
     let conditions = conditions(path, &fields);
-    let score = conditions
-        .iter()
-        .map(|condition| usize::from(condition.score_delta))
-        .sum::<usize>()
-        .min(100) as u8;
+    let score = Penalties::from_deltas(conditions.iter().map(|condition| condition.score_delta))
+        .risk_score();
     FrontmatterDiscoveryRiskReport {
         score,
-        level: RiskLevel::from_score(score),
+        level: score.level(),
         fields,
         conditions,
     }
@@ -180,9 +178,9 @@ fn conditions(path: &Path, fields: &FrontmatterDiscoveryFields) -> Vec<RiskCondi
                 RiskLevel::Critical
             },
             score_delta: if fields.parse_status == FrontmatterParseStatus::Parsed {
-                18
+                penalty::EMPTY_FRONTMATTER_DESCRIPTION
             } else {
-                24
+                penalty::MISSING_FRONTMATTER
             },
             measurement: measurements([
                 ("description_chars", fields.description_chars),
@@ -207,7 +205,7 @@ fn conditions(path: &Path, fields: &FrontmatterDiscoveryFields) -> Vec<RiskCondi
         conditions.push(condition(ConditionSpec {
             id: "ambiguous_short_description",
             level: RiskLevel::Medium,
-            score_delta: 14,
+            score_delta: penalty::AMBIGUOUS_SHORT_DESCRIPTION,
             measurement: measurements([
                 ("description_chars", fields.description_chars),
                 ("domain_term_count", fields.domain_term_count),
@@ -235,7 +233,7 @@ fn conditions(path: &Path, fields: &FrontmatterDiscoveryFields) -> Vec<RiskCondi
         conditions.push(condition(ConditionSpec {
             id: "overbroad_description",
             level: RiskLevel::Medium,
-            score_delta: 10,
+            score_delta: penalty::OVERBROAD_DESCRIPTION,
             measurement: measurements([
                 ("description_chars", fields.description_chars),
                 ("domain_term_count", fields.domain_term_count),
@@ -264,7 +262,11 @@ fn conditions(path: &Path, fields: &FrontmatterDiscoveryFields) -> Vec<RiskCondi
             } else {
                 RiskLevel::Medium
             },
-            score_delta: if over_cap { 12 } else { 6 },
+            score_delta: if over_cap {
+                penalty::DISCOVERY_OVER_CAP
+            } else {
+                penalty::DISCOVERY_NEAR_CAP
+            },
             measurement: measurements([
                 ("combined_discovery_chars", fields.combined_discovery_chars),
                 ("harness_cap_chars", fields.harness_cap_chars),
@@ -283,7 +285,7 @@ fn conditions(path: &Path, fields: &FrontmatterDiscoveryFields) -> Vec<RiskCondi
         conditions.push(condition(ConditionSpec {
             id: "manual_only_visibility",
             level: RiskLevel::Low,
-            score_delta: 0,
+            score_delta: penalty::MANUAL_ONLY_VISIBILITY,
             measurement: measurements([("combined_discovery_chars", fields.combined_discovery_chars)]),
             path,
             text_preview: "Frontmatter disables automatic invocation or menu visibility.",
