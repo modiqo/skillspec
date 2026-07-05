@@ -453,7 +453,13 @@ pub fn render_html(report: &DoctorReport) -> String {
     let mut output = String::new();
     let (risk_label, risk_score, risk_level) = primary_risk(report)
         .map(|(label, score, level)| (label.to_owned(), score, level))
-        .unwrap_or_else(|| ("not evaluated".to_owned(), 0, RiskLevel::Low));
+        .unwrap_or_else(|| {
+            (
+                "not evaluated".to_owned(),
+                super::scoring::RiskScore::default(),
+                RiskLevel::Low,
+            )
+        });
     let readiness_label = humanize_snake(&report.score_model.readiness_label);
 
     output.push_str("<!doctype html>\n<html lang=\"en\">\n<head>\n");
@@ -741,7 +747,7 @@ fn render_issue_text(index: usize, issue: &DoctorIssue) -> String {
     output.push_str(&format!(
         "{}. [{}] {}\n",
         index,
-        issue.severity.to_uppercase(),
+        issue.severity.as_str().to_uppercase(),
         issue.title
     ));
     if let Some(location) = &issue.location {
@@ -759,8 +765,8 @@ fn render_issue_html(issue: &DoctorIssue) -> String {
     let mut output = String::new();
     output.push_str(&format!(
         "<article class=\"finding\"><div><span class=\"badge {}\">{}</span><h3>{}</h3></div>",
-        escape_html(&issue.severity),
-        escape_html(&issue.severity),
+        escape_html(issue.severity.as_str()),
+        escape_html(issue.severity.as_str()),
         escape_html(&issue.title)
     ));
     if let Some(location) = &issue.location {
@@ -810,7 +816,7 @@ fn render_issue_markdown(index: usize, issue: &DoctorIssue) -> String {
     output.push_str(&format!(
         "### {}. {}: {}\n\n",
         index,
-        issue.severity.to_uppercase(),
+        issue.severity.as_str().to_uppercase(),
         markdown_text(&issue.title)
     ));
     if let Some(location) = &issue.location {
@@ -914,7 +920,9 @@ fn pair(label: &str, value: &str) -> String {
     )
 }
 
-fn primary_risk(report: &DoctorReport) -> Option<(&'static str, u8, RiskLevel)> {
+fn primary_risk(
+    report: &DoctorReport,
+) -> Option<(&'static str, super::scoring::RiskScore, RiskLevel)> {
     if let Some(mitigation) = &report.contract_mitigation {
         return Some((
             "residual after contract mitigation",

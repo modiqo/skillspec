@@ -1,7 +1,7 @@
-use super::severity_rank;
+use super::scoring::{penalty, Penalties};
 use super::types::{
     DoctorPackageRiskReport, RiskCondition, RiskConditionKind, RiskConfidence, RiskEvidence,
-    RiskLevel, WorkspaceAgentDriftRiskReport,
+    RiskLevel, Severity, WorkspaceAgentDriftRiskReport,
 };
 use super::{
     basis, display_list, issue, metrics, shape_root, with_location, DoctorIssue, DoctorReport,
@@ -82,13 +82,9 @@ fn report_from_skill_texts(
         &package_reports,
         &workspace_identity,
     ));
-    issues.sort_by_key(|issue| severity_rank(&issue.severity));
-    let penalty = issues
-        .iter()
-        .map(|issue| usize::from(issue.score_penalty))
-        .sum::<usize>()
-        .min(100);
-    let structural_score = u8::try_from(100usize.saturating_sub(penalty)).unwrap_or(0);
+    issues.sort_by_key(|issue| issue.severity);
+    let structural_score =
+        Penalties::from_deltas(issues.iter().map(|issue| issue.score_penalty)).structural_score();
     let workspace_agent_drift_risk = workspace_agent_drift_risk(&shape, &package_reports, &issues);
     let surface = workspace_surface(&package_reports);
     let basis = basis();
@@ -155,7 +151,7 @@ fn workspace_issues(
         issues.push(with_location(
             issue(
                 "workspace_repeated_skill_content",
-                "medium",
+                Severity::Medium,
                 "Repeated skill content should be referentiable",
                 format!(
                     "{} namespaced skill package file(s) contain {} unique byte-identical SKILL.md content item(s); {} repeated occurrence(s) across {} group(s) account for approximately {} repeated source token(s).",
@@ -167,7 +163,7 @@ fn workspace_issues(
                 ),
                 vec!["skillspec_local_reliability_gap", "skillspec_local_contract_trace"],
                 "Preserve every namespace/path package identity, but store one canonical source-content artifact per SHA and make each repeated package refer to that content instead of copying bytes as independent source.",
-                8,
+                penalty::WORKSPACE_REPEATED_SKILL_CONTENT,
             ),
             shape.root.clone(),
         ));
@@ -176,7 +172,7 @@ fn workspace_issues(
         issues.push(with_location(
             issue(
                 "workspace_reused_frontmatter_names",
-                "medium",
+                Severity::Medium,
                 "Frontmatter names repeat across distinct package identities",
                 format!(
                     "{} frontmatter name group(s) repeat across {} extra package occurrence(s). This is valid when namespace/path is the identity, but it is load-bearing for agents unless displayed explicitly.",
@@ -185,7 +181,7 @@ fn workspace_issues(
                 ),
                 vec!["claude_skill_frontmatter_discovery", "skillspec_local_reliability_gap"],
                 "Use namespace/path identity in workspace maps and show repeated names as referentiable aliases rather than duplicate package errors.",
-                6,
+                penalty::WORKSPACE_REUSED_FRONTMATTER_NAMES,
             ),
             shape.root.clone(),
         ));
@@ -194,7 +190,7 @@ fn workspace_issues(
         issues.push(with_location(
             issue(
                 "workspace_cross_skill_reference_risk",
-                "high",
+                Severity::High,
                 "Skill packages reference other skill packages without explicit dependencies",
                 format!(
                     "Referenced nested skill package(s): {}.",
@@ -202,7 +198,7 @@ fn workspace_issues(
                 ),
                 vec!["skillspec_local_reliability_gap", "skillspec_local_contract_trace"],
                 "Preserve package identity and connect packages with explicit SkillSpec dependencies.",
-                16,
+                penalty::WORKSPACE_CROSS_SKILL_REFERENCE,
             ),
             shape.root.clone(),
         ));
@@ -379,7 +375,7 @@ fn name_collision_issue(
     Some(with_location(
         issue(
             "workspace_name_collision_risk",
-            "high",
+            Severity::High,
             "Workspace package names collide after normalization",
             format!("Install-slug collision(s): {}.", collisions.join("; ")),
             vec![
@@ -387,7 +383,7 @@ fn name_collision_issue(
                 "skillspec_local_reliability_gap",
             ],
             "Use namespace-preserving package ids and collision-resistant install slugs.",
-            14,
+            penalty::WORKSPACE_NAME_COLLISION,
         ),
         shape.root.clone(),
     ))
@@ -402,12 +398,9 @@ fn workspace_agent_drift_risk(
         .iter()
         .map(|package| package.agent_drift_risk.score)
         .max()
-        .unwrap_or(0);
-    let issue_score = issues
-        .iter()
-        .map(|issue| usize::from(issue.score_penalty))
-        .sum::<usize>()
-        .min(100) as u8;
+        .unwrap_or_default();
+    let issue_score =
+        Penalties::from_deltas(issues.iter().map(|issue| issue.score_penalty)).risk_score();
     let score = package_score.max(issue_score);
     let mut conditions = issues
         .iter()
@@ -418,7 +411,7 @@ fn workspace_agent_drift_risk(
             } else {
                 RiskConditionKind::ShapeRisk
             },
-            level: RiskLevel::from_severity(&issue.severity),
+            level: issue.severity.into(),
             score_delta: issue.score_penalty,
             confidence: RiskConfidence::Medium,
             measurement: BTreeMap::new(),
@@ -439,7 +432,7 @@ fn workspace_agent_drift_risk(
     }
     WorkspaceAgentDriftRiskReport {
         score,
-        level: RiskLevel::from_score(score),
+        level: score.level(),
         summary: format!(
             "{} package(s) analyzed under {} with full per-package raw skill profiles.",
             packages.len(),
@@ -452,7 +445,7 @@ fn workspace_agent_drift_risk(
 fn package_risk_rollup_condition(
     shape: &DoctorShapeReport,
     packages: &[DoctorPackageRiskReport],
-    package_score: u8,
+    package_score: super::scoring::RiskScore,
 ) -> Option<RiskCondition> {
     if packages.is_empty() {
         return None;
@@ -507,8 +500,8 @@ fn package_risk_rollup_condition(
     Some(RiskCondition {
         id: "workspace_package_risk_rollup".to_owned(),
         kind: RiskConditionKind::WorkspaceAggregateRisk,
-        level: RiskLevel::from_score(package_score),
-        score_delta: package_score,
+        level: package_score.level(),
+        score_delta: package_score.get(),
         confidence: RiskConfidence::High,
         measurement,
         evidence: vec![RiskEvidence {
@@ -535,7 +528,7 @@ fn package_risk_rollup_condition(
         consequence: format!(
             "Workspace {} contains raw package risk up to {}.",
             shape.kind,
-            RiskLevel::from_score(package_score).as_str()
+            package_score.level().as_str()
         ),
         recommended_action:
             "Do not treat workspace shape readiness as package trustworthiness; port and prove packages in risk order while preserving namespace/path identity."

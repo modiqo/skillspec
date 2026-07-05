@@ -7,13 +7,17 @@ mod metrics;
 pub mod remote_source;
 mod renderer;
 mod risk;
+mod scoring;
 pub mod source_map;
 mod types;
 mod workspace_package_profile;
 mod workspace_report;
 
 pub use renderer::{render, render_html, render_markdown};
+pub use scoring::{RiskScore, StructuralScore};
+pub use types::{RiskLevel, Severity};
 
+use scoring::{penalty, Penalties};
 use serde::Serialize;
 use skillspec_core::error::{Error, Result};
 use skillspec_core::{model::SkillSpec, parser};
@@ -22,7 +26,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use types::{
     AgentDriftRiskReport, ContractMitigationLevel, ContractMitigationReport,
-    DoctorPackageRiskReport, FrontmatterDiscoveryRiskReport, RawActivationRiskReport, RiskLevel,
+    DoctorPackageRiskReport, FrontmatterDiscoveryRiskReport, RawActivationRiskReport,
     WorkspaceAgentDriftRiskReport,
 };
 
@@ -40,7 +44,7 @@ pub struct DoctorReport {
     pub shape: DoctorShapeReport,
     pub verdict: String,
     pub score_model: DoctorScoreModelReport,
-    pub structural_score: u8,
+    pub structural_score: StructuralScore,
     pub large_surface_percentage: u8,
     pub surface: SurfaceReport,
     pub counts: DoctorCounts,
@@ -69,7 +73,7 @@ pub struct DoctorScoreModelReport {
     pub primary_score_label: String,
     pub primary_score_field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub primary_score: Option<u8>,
+    pub primary_score: Option<RiskScore>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub primary_level: Option<RiskLevel>,
     pub risk_direction: String,
@@ -177,7 +181,7 @@ pub struct DoctorCounts {
 #[derive(Clone, Debug, Serialize)]
 pub struct DoctorIssue {
     pub id: String,
-    pub severity: String,
+    pub severity: Severity,
     pub title: String,
     pub evidence: String,
     pub basis: Vec<String>,
@@ -305,7 +309,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 Some(with_location(
                     issue(
                         "invalid_behavior_contract",
-                        "high",
+                        Severity::High,
                         "SkillSpec contract is present but invalid",
                         format!("skill.spec.yml could not be loaded: {error}"),
                         vec![
@@ -313,7 +317,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                             "contract_trace_static_well_formedness",
                         ],
                         "Fix `skill.spec.yml` validation errors before relying on this skill; an invalid contract cannot mitigate prose drift.",
-                        18,
+                        penalty::INVALID_BEHAVIOR_CONTRACT,
                     ),
                     skill_spec_path.display().to_string(),
                 )),
@@ -349,17 +353,17 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
     if surface.activation_lines > LARGE_BODY_LINES
         || surface.activation_estimated_tokens > LARGE_BODY_TOKENS
     {
-        let penalty = if surface.activation_lines > LARGE_BODY_LINES * 2
+        let score_penalty = if surface.activation_lines > LARGE_BODY_LINES * 2
             || surface.activation_estimated_tokens > LARGE_BODY_TOKENS * 2
         {
-            24
+            penalty::OVERSIZED_ACTIVATION_BODY
         } else {
-            16
+            penalty::LARGE_ACTIVATION_BODY
         };
         issues.push(with_location(
             issue(
                 "large_activation_body",
-                "high",
+                Severity::High,
                 "Large activation-loaded instruction body",
                 format!(
                     "SKILL.md activation body is {} lines / approximately {} tokens; this exceeds the {} line or {} token guidance used by skill authoring practice.",
@@ -373,7 +377,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "contract_trace_activation_adherence_enforcement",
                 ],
                 "Split detail into referenced files, then use `skillspec source map` and `skillspec import-skill` so load-bearing behavior can be reviewed progressively.",
-                penalty,
+                score_penalty,
             ),
             format!("{}:{}", skill.path.display(), skill.body_start_line),
         ));
@@ -383,7 +387,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "large_activation_surface",
-                "high",
+                Severity::High,
                 "Most package text loads at activation",
                 format!(
                     "{}% of loaded text surface is in SKILL.md activation body; little is deferred behind task-specific references.",
@@ -394,7 +398,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "reliability_gap_instruction_density",
                 ],
                 "Move long references, examples, and code into referenced files and keep the activation body as a compact router.",
-                18,
+                penalty::LARGE_ACTIVATION_SURFACE,
             ),
             skill.path.display().to_string(),
         ));
@@ -402,7 +406,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "medium_activation_surface",
-                "medium",
+                Severity::Medium,
                 "Activation surface is still broad",
                 format!(
                     "{}% of loaded text surface is in SKILL.md activation body.",
@@ -410,7 +414,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["reliability_gap_instruction_density"],
                 "Review whether examples and procedural detail can be deferred into references.",
-                8,
+                penalty::MEDIUM_ACTIVATION_SURFACE,
             ),
             skill.path.display().to_string(),
         ));
@@ -420,7 +424,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "instruction_density",
-                "high",
+                Severity::High,
                 "Dense load-bearing prose",
                 format!(
                     "Found {} modal obligation spans and {} numbered steps in the activation body.",
@@ -431,7 +435,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "contract_trace_activation_adherence_enforcement",
                 ],
                 "Promote route choices, forbids, elicitations, dependencies, and tests into `skill.spec.yml` so they can be checked instead of remembered.",
-                14,
+                penalty::INSTRUCTION_DENSITY,
             ),
             skill.path.display().to_string(),
         ));
@@ -441,7 +445,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "primacy_bias_late_obligations",
-                "medium",
+                Severity::Medium,
                 "Late load-bearing instructions are exposed to primacy bias",
                 format!(
                     "{} modal obligation span(s) appear after the first {}% of the activation body.",
@@ -449,7 +453,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["reliability_gap_instruction_density"],
                 "Move late obligations into earlier route/rule summaries or structured checks; do not rely on a model remembering buried instructions.",
-                10,
+                penalty::PRIMACY_BIAS_LATE_OBLIGATIONS,
             ),
             skill.path.display().to_string(),
         ));
@@ -461,7 +465,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "code_mixed_with_activation_instructions",
-                "medium",
+                Severity::Medium,
                 "Code is mixed into the activation instruction body",
                 format!(
                     "Found {} fenced code block(s) in SKILL.md, accounting for about {}% of activation bytes.",
@@ -472,7 +476,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "contract_trace_static_well_formedness",
                 ],
                 "Move executable code into scripts/resources or structured `code` entries and state whether snippets are executable, examples, or reference material.",
-                12,
+                penalty::CODE_MIXED_WITH_ACTIVATION,
             ),
             skill.path.display().to_string(),
         ));
@@ -482,7 +486,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "unlabeled_code_fences",
-                "medium",
+                Severity::Medium,
                 "Code fence language is ambiguous",
                 format!(
                     "{} code fence(s) in SKILL.md omit a language label.",
@@ -490,7 +494,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["reliability_gap_no_execution_guarantees"],
                 "Label code fences and classify each one as executable code, command example, or non-executable reference.",
-                6,
+                penalty::UNLABELED_CODE_FENCES,
             ),
             skill.path.display().to_string(),
         ));
@@ -500,7 +504,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "ambiguous_execution_substrate",
-                "high",
+                Severity::High,
                 "Operational prose lacks a structured execution contract",
                 "The activation body tells the model to use/run/create/fetch/click/install or similar, but there is no SkillSpec route, tool boundary, command template, or trace vocabulary.".to_owned(),
                 vec![
@@ -508,7 +512,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "contract_trace_unproven_verdict",
                 ],
                 "Add a SkillSpec contract with routes, phase tool boundaries, commands, scenario tests, and trace requirements.",
-                18,
+                penalty::AMBIGUOUS_EXECUTION_SUBSTRATE,
             ),
             skill.path.display().to_string(),
         ));
@@ -524,7 +528,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "implicit_dependency_contract",
-                "high",
+                Severity::High,
                 "Dependencies are implicit",
                 format!(
                     "Detected {} dependency mention(s), {} code file(s), {} manifest file(s), and {} code block(s), but no deps.toml ledger.",
@@ -535,7 +539,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["reliability_gap_implicit_environment_contract"],
                 "Create `deps.toml` and preserve dependency authority, local status, install risk, and degraded proof impact before proof or install.",
-                16,
+                penalty::IMPLICIT_DEPENDENCY_CONTRACT,
             ),
             source_root.display().to_string(),
         ));
@@ -545,7 +549,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "missing_referenced_files",
-                "medium",
+                Severity::Medium,
                 "Referenced local files are missing",
                 format!(
                     "{} local Markdown reference(s) did not resolve to files in the skill package.",
@@ -553,7 +557,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["contract_trace_static_well_formedness"],
                 "Fix broken links or preserve the missing files before import, install, or release.",
-                8,
+                penalty::MISSING_REFERENCED_FILES,
             ),
             skill.path.display().to_string(),
         ));
@@ -563,7 +567,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "unmapped_package_surface",
-                "medium",
+                Severity::Medium,
                 "Package files are present but not clearly reachable",
                 format!(
                     "{} non-SKILL file(s) are present without an explicit local reference from Markdown.",
@@ -571,7 +575,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                 ),
                 vec!["contract_trace_static_well_formedness"],
                 "Declare package-local files as imports, resources, code sources, artifacts, or dependency ledgers during SkillSpec porting.",
-                8,
+                penalty::UNMAPPED_PACKAGE_SURFACE,
             ),
             source_root.display().to_string(),
         ));
@@ -581,7 +585,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "missing_behavior_contract",
-                "high",
+                Severity::High,
                 "No machine-checkable behavior contract",
                 "No skill.spec.yml was found, so route choices, forbids, tool boundaries, dependency checks, scenario tests, and trace expectations are not falsifiable.".to_owned(),
                 vec![
@@ -589,7 +593,7 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
                     "contract_trace_behavioral_contract",
                 ],
                 "Run `skillspec source map`, then `skillspec import-skill`, and complete the generated contract before install or proof.",
-                20,
+                penalty::MISSING_BEHAVIOR_CONTRACT,
             ),
             source_root.display().to_string(),
         ));
@@ -599,25 +603,21 @@ fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
         issues.push(with_location(
             issue(
                 "missing_trace_proof_surface",
-                "medium",
+                Severity::Medium,
                 "Runtime success would be unproven",
                 "No trace/progress/test surface was found, so a successful run would not prove which obligations actually executed.".to_owned(),
                 vec!["contract_trace_unproven_verdict"],
                 "Add scenario tests and trace/progress requirements; report `unproven` when evidence is absent instead of treating no error as success.",
-                10,
+                penalty::MISSING_TRACE_PROOF_SURFACE,
             ),
             source_root.display().to_string(),
         ));
     }
 
-    issues.sort_by_key(|issue| severity_rank(&issue.severity));
-    let penalty = issues
-        .iter()
-        .map(|issue| usize::from(issue.score_penalty))
-        .sum::<usize>()
-        .min(100);
-    let structural_score = u8::try_from(100usize.saturating_sub(penalty)).unwrap_or(0);
-    let verdict = verdict(structural_score);
+    issues.sort_by_key(|issue| issue.severity);
+    let structural_score =
+        Penalties::from_deltas(issues.iter().map(|issue| issue.score_penalty)).structural_score();
+    let verdict = structural_score.verdict();
 
     let basis = basis();
     let raw_activation_risk = raw_activation_risk(&surface, &counts, structural_score);
@@ -872,7 +872,7 @@ fn shape_only_report_from_classification(
         shape,
         verdict: "shape-only: full single-skill doctor not run".to_owned(),
         score_model: score_model("not_evaluated", None, None),
-        structural_score: 0,
+        structural_score: StructuralScore::new(0),
         large_surface_percentage: 0,
         surface: SurfaceReport::default(),
         counts,
@@ -898,7 +898,7 @@ fn frontmatter_issues(report: &FrontmatterDiscoveryRiskReport, location: &str) -
             with_location(
                 issue(
                     &condition.id,
-                    condition.level.as_str(),
+                    condition.level.into(),
                     frontmatter_issue_title(&condition.id),
                     condition
                         .evidence
@@ -907,7 +907,9 @@ fn frontmatter_issues(report: &FrontmatterDiscoveryRiskReport, location: &str) -
                         .unwrap_or_else(|| condition.consequence.clone()),
                     condition.basis_ids.iter().map(String::as_str).collect(),
                     &condition.recommended_action,
-                    condition.score_delta.min(20),
+                    condition
+                        .score_delta
+                        .min(penalty::FRONTMATTER_CONDITION_ISSUE_CAP),
                 ),
                 location.to_owned(),
             )
@@ -1124,7 +1126,7 @@ fn recommended_shape_command(kind: &str, root: &str, primary_skill: Option<&str>
 
 fn score_model(
     primary_score_field: &str,
-    primary_score: Option<u8>,
+    primary_score: Option<RiskScore>,
     primary_level: Option<RiskLevel>,
 ) -> DoctorScoreModelReport {
     DoctorScoreModelReport {
@@ -1168,7 +1170,7 @@ fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorI
         "entry_skill_with_subskills" => issues.push(with_location(
             issue(
                 "workspace_shape_entry_with_subskills",
-                "medium",
+                Severity::Medium,
                 "Root skill references a multi-skill workspace",
                 format!(
                     "{} SKILL.md file(s) were discovered; referenced nested packages: {}.",
@@ -1177,14 +1179,14 @@ fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorI
                 ),
                 vec!["contract_trace_static_well_formedness"],
                 "Run `skillspec workspace map` so each SKILL.md is treated as an atomic package and dependencies are explicit.",
-                0,
+                penalty::INFORMATIONAL,
             ),
             shape.root.clone(),
         )),
         "plugin_workspace" => issues.push(with_location(
             issue(
                 "plugin_workspace_shape",
-                "medium",
+                Severity::Medium,
                 "Plugin-shaped workspace requires namespace preservation",
                 format!(
                     "Detected {} plugin root(s) and {} SKILL.md package(s).",
@@ -1193,26 +1195,26 @@ fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorI
                 ),
                 vec!["contract_trace_static_well_formedness"],
                 "Run `skillspec workspace map`; do not flatten skill names across plugin namespaces.",
-                0,
+                penalty::INFORMATIONAL,
             ),
             shape.root.clone(),
         )),
         "multi_skill_workspace" => issues.push(with_location(
             issue(
                 "multi_skill_workspace_shape",
-                "medium",
+                Severity::Medium,
                 "Multiple atomic skill packages found",
                 format!("Detected {} SKILL.md file(s).", shape.skill_files.len()),
                 vec!["contract_trace_static_well_formedness"],
                 "Run `skillspec workspace map` before fanout import or per-package doctor analysis.",
-                0,
+                penalty::INFORMATIONAL,
             ),
             shape.root.clone(),
         )),
         "non_skill_repository" => issues.push(with_location(
             issue(
                 "no_skill_entrypoint",
-                "high",
+                Severity::High,
                 "Target is not shaped like an agent skill",
                 format!(
                     "No SKILL.md was found. Static inventory saw {} Markdown file(s), {} code file(s), and {} manifest file(s).",
@@ -1220,7 +1222,7 @@ fn shape_issues(shape: &DoctorShapeReport, counts: &DoctorCounts) -> Vec<DoctorI
                 ),
                 vec!["contract_trace_static_well_formedness"],
                 "Pass a folder containing SKILL.md, a GitHub skill folder URL, or add a SKILL.md entrypoint before running doctor.",
-                0,
+                penalty::INFORMATIONAL,
             ),
             shape.root.clone(),
         )),
@@ -1768,7 +1770,7 @@ fn operational_prose(body: &str) -> bool {
 
 fn issue(
     id: &str,
-    severity: &str,
+    severity: Severity,
     title: &str,
     evidence: String,
     basis: Vec<&str>,
@@ -1777,7 +1779,7 @@ fn issue(
 ) -> DoctorIssue {
     DoctorIssue {
         id: id.to_owned(),
-        severity: severity.to_owned(),
+        severity,
         title: title.to_owned(),
         evidence,
         basis: basis.into_iter().map(str::to_owned).collect(),
@@ -1790,25 +1792,6 @@ fn issue(
 fn with_location(mut issue: DoctorIssue, location: String) -> DoctorIssue {
     issue.location = Some(location);
     issue
-}
-
-fn severity_rank(severity: &str) -> u8 {
-    match severity {
-        "critical" => 0,
-        "high" => 1,
-        "medium" => 2,
-        "low" => 3,
-        _ => 4,
-    }
-}
-
-fn verdict(score: u8) -> String {
-    match score {
-        80..=100 => "low reliability debt".to_owned(),
-        60..=79 => "medium reliability debt".to_owned(),
-        40..=59 => "high reliability debt".to_owned(),
-        _ => "critical reliability debt".to_owned(),
-    }
 }
 
 fn basis() -> Vec<DoctorBasis> {
@@ -1938,10 +1921,10 @@ fn basis() -> Vec<DoctorBasis> {
 fn raw_activation_risk(
     surface: &SurfaceReport,
     counts: &DoctorCounts,
-    structural_score: u8,
+    structural_score: StructuralScore,
 ) -> RawActivationRiskReport {
-    let score = 100u8.saturating_sub(structural_score);
-    let level = RiskLevel::from_score(score);
+    let score = structural_score.risk();
+    let level = score.level();
     RawActivationRiskReport {
         score,
         level,
@@ -1959,16 +1942,11 @@ fn raw_activation_risk(
 fn contract_mitigation(
     spec_path: &Path,
     spec: &SkillSpec,
-    raw_risk_score: u8,
+    raw_risk_score: RiskScore,
 ) -> ContractMitigationReport {
     let level = contract_mitigation_level(spec);
-    let reduction = match level {
-        ContractMitigationLevel::Strong => 30,
-        ContractMitigationLevel::Partial => 18,
-        ContractMitigationLevel::Weak => 8,
-    };
-    let residual_risk_score = raw_risk_score.saturating_sub(reduction);
-    let residual_risk_level = RiskLevel::from_score(residual_risk_score);
+    let residual_risk_score = raw_risk_score.mitigated_by(level);
+    let residual_risk_level = residual_risk_score.level();
     ContractMitigationReport {
         present: true,
         spec_path: spec_path.display().to_string(),
@@ -2006,7 +1984,7 @@ fn next_steps(
     has_valid_skill_spec: bool,
     has_deps_toml: bool,
     has_structured_dependencies: bool,
-    raw_activation_score: u8,
+    raw_activation_score: RiskScore,
 ) -> Vec<String> {
     let mut steps = Vec::new();
     let source = source_root.display();
@@ -2016,7 +1994,7 @@ fn next_steps(
         ));
         steps.push("Restart the harness, then invoke the skill normally; the generated loader should ask the CLI for route guidance instead of loading the full contract into context.".to_owned());
         steps.push("Read the final alignment summary after important runs: decision replay, requirements proven, missing proof, forbidden actions, and token/wall-clock metrics when available.".to_owned());
-        if raw_activation_score <= 24 {
+        if raw_activation_score.level() == RiskLevel::Low {
             steps.push("Keep the activated SKILL.md trampoline thin and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
         } else {
             steps.push("Thin the activated SKILL.md trampoline and let `skillspec run-loop --guide agent` drive route, gate, resume, and proof navigation.".to_owned());
@@ -2109,8 +2087,12 @@ mod tests {
                         .to_owned(),
             },
             verdict: "low reliability debt".to_owned(),
-            score_model: super::score_model("agent_drift_risk.score", Some(0), Some(super::RiskLevel::Low)),
-            structural_score: 100,
+            score_model: super::score_model(
+                "agent_drift_risk.score",
+                Some(super::RiskScore::new(0)),
+                Some(super::RiskLevel::Low),
+            ),
+            structural_score: super::StructuralScore::new(100),
             large_surface_percentage: 0,
             surface: SurfaceReport::default(),
             counts: DoctorCounts::default(),

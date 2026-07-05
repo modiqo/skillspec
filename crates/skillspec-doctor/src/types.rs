@@ -1,3 +1,4 @@
+use super::scoring::{RiskScore, StructuralScore};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -11,30 +12,56 @@ pub enum RiskLevel {
 }
 
 impl RiskLevel {
-    pub fn from_score(score: u8) -> Self {
-        match score {
-            0..=24 => Self::Low,
-            25..=49 => Self::Medium,
-            50..=74 => Self::High,
-            _ => Self::Critical,
-        }
-    }
-
-    pub fn from_severity(severity: &str) -> Self {
-        match severity {
-            "critical" => Self::Critical,
-            "high" => Self::High,
-            "medium" => Self::Medium,
-            _ => Self::Low,
-        }
-    }
-
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Low => "low",
             Self::Medium => "medium",
             Self::High => "high",
             Self::Critical => "critical",
+        }
+    }
+}
+
+/// Severity of a [`super::DoctorIssue`], ordered most severe first so issue
+/// lists sort naturally by declaration order.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+impl Severity {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Critical => "critical",
+            Self::High => "high",
+            Self::Medium => "medium",
+            Self::Low => "low",
+        }
+    }
+}
+
+impl From<Severity> for RiskLevel {
+    fn from(severity: Severity) -> Self {
+        match severity {
+            Severity::Critical => Self::Critical,
+            Severity::High => Self::High,
+            Severity::Medium => Self::Medium,
+            Severity::Low => Self::Low,
+        }
+    }
+}
+
+impl From<RiskLevel> for Severity {
+    fn from(level: RiskLevel) -> Self {
+        match level {
+            RiskLevel::Critical => Self::Critical,
+            RiskLevel::High => Self::High,
+            RiskLevel::Medium => Self::Medium,
+            RiskLevel::Low => Self::Low,
         }
     }
 }
@@ -97,7 +124,7 @@ pub struct RiskBasisReport {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct FrontmatterDiscoveryRiskReport {
-    pub score: u8,
+    pub score: RiskScore,
     pub level: RiskLevel,
     pub fields: FrontmatterDiscoveryFields,
     pub conditions: Vec<RiskCondition>,
@@ -145,7 +172,7 @@ pub enum FrontmatterParseStatus {
 #[derive(Clone, Debug, Serialize)]
 pub struct AgentDriftRiskReport {
     pub schema: String,
-    pub score: u8,
+    pub score: RiskScore,
     pub level: RiskLevel,
     pub threshold_source: String,
     pub summary: String,
@@ -158,7 +185,7 @@ pub struct AgentDriftRiskReport {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct RawActivationRiskReport {
-    pub score: u8,
+    pub score: RiskScore,
     pub level: RiskLevel,
     pub activation_estimated_tokens: usize,
     pub activation_lines: usize,
@@ -177,7 +204,7 @@ pub struct ContractMitigationReport {
     pub dependencies: usize,
     pub tests: usize,
     pub level: ContractMitigationLevel,
-    pub residual_risk_score: u8,
+    pub residual_risk_score: RiskScore,
     pub residual_risk_level: RiskLevel,
     pub summary: String,
 }
@@ -202,7 +229,7 @@ impl ContractMitigationLevel {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct WorkspaceAgentDriftRiskReport {
-    pub score: u8,
+    pub score: RiskScore,
     pub level: RiskLevel,
     pub summary: String,
     pub conditions: Vec<RiskCondition>,
@@ -222,7 +249,7 @@ pub struct DoctorPackageRiskReport {
     pub canonical_risk_profile_path: Option<String>,
     pub shape_role: String,
     pub entrypoint: String,
-    pub structural_score: u8,
+    pub structural_score: StructuralScore,
     pub activation_estimated_tokens: usize,
     pub activation_lines: usize,
     pub frontmatter_discovery_risk: FrontmatterDiscoveryRiskReport,

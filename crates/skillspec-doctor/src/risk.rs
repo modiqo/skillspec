@@ -1,3 +1,4 @@
+use super::scoring::StructuralScore;
 use super::types::{
     AgentDriftRiskReport, FrontmatterDiscoveryRiskReport, RiskBasisReport, RiskCondition,
     RiskConditionKind, RiskConfidence, RiskEvidence, RiskLevel,
@@ -6,12 +7,13 @@ use super::{DoctorBasis, DoctorIssue};
 use std::collections::BTreeMap;
 
 pub(super) fn agent_report(
-    structural_score: u8,
+    structural_score: StructuralScore,
     issues: &[DoctorIssue],
     frontmatter: Option<FrontmatterDiscoveryRiskReport>,
     basis: &[DoctorBasis],
 ) -> AgentDriftRiskReport {
-    let score = 100u8.saturating_sub(structural_score);
+    let score = structural_score.risk();
+    let level = score.level();
     let mut conditions = issues.iter().map(condition_from_issue).collect::<Vec<_>>();
     if let Some(frontmatter) = &frontmatter {
         conditions.extend(frontmatter.conditions.clone());
@@ -20,10 +22,10 @@ pub(super) fn agent_report(
     AgentDriftRiskReport {
         schema: "skillspec.doctor.agent_drift_risk.v0".to_owned(),
         score,
-        level: RiskLevel::from_score(score),
+        level,
         threshold_source: "skillspec_policy_v0".to_owned(),
-        summary: summary(score),
-        recommended_mode: recommended_mode(score).to_owned(),
+        summary: summary(level),
+        recommended_mode: recommended_mode(level).to_owned(),
         frontmatter_discovery_risk: frontmatter,
         conditions,
         basis_registry: basis.iter().map(basis_report).collect(),
@@ -34,7 +36,7 @@ fn condition_from_issue(issue: &DoctorIssue) -> RiskCondition {
     RiskCondition {
         id: issue.id.clone(),
         kind: kind_for_issue(&issue.id),
-        level: RiskLevel::from_severity(&issue.severity),
+        level: issue.severity.into(),
         score_delta: issue.score_penalty,
         confidence: RiskConfidence::Medium,
         measurement: BTreeMap::new(),
@@ -75,8 +77,8 @@ fn kind_for_issue(id: &str) -> RiskConditionKind {
     }
 }
 
-fn summary(score: u8) -> String {
-    match RiskLevel::from_score(score) {
+fn summary(level: RiskLevel) -> String {
+    match level {
         RiskLevel::Low => "Low static risk that an agent will drift from the skill instructions."
             .to_owned(),
         RiskLevel::Medium => {
@@ -91,8 +93,8 @@ fn summary(score: u8) -> String {
     }
 }
 
-fn recommended_mode(score: u8) -> &'static str {
-    match RiskLevel::from_score(score) {
+fn recommended_mode(level: RiskLevel) -> &'static str {
+    match level {
         RiskLevel::Low => "usable_with_review",
         RiskLevel::Medium => "review_before_install",
         RiskLevel::High | RiskLevel::Critical => "port_to_skillspec_before_install",

@@ -138,6 +138,7 @@ penalty = min(100, sum(issue.score_penalty))
 structural_score = 100 - penalty
 agent_drift_risk.score = 100 - structural_score
 agent_drift_risk.level = policy_band(agent_drift_risk.score)
+verdict = "<policy_band(100 - structural_score)> reliability debt"
 ```
 
 Policy bands are:
