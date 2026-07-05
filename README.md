@@ -22,6 +22,16 @@ No new agent runtime. No orchestration platform. Just a CLI and a small
   </a>
 </p>
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=modiqo%2Fskillspec&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=modiqo/skillspec&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=modiqo/skillspec&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=modiqo/skillspec&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## See It In 30 Seconds
 
 Point Doctor at any skill, a local folder or a public GitHub URL:
