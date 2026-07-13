@@ -1447,37 +1447,6 @@ h3 {
   text-align: center;
 }
 
-.star-history-section {
-  margin-bottom: 30px;
-  border: 2px solid var(--line);
-  padding: 34px 38px;
-  background: rgba(251, 248, 240, 0.74);
-}
-
-.star-history-section .section-heading {
-  align-items: end;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--line);
-  padding: 0 0 20px;
-  background: transparent;
-}
-
-.star-history-section h2 {
-  max-width: 940px;
-}
-
-.star-history-frame {
-  overflow: hidden;
-  border: 1px solid var(--line-soft);
-  background: #ffffff;
-}
-
-.star-history-frame img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
 .boom-tax-section {
   margin-bottom: 30px;
   border: 2px solid var(--line);
@@ -3940,7 +3909,6 @@ pre code {
 
   .request-panel,
   .private-note,
-  .star-history-section,
   .load-bearing-section,
   .operating-loop-section,
   .contract-contrast,
@@ -4100,7 +4068,6 @@ pre code {
 
   .request-panel,
   .private-note,
-  .star-history-section,
   .load-bearing-section,
   .operating-loop-section,
   .contract-contrast,
