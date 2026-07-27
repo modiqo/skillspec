@@ -215,6 +215,12 @@ pub(super) enum Command {
         /// Emit machine-readable JSON instead of the formatted human report.
         #[arg(long)]
         json: bool,
+        /// Write decoded concealment payloads to a file, for a local target.
+        ///
+        /// This is the only way a hidden payload leaves the tool. It never goes
+        /// to stdout or JSON; you open the file deliberately.
+        #[arg(long)]
+        reveal: Option<String>,
     },
     #[command(about = "Generate shape-specific import checklists")]
     Import {

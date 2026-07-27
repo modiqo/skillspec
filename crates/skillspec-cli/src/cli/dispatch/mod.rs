@@ -115,9 +115,10 @@ pub(super) fn run(command: Command) -> Result<()> {
             command,
             path,
             json,
+            reveal,
         } => match command {
             Some(command) => boundary_cmd::command(command)?,
-            None => boundary_cmd::run(path, json)?,
+            None => boundary_cmd::run(path, json, reveal)?,
         },
         Command::Import { command } => checklist_cmd::import(command)?,
         Command::Run { command } => checklist_cmd::run(command)?,

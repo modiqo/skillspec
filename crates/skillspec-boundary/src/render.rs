@@ -15,15 +15,62 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 /// Render the default text report.
+///
+/// Ordering follows document 41: concealment leads because it invalidates the
+/// reliability of everything below it, then directives because they change how
+/// the reader should read the effects, then the effect surface itself.
 pub fn render(surface: &EffectSurface) -> String {
     let mut out = String::new();
     header(surface, &mut out);
+    concealment(surface, &mut out);
+    directives(surface, &mut out);
     consequence(surface, &mut out);
     unresolved(surface, &mut out);
     effects(surface, &mut out);
     skipped(surface, &mut out);
     footer(surface, &mut out);
     out
+}
+
+fn concealment(surface: &EffectSurface, out: &mut String) {
+    if surface.concealment.is_empty() {
+        return;
+    }
+    let _ = writeln!(out, "Concealment");
+    for finding in &surface.concealment {
+        let _ = writeln!(
+            out,
+            "- {}  {}:{}",
+            finding.id.as_str(),
+            finding.path,
+            finding.line
+        );
+        let _ = writeln!(out, "  {}", finding.statement);
+        if let (Some(sha), Some(bytes)) = (&finding.decoded_sha256, finding.decoded_bytes) {
+            let short = sha.get(..12).unwrap_or(sha);
+            let _ = writeln!(
+                out,
+                "  decoded: sha256 {short}…  {bytes} bytes  (use --reveal to write it to a file)"
+            );
+        }
+    }
+    let _ = writeln!(out);
+}
+
+fn directives(surface: &EffectSurface, out: &mut String) {
+    if surface.directives.is_empty() {
+        return;
+    }
+    let _ = writeln!(out, "Directives");
+    for finding in &surface.directives {
+        let _ = writeln!(
+            out,
+            "- {}  {}:{}",
+            finding.kind_id, finding.path, finding.line
+        );
+        let _ = writeln!(out, "  \"{}\"", finding.text);
+    }
+    let _ = writeln!(out);
 }
 
 fn header(surface: &EffectSurface, out: &mut String) {

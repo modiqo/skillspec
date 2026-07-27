@@ -55,6 +55,12 @@ pub struct EffectSurface {
     pub staged_from: Option<String>,
     pub skill_path: String,
     pub analysis: AnalysisReport,
+    /// Text a reader will not see but a model will. Not effects; no grants.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub concealment: Vec<crate::concealment::Concealment>,
+    /// Instructions that retarget the agent's behavior. Not effects; no grants.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub directives: Vec<crate::directive::Directive>,
     /// Effects that can become grants.
     pub effects: Vec<Effect>,
     /// Effects whose target could not be determined.
@@ -80,6 +86,8 @@ impl EffectSurface {
             staged_from: None,
             skill_path,
             analysis,
+            concealment: Vec::new(),
+            directives: Vec::new(),
             effects,
             unresolved,
             summary,

@@ -142,10 +142,10 @@ crates/skillspec-boundary/
       path.rs            expansion, lexical resolution, path class table
       argv.rs            basename, wrapper unwrapping, pipe-to-interpreter
       env.rs             variable extraction, credential-like marking
-    concealment.rs       the six detectors from document 39
+    concealment.rs       the six detectors from document 39 (implemented)
     directive/
-      mod.rs             the seven detectors from document 41
-      phrases.rs         phrase families as reviewable data tables
+      mod.rs             the seven detectors from document 41 (implemented)
+      phrases.rs         phrase families as reviewable data tables (implemented)
     flow.rs              chains from document 42: direct chains in M1, the
                          graph in M7
     sanitize.rs          the content sanitizer from document 36; every quoted

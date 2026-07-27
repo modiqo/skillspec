@@ -55,18 +55,27 @@ design decision recorded in this document, not an implementation detail.
 
 ## Matching Method
 
-Directives are matched **within classified obligation spans**, not by scanning
-the whole document.
+Directives are matched on **instruction-shaped lines**, not by scanning the
+whole document. A line qualifies when it is a list item, or carries an
+imperative or modal marker (`must`, `never`, `do not`, `ignore`, `skip`, and so
+on). An imperative that instructs the agent is structurally different from a
+paragraph that discusses a topic, and that line gate keeps the two apart.
 
-The source map already produces `SourceClassificationKind::ModalObligation` and
-`ForbidCandidate` spans. Restricting matches to those spans is the single most
-important precision decision in this family: an imperative sentence that
-instructs the agent is structurally different from a paragraph that discusses a
-topic, and the classifier already separates them.
+The implementation originally proposed restricting to the source map's
+`SourceClassificationKind::ModalObligation` and `ForbidCandidate` spans. In
+practice that classifier is tuned for must/never modals and misses the
+imperative forms directives most often take - "do not tell the user", "skip the
+confirmation", "ignore previous instructions" - catching only about one in five
+on a realistic hostile skill. The phrase families here are specific multi-word
+imperatives, so the line gate plus phrase specificity provides the precision the
+obligation-span restriction was meant to give, with far better recall. The
+source-map spans remain available and could tighten the gate further if a
+precision problem ever appears.
 
-Within a span, each detector is a small phrase-family matcher. Phrase families
-are kept in one table per detector so they can be reviewed as data rather than
-read out of control flow.
+Each detector is a small phrase-family matcher. Phrase families are kept in one
+table per detector (`directive/phrases.rs`) so they can be reviewed as data
+rather than read out of control flow, and each family records the taxonomy it
+derives from per investigation I3.
 
 `directive.activation_overbreadth` is the exception: it reads frontmatter and
 the activation criteria rather than obligation spans, because that is where

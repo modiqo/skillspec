@@ -2,6 +2,10 @@ use crate::{boundary, error};
 
 pub use boundary::{CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal};
 
+pub fn reveal_payloads(target: &str, out: &str) -> error::Result<()> {
+    boundary::reveal_payloads(target, out)
+}
+
 pub fn analyze_target(target: &str) -> error::Result<EffectSurface> {
     boundary::analyze_target(target)
 }

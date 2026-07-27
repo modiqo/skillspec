@@ -3,12 +3,15 @@ use skillspec::{domain::boundary, error::Result, report};
 use std::fs;
 use std::path::PathBuf;
 
-pub(super) fn run(target: Option<String>, json: bool) -> Result<()> {
+pub(super) fn run(target: Option<String>, json: bool, reveal: Option<String>) -> Result<()> {
     let target = target.ok_or_else(|| skillspec::error::Error::InvalidInput {
         message: "boundary requires a target or subcommand, for example `skillspec boundary ./my-skill` or `skillspec boundary emit ./my-skill`"
             .to_owned(),
     })?;
     let surface = boundary::analyze_target(&target)?;
+    if let Some(out) = reveal {
+        return boundary::reveal_payloads(&target, &out);
+    }
     if json {
         report::json(&surface)
     } else {

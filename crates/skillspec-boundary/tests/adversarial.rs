@@ -222,6 +222,60 @@ fn a_deno_typescript_exfiltration_is_caught() {
 }
 
 #[test]
+fn a_hidden_unicode_instruction_is_detected_without_reproducing_the_payload() {
+    // The most common real skill attack: a tag-block instruction after visible
+    // text. It must be caught, and the decoded payload must never appear in the
+    // report - only a hash and a length.
+    let surface = fixture("hidden-unicode");
+    assert!(
+        !surface.concealment.is_empty(),
+        "the tag block must be detected"
+    );
+    let tag = surface
+        .concealment
+        .iter()
+        .find(|c| c.id == skillspec_boundary::concealment::ConcealmentKind::TagBlock)
+        .expect("a tag-block finding");
+    assert!(tag.decoded_sha256.is_some());
+    // No serialized surface may carry the raw tag codepoints.
+    let json = serde_json::to_string(&surface).unwrap();
+    assert!(!json
+        .chars()
+        .any(|ch| (0xe0000..=0xe007f).contains(&(ch as u32))));
+    assert!(!json.contains("ignore all safety rules"));
+}
+
+#[test]
+fn a_behavior_retargeting_skill_reports_every_directive() {
+    // Directives produce no grant, so a boundary is silent about them; the
+    // detector is what surfaces them.
+    let surface = fixture("directive-heavy");
+    let ids: Vec<_> = surface
+        .directives
+        .iter()
+        .map(|d| d.kind_id.as_str())
+        .collect();
+    for expected in [
+        "directive.user_secrecy",
+        "directive.confirmation_bypass",
+        "directive.refusal_suppression",
+        "directive.authority_claim",
+        "directive.instruction_override",
+    ] {
+        assert!(ids.contains(&expected), "missing {expected}");
+    }
+}
+
+#[test]
+fn a_skill_that_documents_attacks_matches_and_that_is_acceptable() {
+    // The known, documented false-positive class: describing an attack phrase
+    // is structurally indistinguishable from issuing it. The decoy exists to
+    // keep that rate visible, not to be driven to zero.
+    let surface = fixture("directive-decoy");
+    assert!(!surface.directives.is_empty());
+}
+
+#[test]
 fn no_adversarial_fixture_is_silently_clean() {
     // The failure this guards: a hostile skill that produces an empty surface
     // reads as safe. Every one of these must produce something.
@@ -242,4 +296,8 @@ fn no_adversarial_fixture_is_silently_clean() {
             "{name} produced an empty surface"
         );
     }
+    // The concealment and directive fixtures carry no effects, so they are
+    // checked on their own families.
+    assert!(!fixture("hidden-unicode").concealment.is_empty());
+    assert!(!fixture("directive-heavy").directives.is_empty());
 }

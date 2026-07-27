@@ -31,11 +31,18 @@ const PYTHON_EXTENSIONS: &[&str] = &["py"];
 const TSJS_EXTENSIONS: &[&str] = &["ts", "js", "mjs", "cjs", "mts", "cts"];
 
 /// Everything read out of one package, before deduplication.
-#[derive(Debug)]
 pub struct Extraction {
     pub observations: Vec<EffectObservation>,
     pub skill_path: String,
     pub extractors: Vec<&'static str>,
+    /// Concealment findings from every scanned text file.
+    pub concealment: Vec<crate::concealment::Concealment>,
+    /// The skill body text, for directive detection.
+    pub skill_body: String,
+    /// The 1-based line the skill body starts on, past the frontmatter.
+    pub skill_body_line: usize,
+    /// The skill's activation description, for activation overbreadth.
+    pub activation_description: Option<String>,
 }
 
 /// Extract every effect observable in a mapped source package.
@@ -51,6 +58,10 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
 
     let mut observations = Vec::new();
     let mut extractors = BTreeSet::new();
+    let mut concealment = Vec::new();
+    let mut skill_body = String::new();
+    let mut skill_body_line = 1;
+    let mut activation_description = None;
 
     for file in &map.files {
         if file.load_status != SourceFileLoadStatus::Loaded {
@@ -69,6 +80,16 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
             continue;
         };
         let reach = reach_for(&file.path, &skill_path, &referenced);
+
+        // Concealment can hide in any text file, not only the skill body.
+        concealment.extend(crate::concealment::scan(&content, &file.path, 1));
+
+        if file.kind == SourceFileKind::Markdown && file.id == skill_file_id {
+            let (body, body_line) = body_after_frontmatter(&content);
+            skill_body = body.to_owned();
+            skill_body_line = body_line;
+            activation_description = frontmatter_description(&content);
+        }
 
         match file.kind {
             SourceFileKind::Markdown => {
@@ -121,7 +142,60 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
         observations,
         skill_path,
         extractors: extractors.into_iter().collect(),
+        concealment,
+        skill_body,
+        skill_body_line,
+        activation_description,
     })
+}
+
+/// The skill body past its YAML frontmatter, and the line it starts on.
+fn body_after_frontmatter(content: &str) -> (&str, usize) {
+    let mut lines = content.lines();
+    if lines.next().map(str::trim) != Some("---") {
+        return (content, 1);
+    }
+    let mut consumed = 1usize;
+    for line in lines {
+        consumed += 1;
+        if line.trim() == "---" {
+            // Byte offset just past this line.
+            let mut offset = 0;
+            for (index, raw) in content.lines().enumerate() {
+                offset += raw.len() + 1;
+                if index + 1 == consumed {
+                    break;
+                }
+            }
+            return (content.get(offset..).unwrap_or(""), consumed + 1);
+        }
+    }
+    (content, 1)
+}
+
+/// The `description:` field from a skill's YAML frontmatter.
+fn frontmatter_description(content: &str) -> Option<String> {
+    let mut in_frontmatter = false;
+    for line in content.lines() {
+        if line.trim() == "---" {
+            if in_frontmatter {
+                break;
+            }
+            in_frontmatter = true;
+            continue;
+        }
+        if in_frontmatter {
+            if let Some(value) = line.trim().strip_prefix("description:") {
+                return Some(
+                    value
+                        .trim()
+                        .trim_matches(|ch| ch == '"' || ch == '\'')
+                        .to_owned(),
+                );
+            }
+        }
+    }
+    None
 }
 
 /// The single `SKILL.md` this package is built around.

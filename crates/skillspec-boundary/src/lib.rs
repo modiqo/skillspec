@@ -28,7 +28,9 @@
 //! stable Rust API.
 
 pub mod bounds;
+pub mod concealment;
 pub mod dedupe;
+pub mod directive;
 pub mod drift;
 pub mod effect;
 pub mod emit;
@@ -40,7 +42,9 @@ pub mod sanitize;
 pub mod surface;
 
 pub use bounds::{Bounds, Budget};
+pub use concealment::Concealment;
 pub use dedupe::Effect;
+pub use directive::Directive;
 pub use drift::{diff, DriftReport};
 pub use effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget,
@@ -113,7 +117,12 @@ pub fn check(
         CheckMode::Absolute => {
             let surface = analyze_target(target)?;
             let proposal = compile(&surface);
+            // Concealment and directives are concerning in their own right: they
+            // operate inside permissions the skill already has, so a boundary
+            // does not cover them and the gate must.
             let concerning = !surface.summary.sensitive_path_classes.is_empty()
+                || !surface.concealment.is_empty()
+                || !surface.directives.is_empty()
                 || surface
                     .all()
                     .any(|effect| effect.class == EffectClass::NetEgress);
@@ -204,6 +213,56 @@ pub fn analyze_target(target: &str) -> Result<EffectSurface> {
     Ok(surface)
 }
 
+/// Decode concealment payloads from a local target and write them to `out`.
+///
+/// Local targets only: a remote checkout is gone by the time this runs, and
+/// revealing a payload is a deliberate act on files the user already has. The
+/// decoded text never touches stdout, JSON, or a report.
+pub fn reveal_payloads(target: &str, out: &str) -> Result<()> {
+    let root = Path::new(target);
+    if !root.exists() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "--reveal works on a local skill folder; {target:?} is not a local path"
+            ),
+        });
+    }
+    let mut revealed = String::new();
+    collect_reveal(root, root, &mut revealed)?;
+    if revealed.is_empty() {
+        revealed.push_str("# No decodable concealment payloads were found.\n");
+    }
+    std::fs::write(out, revealed).map_err(|source| Error::Write {
+        path: Path::new(out).to_path_buf(),
+        source,
+    })?;
+    Ok(())
+}
+
+fn collect_reveal(root: &Path, dir: &Path, out: &mut String) -> Result<()> {
+    let entries = std::fs::read_dir(dir).map_err(|source| Error::Read {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                continue;
+            }
+            collect_reveal(root, &path, out)?;
+        } else if let Ok(text) = std::fs::read_to_string(&path) {
+            let relative = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            out.push_str(&concealment::reveal(&text, &relative));
+        }
+    }
+    Ok(())
+}
+
 /// Whether a target was written as a path and so must exist locally.
 ///
 /// Without this, a mistyped local path falls through to the remote parser and
@@ -230,6 +289,15 @@ pub fn analyze_with(path: &Path, bounds: Bounds) -> Result<EffectSurface> {
     let source_root = Path::new(&map.source_root).to_path_buf();
     let mut budget = Budget::new(bounds);
     let extraction = extract::run(&map, &source_root, &mut budget)?;
+
+    let directives = directive::scan(
+        &extraction.skill_body,
+        &extraction.skill_path,
+        extraction.skill_body_line,
+        extraction.activation_description.as_deref(),
+    );
+    let concealment = extraction.concealment.clone();
+
     let effects = dedupe::merge(extraction.observations);
 
     let analysis = surface::AnalysisReport {
@@ -245,10 +313,13 @@ pub fn analyze_with(path: &Path, bounds: Bounds) -> Result<EffectSurface> {
         files_skipped: budget.skipped().to_vec(),
     };
 
-    Ok(EffectSurface::new(
+    let mut surface = EffectSurface::new(
         path.display().to_string(),
         extraction.skill_path,
         analysis,
         effects,
-    ))
+    );
+    surface.concealment = concealment;
+    surface.directives = directives;
+    Ok(surface)
 }
