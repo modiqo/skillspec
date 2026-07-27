@@ -128,10 +128,17 @@ impl Budget {
         &line[..end]
     }
 
-    /// Whether any bound fired. A truncated analysis yields an incomplete
-    /// proposal, for the same reason an unresolved effect does.
+    /// Whether a resource limit truncated the analysis, so it did not read
+    /// everything it should have.
+    ///
+    /// A skipped *binary* file does not count: an image or archive holds no
+    /// effects, and its absence hides nothing, so a skill that ships assets is
+    /// not incomplete for that reason. Only a file-count, file-size, or byte
+    /// budget that fired means the surface was genuinely cut short.
     pub fn truncated(&self) -> bool {
-        !self.skipped.is_empty()
+        self.skipped
+            .iter()
+            .any(|file| file.reason != SkipReason::Binary)
     }
 
     pub fn files_read(&self) -> usize {
@@ -176,6 +183,16 @@ mod tests {
         assert!(!budget.admit("big.bin", 500));
         assert_eq!(budget.skipped()[0].reason, SkipReason::FileTooLarge);
         assert!(budget.truncated());
+    }
+
+    #[test]
+    fn a_skipped_binary_does_not_make_the_analysis_incomplete() {
+        // A skill that ships images is not "incomplete" for skipping them; a
+        // PNG holds no effects.
+        let mut budget = Budget::new(small_bounds());
+        budget.skip("logo.png", SkipReason::Binary);
+        assert!(!budget.truncated());
+        assert_eq!(budget.skipped().len(), 1);
     }
 
     #[test]

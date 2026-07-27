@@ -217,6 +217,12 @@ fn extract_line(
 
     for call in CALLS {
         if let Some(paren) = find_call(line, call.name) {
+            // `fetch` is both an outbound call and, in server frameworks, a
+            // request-handler name and an internal dispatch method. Only treat
+            // it as network when it is the global function called with a URL.
+            if call.name == "fetch" && !is_outbound_fetch(line, paren) {
+                continue;
+            }
             let argument = first_argument(line, paren);
             emit(call.kind, argument, line, paren, context, &evidence(), out);
         }
@@ -430,6 +436,39 @@ fn emit_process_env(
     }
 }
 
+/// Whether a `fetch(` at `paren` is an outbound network call rather than a
+/// handler definition or an internal dispatch.
+///
+/// Excludes `.fetch(` (a method on an object, e.g. a Cloudflare Worker's
+/// `app.fetch(request)`), `override`/`async`/`function` definitions of a
+/// `fetch` method, and a first argument that is a request-shaped identifier.
+/// A URL string, a template literal, or an ordinary variable still counts.
+fn is_outbound_fetch(line: &str, paren: usize) -> bool {
+    let before = line[..paren].trim_end();
+    // The token immediately before `fetch` - method access or a definition
+    // keyword - disqualifies it.
+    let head = before.trim_end_matches("fetch").trim_end();
+    if head.ends_with('.') {
+        return false;
+    }
+    if let Some(word) = head.rsplit([' ', '\t']).next() {
+        if matches!(
+            word,
+            "override" | "async" | "function" | "def" | "public" | "private"
+        ) {
+            return false;
+        }
+    }
+    // A request-object first argument indicates a handler or dispatch.
+    let arg = line[paren + 1..]
+        .split([',', ')'])
+        .next()
+        .unwrap_or_default()
+        .trim();
+    let arg_name = arg.split([':', ' ']).next().unwrap_or_default();
+    !matches!(arg_name, "request" | "req" | "ctx" | "event" | "e")
+}
+
 /// Whether the call opened at `paren` has a second positional argument on this
 /// line - a comma at the top bracket level before the call closes.
 fn has_second_argument(line: &str, paren: usize) -> bool {
@@ -591,6 +630,22 @@ mod tests {
         // A multi-line fetch whose options object opens on the call line is
         // egress even though the method keyword is on a later line.
         assert!(classes("fetch(\"https://api.example.com/x\", {").contains(&EffectClass::NetEgress));
+    }
+
+    #[test]
+    fn a_fetch_handler_definition_is_not_an_outbound_call() {
+        // Cloudflare/Hono style: defining or dispatching, not calling out.
+        assert!(run("override fetch(request: Request): Promise<Response> {").is_empty());
+        assert!(run("return this.#app.fetch(request, {}, this.ctx);").is_empty());
+        assert!(run("const res = app.fetch(req);").is_empty());
+    }
+
+    #[test]
+    fn an_outbound_fetch_to_a_url_is_still_network() {
+        assert!(
+            classes("await fetch(\"https://api.example.com/x\")").contains(&EffectClass::NetFetch)
+        );
+        assert!(classes("const r = fetch(endpoint)").contains(&EffectClass::NetFetch));
     }
 
     #[test]
