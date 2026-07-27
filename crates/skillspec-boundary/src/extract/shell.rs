@@ -155,6 +155,7 @@ pub struct ShellContext<'a> {
 pub fn extract(text: &str, context: ShellContext<'_>) -> Vec<EffectObservation> {
     let mut observations = Vec::new();
     let text = strip_heredocs(text);
+    let text = blank_multiline_string_interiors(&text);
     for (line_number, line) in logical_lines(&text, context.first_line) {
         extract_line(&line, line_number, context, &mut observations);
     }
@@ -198,6 +199,57 @@ fn heredoc_delimiter(line: &str) -> Option<String> {
         .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
         .collect::<String>();
     (!word.is_empty()).then_some(word)
+}
+
+/// Blank out lines that fall inside a multi-line quoted string.
+///
+/// `node -e "..."` and `python -c "..."` carry code in another language across
+/// several lines inside one quoted argument. The opening line holds the real
+/// command; the interior lines are string data, and reading them as shell
+/// produces binaries like `const`. The opening and closing lines are kept so
+/// the command and any trailing pipeline survive; fully-interior lines are
+/// blanked, preserving line numbers.
+fn blank_multiline_string_interiors(text: &str) -> String {
+    let mut out = Vec::new();
+    let mut open: Option<u8> = None;
+    for line in text.lines() {
+        let began_inside = open.is_some();
+        open = quote_state_after(line, open);
+        if began_inside {
+            out.push("");
+        } else {
+            out.push(line);
+        }
+    }
+    out.join("\n")
+}
+
+/// The open-quote state at the end of `line`, given the state at its start.
+fn quote_state_after(line: &str, mut open: Option<u8>) -> Option<u8> {
+    let bytes = line.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        match open {
+            Some(quote) => {
+                if byte == b'\\' {
+                    index += 2;
+                    continue;
+                }
+                if byte == quote {
+                    open = None;
+                }
+            }
+            None => match byte {
+                b'\\' => index += 1,
+                b'#' => break, // a comment ends the line; quotes in it do not count
+                b'\'' | b'"' => open = Some(byte),
+                _ => {}
+            },
+        }
+        index += 1;
+    }
+    open
 }
 
 /// Join backslash continuations so a command split across lines is read as one.
@@ -1055,6 +1107,24 @@ mod tests {
             &observation.target,
             crate::effect::EffectTarget::Package { pinned, .. } if *pinned
         )));
+    }
+
+    #[test]
+    fn multiline_string_arguments_are_not_read_as_commands() {
+        // `node -e "..."` carries JS across lines inside one quoted argument.
+        let text = "node -e \"\nconst fs = require('fs');\nfs.writeFileSync('x');\n\"\ngit status";
+        let binaries = run(text)
+            .into_iter()
+            .filter_map(|observation| match observation.target {
+                crate::effect::EffectTarget::Binary { name, .. } => Some(name),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(binaries.contains(&"node".to_owned()));
+        assert!(binaries.contains(&"git".to_owned()));
+        assert!(!binaries
+            .iter()
+            .any(|name| name == "const" || name == "fs.writefilesync"));
     }
 
     #[test]

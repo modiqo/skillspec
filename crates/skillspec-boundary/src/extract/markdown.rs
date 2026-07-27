@@ -195,6 +195,31 @@ fn keep_command_lines(body: &str) -> String {
         .join("\n")
 }
 
+/// Keywords that open a JavaScript, TypeScript, or config statement.
+///
+/// Unlabeled fences hold polyglot snippets - a tsconfig, a React component -
+/// as often as commands. A line beginning with one of these is source code in
+/// another language, not a shell command, even when it contains a `/`.
+const NON_SHELL_KEYWORDS: &[&str] = &[
+    "const",
+    "let",
+    "var",
+    "function",
+    "return",
+    "import",
+    "export",
+    "class",
+    "interface",
+    "type",
+    "async",
+    "await",
+    "module.exports",
+    "require",
+    "new",
+    "public",
+    "private",
+];
+
 fn line_has_effect_signal(line: &str) -> bool {
     let trimmed = line.trim();
     if trimmed.is_empty() {
@@ -204,6 +229,11 @@ fn line_has_effect_signal(line: &str) -> bool {
         .trim_start_matches(['$', '#', '>', ' '])
         .trim_start();
     let first = stripped.split_whitespace().next().unwrap_or_default();
+    // A line opening a statement in another language is not a command, even
+    // when a string path inside it would otherwise look like a signal.
+    if NON_SHELL_KEYWORDS.contains(&first.trim_end_matches([';', '(', ':'])) {
+        return false;
+    }
     // A prompt-prefixed or operator-bearing line, or a URL, is a command.
     if trimmed.contains("://")
         || trimmed.contains("${")
@@ -329,6 +359,19 @@ mod tests {
         assert!(kept.contains("curl https://api.example.com"));
         assert!(!kept.contains("The API"));
         assert!(!kept.contains("You can"));
+    }
+
+    #[test]
+    fn polyglot_source_lines_are_dropped_from_unlabeled_blocks() {
+        // A tsconfig path or a require() must not be read as a shell command
+        // just because it contains a slash.
+        for line in [
+            "const config = require('./src/index');",
+            "import fs from '/node_modules/fs';",
+            "export default function App() {",
+        ] {
+            assert!(!super::line_has_effect_signal(line), "{line}");
+        }
     }
 
     #[test]
