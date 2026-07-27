@@ -9,9 +9,9 @@ use super::{
     WorkspaceFrontmatterNameRefReport, WorkspaceIdentityReport, WorkspaceNamespaceIdentityReport,
     WorkspaceSourceContentRefReport,
 };
-use crate::remote_source;
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use skillspec_source::remote;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -49,7 +49,7 @@ pub(super) fn inspect_remote_target(
     for skill_file in &classification.shape.skill_files {
         skill_texts.push((
             skill_file.clone(),
-            remote_source::git_show_text(checkout_dir, skill_file)?,
+            remote::git_show_text(checkout_dir, skill_file)?,
         ));
     }
     report_from_skill_texts(

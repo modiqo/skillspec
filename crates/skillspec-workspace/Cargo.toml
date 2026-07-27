@@ -10,6 +10,7 @@ description = "Internal workspace authoring graph modules for the SkillSpec CLI"
 skillspec-authoring = { version = "0.1.8", path = "../skillspec-authoring" }
 skillspec-core = { version = "0.1.8", path = "../skillspec-core" }
 skillspec-doctor = { version = "0.1.8", path = "../skillspec-doctor" }
+skillspec-source = { version = "0.1.8", path = "../skillspec-source" }
 skillspec-harness = { version = "0.1.8", path = "../skillspec-harness" }
 regex = "1.12.4"
 serde = { version = "1.0.219", features = ["derive"] }

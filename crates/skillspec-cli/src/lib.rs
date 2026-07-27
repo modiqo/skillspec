@@ -45,7 +45,8 @@ pub mod features {
         compiler, git_context, importer, metrics, port_one_shot, workspace_synthesizer,
     };
     pub use skillspec_doctor as doctor;
-    pub use skillspec_doctor::{remote_source, source_map};
+    pub use skillspec_doctor::remote_source;
+    pub use skillspec_source::{remote, source_map};
 }
 
 #[doc(hidden)]
@@ -61,10 +62,11 @@ pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, pars
 #[doc(hidden)]
 pub use skillspec_doctor as doctor;
 #[doc(hidden)]
-pub use skillspec_doctor::{remote_source, source_map};
+pub use skillspec_doctor::remote_source;
 #[doc(hidden)]
 pub use skillspec_runtime::{
     act, align, command_path, decision, deps, guide, progress, report, trace,
 };
+pub use skillspec_source::{remote, source_map};
 #[doc(hidden)]
 pub use skillspec_workspace as workspace;

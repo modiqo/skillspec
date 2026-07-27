@@ -2,7 +2,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use skillspec_core::error::{Error, Result};
 use skillspec_core::model::{ResourceRole, SkillSpec};
-use skillspec_doctor::source_map::{
+use skillspec_source::source_map::{
     SourceClassificationKind, SourceCoverageStatus, SourceMap, SourceNodeRecord,
     SourceReferenceKind,
 };

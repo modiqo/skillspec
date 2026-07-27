@@ -1,17 +1,18 @@
 set shell := ["bash", "-uc"]
 
-packages := "skillspec-core skillspec-runtime skillspec-doctor skillspec-authoring skillspec-harness skillspec-workspace skillspec"
+packages := "skillspec-core skillspec-source skillspec-runtime skillspec-doctor skillspec-authoring skillspec-harness skillspec-workspace skillspec"
 
 # Show the local crate hierarchy and dependency direction.
 packages:
     @printf "%s\n" \
       "1. skillspec-core" \
-      "2. skillspec-runtime -> skillspec-core" \
-      "3. skillspec-doctor -> skillspec-core" \
-      "4. skillspec-authoring -> skillspec-core, skillspec-runtime, skillspec-doctor" \
-      "5. skillspec-harness -> skillspec-core, skillspec-runtime" \
-      "6. skillspec-workspace -> skillspec-core, skillspec-doctor, skillspec-authoring, skillspec-harness" \
-      "7. skillspec CLI -> all internal crates" \
+      "2. skillspec-source -> skillspec-core" \
+      "3. skillspec-runtime -> skillspec-core" \
+      "4. skillspec-doctor -> skillspec-core, skillspec-source" \
+      "5. skillspec-authoring -> skillspec-core, skillspec-runtime, skillspec-doctor, skillspec-source" \
+      "6. skillspec-harness -> skillspec-core, skillspec-runtime" \
+      "7. skillspec-workspace -> skillspec-core, skillspec-doctor, skillspec-authoring, skillspec-harness, skillspec-source" \
+      "8. skillspec CLI -> all internal crates" \
       "test-only. skillspec-harness-lab -> sandbox harness test helpers"
 
 # List detected harness skill roots.

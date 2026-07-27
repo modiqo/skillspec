@@ -26,6 +26,7 @@ skillspec-core = { version = "0.1.8", path = "../skillspec-core" }
 skillspec-doctor = { version = "0.1.8", path = "../skillspec-doctor" }
 skillspec-harness = { version = "0.1.8", path = "../skillspec-harness" }
 skillspec-runtime = { version = "0.1.8", path = "../skillspec-runtime" }
+skillspec-source = { version = "0.1.8", path = "../skillspec-source" }
 skillspec-workspace = { version = "0.1.8", path = "../skillspec-workspace" }
 clap = { version = "4.5.40", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }

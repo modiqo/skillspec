@@ -961,6 +961,7 @@ dependencies = [
  "skillspec-doctor",
  "skillspec-harness",
  "skillspec-runtime",
+ "skillspec-source",
  "skillspec-workspace",
 ]
 
@@ -975,6 +976,7 @@ dependencies = [
  "skillspec-core",
  "skillspec-doctor",
  "skillspec-runtime",
+ "skillspec-source",
 ]
 
 [[package]]
@@ -999,6 +1001,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-core",
+ "skillspec-source",
 ]
 
 [[package]]
@@ -1034,6 +1037,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "skillspec-source"
+version = "0.1.8"
+dependencies = [
+ "markdown",
+ "serde",
+ "serde_json",
+ "sha2",
+ "skillspec-core",
+]
+
+[[package]]
 name = "skillspec-workspace"
 version = "0.1.8"
 dependencies = [
@@ -1046,6 +1060,7 @@ dependencies = [
  "skillspec-core",
  "skillspec-doctor",
  "skillspec-harness",
+ "skillspec-source",
 ]
 
 [[package]]

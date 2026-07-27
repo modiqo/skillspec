@@ -1,6 +1,6 @@
 use crate::{
     capability, compiler, deps, error, grammar, importer, imports, model, parser, port_one_shot,
-    remote_source, router, router_lifecycle, source_map, workspace, workspace_synthesizer,
+    remote, remote_source, router, router_lifecycle, source_map, workspace, workspace_synthesizer,
 };
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -117,7 +117,7 @@ pub fn create_source_map_from_source(
         return create_source_map(&local_path, out);
     }
 
-    let Some(_) = remote_source::parse_target(source)? else {
+    let Some(_) = remote::parse_target(source)? else {
         return create_source_map(&local_path, out);
     };
 

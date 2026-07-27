@@ -10,8 +10,9 @@ use skillspec_core::model::{
     TraceConfig, TraceEventKind, TraceMode,
 };
 use skillspec_core::{grammar, imports, parser};
-use skillspec_doctor::{self as doctor, source_map};
+use skillspec_doctor::{self as doctor};
 use skillspec_runtime::{decision, deps, progress};
+use skillspec_source::source_map;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

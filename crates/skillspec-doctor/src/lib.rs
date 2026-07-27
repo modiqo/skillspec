@@ -1,5 +1,5 @@
-use crate::remote_source::RemoteSkillSource;
-use crate::source_map::{
+use skillspec_source::remote::{self, RemoteSkillSource};
+use skillspec_source::source_map::{
     SourceClassificationKind, SourceFileKind, SourceFileLoadStatus, SourceMap, SourceReferenceKind,
 };
 mod frontmatter;
@@ -8,7 +8,6 @@ pub mod remote_source;
 mod renderer;
 mod risk;
 mod scoring;
-pub mod source_map;
 mod types;
 mod workspace_package_profile;
 mod workspace_report;
@@ -227,14 +226,14 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
         });
     }
 
-    let Some(remote) = remote_source::parse_target(target)? else {
+    let Some(remote) = remote::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
                 "doctor target {target:?} does not exist locally; remote doctor supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
             ),
         });
     };
-    let staged = remote_source::clone_remote_temp(&remote, "skillspec-doctor")?;
+    let staged = remote::clone_remote_temp(&remote, "skillspec-doctor")?;
     let rewrite_root = remote
         .path
         .as_deref()
@@ -291,7 +290,7 @@ fn inspect_local_target(path: &Path) -> Result<DoctorReport> {
 }
 
 fn inspect_simple_skill(path: &Path) -> Result<DoctorReport> {
-    let map = source_map::build(path)?;
+    let map = skillspec_source::source_map::build(path)?;
     let source_root = PathBuf::from(&map.source_root);
     let skill = load_skill_body(&map, &source_root)?;
     let skill_sections = frontmatter::split_skill(&format!("{}{}", skill.frontmatter, skill.body));
@@ -697,7 +696,7 @@ fn inspect_staged_remote(
     checkout_dir: &Path,
 ) -> Result<DoctorReport> {
     if let Some(path) = &remote.path {
-        remote_source::set_sparse_path(checkout_dir, path)?;
+        remote::set_sparse_path(checkout_dir, path)?;
         let scope_path = checkout_dir.join(path);
         if !scope_path.exists() {
             return Err(Error::InvalidInput {
@@ -710,12 +709,12 @@ fn inspect_staged_remote(
         return inspect_local_target(&scope_path);
     }
 
-    let tree_files = remote_source::git_tree_files(checkout_dir)?;
+    let tree_files = remote::git_tree_files(checkout_dir)?;
     let root_skill_content = if tree_files
         .iter()
         .any(|path| path.to_string_lossy().eq_ignore_ascii_case("SKILL.md"))
     {
-        remote_source::git_show_text(checkout_dir, "SKILL.md").ok()
+        remote::git_show_text(checkout_dir, "SKILL.md").ok()
     } else {
         None
     };
@@ -747,7 +746,7 @@ fn inspect_staged_remote(
         .map(path_to_slash)
         .filter(|path| !path.is_empty())
         .unwrap_or_else(|| ".".to_owned());
-    remote_source::set_sparse_path(checkout_dir, &package_path)?;
+    remote::set_sparse_path(checkout_dir, &package_path)?;
     let scope_path = if package_path == "." {
         checkout_dir.to_path_buf()
     } else {
