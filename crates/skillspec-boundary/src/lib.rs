@@ -157,12 +157,12 @@ pub fn check(
     }
 }
 
-/// Enumerate the effect surface of a local folder or a public GitHub target.
+/// Enumerate the effect surface of a local folder or a remote git target.
 ///
-/// A remote target is staged into a temporary checkout, analyzed, and the
-/// checkout is removed when the staging guard drops. Nothing in the package is
-/// executed at any point, which is what makes it safe to point this at a
-/// repository nobody has reviewed.
+/// A remote target on any git host is staged into a temporary checkout,
+/// analyzed, and the checkout is removed when the staging guard drops. Nothing
+/// in the package is executed at any point, which is what makes it safe to point
+/// this at a repository nobody has reviewed.
 pub fn analyze_target(target: &str) -> Result<EffectSurface> {
     let local = Path::new(target);
     if local.exists() {
@@ -185,7 +185,7 @@ pub fn analyze_target(target: &str) -> Result<EffectSurface> {
     let Some(source) = remote::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
-                "boundary target {target:?} does not exist locally; remote analysis supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
+                "boundary target {target:?} does not exist locally; remote analysis supports a public git repo or skill-folder URL on any host - GitHub, GitLab, Bitbucket, or self-hosted - for example https://github.com/<owner>/<repo>, https://gitlab.com/<group>/<repo>/-/tree/<branch>/<path>, or a direct <url>.git"
             ),
         });
     };

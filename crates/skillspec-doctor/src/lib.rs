@@ -229,7 +229,7 @@ pub fn inspect_target(target: &str) -> Result<DoctorReport> {
     let Some(remote) = remote::parse_target(target)? else {
         return Err(Error::InvalidInput {
             message: format!(
-                "doctor target {target:?} does not exist locally; remote doctor supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
+                "doctor target {target:?} does not exist locally; remote doctor supports a public git repo or skill-folder URL on any host - GitHub, GitLab, Bitbucket, or self-hosted - for example https://github.com/<owner>/<repo> or https://gitlab.com/<group>/<repo>/-/tree/<branch>/<path>"
             ),
         });
     };

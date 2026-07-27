@@ -1,6 +1,7 @@
 //! Remote skill-source staging primitives.
 //!
-//! Target parsing and git checkout mechanics for public GitHub skill targets.
+//! Target parsing and git checkout mechanics for public skill targets on any
+//! git host: GitHub, GitLab, Bitbucket, self-hosted, or a direct .git URL.
 //! This module deliberately knows nothing about skill shape or analysis: it
 //! resolves a target to a repository plus an optional path, and materializes
 //! that path into a temporary or persistent checkout.
@@ -46,61 +47,81 @@ impl Drop for TemporaryRemoteCheckout {
 
 pub fn parse_target(target: &str) -> Result<Option<RemoteSkillSource>> {
     let trimmed = target.trim();
-    if let Some(path) = trimmed.strip_prefix("git@github.com:") {
-        let path = path.trim_end_matches(".git");
-        let parts = path
-            .split('/')
-            .filter(|part| !part.is_empty())
-            .collect::<Vec<_>>();
-        if parts.len() < 2 {
-            return Err(Error::InvalidInput {
-                message: "remote source SSH shorthand requires git@github.com:<owner>/<repo>.git"
-                    .to_owned(),
-            });
+
+    // SSH shorthand for any host: git@<host>:<owner>/<repo>[.git][/<path>].
+    if let Some(rest) = trimmed.strip_prefix("git@") {
+        if let Some((host, path)) = rest.split_once(':') {
+            let parts = split_parts(path.trim_end_matches(".git"));
+            if parts.len() < 2 {
+                return Err(Error::InvalidInput {
+                    message: "SSH shorthand requires git@<host>:<owner>/<repo>.git".to_owned(),
+                });
+            }
+            return Ok(Some(RemoteSkillSource {
+                repo_url: format!("https://{host}/{}/{}.git", parts[0], parts[1]),
+                branch: None,
+                path: (parts.len() > 2).then(|| parts[2..].join("/")),
+            }));
         }
+    }
+
+    // A direct `.git` clone URL, any host, with no subpath.
+    if (trimmed.starts_with("https://") || trimmed.starts_with("http://"))
+        && trimmed.trim_end_matches('/').ends_with(".git")
+    {
         return Ok(Some(RemoteSkillSource {
-            repo_url: format!("https://github.com/{}/{}.git", parts[0], parts[1]),
+            repo_url: trimmed.trim_end_matches('/').to_owned(),
             branch: None,
-            path: (parts.len() > 2).then(|| parts[2..].join("/")),
+            path: None,
         }));
     }
 
-    let without_scheme = trimmed
+    // A full http(s) URL to a repo or a subfolder on any git host.
+    if let Some(rest) = trimmed
         .strip_prefix("https://")
         .or_else(|| trimmed.strip_prefix("http://"))
-        .unwrap_or(trimmed);
-    let github_path = without_scheme
-        .strip_prefix("github.com/")
-        .or_else(|| trimmed.strip_prefix("github:"));
-    let Some(github_path) = github_path else {
-        if looks_like_github_shorthand(trimmed) {
-            return github_shorthand(trimmed).map(Some);
-        }
-        return Ok(None);
-    };
+    {
+        return parse_http_target(rest).map(Some);
+    }
 
-    let parts = github_path
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>();
-    if parts.len() < 2 {
+    // Host-prefixed shorthands and bare owner/repo remain GitHub conventions.
+    if let Some(path) = trimmed.strip_prefix("github.com/") {
+        return parse_http_target(&format!("github.com/{path}")).map(Some);
+    }
+    if let Some(path) = trimmed.strip_prefix("github:") {
+        return github_shorthand(path).map(Some);
+    }
+    if looks_like_github_shorthand(trimmed) {
+        return github_shorthand(trimmed).map(Some);
+    }
+    Ok(None)
+}
+
+/// Parse a scheme-stripped `host/owner/repo[/<tree-marker>/<branch>/<path>]`.
+///
+/// The repository boundary is found by a host's tree/blob marker: GitHub and
+/// GitLab short form use `/tree/` and `/blob/`, GitLab also uses `/-/tree/`,
+/// Bitbucket uses `/src/`. Without a marker the whole path is taken as the
+/// repository and cloned in full, which is correct for a URL that names a repo
+/// directly, including a GitLab subgroup path.
+fn parse_http_target(rest: &str) -> Result<RemoteSkillSource> {
+    let rest = rest.trim_end_matches('/');
+    let Some((host, path)) = rest.split_once('/') else {
         return Err(Error::InvalidInput {
-            message: "remote source requires a GitHub owner/repo target".to_owned(),
+            message: "remote source requires a <host>/<owner>/<repo> target".to_owned(),
+        });
+    };
+    let segments = split_parts(path);
+    if segments.len() < 2 {
+        return Err(Error::InvalidInput {
+            message: "remote source requires an owner and repository, e.g. https://host/owner/repo"
+                .to_owned(),
         });
     }
 
-    let owner = parts[0];
-    let repo = parts[1].trim_end_matches(".git");
-    let (branch, path_parts) = if matches!(parts.get(2), Some(&"tree" | &"blob")) {
-        if parts.len() < 4 {
-            return Err(Error::InvalidInput {
-                message: "GitHub tree/blob URL must include a branch".to_owned(),
-            });
-        }
-        (Some(parts[3].to_owned()), &parts[4..])
-    } else {
-        (None, parts.get(2..).unwrap_or(&[]))
-    };
+    let (repo_segments, branch, path_parts) = split_on_tree_marker(&segments);
+    let repo_path = repo_segments.join("/");
+    let repo_path = repo_path.trim_end_matches(".git");
     let path = path_parts.join("/");
     if is_skill_file_path(&path) {
         return Err(Error::InvalidInput {
@@ -108,11 +129,49 @@ pub fn parse_target(target: &str) -> Result<Option<RemoteSkillSource>> {
                 .to_owned(),
         });
     }
-    Ok(Some(RemoteSkillSource {
-        repo_url: format!("https://github.com/{owner}/{repo}.git"),
+    Ok(RemoteSkillSource {
+        repo_url: format!("https://{host}/{repo_path}.git"),
         branch,
         path: (!path.is_empty()).then_some(path),
-    }))
+    })
+}
+
+/// Split path segments at the first tree/blob marker into
+/// (repo segments, branch, subpath segments).
+fn split_on_tree_marker<'a>(
+    segments: &'a [&'a str],
+) -> (Vec<&'a str>, Option<String>, Vec<&'a str>) {
+    for (index, segment) in segments.iter().enumerate() {
+        // GitLab's `/-/tree/<branch>` and `/-/blob/<branch>`.
+        if *segment == "-"
+            && index + 2 < segments.len()
+            && matches!(segments[index + 1], "tree" | "blob")
+        {
+            return (
+                segments[..index].to_vec(),
+                Some(segments[index + 2].to_owned()),
+                segments[index + 3..].to_vec(),
+            );
+        }
+        // GitHub/GitLab `/tree|blob/<branch>` and Bitbucket `/src/<branch>`.
+        if matches!(*segment, "tree" | "blob" | "src") && index + 1 < segments.len() {
+            return (
+                segments[..index].to_vec(),
+                Some(segments[index + 1].to_owned()),
+                segments[index + 2..].to_vec(),
+            );
+        }
+    }
+    // No marker: the first two segments are owner/repo, the rest is a subpath.
+    (
+        segments[..2].to_vec(),
+        None,
+        segments.get(2..).unwrap_or(&[]).to_vec(),
+    )
+}
+
+fn split_parts(path: &str) -> Vec<&str> {
+    path.split('/').filter(|part| !part.is_empty()).collect()
 }
 
 pub fn clone_remote_temp(
@@ -539,5 +598,73 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("owner/repo or owner/repo/<skill-folder>"));
+    }
+
+    #[test]
+    fn parses_a_gitlab_tree_url() {
+        // GitLab uses `/-/tree/<branch>/<path>`.
+        let remote = parse_target("https://gitlab.com/group/repo/-/tree/main/skills/pdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(remote.repo_url, "https://gitlab.com/group/repo.git");
+        assert_eq!(remote.branch.as_deref(), Some("main"));
+        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
+    }
+
+    #[test]
+    fn parses_a_bitbucket_src_url() {
+        // Bitbucket uses `/src/<branch>/<path>`.
+        let remote = parse_target("https://bitbucket.org/team/repo/src/develop/skills/pdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(remote.repo_url, "https://bitbucket.org/team/repo.git");
+        assert_eq!(remote.branch.as_deref(), Some("develop"));
+        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
+    }
+
+    #[test]
+    fn parses_a_self_hosted_repo_root_url() {
+        let remote = parse_target("https://git.example.com/team/skill-repo")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://git.example.com/team/skill-repo.git"
+        );
+        assert_eq!(remote.path, None);
+    }
+
+    #[test]
+    fn parses_a_direct_dot_git_clone_url() {
+        let remote = parse_target("https://git.example.com/team/skill-repo.git")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://git.example.com/team/skill-repo.git"
+        );
+        assert_eq!(remote.path, None);
+    }
+
+    #[test]
+    fn parses_ssh_shorthand_for_any_host() {
+        let remote = parse_target("git@gitlab.com:group/repo.git")
+            .unwrap()
+            .unwrap();
+        assert_eq!(remote.repo_url, "https://gitlab.com/group/repo.git");
+    }
+
+    #[test]
+    fn a_gitlab_subgroup_repo_clones_the_full_path() {
+        // Without a tree marker, a nested group path is the repository itself.
+        let remote = parse_target("https://gitlab.com/group/subgroup/repo/-/tree/main/pdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://gitlab.com/group/subgroup/repo.git"
+        );
+        assert_eq!(remote.branch.as_deref(), Some("main"));
+        assert_eq!(remote.path.as_deref(), Some("pdf"));
     }
 }

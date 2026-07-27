@@ -26,9 +26,15 @@ Nothing forces you past step 1.
 ```bash
 skillspec boundary ./my-skill
 skillspec boundary https://github.com/owner/repo/tree/main/skills/my-skill
+skillspec boundary https://gitlab.com/group/repo/-/tree/main/skills/my-skill
+skillspec boundary https://bitbucket.org/team/repo/src/main/skills/my-skill
+skillspec boundary https://git.example.com/team/skill-repo.git
 ```
 
-A remote target is staged into a temporary checkout and removed afterward. The
+A remote skill can live on any public git host — GitHub, GitLab, Bitbucket, or
+self-hosted — using that host's folder-URL convention, a plain repo URL, or a
+direct `.git` clone URL. The target is staged into a temporary checkout and
+removed afterward. The
 report leads with a plain-English consequence, then the evidence:
 
 ```text

@@ -414,12 +414,13 @@ fn boundary_rejects_a_local_path_that_does_not_exist() -> TestResult {
 }
 
 #[test]
-fn boundary_rejects_an_unsupported_remote_target() -> TestResult {
+fn boundary_rejects_a_bare_hostname_with_no_repo() -> TestResult {
+    // A URL with no owner/repo cannot be a skill source; other git hosts are
+    // now accepted, so the rejection is about shape, not host.
     let output = Command::new(bin())
         .arg("boundary")
-        .arg("https://example.com/not-github")
+        .arg("https://example.com")
         .output()?;
     assert_failure(&output);
-    assert!(stderr(&output).contains("public GitHub"));
     Ok(())
 }
