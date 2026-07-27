@@ -307,6 +307,23 @@ Publish the baseline report, generated `skill.spec.yml`, compiled loader, and
 alignment report with the repo or pull request so reviewers can see both the
 original skill risk and the proof after porting.
 
+## Constrain What A Skill Can Reach
+
+Doctor tells you whether an agent will *follow* a skill. `skillspec boundary`
+tells you what a skill can *reach* if it does — the network hosts, file paths,
+binaries, and credentials it touches — and compiles that into a least-privilege
+policy you can enforce, without changing the skill.
+
+```bash
+skillspec boundary ./my-skill                 # what could it reach?
+skillspec boundary emit ./my-skill            # a deny-by-default policy
+skillspec boundary guard install              # enforce reviewed policies
+```
+
+It runs on a local skill or a public GitHub URL, executes nothing in the
+package, and works independently of the rest of SkillSpec. Full walkthrough:
+[Analyzing and constraining agent skills](https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md).
+
 ## Why The Scores Are Credible
 
 Doctor is not vibes. Every risk condition cites published work or local
@@ -328,6 +345,7 @@ grammar, and
 ## Learn More
 
 - [How it works](https://github.com/modiqo/skillspec/blob/main/docs/design/README.md)
+- [Analyzing and constraining skills (`boundary`)](https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md)
 - [Command reference](https://github.com/modiqo/skillspec/blob/main/docs/design/operations/16-command-log.md)
 - [Plugin marketplace install](https://github.com/modiqo/skillspec/blob/main/docs/design/operations/26-plugin-marketplace-install.md)
 - [Request a public Doctor report](https://github.com/modiqo/skillspec/issues/new?template=doctor-report.yml)

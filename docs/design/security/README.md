@@ -1,10 +1,19 @@
 # Skill Effect Surface And Boundary Compilation
 
-Status: proposed. No implementation exists yet. Every document in this folder
-describes intended design, not current behavior.
+Status: implemented, in `crates/skillspec-boundary`. These documents describe
+the design; for how to use the shipped commands, see the user guide at
+[`docs/boundary-guide.md`](../../boundary-guide.md).
 
-This folder describes a planned analysis surface that answers one question about
-an agent skill:
+Milestones M0–M5, M3, and M8 are built: effect-surface enumeration (shell,
+Python, Deno/Bun/Node TypeScript), the concealment and directive detector
+families, the proposal compiler and emitters, drift and CI gating, and the
+guard hook that enforces a reviewed policy. Not built: the flow graph
+(document 42, M7), validation level V2, and the workspace-shape aggregation
+(investigation I4). Where an emitter was cancelled by its verification step
+(`claude-frontmatter`), document 37 records why.
+
+This folder describes an analysis surface that answers one question about an
+agent skill:
 
 ```text
 If an agent executed this skill, what could it reach, and what is the smallest
