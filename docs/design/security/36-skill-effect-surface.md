@@ -80,7 +80,7 @@ drives boundary generation.
 | --- | --- |
 | `secret` | `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `~/.kube`, `.env`, `.netrc`, `.pgpass`, keychain paths, `id_rsa`, `*.pem` |
 | `agent_config` | `~/.claude/`, `.claude/`, `settings.json`, `~/.codex/`, `~/.agents/`, `~/.skillspec/`, `CLAUDE.md`, `AGENTS.md`, `MEMORY.md`, hook configuration |
-| `skill_package` | Any `SKILL.md` or skill folder other than the one being analyzed |
+| `skill_package` | Any `SKILL.md` or skill folder other than the one being analyzed. Takes precedence over `agent_config`: a `SKILL.md` under `~/.claude/skills/` is classified here, because both are sensitive and only this class makes the cross-skill propagation path query expressible |
 | `shell_init` | `~/.bashrc`, `~/.zshrc`, `~/.profile`, `~/.zshenv` |
 | `vcs_config` | `.git/config`, `.git/hooks/`, `~/.gitconfig` |
 | `workspace` | Paths under the current project root |
@@ -272,13 +272,23 @@ against a fixture table.
 
 ### Path Normalization
 
-1. Expand `~`, `$HOME`, `%USERPROFILE%`.
+1. Expand `~`, `$HOME`, `${HOME}`, `%USERPROFILE%`. Also fold absolute home
+   layouts - `/Users/<user>/…`, `/home/<user>/…`, `/root/…` - to the same form.
+   Writing a secret path out in full is the cheapest possible evasion, so it must
+   not change the class.
 2. Resolve `.` and `..` lexically. Do not touch the filesystem; the analysis
-   must not depend on the analyst's machine.
-3. Match against the path class table, most specific first.
+   must not depend on the analyst's machine. A `..` that would pop past an
+   interpolated segment is not resolvable, and the path becomes `unknown` rather
+   than being guessed at. A `..` that climbs out of the package root on a
+   relative path is preserved, and leaves the path `unknown`, because lexical
+   resolution cannot say where it landed.
+3. Match against the path class table, most specific first: file name, then
+   directory segments, then home-relative, then absolute roots.
 4. Interpolation anywhere in the path leaves the literal path unresolved but
    still attempts a class match on the fixed prefix. `~/.ssh/$KEYFILE` is
-   `templated` with class `secret`.
+   `templated` with class `secret`. A path that is *only* an interpolation -
+   `$TARGET` - is `dynamic` with class `unknown`.
+5. Class matching is case-insensitive, and Windows separators are folded to `/`.
 
 ### Argv Normalization
 

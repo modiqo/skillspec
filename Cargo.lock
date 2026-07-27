@@ -980,6 +980,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "skillspec-boundary"
+version = "0.1.8"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "skillspec-core",
+ "skillspec-source",
+]
+
+[[package]]
 name = "skillspec-core"
 version = "0.1.8"
 dependencies = [

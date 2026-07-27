@@ -35,19 +35,34 @@ plumbing, with three predictable consequences: doctor's types leak into
 boundary's public API, doctor's release cadence gates boundary's, and the moment
 doctor wants to surface a boundary finding in a joined report there is a cycle.
 
-Extract first:
+Extract first. As implemented:
 
 ```text
 crates/skillspec-source/
   src/lib.rs
-  src/source_map.rs        moved from skillspec-doctor
+  src/source_map.rs        moved wholesale from skillspec-doctor
   src/source_map/builder.rs
-  src/remote_source.rs     moved from skillspec-doctor
+  src/remote.rs            the pure half of doctor's remote_source
 ```
 
-`skillspec-doctor` and `skillspec-boundary` both depend on it. Doctor re-exports
-`source_map` and `remote_source` at their current paths so nothing downstream
-breaks, and `crates/skillspec-cli` keeps compiling unchanged.
+`source_map` moved unchanged; it had no coupling to doctor beyond living there.
+
+`remote_source` did not, and the plan's original wording was wrong about it. It
+referenced `crate::DoctorShapeReport` and `crate::classify_source_shape`, so
+moving the whole module would have dragged shape classification along with it
+and inverted the dependency this milestone exists to fix. The split therefore
+follows the coupling:
+
+- `skillspec_source::remote` owns target parsing, checkout mechanics, sparse
+  paths, and the git plumbing;
+- `skillspec_doctor::remote_source` keeps the shape-aware staging report and
+  candidate selection, built on those primitives.
+
+**No compatibility re-export.** `source_map` has one owner and one import path.
+`skillspec-authoring`, `skillspec-workspace`, and the CLI name `skillspec-source`
+directly. A re-export in doctor would leave two paths to the same type for no
+benefit in a workspace with no external consumers, and it would let a new
+dependency on doctor creep back in unnoticed.
 
 This is aligned with the direction already recorded in
 `docs/design/operations/29-internal-domain-facades.md`, which describes the CLI
@@ -447,8 +462,9 @@ Move `source_map`, `source_map/builder`, and `remote_source` out of
 their current paths. No behavior changes, no new tests beyond confirming the
 workspace builds and the existing suite passes unchanged.
 
-Acceptance: `cargo test --workspace --all-targets` passes with no test file
-edited, and `skillspec-doctor`'s public API is byte-identical.
+Acceptance: `cargo test --workspace --all-targets` passes with no test assertion
+modified. Tests move with the code they cover; the `parse_target` cases went to
+`skillspec-source`, and the staging cases stayed with the staging code.
 
 ### M1: Effect Model And Markdown/Shell Extraction
 
