@@ -93,9 +93,25 @@ Components: 1 connected, 5 independent — 6 analysis path(s).
 The map reads the folder's structure without analyzing effects: which skills
 are present, which files each references (**resources**), which files nothing
 references (**orphans** — where a payload or a directive can hide, since a
-reader following the `SKILL.md` never sees them), and which skills reference
-other skills. It's a fast orientation step to run first, and `--json` gives the
-graph for tooling.
+reader following the `SKILL.md` never sees them), and how the skills connect —
+both skills that reference each other and **entry documents** (a root `README`
+that indexes the collection). References are resolved relative to the linking
+skill and, when that fails, relative to the repository root, so a
+`skills/other/SKILL.md` link written from the root resolves. It's a fast
+orientation step to run first, and `--json` gives the graph for tooling.
+
+Every read-only command works on a remote URL too — the whole collection or one
+skill:
+
+```bash
+skillspec boundary map https://github.com/owner/skills
+skillspec boundary https://github.com/owner/skills
+skillspec boundary https://github.com/owner/skills/tree/main/skills/deploy
+skillspec boundary emit https://github.com/owner/skills/tree/main/skills/deploy
+```
+
+The commands that manage or read local state — `guard`, `diff`/`check --against`
+(which needs git history), and `--reveal` — are local only.
 
 ### A folder with many skills
 

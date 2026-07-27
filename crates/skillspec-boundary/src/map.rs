@@ -39,12 +39,23 @@ pub struct SkillNode {
     pub orphans: Vec<String>,
 }
 
+/// A document outside any skill that indexes or coordinates skills, e.g. a root
+/// `README.md` that links every skill in the collection.
+#[derive(Clone, Debug, Serialize)]
+pub struct EntryDoc {
+    pub path: String,
+    pub references_skills: Vec<String>,
+}
+
 /// The shape of a skill folder.
 #[derive(Clone, Debug, Serialize)]
 pub struct SurfaceMap {
     pub schema: &'static str,
     pub target: String,
     pub skills: Vec<SkillNode>,
+    /// Root-level documents that index the skills below them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub entry_docs: Vec<EntryDoc>,
     /// Connected groups of skills; a single-skill group is independent.
     pub components: Vec<Vec<String>>,
 }
@@ -78,18 +89,15 @@ pub fn build(root: &Path) -> Result<SurfaceMap> {
 
     let owner = |path: &str| owning_package(path, &package_rel);
     let file_of_node = node_to_file(&map);
+    let all_files: BTreeSet<&str> = map.files.iter().map(|file| file.path.as_str()).collect();
 
     // File -> file reference edges, and which files are referenced at all.
     let mut edges: Vec<(String, String)> = Vec::new();
     let mut referenced: BTreeSet<String> = BTreeSet::new();
     for reference in &map.references {
-        let Some(target) = &reference.resolved_file else {
+        let Some(target) = resolve_reference(reference, &all_files) else {
             continue;
         };
-        // The source map joins reference paths without collapsing `..`, so a
-        // cross-skill link resolves to `skills/a/../b/SKILL.md`. Normalize it
-        // to match the clean file paths.
-        let target = normalize_rel(target);
         referenced.insert(target.clone());
         if let Some(source_file) = file_of_node.get(reference.source.as_str()) {
             edges.push(((*source_file).to_owned(), target));
@@ -127,11 +135,13 @@ pub fn build(root: &Path) -> Result<SurfaceMap> {
         }
     }
 
-    // Cross-skill references, and the component graph.
+    // Cross-skill references, the entry-document index, and the component graph.
     let mut adjacency: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut entry: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (source, target) in &edges {
-        if let (Some(a), Some(b)) = (owner(source), owner(target)) {
-            if a != b {
+        let target_owner = owner(target);
+        match (owner(source), target_owner) {
+            (Some(a), Some(b)) if a != b => {
                 let node = skills.get_mut(&a).expect("owner is a known package");
                 if !node.references_skills.contains(&b) {
                     node.references_skills.push(b.clone());
@@ -139,8 +149,21 @@ pub fn build(root: &Path) -> Result<SurfaceMap> {
                 adjacency.entry(a.clone()).or_default().insert(b.clone());
                 adjacency.entry(b).or_default().insert(a);
             }
+            // A reference from a file that belongs to no skill, pointing into a
+            // skill: a root manifest indexing the collection.
+            (None, Some(b)) => {
+                entry.entry(source.clone()).or_default().insert(b);
+            }
+            _ => {}
         }
     }
+    let entry_docs = entry
+        .into_iter()
+        .map(|(path, skills)| EntryDoc {
+            path,
+            references_skills: skills.into_iter().collect(),
+        })
+        .collect::<Vec<_>>();
 
     let components = connected_components(&package_rel, &adjacency);
     let mut skills = skills.into_values().collect::<Vec<_>>();
@@ -150,8 +173,39 @@ pub fn build(root: &Path) -> Result<SurfaceMap> {
         schema: SURFACE_MAP_SCHEMA,
         target: root.display().to_string(),
         skills,
+        entry_docs,
         components,
     })
+}
+
+/// Resolve one reference to a package-relative file path, if it points at a
+/// file that exists.
+///
+/// The source map resolves a link relative to its own file's directory. When
+/// that fails - a common shape in skill collections is `skills/other/SKILL.md`
+/// written relative to the repository root, not the linking skill - fall back
+/// to interpreting the raw target from the root. The fallback is only accepted
+/// when the resulting path names a file that actually exists, so a real
+/// cross-skill link resolves while a dangling one is still ignored: this
+/// resolves references, it does not invent them.
+fn resolve_reference(
+    reference: &skillspec_source::source_map::SourceReferenceRecord,
+    all_files: &BTreeSet<&str>,
+) -> Option<String> {
+    use skillspec_source::source_map::SourceReferenceKind;
+    if let Some(resolved) = &reference.resolved_file {
+        let normalized = normalize_rel(resolved);
+        if all_files.contains(normalized.as_str()) {
+            return Some(normalized);
+        }
+    }
+    if reference.target_kind == SourceReferenceKind::LocalFile {
+        let root_relative = normalize_rel(reference.target.split(['#', '?']).next()?);
+        if !root_relative.is_empty() && all_files.contains(root_relative.as_str()) {
+            return Some(root_relative);
+        }
+    }
+    None
 }
 
 /// The package that owns a file: the longest package path that prefixes it.
@@ -259,6 +313,19 @@ pub fn render(map: &SurfaceMap) -> String {
     );
     let _ = writeln!(out);
 
+    if !map.entry_docs.is_empty() {
+        let _ = writeln!(out, "Entry documents (index the skills below):");
+        for doc in &map.entry_docs {
+            let _ = writeln!(
+                out,
+                "  {} → {}",
+                doc.path,
+                short_list(&doc.references_skills)
+            );
+        }
+        let _ = writeln!(out);
+    }
+
     for skill in &map.skills {
         let _ = writeln!(out, "{}", skill.package);
         if !skill.references_skills.is_empty() {
@@ -362,6 +429,122 @@ mod tests {
             .unwrap();
         assert!(a.references_skills.iter().any(|r| r.ends_with("b")));
         assert!(map.components.iter().any(|c| c.len() == 2));
+    }
+
+    #[test]
+    fn a_repo_root_relative_cross_skill_reference_resolves() {
+        // jakubkrehel shape: a skill links to `skills/b/SKILL.md` relative to
+        // the repo root, not to its own directory.
+        let root = workspace("rootrel");
+        write(
+            &root,
+            "skills/a/SKILL.md",
+            "---
+name: a
+description: x.
+---
+# A
+See [b](skills/b/SKILL.md).
+",
+        );
+        write(
+            &root,
+            "skills/b/SKILL.md",
+            "---
+name: b
+description: y.
+---
+# B
+",
+        );
+        let map = build(&root).unwrap();
+        let a = map
+            .skills
+            .iter()
+            .find(|s| s.package.ends_with("a"))
+            .unwrap();
+        assert!(
+            a.references_skills.iter().any(|r| r.ends_with("b")),
+            "root-relative cross-skill link should resolve"
+        );
+        assert!(map.components.iter().any(|c| c.len() == 2));
+    }
+
+    #[test]
+    fn a_root_manifest_that_indexes_skills_is_an_entry_document() {
+        // jakubkrehel shape: a root README links every skill below it.
+        let root = workspace("manifest");
+        write(
+            &root,
+            "README.md",
+            "# Collection
+- [a](skills/a/SKILL.md)
+- [b](skills/b/SKILL.md)
+",
+        );
+        write(
+            &root,
+            "skills/a/SKILL.md",
+            "---
+name: a
+description: x.
+---
+# A
+",
+        );
+        write(
+            &root,
+            "skills/b/SKILL.md",
+            "---
+name: b
+description: y.
+---
+# B
+",
+        );
+        let map = build(&root).unwrap();
+        let readme = map
+            .entry_docs
+            .iter()
+            .find(|d| d.path.ends_with("README.md"))
+            .unwrap();
+        assert_eq!(readme.references_skills.len(), 2);
+    }
+
+    #[test]
+    fn a_dangling_reference_is_not_invented_as_an_edge() {
+        let root = workspace("dangling");
+        write(
+            &root,
+            "skills/a/SKILL.md",
+            "---
+name: a
+description: x.
+---
+# A
+See [gone](skills/does-not-exist/SKILL.md).
+",
+        );
+        write(
+            &root,
+            "skills/b/SKILL.md",
+            "---
+name: b
+description: y.
+---
+# B
+",
+        );
+        let map = build(&root).unwrap();
+        let a = map
+            .skills
+            .iter()
+            .find(|s| s.package.ends_with("a"))
+            .unwrap();
+        assert!(
+            a.references_skills.is_empty(),
+            "a dangling link is not an edge"
+        );
     }
 
     #[test]
