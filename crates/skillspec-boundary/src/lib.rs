@@ -29,6 +29,7 @@
 
 pub mod bounds;
 pub mod dedupe;
+pub mod drift;
 pub mod effect;
 pub mod emit;
 pub mod extract;
@@ -40,6 +41,7 @@ pub mod surface;
 
 pub use bounds::{Bounds, Budget};
 pub use dedupe::Effect;
+pub use drift::{diff, DriftReport};
 pub use effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget,
     PathClass, Reach, TargetResolution,
@@ -53,6 +55,96 @@ pub use surface::{EffectSurface, EXTRACTOR_VERSION};
 use skillspec_core::error::{Error, Result};
 use skillspec_source::remote;
 use std::path::Path;
+
+/// Analyze `target`, and the same package at a prior git revision, and diff them.
+///
+/// The target must be a local path inside a git working tree. The prior revision
+/// is materialized in a detached worktree that is removed afterwards; neither
+/// the working tree nor the index is disturbed, and nothing is executed.
+pub fn diff_against(target: &str, git_ref: &str) -> Result<DriftReport> {
+    let head = analyze_target(target)?;
+    let worktree = remote::worktree_at_ref(Path::new(target), git_ref)?;
+    let base = analyze(worktree.package_dir())?;
+    Ok(diff(&base, &head, git_ref, "working tree"))
+}
+
+/// The disposition of a `check` run, mapped to a process exit code.
+///
+/// The codes are a contract with CI. Incompleteness (code 2) is deliberately
+/// distinct from findings (code 1): "the tool could not fully determine the
+/// surface" is a different fact from "the tool determined it and it is
+/// concerning", and a job may treat them differently.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckOutcome {
+    /// No finding at or above the threshold.
+    Clean = 0,
+    /// A finding at or above the threshold.
+    Findings = 1,
+    /// The proposal is incomplete because the surface was not fully determined.
+    Incomplete = 2,
+}
+
+impl CheckOutcome {
+    pub fn exit_code(self) -> i32 {
+        self as i32
+    }
+}
+
+/// What `check` evaluated the target against.
+pub enum CheckMode {
+    /// First contact: the whole surface is reviewed against the threshold.
+    Absolute,
+    /// Update: only what changed since `git_ref` is gated.
+    Against(String),
+}
+
+/// Evaluate a target for a CI gate.
+///
+/// Absolute review is the rule for first contact; drift is the rule for an
+/// update. A skill hostile from its first commit shows no drift, and an attacker
+/// controls the baseline history, so gating a first install on drift would be
+/// backwards.
+pub fn check(
+    target: &str,
+    mode: CheckMode,
+    fail_on_incomplete: bool,
+) -> Result<(CheckOutcome, String)> {
+    match mode {
+        CheckMode::Absolute => {
+            let surface = analyze_target(target)?;
+            let proposal = compile(&surface);
+            let concerning = !surface.summary.sensitive_path_classes.is_empty()
+                || surface
+                    .all()
+                    .any(|effect| effect.class == EffectClass::NetEgress);
+            let mut report = render(&surface);
+            if !proposal.complete && fail_on_incomplete {
+                report
+                    .push_str("\nThe surface is incomplete; failing on the incompleteness gate.\n");
+                return Ok((CheckOutcome::Incomplete, report));
+            }
+            let outcome = if concerning {
+                CheckOutcome::Findings
+            } else {
+                CheckOutcome::Clean
+            };
+            Ok((outcome, report))
+        }
+        CheckMode::Against(git_ref) => {
+            let drift = diff_against(target, &git_ref)?;
+            let report = drift::render(&drift);
+            if !drift.comparable {
+                return Ok((CheckOutcome::Incomplete, report));
+            }
+            let outcome = if drift.requires_review() {
+                CheckOutcome::Findings
+            } else {
+                CheckOutcome::Clean
+            };
+            Ok((outcome, report))
+        }
+    }
+}
 
 /// Enumerate the effect surface of a local folder or a public GitHub target.
 ///

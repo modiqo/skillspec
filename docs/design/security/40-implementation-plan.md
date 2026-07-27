@@ -163,7 +163,7 @@ crates/skillspec-boundary/
       claude_frontmatter.rs
       claude_settings.rs
       egress_allowlist.rs
-    drift.rs             two surfaces -> change list
+    drift.rs             two surfaces -> change list (implemented)
     report.rs            serializable report types and schema ids
     render.rs            human text rendering
   tests/

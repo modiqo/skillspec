@@ -19,7 +19,40 @@ pub(super) fn run(target: Option<String>, json: bool) -> Result<()> {
 pub(super) fn command(command: BoundaryCommand) -> Result<()> {
     match command {
         BoundaryCommand::Emit { path, format, out } => emit(path, format, out),
+        BoundaryCommand::Diff {
+            path,
+            against,
+            json,
+        } => diff(path, against, json),
+        BoundaryCommand::Check {
+            path,
+            against,
+            fail_on_incomplete,
+        } => check(path, against, fail_on_incomplete),
     }
+}
+
+fn diff(path: String, against: String, json: bool) -> Result<()> {
+    let report = boundary::diff_against(&path, &against)?;
+    if json {
+        report::json(&report)
+    } else {
+        report::text(&boundary::render_drift(&report))
+    }
+}
+
+fn check(path: String, against: Option<String>, fail_on_incomplete: bool) -> Result<()> {
+    let mode = match against {
+        Some(git_ref) => boundary::CheckMode::Against(git_ref),
+        None => boundary::CheckMode::Absolute,
+    };
+    let (outcome, report) = boundary::check(&path, mode, fail_on_incomplete)?;
+    report::text(&report)?;
+    let code = outcome.exit_code();
+    if code != 0 {
+        std::process::exit(code);
+    }
+    Ok(())
 }
 
 fn emit(path: String, format: String, out: Option<String>) -> Result<()> {

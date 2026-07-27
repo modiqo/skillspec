@@ -252,6 +252,124 @@ pub fn git_show_text(checkout_dir: &Path, path: &str) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+/// A skill package materialized at a git revision in a detached worktree.
+///
+/// The worktree is registered with the repository and removed when this value
+/// drops, so a drift comparison can read a prior revision of a local skill
+/// without disturbing the working tree or index.
+pub struct WorktreeAtRef {
+    repo_root: PathBuf,
+    worktree: PathBuf,
+    package: PathBuf,
+}
+
+impl WorktreeAtRef {
+    /// The package directory inside the worktree.
+    pub fn package_dir(&self) -> &Path {
+        &self.package
+    }
+}
+
+impl Drop for WorktreeAtRef {
+    fn drop(&mut self) {
+        let mut command = Command::new("git");
+        command
+            .arg("-C")
+            .arg(&self.repo_root)
+            .arg("worktree")
+            .arg("remove")
+            .arg("--force")
+            .arg(&self.worktree);
+        let _ = command.output();
+        let _ = fs::remove_dir_all(&self.worktree);
+    }
+}
+
+/// Materialize the skill package that contains `local_path` as it was at `git_ref`.
+///
+/// `local_path` must be inside a git working tree. The package's location
+/// relative to the repository root is preserved, so a skill in a subdirectory is
+/// found at the same subpath in the checked-out revision.
+pub fn worktree_at_ref(local_path: &Path, git_ref: &str) -> Result<WorktreeAtRef> {
+    let repo_root = git_repo_root(local_path)?;
+    let relative = local_path
+        .canonicalize()
+        .map_err(|source| Error::Read {
+            path: local_path.to_path_buf(),
+            source,
+        })?
+        .strip_prefix(&repo_root)
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
+
+    let worktree = std::env::temp_dir().join(format!(
+        "skillspec-boundary-diff-{}-{}",
+        std::process::id(),
+        unique_nanos()
+    ));
+    let mut command = Command::new("git");
+    command
+        .arg("-C")
+        .arg(&repo_root)
+        .arg("worktree")
+        .arg("add")
+        .arg("--detach")
+        .arg("--quiet")
+        .arg(&worktree)
+        .arg(git_ref);
+    run_git(command, "create a worktree for the comparison revision")?;
+
+    let package = worktree.join(&relative);
+    if !package.exists() {
+        let guard = WorktreeAtRef {
+            repo_root,
+            worktree,
+            package,
+        };
+        return Err(Error::InvalidInput {
+            message: format!(
+                "the package path did not exist at {git_ref}: {}",
+                guard.package.display()
+            ),
+        });
+    }
+    Ok(WorktreeAtRef {
+        repo_root,
+        worktree,
+        package,
+    })
+}
+
+fn git_repo_root(path: &Path) -> Result<PathBuf> {
+    let start = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent().map(Path::to_path_buf).unwrap_or_default()
+    };
+    let mut command = Command::new("git");
+    command
+        .arg("-C")
+        .arg(&start)
+        .arg("rev-parse")
+        .arg("--show-toplevel");
+    let output = command.output().map_err(|source| Error::InvalidInput {
+        message: format!(
+            "failed to locate the git repository for {}: {source}",
+            path.display()
+        ),
+    })?;
+    if !output.status.success() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "{} is not inside a git repository, so it has no revision to compare against",
+                path.display()
+            ),
+        });
+    }
+    let root = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    Ok(PathBuf::from(root))
+}
+
 fn run_git(mut command: Command, action: &str) -> Result<()> {
     let output = command.output().map_err(|source| Error::InvalidInput {
         message: format!("failed to run git for {action}: {source}"),

@@ -1,6 +1,6 @@
 use crate::{boundary, error};
 
-pub use boundary::{EffectSurface, EmitTarget, Proposal};
+pub use boundary::{CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal};
 
 pub fn analyze_target(target: &str) -> error::Result<EffectSurface> {
     boundary::analyze_target(target)
@@ -20,4 +20,20 @@ pub fn parse_format(value: &str) -> error::Result<EmitTarget> {
 
 pub fn emit(proposal: &Proposal, target: EmitTarget) -> error::Result<String> {
     boundary::emit(proposal, target)
+}
+
+pub fn diff_against(target: &str, git_ref: &str) -> error::Result<DriftReport> {
+    boundary::diff_against(target, git_ref)
+}
+
+pub fn render_drift(report: &DriftReport) -> String {
+    boundary::drift::render(report)
+}
+
+pub fn check(
+    target: &str,
+    mode: CheckMode,
+    fail_on_incomplete: bool,
+) -> error::Result<(CheckOutcome, String)> {
+    boundary::check(target, mode, fail_on_incomplete)
 }
