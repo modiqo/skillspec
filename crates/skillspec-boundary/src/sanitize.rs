@@ -45,15 +45,16 @@ impl Preview {
             }
             match placeholder(ch) {
                 Some(name) => {
-                    out.push('<');
+                    out.push('[');
                     out.push_str(name);
-                    out.push('>');
+                    out.push(']');
                 }
                 None if ch.is_whitespace() => out.push(' '),
-                None if is_context_breaking(ch) => {
-                    out.push('\u{fffd}');
-                }
-                None => out.push(ch),
+                None if ch.is_control() => out.push('\u{fffd}'),
+                None => match substitute(ch) {
+                    Some(safe) => out.push(safe),
+                    None => out.push(ch),
+                },
             }
         }
 
@@ -101,10 +102,18 @@ fn placeholder(ch: char) -> Option<&'static str> {
     }
 }
 
-/// Characters that could terminate the surrounding text, Markdown, or HTML
-/// context a preview is rendered into.
-fn is_context_breaking(ch: char) -> bool {
-    matches!(ch, '`' | '<' | '>') || ch.is_control()
+/// Inert look-alikes for characters that could terminate the surrounding text,
+/// Markdown, or HTML context a preview is rendered into.
+///
+/// Substituting rather than replacing keeps shell previews readable: a redirect
+/// still reads as a redirect, and a reviewer can see what the command does.
+fn substitute(ch: char) -> Option<char> {
+    match ch {
+        '<' => Some('\u{2039}'),
+        '>' => Some('\u{203a}'),
+        '`' => Some('\''),
+        _ => None,
+    }
 }
 
 fn collapse_spaces(value: &str) -> String {
@@ -141,7 +150,7 @@ mod tests {
         let preview = Preview::of("read\u{200b}the\u{feff}file");
         assert_eq!(
             preview.as_str(),
-            "read<zero-width-space>the<byte-order-mark>file"
+            "read[zero-width-space]the[byte-order-mark]file"
         );
         assert!(!preview.as_str().contains('\u{200b}'));
         assert!(!preview.as_str().contains('\u{feff}'));
@@ -157,7 +166,7 @@ mod tests {
             .collect();
         let preview = Preview::of(&format!("Read carefully.{hidden}"));
         assert!(preview.as_str().starts_with("Read carefully."));
-        assert!(preview.as_str().contains("<unicode-tag>"));
+        assert!(preview.as_str().contains("[unicode-tag]"));
         assert!(!preview.as_str().chars().any(|ch| ch as u32 >= 0xe0000));
     }
 
@@ -165,7 +174,7 @@ mod tests {
     fn bidi_overrides_are_replaced() {
         assert!(Preview::of("a\u{202e}b")
             .as_str()
-            .contains("<bidi-control>"));
+            .contains("[bidi-control]"));
     }
 
     #[test]
@@ -174,6 +183,14 @@ mod tests {
         assert!(!preview.as_str().contains('`'));
         assert!(!preview.as_str().contains('<'));
         assert!(!preview.as_str().contains('>'));
+    }
+
+    #[test]
+    fn redirects_stay_readable_after_substitution() {
+        // A shell preview whose redirect became a replacement character is
+        // useless to a reviewer, so the substitute is a look-alike.
+        let preview = Preview::of("jq . in.json > out.json");
+        assert_eq!(preview.as_str(), "jq . in.json \u{203a} out.json");
     }
 
     #[test]
