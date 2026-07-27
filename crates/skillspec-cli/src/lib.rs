@@ -44,6 +44,7 @@ pub mod features {
     pub use skillspec_authoring::{
         compiler, git_context, importer, metrics, port_one_shot, workspace_synthesizer,
     };
+    pub use skillspec_boundary as boundary;
     pub use skillspec_doctor as doctor;
     pub use skillspec_doctor::remote_source;
     pub use skillspec_source::{remote, source_map};
@@ -57,6 +58,8 @@ pub use lifecycle::{
 };
 #[doc(hidden)]
 pub use skillspec_authoring::{compiler, importer, metrics, port_one_shot, workspace_synthesizer};
+#[doc(hidden)]
+pub use skillspec_boundary as boundary;
 #[doc(hidden)]
 pub use skillspec_core::{grammar, import_dependency_ledger, imports, model, parser};
 #[doc(hidden)]

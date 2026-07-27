@@ -957,6 +957,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "skillspec-authoring",
+ "skillspec-boundary",
  "skillspec-core",
  "skillspec-doctor",
  "skillspec-harness",

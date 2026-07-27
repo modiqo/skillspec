@@ -1,5 +1,6 @@
 use super::args::Command;
 mod authoring_cmd;
+mod boundary_cmd;
 mod capability_cmd;
 mod checklist_cmd;
 mod deps_cmd;
@@ -110,6 +111,9 @@ pub(super) fn run(command: Command) -> Result<()> {
             Some(command) => checklist_cmd::doctor(command)?,
             None => doctor_cmd::run(path, json, html, markdown)?,
         },
+        Command::Boundary { path, json } => {
+            boundary_cmd::run(path, json)?;
+        }
         Command::Import { command } => checklist_cmd::import(command)?,
         Command::Run { command } => checklist_cmd::run(command)?,
         Command::Status { roots, json } => {

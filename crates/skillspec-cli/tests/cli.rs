@@ -2,6 +2,7 @@ mod support;
 
 mod cli {
     mod authoring;
+    mod boundary;
     mod capability_sensemake;
     mod checklist;
     mod cli_core;

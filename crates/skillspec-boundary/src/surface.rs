@@ -48,6 +48,11 @@ pub struct SurfaceSummary {
 pub struct EffectSurface {
     pub schema: &'static str,
     pub target: String,
+    /// `local` or `remote_github`.
+    pub source_kind: String,
+    /// Repository a remote target was staged from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staged_from: Option<String>,
     pub skill_path: String,
     pub analysis: AnalysisReport,
     /// Effects that can become grants.
@@ -71,12 +76,19 @@ impl EffectSurface {
         Self {
             schema: EFFECT_SURFACE_SCHEMA,
             target,
+            source_kind: "local".to_owned(),
+            staged_from: None,
             skill_path,
             analysis,
             effects,
             unresolved,
             summary,
         }
+    }
+
+    /// Every effect, resolved and unresolved, in report order.
+    pub fn all(&self) -> impl Iterator<Item = &Effect> {
+        self.effects.iter().chain(self.unresolved.iter())
     }
 
     /// Whether the surface was fully determined.

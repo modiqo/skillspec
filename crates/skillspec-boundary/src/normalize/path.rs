@@ -166,11 +166,15 @@ fn classify(resolved: &str, home_relative: bool) -> PathClass {
     if lower.starts_with('/') {
         return classify_absolute(&lower);
     }
-    if lower.is_empty() || lower.starts_with("..") {
-        // A relative path that climbs out of the package is not the workspace,
-        // and lexical resolution cannot say what it is.
+    if lower.is_empty() {
         return PathClass::Unknown;
     }
+    // A relative path that climbs above the package root is still project-local
+    // in every realistic layout, so it stays `workspace`. The sensitive cases
+    // are not lost by this: `../../.ssh/id_rsa` is caught by the file-name and
+    // directory rules above, which run first and do not care about traversal.
+    // Reserving `unknown` for genuinely opaque paths is what keeps that class -
+    // and the review queue it feeds - meaningful.
     PathClass::Workspace
 }
 
@@ -446,6 +450,23 @@ mod tests {
     fn quotes_and_surrounding_whitespace_are_stripped() {
         assert_eq!(class_of("  \"~/.aws/credentials\"  "), PathClass::Secret);
         assert_eq!(class_of("'~/.ssh/id_rsa'"), PathClass::Secret);
+    }
+
+    #[test]
+    fn a_relative_path_above_the_package_is_still_project_local() {
+        // Ordinary in document skills. Flagging it beside ~/.aws/credentials
+        // would dilute the review queue for no gain.
+        assert_eq!(class_of("../out.docx"), PathClass::Workspace);
+        assert_eq!(class_of("../../build/report.pdf"), PathClass::Workspace);
+    }
+
+    #[test]
+    fn traversal_never_hides_a_sensitive_name_or_directory() {
+        // The file-name and directory rules run before traversal is considered,
+        // so climbing out cannot be used to launder a secret path.
+        assert_eq!(class_of("../../.ssh/id_rsa"), PathClass::Secret);
+        assert_eq!(class_of("../../../.aws/credentials"), PathClass::Secret);
+        assert_eq!(class_of("../other/.env"), PathClass::Secret);
     }
 
     #[test]

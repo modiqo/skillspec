@@ -23,26 +23,37 @@ use std::fmt;
 ///
 /// Deliberately small: each variant must map onto something a real permission
 /// system can express, because these become grants in a boundary proposal.
+///
+/// The serialized name is the dotted grant token, not the Rust identifier, so
+/// the wire format and the grant label in a boundary policy are the same string.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
 pub enum EffectClass {
     /// Sends data off-host. The exfiltration channel.
+    #[serde(rename = "net.egress")]
     NetEgress,
     /// Brings remote content into the run. The untrusted-input channel.
+    #[serde(rename = "net.fetch")]
     NetFetch,
     /// Reads a path.
+    #[serde(rename = "fs.read")]
     FsRead,
     /// Writes, creates, or deletes a path.
+    #[serde(rename = "fs.write")]
     FsWrite,
     /// Invokes a binary or subprocess.
+    #[serde(rename = "proc.exec")]
     ProcExec,
     /// Reads an environment variable.
+    #[serde(rename = "env.read")]
     EnvRead,
     /// Calls a harness or MCP tool.
+    #[serde(rename = "tool.invoke")]
     ToolInvoke,
     /// Writes agent-controlling state that outlives the run.
+    #[serde(rename = "agent.config")]
     AgentConfig,
     /// Installs a dependency.
+    #[serde(rename = "pkg.install")]
     PkgInstall,
 }
 
@@ -380,6 +391,41 @@ mod tests {
     use super::{
         Confidence, EffectClass, EffectEvidence, EffectTarget, PathClass, Reach, TargetResolution,
     };
+
+    #[test]
+    fn wire_format_matches_the_documented_tokens() {
+        // JSON consumers and boundary policies must agree on one spelling, so
+        // the serialized class is the dotted grant token rather than the Rust
+        // identifier's snake_case.
+        use serde_json::json;
+        assert_eq!(
+            serde_json::to_value(EffectClass::NetEgress).unwrap(),
+            json!("net.egress")
+        );
+        assert_eq!(
+            serde_json::to_value(EffectClass::AgentConfig).unwrap(),
+            json!("agent.config")
+        );
+        assert_eq!(
+            serde_json::to_value(PathClass::SkillPackage).unwrap(),
+            json!("skill_package")
+        );
+        assert_eq!(
+            serde_json::to_value(Reach::Unmapped).unwrap(),
+            json!("unmapped")
+        );
+        for class in [
+            EffectClass::NetEgress,
+            EffectClass::FsRead,
+            EffectClass::PkgInstall,
+        ] {
+            assert_eq!(
+                serde_json::to_value(class).unwrap(),
+                json!(class.as_str()),
+                "{class}"
+            );
+        }
+    }
 
     #[test]
     fn reach_keeps_the_most_visible_sighting() {

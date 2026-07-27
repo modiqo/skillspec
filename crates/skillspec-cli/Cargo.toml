@@ -22,6 +22,7 @@ include = [
 
 [dependencies]
 skillspec-authoring = { version = "0.1.8", path = "../skillspec-authoring" }
+skillspec-boundary = { version = "0.1.8", path = "../skillspec-boundary" }
 skillspec-core = { version = "0.1.8", path = "../skillspec-core" }
 skillspec-doctor = { version = "0.1.8", path = "../skillspec-doctor" }
 skillspec-harness = { version = "0.1.8", path = "../skillspec-harness" }

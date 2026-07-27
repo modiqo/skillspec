@@ -32,6 +32,7 @@ pub mod dedupe;
 pub mod effect;
 pub mod extract;
 pub mod normalize;
+pub mod render;
 pub mod sanitize;
 pub mod surface;
 
@@ -41,11 +42,84 @@ pub use effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget,
     PathClass, Reach, TargetResolution,
 };
+pub use render::render;
 pub use sanitize::Preview;
 pub use surface::{EffectSurface, EXTRACTOR_VERSION};
 
-use skillspec_core::error::Result;
+use skillspec_core::error::{Error, Result};
+use skillspec_source::remote;
 use std::path::Path;
+
+/// Enumerate the effect surface of a local folder or a public GitHub target.
+///
+/// A remote target is staged into a temporary checkout, analyzed, and the
+/// checkout is removed when the staging guard drops. Nothing in the package is
+/// executed at any point, which is what makes it safe to point this at a
+/// repository nobody has reviewed.
+pub fn analyze_target(target: &str) -> Result<EffectSurface> {
+    let local = Path::new(target);
+    if local.exists() {
+        let mut surface = analyze(local)?;
+        surface.target = target.to_owned();
+        return Ok(surface);
+    }
+
+    if looks_like_local_target(target) {
+        let cwd = std::env::current_dir()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| "<unknown>".to_owned());
+        return Err(Error::InvalidInput {
+            message: format!(
+                "boundary target {target:?} does not exist locally from {cwd}; a path written as ./x, ../x, /x, or ~/x must exist before analysis runs"
+            ),
+        });
+    }
+
+    let Some(source) = remote::parse_target(target)? else {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "boundary target {target:?} does not exist locally; remote analysis supports public GitHub repo or skill-folder URLs such as https://github.com/<owner>/<repo> and https://github.com/<owner>/<repo>/tree/<branch>/<path>"
+            ),
+        });
+    };
+
+    let staged = remote::clone_remote_temp(&source, "skillspec-boundary")?;
+    let package_root = match &source.path {
+        Some(path) => {
+            remote::set_sparse_path(staged.checkout_dir(), path)?;
+            staged.checkout_dir().join(path)
+        }
+        None => staged.checkout_dir().to_path_buf(),
+    };
+    if !package_root.exists() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "remote path {} did not materialize from {}",
+                source.path.as_deref().unwrap_or("."),
+                source.repo_url
+            ),
+        });
+    }
+
+    let mut surface = analyze(&package_root)?;
+    surface.target = target.to_owned();
+    surface.source_kind = "remote_github".to_owned();
+    surface.staged_from = Some(source.repo_url);
+    Ok(surface)
+}
+
+/// Whether a target was written as a path and so must exist locally.
+///
+/// Without this, a mistyped local path falls through to the remote parser and
+/// the user gets an error about GitHub URLs for a directory they meant to name.
+fn looks_like_local_target(target: &str) -> bool {
+    let trimmed = target.trim();
+    trimmed.starts_with('.')
+        || trimmed.starts_with('/')
+        || trimmed.starts_with('~')
+        || trimmed.ends_with('/')
+        || trimmed.ends_with('\\')
+}
 
 /// Enumerate the effect surface of a skill package on disk.
 ///

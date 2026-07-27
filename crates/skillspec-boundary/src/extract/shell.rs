@@ -243,21 +243,28 @@ fn extract_line(
 
     // Redirect targets are files, not arguments to the command, so they must
     // not reach argv parsing a second time.
-    for stage in argv::pipeline_stages(&without_redirects) {
-        let Some(command) = argv::normalize(&stage) else {
+    for stage in argv::command_stages(&without_redirects) {
+        let Some(command) = argv::normalize(&stage.text) else {
             continue;
         };
-        extract_command(&command, context, &evidence(), out);
+        extract_command(
+            &command,
+            stage.piped_from_previous,
+            context,
+            &evidence(),
+            out,
+        );
     }
 }
 
 fn extract_command(
     command: &argv::NormalizedCommand,
+    piped_from_previous: bool,
     context: ShellContext<'_>,
     evidence: &EffectEvidence,
     out: &mut Vec<EffectObservation>,
 ) {
-    let piped_interpreter = argv::is_piped_interpreter(command);
+    let piped_interpreter = argv::is_piped_interpreter(command, piped_from_previous);
     out.push(EffectObservation {
         class: EffectClass::ProcExec,
         target: EffectTarget::Binary {
@@ -542,8 +549,14 @@ fn looks_like_path(arg: &str) -> bool {
     if arg.is_empty() || arg.contains(['[', ']', '{', '}', '*', '?', '(', ')', '|', '=']) {
         return false;
     }
-    if arg.contains('/') || arg.starts_with('~') {
+    if arg.starts_with('~') {
         return true;
+    }
+    if arg.contains('/') {
+        // A single absolute segment is far more often a flag value or a token
+        // from prose - PDF `/On`, a bare `/` - than a real path.
+        let segments = arg.split('/').filter(|part| !part.is_empty()).count();
+        return segments > 1 || arg.contains('.');
     }
     let name = arg.trim_start_matches("./");
     // A dotfile: `.env`, `.npmrc`.
@@ -789,6 +802,18 @@ mod tests {
     }
 
     #[test]
+    fn a_subshell_does_not_become_a_binary_named_open_paren() {
+        let binaries = run("(cd build && ls -la)")
+            .into_iter()
+            .filter_map(|observation| match observation.target {
+                crate::effect::EffectTarget::Binary { name, .. } => Some(name),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(binaries, ["cd", "ls"]);
+    }
+
+    #[test]
     fn sudo_is_unwrapped_and_marked_privileged() {
         let observations = run("sudo apt-get install nginx");
         assert!(observations.iter().any(|observation| matches!(
@@ -826,6 +851,10 @@ mod tests {
         assert!(super::looks_like_path("./build/out.txt"));
         assert!(super::looks_like_path("~/.aws/$PROFILE"));
         assert!(!super::looks_like_path(".[].title"));
+        assert!(!super::looks_like_path("/"));
+        assert!(!super::looks_like_path("/On"));
+        assert!(super::looks_like_path("/etc/passwd"));
+        assert!(super::looks_like_path("/tmp/x.json"));
         assert!(!super::looks_like_path("origin"));
         assert!(!super::looks_like_path("--flag=value"));
     }

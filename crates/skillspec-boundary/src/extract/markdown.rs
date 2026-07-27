@@ -67,6 +67,9 @@ fn extract_code_blocks(
         };
         let first_line = node.line_range.map(|range| range[0]).unwrap_or(1);
         let (body, body_line) = strip_fence(text, first_line);
+        if looks_like_data(body) {
+            continue;
+        }
         out.extend(shell::extract(
             body,
             shell::ShellContext {
@@ -135,6 +138,19 @@ fn extract_external_links(
     }
 }
 
+/// Whether an unlabeled block is structured data rather than commands.
+///
+/// Skills document output shapes in unlabeled fences constantly. Reading a JSON
+/// sample as shell produces nothing but noise.
+fn looks_like_data(body: &str) -> bool {
+    let first = body
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default();
+    first.starts_with('{') || first.starts_with('[')
+}
+
 /// Drop the opening and closing fence lines from a code node's slice.
 ///
 /// The source map's byte range covers the whole fenced block, delimiters
@@ -181,6 +197,14 @@ mod tests {
         for language in [Some("python"), Some("rust"), Some("json"), Some("yaml")] {
             assert!(!is_shell_language(language), "{language:?}");
         }
+    }
+
+    #[test]
+    fn structured_data_blocks_are_not_read_as_commands() {
+        assert!(super::looks_like_data("{\n  \"field\": 1\n}"));
+        assert!(super::looks_like_data("[\n  1\n]"));
+        assert!(!super::looks_like_data("git status"));
+        assert!(!super::looks_like_data(""));
     }
 
     #[test]

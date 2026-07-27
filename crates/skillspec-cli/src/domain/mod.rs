@@ -1,4 +1,5 @@
 pub mod authoring;
+pub mod boundary;
 pub mod checklist;
 pub mod doctor;
 pub mod evidence;
