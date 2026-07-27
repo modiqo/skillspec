@@ -296,59 +296,60 @@ fn connected_components(
     components
 }
 
-/// Render the surface map for a human.
+/// Render the surface map as a tree.
+///
+/// Uses `termtree` for the box-drawing connectors so the tree layout is a
+/// dependency's job, not hand-rolled. Each skill's resources and orphans hang
+/// under it, orphans marked, with file paths shown relative to the skill.
 pub fn render(map: &SurfaceMap) -> String {
     use std::fmt::Write;
-    let mut out = String::new();
-    let _ = writeln!(out, "SkillSpec Boundary — Surface Map");
-    let _ = writeln!(out, "================================");
+    use termtree::Tree;
+
     let resources: usize = map.skills.iter().map(|s| s.resources.len()).sum();
-    let _ = writeln!(
-        out,
-        "Target: {}        Skills: {}   Resources: {}   Orphan files: {}",
+    let root_label = format!(
+        "{}   ({} skills · {resources} resources · {} orphans)",
         map.target,
         map.skills.len(),
-        resources,
         map.orphan_count()
     );
-    let _ = writeln!(out);
+    let mut root = Tree::new(root_label);
 
-    if !map.entry_docs.is_empty() {
-        let _ = writeln!(out, "Entry documents (index the skills below):");
-        for doc in &map.entry_docs {
-            let _ = writeln!(
-                out,
-                "  {} → {}",
-                doc.path,
-                short_list(&doc.references_skills)
-            );
-        }
-        let _ = writeln!(out);
+    for doc in &map.entry_docs {
+        root.push(Tree::new(format!(
+            "[entry] {} → indexes {} skill(s)",
+            doc.path,
+            doc.references_skills.len()
+        )));
     }
 
     for skill in &map.skills {
-        let _ = writeln!(out, "{}", skill.package);
+        let mut node = Tree::new(skill.package.clone());
         if !skill.references_skills.is_empty() {
-            let _ = writeln!(
-                out,
-                "  → references: {}",
+            node.push(Tree::new(format!(
+                "→ references: {}",
                 skill.references_skills.join(", ")
-            );
+            )));
         }
-        if !skill.resources.is_empty() {
-            let _ = writeln!(out, "  resources: {}", short_list(&skill.resources));
+        for resource in &skill.resources {
+            node.push(Tree::new(relative_to(resource, &skill.package)));
         }
-        if !skill.orphans.is_empty() {
-            let _ = writeln!(out, "  orphans:   {}", short_list(&skill.orphans));
+        for orphan in &skill.orphans {
+            node.push(Tree::new(format!(
+                "(orphan) {}",
+                relative_to(orphan, &skill.package)
+            )));
         }
+        root.push(node);
     }
-    let _ = writeln!(out);
+
+    let mut out = String::new();
+    let _ = write!(out, "{root}");
 
     let connected = map.components.iter().filter(|c| c.len() > 1).count();
-    let independent = map.independent_count();
     let _ = writeln!(
         out,
-        "Components: {connected} connected, {independent} independent — {} analysis path(s).",
+        "\nComponents: {connected} connected, {} independent — {} analysis path(s).",
+        map.independent_count(),
         map.components.len()
     );
     if map.orphan_count() > 0 {
@@ -360,14 +361,11 @@ pub fn render(map: &SurfaceMap) -> String {
     out
 }
 
-fn short_list(items: &[String]) -> String {
-    let shown = items.iter().take(4).cloned().collect::<Vec<_>>();
-    let rest = items.len().saturating_sub(shown.len());
-    if rest > 0 {
-        format!("{} (+{rest} more)", shown.join(", "))
-    } else {
-        shown.join(", ")
-    }
+/// A file path shown relative to its skill package, for a compact tree leaf.
+fn relative_to(path: &str, package: &str) -> String {
+    path.strip_prefix(&format!("{package}/"))
+        .unwrap_or(path)
+        .to_owned()
 }
 
 #[cfg(test)]

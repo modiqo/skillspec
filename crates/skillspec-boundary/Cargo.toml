@@ -12,3 +12,4 @@ skillspec-source = { version = "0.1.8", path = "../skillspec-source" }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha2 = "0.10.9"
+termtree = "1"

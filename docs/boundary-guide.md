@@ -76,16 +76,15 @@ skillspec boundary map ./skills-repo
 ```
 
 ```text
-SkillSpec Boundary — Surface Map
-Target: ./skills-repo    Skills: 7   Resources: 3   Orphan files: 1
-
-prelude
-  → references: coding-standards
-  resources: prelude/prelude.ts
-effect-service-design
-  resources: effect-service-design/references/AUDIT.md
-  orphans:   effect-service-design/agents/openai.yaml
-...
+./skills-repo   (7 skills · 3 resources · 1 orphans)
+├── [entry] README.md → indexes 7 skill(s)
+├── prelude
+│   ├── → references: coding-standards
+│   └── prelude.ts
+├── effect-service-design
+│   ├── references/AUDIT.md
+│   └── (orphan) agents/openai.yaml
+└── ...
 
 Components: 1 connected, 5 independent — 6 analysis path(s).
 ```
