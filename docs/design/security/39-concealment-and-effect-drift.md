@@ -85,10 +85,39 @@ set, do not produce grants, and do not affect proposal completeness.
 ]
 ```
 
-`decoded_preview` is populated only for `conceal.tag_block` and
-`conceal.variation_selector`, where decoding is a mechanical transform of the
-codepoints. It is truncated to 200 characters and clearly labeled as decoded
-content, not as an accusation.
+`decoded_preview` is **not populated in default output**, and the shape above
+shows the field only for the escape hatch described below.
+
+Decoding a hidden instruction and printing it would take a payload that was
+deliberately obfuscated, extract it cleanly, and place it in a report that
+SkillSpec's own design routes to agents and publishes to GitHub issues. That
+turns the detector into the delivery mechanism for the thing it detects.
+Labeling the field as decoded content is not a control; a model reading the
+report has no obligation to respect the label.
+
+Default output therefore carries only non-actionable facts about the payload:
+
+```json
+{
+  "id": "conceal.tag_block",
+  "path": "SKILL.md",
+  "line": 12,
+  "count": 214,
+  "decoded_sha256": "9f2b…",
+  "decoded_bytes": 214,
+  "decoded_character_classes": ["latin_lowercase", "space", "punctuation"],
+  "statement": "214 Unicode tag characters are present in the activation body. They are not rendered by most editors and viewers. The decoded content is withheld; use --reveal to write it to a file."
+}
+```
+
+`--reveal <path>` writes the decoded payload to a file the caller names. It is
+never written to stdout, never included in `--json`, and never included in the
+published report path. A human who wants to read the payload opens the file
+deliberately, in an editor, outside any agent's context.
+
+The same rule governs `text_preview` on every concealment finding: it passes
+through the content sanitizer in document 36, which replaces the concealment
+codepoints themselves with visible placeholders naming them.
 
 The `statement` field is deliberately descriptive. Reports state that hidden
 characters are present and that they are not normally rendered. They do not state
@@ -212,9 +241,29 @@ that the tool could not fully determine the surface, which is a different thing
 from the tool determining a surface and finding it concerning. A CI job may
 reasonably want to treat those differently.
 
-Absolute severity is available but the design recommends `--against` as the
-default CI usage. A skill with a broad effect surface that has not changed is a
-skill someone already decided to accept.
+### First Install Versus Update
+
+Drift is the right gate for an update and the wrong gate for a first install.
+
+A skill that was hostile in its first commit shows no drift, and an attacker who
+controls the repository controls the baseline history the comparison reads. Using
+`--against` on first contact converts "nothing changed" into "nothing to see,"
+which is precisely backwards.
+
+The rule is therefore explicit and the CLI enforces it:
+
+- **First install: absolute review.** `boundary check` with no `--against` runs
+  the full surface, concealment, and directive families against the threshold.
+- **Update: drift.** `--against <ref>` gates on what changed, on the assumption
+  that the prior surface was reviewed.
+
+`boundary check --against <ref>` where no prior review is recorded emits a
+warning stating that the baseline has not itself been reviewed. SkillSpec has no
+durable record of a human approving a surface, so it cannot verify the
+assumption; it can refuse to let the assumption stay implicit.
+
+A skill with a broad effect surface that has not changed is a skill someone
+already decided to accept - but only if someone actually decided.
 
 ## Sources
 

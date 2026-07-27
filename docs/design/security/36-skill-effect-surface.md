@@ -89,9 +89,20 @@ drives boundary generation.
 | `temp` | `/tmp`, `$TMPDIR`, platform temp roots |
 | `unknown` | Anything that normalization could not place |
 
-`secret`, `agent_config`, `skill_package`, `shell_init`, and `vcs_config` are the
-five classes that should never be granted silently. Document 37 defines how the
-proposal handles them.
+`secret`, `agent_config`, `skill_package`, `shell_init`, `vcs_config`, and
+`unknown` are the six classes that never become a silent allow grant. Document 37
+defines how the proposal handles them.
+
+`unknown` is in that list deliberately. Path normalization is lexical - it never
+touches the filesystem, because a report must not depend on the analyst's
+machine - so it will fail to place paths that a real process would resolve
+without difficulty: absolute home paths on an unfamiliar layout, `..` traversal
+through a symlink, platform-specific variable syntax, case variation on a
+case-insensitive volume. Those are exactly the forms an evasion would take.
+
+Treating `unknown` as ordinary would make it the one place in the model where
+uncertainty resolves toward permission, which contradicts the design's central
+property. Uncertainty resolves toward review everywhere, including here.
 
 ### Target Resolution
 
@@ -397,6 +408,59 @@ The rendering states the extraction mode and any skipped files. A report that
 silently skipped a file it could not parse would understate the surface, and
 under-statement is the failure this design most needs to avoid reporting
 invisibly.
+
+## Handling Untrusted Content In The Report
+
+Every `raw`, `text_preview`, and `decoded_preview` string in this model is
+attacker-controlled text lifted verbatim from a package the analysis exists
+because nobody trusts.
+
+Three consumers make that dangerous. SkillSpec reports are agent-facing by
+design (`docs/design/runtime/25-progressive-agent-guidance.md` treats the CLI as
+a conduit for agent consumption). The public path publishes reports into GitHub
+issues (`docs/design/operations/27-public-doctor-reports.md`). And a human reads
+them in a terminal. A tool whose purpose includes finding hidden instructions
+must not become the mechanism that delivers them, cleanly extracted from their
+obfuscation, into a model's context.
+
+The existing sanitizer at `.github/scripts/sanitize-doctor-report.mjs` only
+rewrites filesystem paths. It offers nothing here.
+
+Every quoted string therefore passes through one content sanitizer before it
+reaches any output:
+
+1. Truncate to 200 characters and mark truncation.
+2. Strip or escape C0 and C1 control characters.
+3. Replace every codepoint the concealment detectors in document 39 match -
+   zero-width, tag block, bidi override, variation selector - with a visible
+   placeholder naming the codepoint. The report says a tag character was present;
+   it does not reproduce one.
+4. Escape backticks, fence sequences, and angle brackets so quoted text cannot
+   terminate the surrounding rendering context in text, Markdown, or HTML output.
+5. Neutralize instruction framing: a preview is always emitted inside a delimited
+   quotation block with a fixed prefix stating it is untrusted quoted material
+   from the analyzed package.
+
+Rule 3 has a consequence for document 39 that is stated there: decoded payloads
+from hidden-character runs are never rendered as plaintext in default output.
+
+## Resource Bounds
+
+The hosted path runs this against arbitrary public repositories, so extraction
+is bounded and the bounds are reported rather than applied silently.
+
+| Bound | Default | On exceed |
+| --- | --- | --- |
+| Files analyzed | 2,000 | Stop, list the count skipped |
+| Bytes per file | 2 MiB | Skip the file, record it |
+| Total bytes analyzed | 64 MiB | Stop, record the truncation |
+| Line length | 64 KiB | Truncate the line, record it |
+| Wall clock | 60 s | Stop, record partial analysis |
+
+Any bound that fires sets `analysis.truncated: true` and adds an entry to
+`analysis.files_skipped`. A truncated analysis produces an incomplete proposal
+under compilation rule 4 in document 37, for the same reason an unresolved effect
+does: the surface was not fully determined.
 
 ## What This Model Does Not Capture
 

@@ -86,6 +86,35 @@ The path class table in document 36 is the unit that matters.
 
 ## Compilation Rules
 
+### Rule Precedence
+
+The rules below interact, so their order is normative. A later rule may add to
+or annotate the output of an earlier one; it may never widen a grant an earlier
+rule withheld.
+
+```text
+1 Default deny            structural, applies to every proposal
+2 Resolved -> grant       the base grant set
+3 Sensitive -> review     narrows rule 2; cannot be overridden by any later rule
+4 Unresolved -> incomplete  annotates, never narrows or widens
+5 Declared unused         reports only, emits nothing
+6 Observed undeclared     reports only, emits nothing
+7 Existing contract       changes presentation to a diff, never the grant set
+```
+
+Two interactions that would otherwise be ambiguous:
+
+- **Rule 7 does not beat rule 3.** If an existing `tool_boundary` allows a
+  sensitive path class outright, the proposal still places it under
+  `permission_required_for` and records the contract's broader grant as a
+  difference for the author to see. A generated file may never silently inherit
+  a sensitive grant from a prior file, because the reason for rule 3 is that a
+  human said so out loud, and inheriting is not saying so.
+- **Rule 5 does not apply through rule 7.** A tool declared in an existing
+  contract but unobserved is reported as `declared_unused` and left in place in
+  the diff. Narrowing someone's committed contract on static evidence alone is
+  exactly the change most likely to break a rarely-taken path.
+
 ### Rule 1: Default Deny
 
 Every proposal sets `default: deny`. This is what makes an under-enumerated
@@ -104,9 +133,15 @@ varies.
 
 ### Rule 3: Sensitive Path Classes Are Never Silently Granted
 
-Effects whose path class is `secret`, `agent_config`, `skill_package`,
-`shell_init`, or `vcs_config` do not become an `allow` entry. They are placed in
-`permission_required_for` and listed in the proposal's review block.
+Effects whose path class satisfies `PathClass::is_sensitive` - `secret`,
+`agent_config`, `skill_package`, `shell_init`, `vcs_config`, and `unknown` - do
+not become an `allow` entry. They are placed in `permission_required_for` and
+listed in the proposal's review block.
+
+`unknown` is included because lexical path normalization fails on exactly the
+forms an evasion takes; document 36 gives the reasoning. In practice this means
+a package using unusual path syntax produces review entries rather than grants,
+which is the intended direction for uncertainty.
 
 The reasoning is that these five classes are the ones where a granted effect
 would be indistinguishable from the attack. A skill that legitimately reads
@@ -153,11 +188,17 @@ The proposal is rendered into whichever policy grammar the reader uses.
 
 | Target id | Artifact | Deny default expressible |
 | --- | --- | --- |
+| `guard` | SkillSpec guard policy consumed by the hook in document 43 | yes |
 | `skillspec` | `tool_boundary` block for `skill.spec.yml` | yes |
 | `claude-frontmatter` | `allowed-tools` list for `SKILL.md` frontmatter | no, allow-list only |
 | `claude-settings` | permission block for a settings file | to be verified |
 | `egress-allowlist` | plain host list for a proxy or network policy | yes, by construction |
 | `json` | the raw proposal, for another tool to consume | not applicable |
+
+`guard` is the default target. It is the only one whose enforcement semantics
+SkillSpec controls end to end, and therefore the only one where the fail-closed
+property is a consequence of this design rather than an assumption about
+somebody else's.
 
 Two implementation requirements follow from that table.
 
@@ -171,9 +212,31 @@ lists this as a standing task, not a one-time step.
 **An emitter for a target that cannot express deny-by-default must say so in its
 output.** `claude-frontmatter` produces an allow-list with no deny semantics; the
 emitted snippet carries a comment stating that it narrows the tool surface but
-does not deny anything the harness permits by default. Emitting a
-weaker-than-intended policy without saying so would misrepresent the protection
-the reader is getting.
+does not deny anything the harness permits by default, and pointing at document
+43's guard hook as the deny-capable option. Emitting a weaker-than-intended
+policy without saying so would misrepresent the protection the reader is getting,
+and the fail-closed argument the whole design rests on does not apply to that
+target.
+
+### Staleness Is A Silent Failure, So It Is Stamped
+
+A stale emitter produces a policy file that parses, applies nothing, and reads
+as protection. Nothing in normal use would reveal it. A standing task to check
+upstream documentation each release is not sufficient mitigation for a failure
+mode with no symptom.
+
+Every emitted artifact therefore carries a verification stamp:
+
+```text
+# skillspec boundary emit --format claude-settings
+# targets permission grammar verified 2026-07-27 against harness docs
+# skillspec 0.1.8
+```
+
+The stamp is data in the emitter module, not a source comment. Two behaviors
+follow from it: the CLI prints a warning when an emitter's stamp is older than
+two releases of this crate, and the stamp appears in the artifact so a reader
+who finds the file six months later can tell what it was written against.
 
 ### Example: `skillspec` Target
 

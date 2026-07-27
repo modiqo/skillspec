@@ -30,7 +30,7 @@ The numeric prefixes preserve the original reading order. The subfolders make
 review ownership explicit: `core`, `authoring`, `runtime`, `router`,
 `operations`, and `security`.
 
-Documents 36 through 42 in `security/` describe proposed work that is not
+Documents 36 through 43 in `security/` describe proposed work that is not
 implemented. They have their own folder overview in
 [security/README.md](security/README.md), which should be read before the
 individual documents.
@@ -79,6 +79,7 @@ individual documents.
 | 40 | [Boundary Implementation Plan](security/40-implementation-plan.md) | Crate layout, module responsibilities, core types, CLI wiring, fixtures, test plan, milestones, standing tasks, and blocking investigations. |
 | 41 | [Agent Directives](security/41-agent-directives.md) | Proposed second detector family for visible instructions that retarget agent behavior rather than reaching the host, plus the whole-report ordering across finding families. |
 | 42 | [Effect Flow Graph](security/42-effect-flow-graph.md) | Proposed relation of effects to one another as confidence-tiered chains, so a report can say a network call carries credential material without claiming taint semantics. |
+| 43 | [Boundary Guard Hook](security/43-boundary-guard-hook.md) | Proposed managed pre-tool hook that enforces a reviewed boundary policy against already-installed skills, reusing the router guard hook lifecycle, with observe/prompt/enforce modes and a local decision log. |
 
 ## Visual Explainers
 
@@ -128,7 +129,7 @@ Every design claim should be grounded in one or more of these sources:
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
 | Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/operations/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
 | Release-candidate testing | `Justfile`, `.github/workflows/ci.yml`, `crates/skillspec-cli/tests/cli/`, `conformance/`, `examples/`, `docs/design/operations/30-testing-matrix.md`, `docs/design/operations/31-controlled-harness-lab.md` |
-| Skill effect surface and boundary proposals (proposed) | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-doctor/src/frontmatter.rs`, `crates/skillspec-core/src/spec/model.rs`, `crates/skillspec-runtime/src/act.rs`, `docs/design/core/09-phase-tool-boundaries.md`, `docs/design/security/` |
+| Skill effect surface and boundary proposals (proposed) | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-doctor/src/frontmatter.rs`, `crates/skillspec-core/src/spec/model.rs`, `crates/skillspec-runtime/src/act.rs`, `crates/skillspec-harness/src/router_lifecycle/hooks.rs`, `docs/design/core/09-phase-tool-boundaries.md`, `docs/design/router/28-router-guard-hooks.md`, `docs/design/security/` |
 
 ## Terms Used In These Docs
 

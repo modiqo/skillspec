@@ -107,6 +107,25 @@ carry sufficient effect detail, either the ledger gains it or V2 is dropped. It
 must not ship as a partial check that reports confident-looking results from
 insufficient data.
 
+### A Second Source For V2
+
+The guard hook in document 43 writes `decisions.jsonl`, an append-only local
+record of intercepted tool calls already normalized into the effect vocabulary
+from document 36. That record is a better V2 input than the progress ledger,
+because it is produced in the same vocabulary the grants are written in and it
+covers skills run through an ordinary harness rather than only those run through
+SkillSpec's runtime.
+
+It also inverts the dependency in a useful way. Running the guard in `observe`
+mode for a period produces exactly the evidence needed to check a proposal
+against real behavior, without executing anything the user was not already going
+to run. The proposal is generated statically, the guard watches, and the
+comparison is between the two.
+
+This does not remove investigation I1. The progress ledger remains the source for
+skills that never install a guard. It does mean V2 has a path that does not
+depend on I1 concluding favorably.
+
 ### V3: Live Harness Observation. Out Of Scope.
 
 Observing a real agent run under an applied boundary would validate the policy

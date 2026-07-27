@@ -26,9 +26,29 @@ below and in `36-skill-effect-surface.md`.
 | 40 | [Implementation Plan](40-implementation-plan.md) | Crate layout, module-by-module build order, types, CLI wiring, fixtures, tests, milestones, and acceptance criteria. |
 | 41 | [Agent Directives](41-agent-directives.md) | The second detector family: visible instructions that retarget the agent's behavior rather than reaching the host. Also fixes the whole-report ordering. |
 | 42 | [Effect Flow Graph](42-effect-flow-graph.md) | Relating effects to each other, so a report can say a network call carries credential material. Explanation only; never alters the proposal. |
+| 43 | [Boundary Guard Hook](43-boundary-guard-hook.md) | The enforcement point: a managed pre-tool hook that applies a reviewed policy to skills the user already has, with no change to those skills. |
 
 Read 36 first. Documents 37, 38, 39, 41, and 42 all consume the effect model it
-defines. Document 40 is the build order for all of them.
+defines. Document 43 is where the output is finally enforced, and document 40 is
+the build order for all of them.
+
+## The Three Steps A User Takes
+
+The design is only useful if each step is worth taking on its own, because most
+users will stop after the first.
+
+```text
+1. report    skillspec boundary <skill>          see what it can reach
+2. policy    skillspec boundary emit <skill>     get a least-privilege policy
+3. guard     skillspec boundary guard install    have it enforced, in observe
+                                                 mode, against skills you
+                                                 already have
+```
+
+Nothing in that sequence asks the user to change a skill, write a
+`skill.spec.yml`, compile anything, or change how they work. Step 3 defaults to
+observing rather than blocking, because a control that gets uninstalled protects
+nothing.
 
 ## Three Families Of Finding
 
@@ -72,9 +92,29 @@ The consequential difference is the failure mode:
 
 - A classifier that misses an effect **fails open**. The effect is not reported,
   and the skill still performs it at runtime.
-- An enumerator that misses an effect **fails closed**, provided the emitted
-  boundary defaults to deny. The effect that was never enumerated is the effect
-  that has no grant, and a deny-by-default policy refuses it.
+- An enumerator that misses an effect **fails closed** - *if and only if* the
+  policy is enforced by a substrate with deny-by-default semantics. The effect
+  that was never enumerated is the effect that has no grant, and a deny-default
+  enforcer refuses it.
+
+That condition is not decoration, and it is the single most important limit in
+this design. Fail-closed is a property of **the enforcement substrate**, not of
+the analysis. Where a substrate can only express an allow-list over a permissive
+default - which is the case for a `SKILL.md` `allowed-tools` list - a missed
+effect is simply permitted, and the argument above provides nothing.
+
+| Enforcement substrate | Deny default | Fail-closed holds |
+| --- | --- | --- |
+| SkillSpec guard hook (document 43) | yes | yes |
+| Container / proxy egress policy | yes | yes |
+| `tool_boundary` in a contract-aware harness | yes | yes, if the harness honors it |
+| `allowed-tools` frontmatter | no | **no** |
+| Harness settings permission block | depends on the harness | verify per harness |
+
+Document 43 exists because of this table. An analysis that can only emit into
+allow-list substrates would have a sound argument and no way to realize it, so
+the design ships an enforcement point of its own for skills that are already
+installed and unmodified.
 
 This does not make enumeration strictly better. It makes its residual risk
 different, and in a direction that is easier to reason about. It also means the

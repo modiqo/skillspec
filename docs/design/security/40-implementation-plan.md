@@ -1,39 +1,73 @@
 # Implementation Plan
 
-Status: proposed. This is the build order for documents 36 through 39, 41, and
-42. No code exists yet.
+Status: proposed. This is the build order for documents 36 through 39 and 41
+through 43. No code exists yet.
 
 ## Scope
 
 Deliver `skillspec boundary`: a command that enumerates a skill's effect surface,
 compiles a least-privilege boundary proposal, emits that proposal into
 harness-native formats, detects concealment and agent directives, relates effects
-to one another as chains, and diffs effect surfaces across revisions.
+to one another as chains, diffs effect surfaces across revisions, and installs a
+managed guard hook that enforces a reviewed policy against skills the user
+already has.
 
 Out of scope for this plan: AST-based extraction and therefore the `dataflow`
-edge kind in document 42, any model call, any runtime enforcement, identity and
-reputation signals, and validation level V2 from document 38 (which is gated
-behind an investigation task below).
+edge kind in document 42, any model call, identity and reputation signals, and
+validation level V2 from document 38 (which is gated behind an investigation
+below, though document 43's decision log gives it a second path).
+
+The guard hook in M8 is an advisory gate at a harness lifecycle event. It is not
+a sandbox, and no part of this plan makes SkillSpec a security boundary on its
+own.
 
 ## 1. Crate Decision
 
-Create a new crate `crates/skillspec-boundary`.
+Two crates, and the first one is an extraction that must happen before any new
+code is written.
 
-Rationale: doctor owns the follow-through-risk rubric and its scoring types. The
-effect surface is a separate axis and documents 36 and the folder README require
-that the two never merge into one score. Keeping them in separate crates makes
-that structural rather than a matter of discipline. The dependency is one-way.
+### M0: Extract `skillspec-source` First
 
-`source_map` is already `pub mod` in `crates/skillspec-doctor/src/lib.rs`, and
-`remote_source` is `pub mod` as well, so the new crate can consume both without
-changing doctor's visibility.
+`source_map` and `remote_source` are infrastructure that currently live inside
+`skillspec-doctor`, a product crate. Pointing `skillspec-boundary` at doctor to
+reach them would make one product crate depend on a sibling product crate for
+plumbing, with three predictable consequences: doctor's types leak into
+boundary's public API, doctor's release cadence gates boundary's, and the moment
+doctor wants to surface a boundary finding in a joined report there is a cycle.
+
+Extract first:
+
+```text
+crates/skillspec-source/
+  src/lib.rs
+  src/source_map.rs        moved from skillspec-doctor
+  src/source_map/builder.rs
+  src/remote_source.rs     moved from skillspec-doctor
+```
+
+`skillspec-doctor` and `skillspec-boundary` both depend on it. Doctor re-exports
+`source_map` and `remote_source` at their current paths so nothing downstream
+breaks, and `crates/skillspec-cli` keeps compiling unchanged.
+
+This is aligned with the direction already recorded in
+`docs/design/operations/29-internal-domain-facades.md`, which describes the CLI
+moving to domain facades in preparation for crate extraction. Doing it before
+`skillspec-boundary` exists costs roughly an hour. Doing it after costs a
+migration of every type the new crate exposes.
+
+### `skillspec-boundary`
+
+Rationale for keeping it separate from doctor: doctor owns the follow-through
+risk rubric and its scoring types. The effect surface is a separate axis, and
+document 36 and the folder README require that the two never merge into one
+score. Separate crates make that structural rather than a matter of discipline.
 
 ### Cargo Wiring
 
-Add to the workspace members list in the root `Cargo.toml`, after
-`crates/skillspec-doctor`:
+Add both to the workspace members list in the root `Cargo.toml`:
 
 ```toml
+    "crates/skillspec-source",
     "crates/skillspec-boundary",
 ```
 
@@ -50,12 +84,15 @@ description = "Effect-surface enumeration and least-privilege boundary proposals
 
 [dependencies]
 skillspec-core = { version = "0.1.8", path = "../skillspec-core" }
-skillspec-doctor = { version = "0.1.8", path = "../skillspec-doctor" }
+skillspec-source = { version = "0.1.8", path = "../skillspec-source" }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 sha2 = "0.10.9"
 ```
+
+Note the absence of `skillspec-doctor`. If a dependency on doctor appears in this
+manifest during implementation, the extraction in M0 was incomplete.
 
 Keep the version in lockstep with the workspace, matching how the other internal
 crates are versioned today.
@@ -95,9 +132,17 @@ crates/skillspec-boundary/
       phrases.rs         phrase families as reviewable data tables
     flow.rs              chains from document 42: direct chains in M1, the
                          graph in M7
-    proposal.rs          effect set -> grant set, compilation rules 1-7
+    sanitize.rs          the content sanitizer from document 36; every quoted
+                         string from an analyzed package passes through it
+    bounds.rs            the resource limits from document 36
+    proposal.rs          effect set -> grant set, rule precedence then rules 1-7
+    guard/
+      mod.rs             policy store, modes, decision log (document 43)
+      policy.rs          reviewed policy records keyed by install slug
+      decide.rs          intercepted call -> effect -> grant match -> decision
     emit/
       mod.rs             target registry and dispatch
+      guard.rs           guard policy, the default target (document 43)
       skillspec.rs       tool_boundary YAML block
       claude_frontmatter.rs
       claude_settings.rs
@@ -170,10 +215,14 @@ pub enum PathClass {
 }
 
 impl PathClass {
-    /// The five classes that never become a silent allow grant.
+    /// The six classes that never become a silent allow grant.
+    ///
+    /// `Unknown` is included deliberately: lexical normalization fails on
+    /// exactly the path forms an evasion takes, so uncertainty must resolve
+    /// toward review rather than toward permission. See document 36.
     pub fn is_sensitive(self) -> bool {
         matches!(self, Self::Secret | Self::AgentConfig | Self::SkillPackage
-                     | Self::ShellInit | Self::VcsConfig)
+                     | Self::ShellInit | Self::VcsConfig | Self::Unknown)
     }
 }
 
@@ -297,14 +346,29 @@ Register the new modules in `cli/args/mod.rs`, `cli/dispatch/mod.rs`, and
 ### Command Surface
 
 ```text
-skillspec boundary <target> [--json] [--markdown]
-skillspec boundary emit <target> --format <fmt> [-o <file>]
+skillspec boundary <target> [--json] [--markdown] [--reveal <file>]
+skillspec boundary emit <target> [--format <fmt>] [-o <file>]
 skillspec boundary diff <target> --against <ref> [--json]
 skillspec boundary check <target> [--against <ref>] [--fail-on <level>]
+
+skillspec boundary guard install
+skillspec boundary guard status
+skillspec boundary guard mode <observe|prompt|enforce> [--skill <slug>]
+skillspec boundary guard review [--skill <slug>]
+skillspec boundary guard log [--skill <slug>] [--json]
+skillspec boundary guard uninstall
 ```
 
+`--format` defaults to `guard`, per document 37.
+
+`--reveal <file>` is the only path by which a decoded concealment payload leaves
+the tool, and it writes to a file the caller names. It must never write decoded
+content to stdout or into `--json`; document 39 gives the reasoning.
+
 Exit codes for `check` are defined in document 39 and must be implemented
-exactly, including the separation of code 2 for incompleteness.
+exactly, including the separation of code 2 for incompleteness. `check` with no
+`--against` performs absolute review; with `--against` it gates on drift and
+warns that the baseline is itself unreviewed.
 
 ## 6. Fixtures
 
@@ -356,6 +420,36 @@ throughout for this reason; doctor already does.
 
 ## 8. Milestones
 
+Sizing is deliberate rather than omitted. These are rough and assume one person
+working with review; the point is that M1 is a week, not an afternoon, and that
+its least glamorous parts are the load-bearing ones.
+
+| Milestone | Rough size | Gate |
+| --- | --- | --- |
+| M0 crate extraction | 0.5 day | Do first |
+| M1 effect model and extraction | 4-6 days | - |
+| M2 CLI and rendering | 2 days | after M1 |
+| M3 concealment and directives | 3-4 days | I3 concluded |
+| M4 proposal and emitters | 3 days | I2 concluded |
+| M5 drift and gating | 2 days | after M4 |
+| M6 contract cross-check | 2 days | after M4 |
+| M7 flow graph | 4 days | after M5 |
+| M8 guard hook | 5-7 days | after M4; event grammar verified |
+
+Do not begin M2 before M1's normalizer test tables exist. They are the least
+interesting and most load-bearing code in the crate, and they are the thing that
+gets skipped under schedule pressure.
+
+### M0: Extract `skillspec-source`
+
+Move `source_map`, `source_map/builder`, and `remote_source` out of
+`skillspec-doctor` into a new `skillspec-source` crate. Doctor re-exports both at
+their current paths. No behavior changes, no new tests beyond confirming the
+workspace builds and the existing suite passes unchanged.
+
+Acceptance: `cargo test --workspace --all-targets` passes with no test file
+edited, and `skillspec-doctor`'s public API is byte-identical.
+
 ### M1: Effect Model And Markdown/Shell Extraction
 
 - `effect.rs`, `dedupe.rs`, `extract/mod.rs`, `extract/markdown.rs`,
@@ -364,6 +458,9 @@ throughout for this reason; doctor already does.
 - `report.rs` with `skillspec.boundary.effect_surface.v0`
 - `flow.rs` limited to `chain.direct`: source-class and sink-class effects within
   one pipeline, per document 42 level 1
+- `sanitize.rs` and `bounds.rs` from document 36. Both land in M1 rather than
+  later: every string the crate emits from here on must already be going through
+  the sanitizer, and retrofitting it means auditing every construction site
 - Fixtures: `clean-formatter`, `github-reporter`, `unmapped-payload`,
   `dynamic-endpoint`, `wrapped-exec`, `direct-chain`
 - Unit tests for all normalizers
@@ -372,6 +469,11 @@ Acceptance: `analyze` on `github-reporter` returns the expected grants with
 correct reach and resolution; `dynamic-endpoint` produces exactly one unresolved
 entry; `direct-chain` produces exactly one high-confidence chain;
 `clean-formatter` produces none; determinism test passes.
+
+Sanitizer acceptance is separate and asserted directly: a fixture whose
+`SKILL.md` contains control characters, a fence sequence, and a zero-width run
+produces a report in which none of those appear literally in any output format.
+Write this test before the renderer, not after.
 
 ### M2: CLI Surface And Human Rendering
 
@@ -458,7 +560,45 @@ it is the failure most likely to survive review.
 Do not start M7 before M5 ships. The boundary path is complete without it, and
 document 42 requires that no compilation rule consult a chain.
 
-## 9. Standing Tasks
+### M8: Guard Hook
+
+Document 43. The largest milestone and the one that makes the rest usable.
+
+- `guard/` policy store under `$SKILLSPEC_HOME/boundary/`, keyed by install slug
+- `emit/guard.rs` as the default emission target
+- Hook install, status, mode, review, log, and uninstall, reusing the
+  manifest-scoped mutation discipline in
+  `crates/skillspec-harness/src/router_lifecycle/hooks.rs`
+- `observe` as the install default, with the promotion prompt
+- `decisions.jsonl` append-only decision log
+- The failure-behavior table from document 43, including the rule that a call
+  which cannot be normalized is treated as matching no grant
+
+Verify the `PreToolUse` event name, payload shape, and decision grammar against
+current harness documentation before writing the handler. Do not infer them from
+the `UserPromptSubmit` implementation; that is a different event with a different
+payload.
+
+Acceptance: in a harness lab sandbox, installing the guard adds exactly one
+managed hook entry and leaves pre-existing user hooks untouched; uninstall
+restores the file byte-for-byte; `observe` mode records decisions and blocks
+nothing; `enforce` mode refuses a call with no matching grant and names the grant
+that would have been required.
+
+## 9. Deferred Decisions
+
+**The joined report.** Doctor and boundary each build a source map, stage remote
+targets, and render a report. A user running both pays twice and receives two
+artifacts that do not reference each other. The strategically differentiated
+output is the joined claim - that a skill reaches sensitive material *and* that
+its constraining obligation sits where a model is least likely to honor it.
+
+This plan does not build that, and separation of axes is a rule about scoring,
+not an argument against a combined presentation. M0's crate extraction is what
+keeps the option open: with `skillspec-source` shared, a later reporting crate
+can depend on both without a cycle. Decide after M5.
+
+## 10. Standing Tasks
 
 **Emitter syntax verification.** Before M4 ships and before every release
 thereafter, verify the emitted `claude-frontmatter` and `claude-settings` syntax
@@ -473,7 +613,7 @@ must be checked against the rule in
 labels rather than executable policy. Add this to the documentation QA checklist
 in `docs/design/operations/17-qa-process.md`.
 
-## 10. Investigations Before Implementation
+## 11. Investigations Before Implementation
 
 **I1: Progress-ledger effect detail (blocks V2).** Read the actual
 `execution.jsonl` shape produced by `crates/skillspec-runtime/src/progress.rs`
@@ -504,7 +644,7 @@ effect surface aggregates or stays per-package, and cross-skill writes are a
 finding class this plan does not yet define. Schedule after M5; do not let the
 single-skill types harden in a way that blocks per-package reporting.
 
-## 11. Risks
+## 12. Risks
 
 | Risk | Mitigation |
 | --- | --- |
@@ -516,8 +656,12 @@ single-skill types harden in a way that blocks per-package reporting.
 | Scope creep toward a classifier | Two fixed detector families: six concealment, seven directive. Adding to either is a design decision recorded in documents 39 or 41, not an implementation detail. |
 | Directive false positives make the family ignorable | `directive-decoy` keeps the rate visible in a golden file. The response is narrowing phrase families, never adding a scoring model. |
 | Chains overstated as taint analysis | Per-edge confidence, weakest-edge chain confidence, and a per-tier wording rule asserted in tests on rendered text. |
+| The report becomes an injection vector | Every quoted string passes `sanitize.rs`; decoded payloads never reach stdout or JSON; asserted by a dedicated M1 test before the renderer exists. |
+| Analyzer resource exhaustion on hostile repos | `bounds.rs` limits from document 36, reported rather than applied silently, and a bound that fires makes the proposal incomplete. |
+| Guard blocks legitimate work and gets uninstalled | `observe` is the install default; promotion to `enforce` is prompted only after the decision log shows the policy covering real calls. |
+| Guard creates a false sense of continuous coverage | The failure-behavior table in document 43 is implemented as written, and `guard status` reports hook-execution exposure plainly. |
 
-## 12. Preflight
+## 13. Preflight
 
 Per `CONTRIBUTING.md`, before any PR from this work:
 
@@ -528,7 +672,7 @@ cargo test --workspace --all-targets
 cargo build --workspace
 ```
 
-## 13. Sources
+## 14. Sources
 
 - `crates/skillspec-doctor/src/lib.rs`, `source_map.rs`, `remote_source.rs`,
   `frontmatter.rs` - everything this crate consumes.
