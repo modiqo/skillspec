@@ -67,6 +67,36 @@ present:
 
 Add `--json` for the machine-readable surface.
 
+### Map the shape first
+
+Before analyzing, see how a folder of skills is put together:
+
+```bash
+skillspec boundary map ./skills-repo
+```
+
+```text
+SkillSpec Boundary — Surface Map
+Target: ./skills-repo    Skills: 7   Resources: 3   Orphan files: 1
+
+prelude
+  → references: coding-standards
+  resources: prelude/prelude.ts
+effect-service-design
+  resources: effect-service-design/references/AUDIT.md
+  orphans:   effect-service-design/agents/openai.yaml
+...
+
+Components: 1 connected, 5 independent — 6 analysis path(s).
+```
+
+The map reads the folder's structure without analyzing effects: which skills
+are present, which files each references (**resources**), which files nothing
+references (**orphans** — where a payload or a directive can hide, since a
+reader following the `SKILL.md` never sees them), and which skills reference
+other skills. It's a fast orientation step to run first, and `--json` gives the
+graph for tooling.
+
 ### A folder with many skills
 
 Point `boundary` at a repository of skills — a multi-skill workspace or a
@@ -280,6 +310,7 @@ policies and the decision log are left in place.
 
 | Command | Purpose |
 | --- | --- |
+| `boundary map <folder>` | Map the folder's shape: skills, resources, orphans, cross-references |
 | `boundary <target>` | Report the effect surface |
 | `boundary <target> --reveal <file>` | Write decoded concealment payloads to a file |
 | `boundary check <target> [--against <ref>]` | CI gate; exit codes 0–3 |

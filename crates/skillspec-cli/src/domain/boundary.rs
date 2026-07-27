@@ -1,5 +1,6 @@
 use crate::{boundary, error};
 
+pub use boundary::map::{self, SurfaceMap};
 pub use boundary::workspace::{self, WorkspaceSurface};
 pub use boundary::{
     Analysis, CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal,
@@ -15,6 +16,14 @@ pub fn analyze_target(target: &str) -> error::Result<EffectSurface> {
 
 pub fn analyze_any(target: &str) -> error::Result<Analysis> {
     boundary::analyze_any(target)
+}
+
+pub fn surface_map(target: &str) -> error::Result<SurfaceMap> {
+    boundary::surface_map(target)
+}
+
+pub fn render_surface_map(m: &SurfaceMap) -> String {
+    boundary::map::render(m)
 }
 
 pub fn render(surface: &EffectSurface) -> String {

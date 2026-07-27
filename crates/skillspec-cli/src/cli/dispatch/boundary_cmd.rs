@@ -44,6 +44,16 @@ pub(super) fn command(command: BoundaryCommand) -> Result<()> {
             fail_on_incomplete,
         } => check(path, against, fail_on_incomplete),
         BoundaryCommand::Guard { command } => guard_cmd::run(command),
+        BoundaryCommand::Map { path, json } => map(path, json),
+    }
+}
+
+fn map(path: String, json: bool) -> Result<()> {
+    let surface_map = boundary::surface_map(&path)?;
+    if json {
+        report::json(&surface_map)
+    } else {
+        report::text(&boundary::render_surface_map(&surface_map))
     }
 }
 

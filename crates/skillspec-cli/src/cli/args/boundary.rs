@@ -3,6 +3,17 @@ use clap::Subcommand;
 #[derive(Debug, Subcommand)]
 pub(in crate::cli) enum BoundaryCommand {
     #[command(
+        about = "Map the shape of a skill folder before analyzing it",
+        long_about = "Build the surface map of a folder of skills without analyzing effects: which skills are present, which files each one references (resources), which files nothing references (orphans - where a payload or directive can hide), and which skills reference other skills. Skills that reference each other form a connected group; the rest are independent. Use this first to understand a repository's shape before reading per-skill boundary reports."
+    )]
+    Map {
+        /// Local folder of skills, or public git skill URL.
+        path: String,
+        /// Emit machine-readable JSON instead of the formatted map.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
         about = "Emit a least-privilege boundary proposal in a policy format",
         long_about = "Compile the enumerated effect surface into a deny-by-default permission set and render it into a policy grammar. Supported formats: skillspec (a tool_boundary block for skill.spec.yml), egress-allowlist (a host list for a proxy or container network policy), and json (the proposal itself). Every supported format can express deny-by-default; a format that cannot would not give the fail-closed property the analysis depends on. Effects whose target could not be determined never become grants, and a proposal built from an incomplete surface says so in the emitted artifact. SkillSpec does not enforce the emitted policy."
     )]

@@ -36,6 +36,7 @@ pub mod effect;
 pub mod emit;
 pub mod extract;
 pub mod guard;
+pub mod map;
 pub mod normalize;
 pub mod proposal;
 pub mod render;
@@ -251,6 +252,40 @@ fn ensure_single_skill(root: &Path) -> Result<()> {
         });
     }
     Ok(())
+}
+
+/// Build the surface map of a local folder or a remote git target.
+///
+/// A phase-0 orientation step: the shape of the folder - skills, resources,
+/// orphan files, cross-skill references - without analyzing effects. Reads the
+/// package; never executes anything.
+pub fn surface_map(target: &str) -> Result<map::SurfaceMap> {
+    let local = Path::new(target);
+    if local.exists() {
+        let mut m = map::build(local)?;
+        m.target = target.to_owned();
+        return Ok(m);
+    }
+    if looks_like_local_target(target) {
+        analyze_target(target)?;
+        unreachable!("analyze_target errors on a missing local path");
+    }
+    let Some(source) = remote::parse_target(target)? else {
+        return Err(Error::InvalidInput {
+            message: format!("boundary map target {target:?} does not exist locally and is not a supported remote git URL"),
+        });
+    };
+    let staged = remote::clone_remote_temp(&source, "skillspec-boundary-map")?;
+    let root = match &source.path {
+        Some(path) => {
+            remote::set_sparse_path(staged.checkout_dir(), path)?;
+            staged.checkout_dir().join(path)
+        }
+        None => staged.checkout_dir().to_path_buf(),
+    };
+    let mut m = map::build(&root)?;
+    m.target = target.to_owned();
+    Ok(m)
 }
 
 /// The result of analyzing a target that may hold one skill or many.
