@@ -26,6 +26,14 @@ Do not run `skillspec act`, `skillspec query`, `skillspec refs`, or `skillspec -
 
 For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command or `skillspec doctor checklist <source> --json` when available, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
 
+For security assessment — what a skill could reach if executed, and a least-privilege boundary for it — use the standalone `skillspec boundary` commands and answer directly. This is a separate read-only tool that needs no `skill.spec.yml` and installs/changes nothing:
+- `skillspec boundary map <folder-or-url>` — a tree of a skill collection: skills, resources, orphan files, and cross-references.
+- `skillspec boundary <skill-or-url>` — the effect surface: what it reads, reaches, executes, plus concealment and directive findings.
+- `skillspec boundary emit <skill>` — a deny-by-default policy compiled from that surface.
+- `skillspec boundary guard install|add|mode enforce` — enforce a reviewed policy against installed skills via a managed PreToolUse hook.
+
+Both local paths and public git URLs (GitHub, GitLab, Bitbucket, self-hosted) are supported; nothing in the analyzed package is executed. See `docs/boundary-guide.md`.
+
 For proof-bearing execution routes, prefer `skillspec run checklist <run_dir> --stage entry|loop|exit --json` when available for current-phase cues, proof requirements, repeat-until conditions, forbids, and final alignment directives. Otherwise use the run-loop guide's current gate. Record routine successful evidence with one quiet `skillspec progress checkpoint ... --quiet` command at natural phase boundaries. Use individual `skillspec progress record` only for failures, blockers, or debugging.
 
 For imports, prefer `skillspec import checklist <source-or-workspace> --stage entry|loop|exit --json` when available. The generated checklist owns the shape-specific template for single `SKILL.md`, multi-skill folder, or plugin-shaped source; follow its package/file/block repeat loops, commands, directives, evidence requirements, activation policy, and forbids until complete or blocked. Do not review one representative package, bulk-promote scaffolds, or install generated drafts.

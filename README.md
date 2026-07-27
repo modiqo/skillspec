@@ -320,8 +320,18 @@ skillspec boundary emit ./my-skill            # a deny-by-default policy
 skillspec boundary guard install              # enforce reviewed policies
 ```
 
-It runs on a local skill or a public GitHub URL, executes nothing in the
-package, and works independently of the rest of SkillSpec. Full walkthrough:
+It runs on a local skill or a public git URL (GitHub, GitLab, Bitbucket, or
+self-hosted), executes nothing in the package, and is a **standalone tool** — it
+needs no `skill.spec.yml`, changes nothing about your skills, and does not
+require adopting the rest of SkillSpec. Install the binary and use `boundary`
+on its own:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+skillspec boundary map https://github.com/owner/skills   # a tree of the shape
+```
+
+Full walkthrough:
 [Analyzing and constraining agent skills](https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md).
 
 ## Why The Scores Are Credible

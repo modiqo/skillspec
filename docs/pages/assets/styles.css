@@ -4374,3 +4374,15 @@ pre code {
     font-size: 2.4rem;
   }
 }
+
+.boundary-steps {
+  margin: 18px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.boundary-steps li strong {
+  color: var(--accent, #d8b46a);
+}

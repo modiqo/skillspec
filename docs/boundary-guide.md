@@ -5,7 +5,7 @@
 > If an agent executed this skill, what could it reach — and what is the
 > smallest permission set that still lets it work?
 
-It works on a skill you have locally or a public GitHub skill URL, needs no
+It works on a skill you have locally or a public git skill URL, needs no
 `skill.spec.yml` and no changes to the skill, and never executes anything in the
 package. You can use every part of it independently.
 
@@ -16,6 +16,27 @@ There are three things you can do, in increasing order of commitment:
 3. **Enforce** — apply a reviewed policy to the skills you already run.
 
 Nothing forces you past step 1.
+
+## Install and use it on its own
+
+`skillspec boundary` ships inside the `skillspec` binary, but it is a standalone
+tool: it does not require you to adopt SkillSpec's authoring, router, or spec
+workflow, does not need a `skill.spec.yml`, and does not change or install
+anything into your skills. If all you want is to analyze and constrain other
+people's skills, install the binary and use `boundary` — nothing else.
+
+```bash
+# one-line installer
+curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | sh
+# or, with Rust installed
+cargo install skillspec
+
+skillspec boundary map https://github.com/owner/skills   # orient
+skillspec boundary https://github.com/owner/skills        # assess
+```
+
+The rest of SkillSpec (import, compile, run, router) is entirely optional and
+independent of `boundary`.
 
 ---
 

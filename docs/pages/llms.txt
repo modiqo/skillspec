@@ -13,6 +13,7 @@ License: Apache 2.0
 ## What SkillSpec Does
 
 - Assesses existing skills with Doctor before the agent trusts them.
+- Constrains skills with `skillspec boundary`: what a skill can reach if executed, a least-privilege policy, and a guard hook that enforces it. Standalone; needs no skill.spec.yml.
 - Converts load-bearing prose from `SKILL.md` into a reviewed `skill.spec.yml` contract.
 - Guides execution through routes, phases, tool boundaries, checks, and proof obligations.
 - Supports router mode so agents select the right skill without loading every skill into context.
@@ -22,6 +23,7 @@ License: Apache 2.0
 
 - Homepage: https://skillspec.sh/#home
 - Assess a skill: https://skillspec.sh/#assess
+- Constrain what a skill can reach: https://skillspec.sh/#boundary
 - Install guide: https://skillspec.sh/#install
 - Ecosystem pressure: https://skillspec.sh/#platform-shift
 - Load-bearing prose: https://skillspec.sh/#load-bearing-prose
@@ -67,6 +69,15 @@ skillspec doctor ./my-skill --html
 skillspec doctor ./my-skill --json
 ```
 
+Constrain what a skill can reach (standalone; local folder or public git URL):
+
+```sh
+skillspec boundary map ./skills-repo        # tree: skills, resources, orphans
+skillspec boundary ./my-skill               # effect surface + concealment + directives
+skillspec boundary emit ./my-skill          # deny-by-default policy
+skillspec boundary guard install            # enforce reviewed policies via a hook
+```
+
 Run Doctor from an agent harness after the SkillSpec skill is installed:
 
 ```text
@@ -97,6 +108,7 @@ skillspec install skill ./my-skill --all-detected
 When helping a user with SkillSpec:
 
 - Prefer `skillspec doctor` first when evaluating an existing skill.
+- Use `skillspec boundary` to see what a skill could reach if executed and to compile or enforce a least-privilege boundary; it is standalone and needs no skill.spec.yml.
 - Treat Doctor output as a static follow-through risk report, not as a domain-quality score.
 - Use `/skillspec import` inside the harness to convert a prose skill into `skill.spec.yml`.
 - Use router mode when many skills are installed and skill selection should be explicit.
@@ -108,6 +120,8 @@ When helping a user with SkillSpec:
 - Reliability gap: https://github.com/modiqo/skillspec/blob/main/docs/overview/00-skills-reliability-gap.md
 - Contract trace methodology: https://github.com/modiqo/skillspec/blob/main/docs/overview/08-contract-trace-methodology.md
 - Doctor risk model: https://github.com/modiqo/skillspec/blob/main/docs/design/operations/22-doctor-agent-drift-risk.md
+- Boundary guide: https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md
+- Skill effect surface and boundary design: https://github.com/modiqo/skillspec/blob/main/docs/design/security/README.md
 - Router mode: https://github.com/modiqo/skillspec/blob/main/docs/visuals/explainers/03-router-mode.md
 - Guided trampoline: https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/24-guided-trampoline.md
 - Traces and alignment: https://github.com/modiqo/skillspec/blob/main/docs/design/runtime/12-traces-and-alignment.md
