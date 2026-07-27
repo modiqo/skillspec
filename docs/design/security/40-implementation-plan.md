@@ -528,14 +528,18 @@ detector contributes to any number in a doctor report.
 
 - `proposal.rs` implementing compilation rules 1 through 7
 - V0 internal-coverage checks from document 38
-- `emit/skillspec.rs` and `emit/egress_allowlist.rs`
-- `emit/claude_frontmatter.rs` and `emit/claude_settings.rs`, **after** the
-  syntax verification task below
+- `emit/skillspec.rs`, `emit/egress_allowlist.rs`, and the `json` target
 - `skillspec boundary emit`
+
+`emit/claude_frontmatter.rs` was **cancelled** by its verification step, not
+deferred: `allowed-tools` grants permission rather than restricting it, so the
+emitter would have pre-approved the effects the analysis found. Document 37
+records the finding. `emit/claude_settings.rs` remains unbuilt pending its own
+verification.
 
 Acceptance: `secret-reader` produces `permission_required_for` and never
 `allow`; `dynamic-endpoint` produces `complete: false`; V0 coverage passes on
-every fixture; each emitter has a golden output file.
+every fixture; each emitter has tests over the fixture set.
 
 ### M5: Drift And Gating
 

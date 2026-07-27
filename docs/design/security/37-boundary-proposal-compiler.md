@@ -186,19 +186,47 @@ over-granted; they do not get their file rewritten.
 
 The proposal is rendered into whichever policy grammar the reader uses.
 
-| Target id | Artifact | Deny default expressible |
-| --- | --- | --- |
-| `guard` | SkillSpec guard policy consumed by the hook in document 43 | yes |
-| `skillspec` | `tool_boundary` block for `skill.spec.yml` | yes |
-| `claude-frontmatter` | `allowed-tools` list for `SKILL.md` frontmatter | no, allow-list only |
-| `claude-settings` | permission block for a settings file | to be verified |
-| `egress-allowlist` | plain host list for a proxy or network policy | yes, by construction |
-| `json` | the raw proposal, for another tool to consume | not applicable |
+| Target id | Artifact | Deny default expressible | Status |
+| --- | --- | --- | --- |
+| `guard` | SkillSpec guard policy consumed by the hook in document 43 | yes | planned, M8 |
+| `skillspec` | `tool_boundary` block for `skill.spec.yml` | yes | implemented |
+| `egress-allowlist` | plain host list for a proxy or network policy | yes, by construction | implemented |
+| `json` | the raw proposal, for another tool to consume | not applicable | implemented |
+| `claude-settings` | permission block for a settings file | to be verified | not built |
+| ~~`claude-frontmatter`~~ | `allowed-tools` list for `SKILL.md` frontmatter | **no - see below** | **will not be built** |
 
-`guard` is the default target. It is the only one whose enforcement semantics
-SkillSpec controls end to end, and therefore the only one where the fail-closed
-property is a consequence of this design rather than an assumption about
-somebody else's.
+`guard` becomes the default target once it exists. It is the only one whose
+enforcement semantics SkillSpec controls end to end, and therefore the only one
+where the fail-closed property is a consequence of this design rather than an
+assumption about somebody else's. Until then the default is `skillspec`.
+
+### Verified: `allowed-tools` Grants, It Does Not Restrict
+
+Checked against the Claude Code skills documentation on 2026-07-27. The
+`allowed-tools` frontmatter field pre-approves tools for the turn that invokes
+the skill. The documentation is explicit:
+
+```text
+It does not restrict which tools are available: every tool remains callable,
+and your permission settings still govern tools that are not listed.
+```
+
+That inverts the intended direction. Emitting an enumerated effect set into
+`allowed-tools` would **pre-approve exactly the effects the analysis found**,
+turning a least-privilege report into a permission grant and removing the
+approval prompts a user would otherwise see. A reader who pasted the artifact in
+would end up with strictly weaker protection than before, while believing they
+had applied a boundary.
+
+There is therefore no correct way to emit this proposal into `allowed-tools`,
+and the target is removed rather than shipped with a caveat. The sibling field
+`disallowed-tools` does restrict, but it is a deny-list over a permissive
+default and its unit is the harness tool name rather than an effect class, so it
+cannot express this proposal either.
+
+This is exactly the failure the standing verification task exists to catch, and
+it is worth recording as precedent: an emitter whose grammar was assumed rather
+than checked would have shipped a security feature that reduces security.
 
 Two implementation requirements follow from that table.
 

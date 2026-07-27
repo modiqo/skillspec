@@ -111,9 +111,14 @@ pub(super) fn run(command: Command) -> Result<()> {
             Some(command) => checklist_cmd::doctor(command)?,
             None => doctor_cmd::run(path, json, html, markdown)?,
         },
-        Command::Boundary { path, json } => {
-            boundary_cmd::run(path, json)?;
-        }
+        Command::Boundary {
+            command,
+            path,
+            json,
+        } => match command {
+            Some(command) => boundary_cmd::command(command)?,
+            None => boundary_cmd::run(path, json)?,
+        },
         Command::Import { command } => checklist_cmd::import(command)?,
         Command::Run { command } => checklist_cmd::run(command)?,
         Command::Status { roots, json } => {

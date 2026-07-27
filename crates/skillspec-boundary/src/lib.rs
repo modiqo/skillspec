@@ -30,8 +30,10 @@
 pub mod bounds;
 pub mod dedupe;
 pub mod effect;
+pub mod emit;
 pub mod extract;
 pub mod normalize;
+pub mod proposal;
 pub mod render;
 pub mod sanitize;
 pub mod surface;
@@ -42,6 +44,8 @@ pub use effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget,
     PathClass, Reach, TargetResolution,
 };
+pub use emit::{emit, EmitTarget};
+pub use proposal::{compile, Proposal};
 pub use render::render;
 pub use sanitize::Preview;
 pub use surface::{EffectSurface, EXTRACTOR_VERSION};

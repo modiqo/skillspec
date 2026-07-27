@@ -68,6 +68,73 @@ fn boundary_reports_a_clean_skill_without_claiming_it_is_safe() -> TestResult {
 }
 
 #[test]
+fn boundary_emit_renders_a_deny_default_tool_boundary() -> TestResult {
+    let output = Command::new(bin())
+        .arg("boundary")
+        .arg("emit")
+        .arg(fixture("secret-reader"))
+        .output()?;
+    assert_success(&output);
+
+    let text = stdout(&output);
+    assert!(text.contains("tool_boundary:"));
+    assert!(text.contains("default: deny"));
+    // A sensitive class is held for review, never emitted as an allow.
+    assert!(text.contains("permission_required_for:"));
+    let before_review = text
+        .split("permission_required_for")
+        .next()
+        .unwrap_or_default();
+    assert!(!before_review.contains("fs.read:secret"));
+    Ok(())
+}
+
+#[test]
+fn boundary_emit_writes_to_a_file_when_asked() -> TestResult {
+    let dir = TempDir::new("boundary-emit");
+    let out = dir.path().join("nested/policy.yml");
+    let output = Command::new(bin())
+        .arg("boundary")
+        .arg("emit")
+        .arg(fixture("direct-chain"))
+        .arg("--out")
+        .arg(&out)
+        .output()?;
+    assert_success(&output);
+    assert!(std::fs::read_to_string(&out)?.contains("default: deny"));
+    Ok(())
+}
+
+#[test]
+fn boundary_emit_supports_the_egress_allowlist_format() -> TestResult {
+    let output = Command::new(bin())
+        .arg("boundary")
+        .arg("emit")
+        .arg(fixture("direct-chain"))
+        .arg("--format")
+        .arg("egress-allowlist")
+        .output()?;
+    assert_success(&output);
+    assert!(stdout(&output).contains("archive.example.com"));
+    Ok(())
+}
+
+#[test]
+fn boundary_emit_rejects_an_unsupported_format() -> TestResult {
+    // allowed-tools grants rather than restricts, so no such target exists.
+    let output = Command::new(bin())
+        .arg("boundary")
+        .arg("emit")
+        .arg(fixture("clean-formatter"))
+        .arg("--format")
+        .arg("claude-frontmatter")
+        .output()?;
+    assert_failure(&output);
+    assert!(stderr(&output).contains("unknown boundary format"));
+    Ok(())
+}
+
+#[test]
 fn boundary_requires_a_target() -> TestResult {
     let output = Command::new(bin()).arg("boundary").output()?;
     assert_failure(&output);

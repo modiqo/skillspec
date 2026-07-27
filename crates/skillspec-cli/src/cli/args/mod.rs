@@ -1,3 +1,4 @@
+mod boundary;
 mod capability;
 mod checklist;
 mod deps;
@@ -14,6 +15,7 @@ mod types;
 mod visibility;
 mod workspace;
 
+pub(in crate::cli) use boundary::BoundaryCommand;
 pub(in crate::cli) use capability::CapabilityCommand;
 pub(in crate::cli) use checklist::{DoctorCommand, ImportCommand, RunCommand};
 pub(in crate::cli) use deps::DepsCommand;
@@ -206,6 +208,8 @@ pub(super) enum Command {
         long_about = "Enumerate the effect surface of a local skill folder or a public GitHub skill target: the network hosts, filesystem paths, binaries, environment variables, and packages the skill could reach if an agent followed its instructions. Remote targets are staged into a temporary checkout and removed afterwards. Nothing in the analyzed package is executed and no model is called, which is what makes it safe to point at an unreviewed repository. The analysis enumerates rather than classifies: it reports what a package touches, including the ordinary parts, and never claims that a skill is malicious or safe. Effects whose target cannot be determined from source text are reported as unresolved rather than guessed at. SkillSpec does not enforce any boundary; the report describes what a harness, guard hook, or network policy would need to permit."
     )]
     Boundary {
+        #[command(subcommand)]
+        command: Option<BoundaryCommand>,
         /// Local skill folder, public GitHub skill folder URL, or public GitHub repo URI.
         path: Option<String>,
         /// Emit machine-readable JSON instead of the formatted human report.
