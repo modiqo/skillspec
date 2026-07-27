@@ -41,6 +41,7 @@ pub mod proposal;
 pub mod render;
 pub mod sanitize;
 pub mod surface;
+pub mod workspace;
 
 pub use bounds::{Bounds, Budget};
 pub use concealment::Concealment;
@@ -166,6 +167,7 @@ pub fn check(
 pub fn analyze_target(target: &str) -> Result<EffectSurface> {
     let local = Path::new(target);
     if local.exists() {
+        ensure_single_skill(local)?;
         let mut surface = analyze(local)?;
         surface.target = target.to_owned();
         return Ok(surface);
@@ -208,11 +210,124 @@ pub fn analyze_target(target: &str) -> Result<EffectSurface> {
         });
     }
 
+    ensure_single_skill(&package_root)?;
     let mut surface = analyze(&package_root)?;
     surface.target = target.to_owned();
     surface.source_kind = "remote_github".to_owned();
     surface.staged_from = Some(source.repo_url);
     Ok(surface)
+}
+
+/// Reject a folder of many skills for the single-skill commands.
+///
+/// `emit`, `check`, `diff`, and `guard add` operate on one skill. Pointed at a
+/// workspace they would flatten it, so they refuse and name the packages, since
+/// the right thing is to point at a specific skill folder. `boundary <target>`
+/// and its workspace report are unaffected - they call `analyze` directly.
+fn ensure_single_skill(root: &Path) -> Result<()> {
+    let packages = workspace::skill_package_dirs(root)?;
+    if packages.len() > 1 || packages.first().is_some_and(|dir| dir != root) {
+        let names = packages
+            .iter()
+            .filter_map(|dir| dir.strip_prefix(root).ok())
+            .map(|dir| dir.to_string_lossy().to_string())
+            .filter(|dir| !dir.is_empty())
+            .take(6)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(Error::InvalidInput {
+            message: format!(
+                "{} holds {} skills, not one; this command operates on a single skill. Point it at a specific skill folder, e.g. {root}/{first}. Skills: {names}",
+                root.display(),
+                packages.len(),
+                root = root.display(),
+                first = packages
+                    .iter()
+                    .filter_map(|dir| dir.strip_prefix(root).ok())
+                    .map(|dir| dir.to_string_lossy().to_string())
+                    .find(|dir| !dir.is_empty())
+                    .unwrap_or_else(|| "<skill>".to_owned()),
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// The result of analyzing a target that may hold one skill or many.
+pub enum Analysis {
+    /// A single skill package.
+    Single(Box<EffectSurface>),
+    /// A folder of skills, each analyzed on its own.
+    Workspace(Box<workspace::WorkspaceSurface>),
+}
+
+/// Analyze a local or remote target, returning a single surface when it is one
+/// skill and a per-package workspace surface when it is a folder of skills.
+///
+/// This is what `skillspec boundary <target>` calls: it never flattens a
+/// repository of many skills into one synthetic surface.
+pub fn analyze_any(target: &str) -> Result<Analysis> {
+    let local = Path::new(target);
+    if local.exists() {
+        return dispatch(local, target, "local", None);
+    }
+    if looks_like_local_target(target) {
+        // Reuse analyze_target's precise error for a missing local path.
+        analyze_target(target)?;
+        unreachable!("analyze_target returns an error for a missing local path");
+    }
+
+    let Some(source) = remote::parse_target(target)? else {
+        return analyze_target(target).map(|s| Analysis::Single(Box::new(s)));
+    };
+    let staged = remote::clone_remote_temp(&source, "skillspec-boundary")?;
+    let package_root = match &source.path {
+        Some(path) => {
+            remote::set_sparse_path(staged.checkout_dir(), path)?;
+            staged.checkout_dir().join(path)
+        }
+        None => staged.checkout_dir().to_path_buf(),
+    };
+    if !package_root.exists() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "remote path {} did not materialize from {}",
+                source.path.as_deref().unwrap_or("."),
+                source.repo_url
+            ),
+        });
+    }
+    dispatch(
+        &package_root,
+        target,
+        "remote_github",
+        Some(source.repo_url),
+    )
+}
+
+fn dispatch(
+    root: &Path,
+    target: &str,
+    source_kind: &str,
+    staged_from: Option<String>,
+) -> Result<Analysis> {
+    let packages = workspace::skill_package_dirs(root)?;
+    // One package whose directory is the root is a single skill. More than one,
+    // or one nested below the root, is a workspace.
+    let single = packages.len() == 1 && packages[0] == root;
+    if single {
+        let mut surface = analyze(root)?;
+        surface.target = target.to_owned();
+        surface.source_kind = source_kind.to_owned();
+        surface.staged_from = staged_from;
+        return Ok(Analysis::Single(Box::new(surface)));
+    }
+
+    let mut workspace = workspace::analyze_workspace(root)?;
+    workspace.target = target.to_owned();
+    workspace.source_kind = source_kind.to_owned();
+    workspace.staged_from = staged_from;
+    Ok(Analysis::Workspace(Box::new(workspace)))
 }
 
 /// Decode concealment payloads from a local target and write them to `out`.

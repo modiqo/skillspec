@@ -67,6 +67,34 @@ present:
 
 Add `--json` for the machine-readable surface.
 
+### A folder with many skills
+
+Point `boundary` at a repository of skills — a multi-skill workspace or a
+plugin — and it analyzes **each skill on its own**, never flattening them into
+one synthetic surface:
+
+```text
+SkillSpec Boundary — Workspace
+==============================
+Target: ./skills-repo        Skills: 18
+
+! skills/claude-api            7 directive(s); egress → api.anthropic.com
+! skills/docx                  3 concealment
+  skills/pdf                   clean
+  ...
+
+7 of 18 skills warrant a closer look. Run `skillspec boundary <skill-folder>`
+on one for its full report.
+```
+
+Referenced resources and bundled scripts inside a skill are part of that skill's
+own surface — including files nothing in the `SKILL.md` reaches, which are
+reported at `unmapped` reach.
+
+`emit`, `check`, `diff`, and `guard add` operate on a single skill. Pointed at a
+folder of many, they tell you to name a specific skill folder rather than
+flatten it.
+
 ### Gate a skill in CI
 
 ```bash

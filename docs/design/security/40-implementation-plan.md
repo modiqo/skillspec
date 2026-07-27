@@ -659,7 +659,7 @@ and record the provenance of each family in `directive/phrases.rs` so a reviewer
 can see where a phrase came from. Phrases with no external basis should be marked
 as such.
 
-**I4: Workspace shapes.** This plan covers `simple_skill` only. Multi-skill,
+**I4: Workspace shapes.** IMPLEMENTED (per-package analysis in crates/skillspec-boundary/src/workspace.rs). This plan covers `simple_skill` only. Multi-skill,
 entry-with-subskills, and plugin workspaces need a decision about whether the
 effect surface aggregates or stays per-package, and cross-skill writes are a
 finding class this plan does not yet define. Schedule after M5; do not let the

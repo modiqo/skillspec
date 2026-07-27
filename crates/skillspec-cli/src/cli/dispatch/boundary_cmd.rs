@@ -9,14 +9,24 @@ pub(super) fn run(target: Option<String>, json: bool, reveal: Option<String>) ->
         message: "boundary requires a target or subcommand, for example `skillspec boundary ./my-skill` or `skillspec boundary emit ./my-skill`"
             .to_owned(),
     })?;
-    let surface = boundary::analyze_target(&target)?;
     if let Some(out) = reveal {
         return boundary::reveal_payloads(&target, &out);
     }
-    if json {
-        report::json(&surface)
-    } else {
-        report::text(&boundary::render(&surface))
+    match boundary::analyze_any(&target)? {
+        boundary::Analysis::Single(surface) => {
+            if json {
+                report::json(&surface)
+            } else {
+                report::text(&boundary::render(&surface))
+            }
+        }
+        boundary::Analysis::Workspace(workspace) => {
+            if json {
+                report::json(&workspace)
+            } else {
+                report::text(&boundary::workspace::render(&workspace))
+            }
+        }
     }
 }
 

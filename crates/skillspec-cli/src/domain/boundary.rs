@@ -1,6 +1,9 @@
 use crate::{boundary, error};
 
-pub use boundary::{CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal};
+pub use boundary::workspace::{self, WorkspaceSurface};
+pub use boundary::{
+    Analysis, CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal,
+};
 
 pub fn reveal_payloads(target: &str, out: &str) -> error::Result<()> {
     boundary::reveal_payloads(target, out)
@@ -8,6 +11,10 @@ pub fn reveal_payloads(target: &str, out: &str) -> error::Result<()> {
 
 pub fn analyze_target(target: &str) -> error::Result<EffectSurface> {
     boundary::analyze_target(target)
+}
+
+pub fn analyze_any(target: &str) -> error::Result<Analysis> {
+    boundary::analyze_any(target)
 }
 
 pub fn render(surface: &EffectSurface) -> String {
