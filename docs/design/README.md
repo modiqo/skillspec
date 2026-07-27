@@ -27,8 +27,13 @@ what the current implementation accepts.
 ## Catalog
 
 The numeric prefixes preserve the original reading order. The subfolders make
-review ownership explicit: `core`, `authoring`, `runtime`, `router`, and
-`operations`.
+review ownership explicit: `core`, `authoring`, `runtime`, `router`,
+`operations`, and `security`.
+
+Documents 36 through 40 in `security/` describe proposed work that is not
+implemented. They have their own folder overview in
+[security/README.md](security/README.md), which should be read before the
+individual documents.
 
 | Order | Doc | Purpose |
 | --- | --- | --- |
@@ -67,6 +72,11 @@ review ownership explicit: `core`, `authoring`, `runtime`, `router`, and
 | 33 | [Router Provider Neutrality](router/33-router-execution-policy-gate.md) | Why the router stays provider-neutral, where execution substrate policy belongs, and how the activation-anchor gate avoids broad false positives. |
 | 34 | [Router Policy Profiles And Passthrough](router/34-router-policy-profiles-and-passthrough.md) | Proposed provider-neutral router policy layer for ordered preferences, soft and hard rule modes, temporary passthrough profiles, scheduler control, and auditable route explanations. |
 | 35 | [Shape-Specific Checklist Generation](authoring/35-shape-specific-checklists.md) | Proposed generated checklist contracts for doctor, import, and run workflows, with common invariants plus single-skill, multi-skill, and plugin-shaped source templates. |
+| 36 | [Skill Effect Surface](security/36-skill-effect-surface.md) | Proposed effect model for enumerating what a skill could reach if executed: effect classes, path classes, target resolution, reach, extraction sources, normalization, and report schema. |
+| 37 | [Boundary Proposal Compiler](security/37-boundary-proposal-compiler.md) | Proposed compilation of an effect surface into a least-privilege boundary proposal, and emission into harness-native permission formats. |
+| 38 | [Boundary Validation](security/38-boundary-validation.md) | Proposed validation levels for a boundary proposal, and the limits imposed by the rule that SkillSpec does not execute target skill code. |
+| 39 | [Concealment And Effect Drift](security/39-concealment-and-effect-drift.md) | Proposed concealment detector set, version-to-version effect drift classes, re-consent semantics, and gating exit codes. |
+| 40 | [Boundary Implementation Plan](security/40-implementation-plan.md) | Crate layout, module responsibilities, core types, CLI wiring, fixtures, test plan, milestones, standing tasks, and blocking investigations. |
 
 ## Visual Explainers
 
@@ -116,6 +126,7 @@ Every design claim should be grounded in one or more of these sources:
 | CLI surface | `crates/skillspec-cli/src/cli/args/`, `crates/skillspec-cli/src/cli/dispatch/`, `crates/skillspec-cli/src/domain/` |
 | Internal crate boundaries | `crates/skillspec-core/`, `crates/skillspec-runtime/`, `crates/skillspec-doctor/`, `crates/skillspec-authoring/`, `crates/skillspec-harness/`, `crates/skillspec-workspace/`, `crates/skillspec-cli/src/domain/`, `docs/design/operations/29-internal-domain-facades.md`, `~/tulving/design/skillspec-crate-boundaries/README.md` |
 | Release-candidate testing | `Justfile`, `.github/workflows/ci.yml`, `crates/skillspec-cli/tests/cli/`, `conformance/`, `examples/`, `docs/design/operations/30-testing-matrix.md`, `docs/design/operations/31-controlled-harness-lab.md` |
+| Skill effect surface and boundary proposals (proposed) | `crates/skillspec-doctor/src/source_map.rs`, `crates/skillspec-doctor/src/remote_source.rs`, `crates/skillspec-doctor/src/frontmatter.rs`, `crates/skillspec-core/src/spec/model.rs`, `crates/skillspec-runtime/src/act.rs`, `docs/design/core/09-phase-tool-boundaries.md`, `docs/design/security/` |
 
 ## Terms Used In These Docs
 
@@ -183,6 +194,16 @@ which execution obligations have proof.
 by `skillspec trace align --proof-digest`. It converts missing phase
 requirements, routes, route checks, forbids, elicitations, and closures into a
 batch-planning artifact for one `progress batch` call.
+
+`Effect surface` means the proposed enumeration of host-visible actions a skill
+could cause if an agent executed its instructions. It is distinct from
+`activation surface`, which measures how much package text loads into context at
+activation time, and from `capability seed`, which is a local bootstrap entry
+under `~/.skillspec/capabilities/`. See `docs/design/security/`.
+
+`Boundary proposal` means the proposed least-privilege permission set derived
+from an effect surface. It is a policy artifact for some other component to
+enforce; SkillSpec does not enforce it.
 
 `Completion summary` means the compact final status shape available from
 `skillspec trace align --summary` when proof is explicitly inspected. Normal
