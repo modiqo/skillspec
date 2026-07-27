@@ -30,7 +30,7 @@ The numeric prefixes preserve the original reading order. The subfolders make
 review ownership explicit: `core`, `authoring`, `runtime`, `router`,
 `operations`, and `security`.
 
-Documents 36 through 40 in `security/` describe proposed work that is not
+Documents 36 through 42 in `security/` describe proposed work that is not
 implemented. They have their own folder overview in
 [security/README.md](security/README.md), which should be read before the
 individual documents.
@@ -77,6 +77,8 @@ individual documents.
 | 38 | [Boundary Validation](security/38-boundary-validation.md) | Proposed validation levels for a boundary proposal, and the limits imposed by the rule that SkillSpec does not execute target skill code. |
 | 39 | [Concealment And Effect Drift](security/39-concealment-and-effect-drift.md) | Proposed concealment detector set, version-to-version effect drift classes, re-consent semantics, and gating exit codes. |
 | 40 | [Boundary Implementation Plan](security/40-implementation-plan.md) | Crate layout, module responsibilities, core types, CLI wiring, fixtures, test plan, milestones, standing tasks, and blocking investigations. |
+| 41 | [Agent Directives](security/41-agent-directives.md) | Proposed second detector family for visible instructions that retarget agent behavior rather than reaching the host, plus the whole-report ordering across finding families. |
+| 42 | [Effect Flow Graph](security/42-effect-flow-graph.md) | Proposed relation of effects to one another as confidence-tiered chains, so a report can say a network call carries credential material without claiming taint semantics. |
 
 ## Visual Explainers
 

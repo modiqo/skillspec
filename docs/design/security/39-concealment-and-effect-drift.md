@@ -4,8 +4,8 @@ Status: proposed. Nothing in this document is implemented.
 
 ## Purpose
 
-Cover the two things an enumerated effect surface and a deny-by-default boundary
-do not address:
+Cover two things an enumerated effect surface and a deny-by-default boundary do
+not address:
 
 1. **Concealment.** Text that a human reader of the skill will not see but a
    model will. Concealment creates no grant, so denying by default does not
@@ -13,8 +13,14 @@ do not address:
 2. **Effect drift.** A skill whose effect surface grew between two revisions.
    The first surface was reviewed and approved; the second was not.
 
-These are the only two places in this design where a detector is warranted, and
-the set is deliberately small.
+A third gap of the same kind - visible instructions that retarget the agent's
+own behavior rather than reaching the host - is covered in
+`41-agent-directives.md`. Concealment and directives are sibling detector
+families with the same rationale: they produce no grant, so default-deny is
+silent about them.
+
+Detectors are warranted in exactly those two families and nowhere else in this
+design, and both sets are deliberately small and fixed.
 
 ## Part 1: Concealment
 

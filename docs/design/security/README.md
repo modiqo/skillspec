@@ -22,10 +22,27 @@ below and in `36-skill-effect-surface.md`.
 | 36 | [Skill Effect Surface](36-skill-effect-surface.md) | The effect model, effect classes, target resolution, reach, extraction sources, and the effect-surface report schema. |
 | 37 | [Boundary Proposal Compiler](37-boundary-proposal-compiler.md) | How an effect surface becomes a least-privilege boundary proposal, and how that proposal is emitted into harness-native permission formats. |
 | 38 | [Boundary Validation](38-boundary-validation.md) | How a candidate boundary is checked for grant coverage, and the narrow conditions under which behavioral validation is possible. |
-| 39 | [Concealment And Effect Drift](39-concealment-and-effect-drift.md) | The residual detector set that default-deny cannot cover, and version-to-version effect drift with re-consent semantics. |
+| 39 | [Concealment And Effect Drift](39-concealment-and-effect-drift.md) | The concealment detector set that default-deny cannot cover, and version-to-version effect drift with re-consent semantics. |
 | 40 | [Implementation Plan](40-implementation-plan.md) | Crate layout, module-by-module build order, types, CLI wiring, fixtures, tests, milestones, and acceptance criteria. |
+| 41 | [Agent Directives](41-agent-directives.md) | The second detector family: visible instructions that retarget the agent's behavior rather than reaching the host. Also fixes the whole-report ordering. |
+| 42 | [Effect Flow Graph](42-effect-flow-graph.md) | Relating effects to each other, so a report can say a network call carries credential material. Explanation only; never alters the proposal. |
 
-Read 36 first. Documents 37, 38, and 39 all consume the effect model it defines.
+Read 36 first. Documents 37, 38, 39, 41, and 42 all consume the effect model it
+defines. Document 40 is the build order for all of them.
+
+## Three Families Of Finding
+
+The reports produced by this work carry three kinds of finding, and the
+difference between them is the design's central argument.
+
+| Family | What it is | Why default-deny does or does not cover it |
+| --- | --- | --- |
+| **Effects** (36) | What the skill reaches on the host | Covered. A missed effect has no grant, and a deny default refuses it. |
+| **Concealment** (39) | Text a reader will not see but a model will | Not covered. Hidden text creates no grant. Detectors required. |
+| **Directives** (41) | Instructions retargeting the agent's own behavior | Not covered. A directive can operate entirely inside permissions already granted. Detectors required. |
+
+Chains (42) are not a fourth family. They are relationships among effects, and
+they change how a report reads, never what it grants.
 
 ## Why This Exists
 
@@ -70,6 +87,11 @@ enumerated and legitimately granted. A skill that needs `api.github.com` can
 exfiltrate to `api.github.com`. That gap is real, is stated in every document
 here, and is not closed by this design.
 
+The argument also stops at the boundary of the effect model itself. Concealment
+and directives are outside it, which is why they get detectors, and why the
+detector sets are small and fixed rather than growing toward a general
+classifier.
+
 ## Non-Goals
 
 - **Not a security boundary.** SkillSpec does not sandbox, intercept, or enforce.
@@ -88,6 +110,15 @@ here, and is not closed by this design.
 - **Not adoption-gated.** The analysis must run against an unmodified prose
   `SKILL.md` with no `skill.spec.yml`, no compilation, and no install. Where a
   contract does exist, the analysis uses it; it never requires one.
+- **No identity or reputation signals.** Typosquatting, name similarity to
+  popular skills, publisher reputation, and registry ranking are real parts of
+  the threat model and are deliberately excluded. None of them is derivable from
+  package contents; they need a registry corpus this project does not have.
+  Half-implementing them from a hardcoded list of popular names would produce
+  confident-looking findings from insufficient data.
+- **No taint semantics.** Document 42 relates effects to one another with
+  explicit per-edge confidence. That is reachability over a graph, not taint
+  analysis, and the reports say so.
 
 ## Terms
 
@@ -114,6 +145,14 @@ effect surface.
 
 `Effect drift` means the difference between the effect surfaces of two revisions
 of the same skill.
+
+`Directive` means an instruction addressed to the agent's own behavior rather
+than to the host: withholding information from the user, skipping a
+confirmation, overriding earlier guidance. Directives produce no effects and no
+grants.
+
+`Chain` means a path from a source-class effect to a sink-class effect over the
+flow graph in document 42, carrying the confidence of its weakest edge.
 
 This vocabulary deliberately avoids the word `capability`, which in SkillSpec
 already means a local bootstrap seed under `~/.skillspec/capabilities/` as

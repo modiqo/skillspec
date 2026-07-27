@@ -378,13 +378,16 @@ is visible in code review.
 ## Human Output
 
 The default text rendering is ordered for a reviewer deciding whether to install,
-not for a scanner reading severities. Ordering:
+not for a scanner reading severities. Within the effect section:
 
 1. Unresolved effects.
 2. Effects touching `secret`, `agent_config`, `skill_package`, `shell_init`, or
    `vcs_config` path classes.
 3. `net.egress` targets.
 4. Everything else, grouped by class.
+
+The effect section's position within the whole report, relative to concealment,
+directives, and chains, is defined in `41-agent-directives.md`.
 
 Effects found only at `unmapped` reach are annotated inline rather than sorted
 into their own section, so the reviewer sees them in the context of the class
