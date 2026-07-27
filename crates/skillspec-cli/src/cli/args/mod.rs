@@ -15,7 +15,7 @@ mod types;
 mod visibility;
 mod workspace;
 
-pub(in crate::cli) use boundary::BoundaryCommand;
+pub(in crate::cli) use boundary::{BoundaryCommand, GuardCommand};
 pub(in crate::cli) use capability::CapabilityCommand;
 pub(in crate::cli) use checklist::{DoctorCommand, ImportCommand, RunCommand};
 pub(in crate::cli) use deps::DepsCommand;

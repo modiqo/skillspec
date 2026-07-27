@@ -7,6 +7,7 @@ mod deps_cmd;
 mod doctor_cmd;
 mod durable_cmd;
 mod grammar_cmd;
+mod guard_cmd;
 mod imports_cmd;
 mod install_cmd;
 mod progress_cmd;

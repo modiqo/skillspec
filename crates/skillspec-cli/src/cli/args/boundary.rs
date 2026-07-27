@@ -44,4 +44,42 @@ pub(in crate::cli) enum BoundaryCommand {
         #[arg(long)]
         fail_on_incomplete: bool,
     },
+    #[command(
+        about = "Manage the boundary guard hook that enforces reviewed policies",
+        long_about = "Install and operate a managed PreToolUse hook that applies reviewed boundary policies to skills you already have. The guard needs no skill.spec.yml, no compile, and no change to the guarded skill. It installs in observe mode by default - recording every intercepted tool call and whether an approved grant covers it, blocking nothing - because a control that blocks against an unvalidated policy is uninstalled within the hour. Promote to enforce once the decision log shows the policy covering real calls. A PreToolUse call cannot be attributed to a single skill, so enforcement is against the union of every approved policy's grants. SkillSpec does not sandbox: the guard is an advisory gate at a lifecycle event the harness exposes, and a guard that cannot run is reported in status rather than silently permitting."
+    )]
+    Guard {
+        #[command(subcommand)]
+        command: GuardCommand,
+    },
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub(in crate::cli) enum GuardCommand {
+    #[command(about = "Install the managed PreToolUse hook (observe mode)")]
+    Install,
+    #[command(about = "Approve a skill's boundary proposal as a stored policy")]
+    Add {
+        /// Local skill folder, or public GitHub skill URL.
+        path: String,
+    },
+    #[command(about = "Show guard config, mode, and stored policies")]
+    Status,
+    #[command(about = "Set the guard mode: observe, prompt, or enforce")]
+    Mode {
+        /// observe, prompt, or enforce.
+        mode: String,
+    },
+    #[command(about = "Read the local decision log")]
+    Log {
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(about = "Remove the managed hook and guard config")]
+    Uninstall,
+    #[command(
+        about = "PreToolUse entrypoint: reads a payload on stdin, prints a decision",
+        hide = true
+    )]
+    Hook,
 }

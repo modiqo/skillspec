@@ -153,7 +153,7 @@ crates/skillspec-boundary/
     bounds.rs            the resource limits from document 36
     proposal.rs          effect set -> grant set, rule precedence then rules 1-7
     guard/
-      mod.rs             policy store, modes, decision log (document 43)
+      mod.rs             policy store, modes, decision log (document 43, implemented)
       policy.rs          reviewed policy records keyed by install slug
       decide.rs          intercepted call -> effect -> grant match -> decision
     emit/

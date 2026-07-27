@@ -1,3 +1,4 @@
+use super::guard_cmd;
 use crate::cli::args::BoundaryCommand;
 use skillspec::{domain::boundary, error::Result, report};
 use std::fs;
@@ -32,6 +33,7 @@ pub(super) fn command(command: BoundaryCommand) -> Result<()> {
             against,
             fail_on_incomplete,
         } => check(path, against, fail_on_incomplete),
+        BoundaryCommand::Guard { command } => guard_cmd::run(command),
     }
 }
 

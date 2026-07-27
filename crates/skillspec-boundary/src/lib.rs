@@ -35,6 +35,7 @@ pub mod drift;
 pub mod effect;
 pub mod emit;
 pub mod extract;
+pub mod guard;
 pub mod normalize;
 pub mod proposal;
 pub mod render;
@@ -51,6 +52,7 @@ pub use effect::{
     PathClass, Reach, TargetResolution,
 };
 pub use emit::{emit, EmitTarget};
+pub use guard::{GuardPolicy, GuardStore, Mode};
 pub use proposal::{compile, Proposal};
 pub use render::render;
 pub use sanitize::Preview;
