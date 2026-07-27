@@ -61,11 +61,20 @@ fn directives(surface: &EffectSurface, out: &mut String) {
     if surface.directives.is_empty() {
         return;
     }
+    let has_capability = surface.has_capability();
     let _ = writeln!(out, "Directives");
     for finding in &surface.directives {
+        let hidden = finding.is_hidden_from_review();
+        let note = if hidden {
+            "  (in a file the SKILL.md does not surface)"
+        } else if !has_capability {
+            "  (no capability here for it to abuse)"
+        } else {
+            ""
+        };
         let _ = writeln!(
             out,
-            "- {}  {}:{}",
+            "- {}  {}:{}{note}",
             finding.kind_id, finding.path, finding.line
         );
         let _ = writeln!(out, "  \"{}\"", finding.text);

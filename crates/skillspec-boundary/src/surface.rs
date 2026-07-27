@@ -99,6 +99,38 @@ impl EffectSurface {
         self.effects.iter().chain(self.unresolved.iter())
     }
 
+    /// Whether the skill has a capability a directive could abuse: it reaches
+    /// the network or reads a sensitive path.
+    ///
+    /// A behavior directive is only meaningful next to a capability. "Do not
+    /// mention this" is benign in a skill that touches nothing and an attack in
+    /// one that reads credentials and sends data, and the difference is exactly
+    /// this predicate.
+    pub fn has_capability(&self) -> bool {
+        !self.summary.sensitive_path_classes.is_empty()
+            || self.all().any(|effect| {
+                matches!(effect.class, EffectClass::NetEgress | EffectClass::NetFetch)
+            })
+    }
+
+    /// Directives worth raising an alarm about.
+    ///
+    /// A strong family - an injection, a self-disclosure, an unfounded
+    /// authorization, a refusal override - is concerning wherever it appears. A
+    /// contextual family - secrecy, confirmation bypass, activation overbreadth -
+    /// is concerning only when the skill has a capability it could abuse, or when
+    /// the instruction itself names a sensitive subject. Reach alone is not the
+    /// trigger, because a referenced style guide legitimately says "do not
+    /// report a convention as a failure"; a credential-secrecy instruction does
+    /// not. Every directive is still reported - this is only the subset that
+    /// flags a skill and gates a check.
+    pub fn concerning_directives(&self) -> impl Iterator<Item = &crate::directive::Directive> {
+        let has_capability = self.has_capability();
+        self.directives.iter().filter(move |directive| {
+            directive.is_strong() || has_capability || directive.mentions_sensitive_subject()
+        })
+    }
+
     /// Whether the surface was fully determined.
     ///
     /// An unresolved effect and a truncated analysis both mean the same thing

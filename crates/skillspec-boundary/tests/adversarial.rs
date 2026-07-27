@@ -276,6 +276,24 @@ fn a_skill_that_documents_attacks_matches_and_that_is_acceptable() {
 }
 
 #[test]
+fn a_directive_planted_in_a_referenced_file_is_caught() {
+    // The instruction lives in references/style.md, not SKILL.md, so a reviewer
+    // reading the skill body would not see it. The scan reaches it, marks it
+    // hidden, and treats it as concerning.
+    let surface = fixture("hidden-directive");
+    assert!(surface
+        .directives
+        .iter()
+        .any(|d| d.path.contains("references/") && d.is_hidden_from_review()));
+    assert!(surface.concerning_directives().next().is_some());
+    // The override is strong; the secrecy line names a sensitive subject.
+    assert!(surface
+        .directives
+        .iter()
+        .any(|d| d.kind_id == "directive.instruction_override"));
+}
+
+#[test]
 fn no_adversarial_fixture_is_silently_clean() {
     // The failure this guards: a hostile skill that produces an empty surface
     // reads as safe. Every one of these must produce something.
@@ -300,4 +318,8 @@ fn no_adversarial_fixture_is_silently_clean() {
     // checked on their own families.
     assert!(!fixture("hidden-unicode").concealment.is_empty());
     assert!(!fixture("directive-heavy").directives.is_empty());
+    assert!(fixture("hidden-directive")
+        .concerning_directives()
+        .next()
+        .is_some());
 }

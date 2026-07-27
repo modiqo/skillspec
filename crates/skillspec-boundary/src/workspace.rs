@@ -53,7 +53,7 @@ impl WorkspaceSurface {
 fn package_is_concerning(surface: &EffectSurface) -> bool {
     !surface.summary.sensitive_path_classes.is_empty()
         || !surface.concealment.is_empty()
-        || !surface.directives.is_empty()
+        || surface.concerning_directives().next().is_some()
         || surface
             .all()
             .any(|effect| effect.class == crate::effect::EffectClass::NetEgress)
@@ -190,8 +190,9 @@ fn package_line(entry: &PackageSurface) -> String {
     if !s.concealment.is_empty() {
         flags.push(format!("{} concealment", s.concealment.len()));
     }
-    if !s.directives.is_empty() {
-        flags.push(format!("{} directive(s)", s.directives.len()));
+    let directives = s.concerning_directives().count();
+    if directives > 0 {
+        flags.push(format!("{directives} directive(s)"));
     }
     if !s.summary.sensitive_path_classes.is_empty() {
         flags.push(format!(

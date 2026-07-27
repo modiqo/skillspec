@@ -37,12 +37,8 @@ pub struct Extraction {
     pub extractors: Vec<&'static str>,
     /// Concealment findings from every scanned text file.
     pub concealment: Vec<crate::concealment::Concealment>,
-    /// The skill body text, for directive detection.
-    pub skill_body: String,
-    /// The 1-based line the skill body starts on, past the frontmatter.
-    pub skill_body_line: usize,
-    /// The skill's activation description, for activation overbreadth.
-    pub activation_description: Option<String>,
+    /// Directive findings from every markdown file, each carrying its reach.
+    pub directives: Vec<crate::directive::Directive>,
 }
 
 /// Extract every effect observable in a mapped source package.
@@ -59,9 +55,7 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
     let mut observations = Vec::new();
     let mut extractors = BTreeSet::new();
     let mut concealment = Vec::new();
-    let mut skill_body = String::new();
-    let mut skill_body_line = 1;
-    let mut activation_description = None;
+    let mut directives = Vec::new();
 
     for file in &map.files {
         if file.load_status != SourceFileLoadStatus::Loaded {
@@ -84,11 +78,24 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
         // Concealment can hide in any text file, not only the skill body.
         concealment.extend(crate::concealment::scan(&content, &file.path, 1));
 
-        if file.kind == SourceFileKind::Markdown && file.id == skill_file_id {
-            let (body, body_line) = body_after_frontmatter(&content);
-            skill_body = body.to_owned();
-            skill_body_line = body_line;
-            activation_description = frontmatter_description(&content);
+        // Instructions load from every markdown a skill carries, not only its
+        // SKILL.md. A directive planted in a referenced or unmapped file is one
+        // a reviewer of the SKILL.md would never see, so it is scanned too, with
+        // its reach recorded.
+        if file.kind == SourceFileKind::Markdown {
+            if file.id == skill_file_id {
+                let (body, body_line) = body_after_frontmatter(&content);
+                directives.extend(crate::directive::scan_document(
+                    body, &file.path, body_line, reach,
+                ));
+                if let Some(description) = frontmatter_description(&content) {
+                    directives.extend(crate::directive::scan_activation(&description, &file.path));
+                }
+            } else {
+                directives.extend(crate::directive::scan_document(
+                    &content, &file.path, 1, reach,
+                ));
+            }
         }
 
         match file.kind {
@@ -143,9 +150,7 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
         skill_path,
         extractors: extractors.into_iter().collect(),
         concealment,
-        skill_body,
-        skill_body_line,
-        activation_description,
+        directives,
     })
 }
 

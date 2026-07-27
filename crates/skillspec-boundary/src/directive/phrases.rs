@@ -85,6 +85,11 @@ pub struct Family {
 /// The directive phrase families. Each phrase is lowercase and matched as a
 /// substring within an obligation span.
 pub const FAMILIES: &[Family] = &[
+    // Broad on purpose. A user-secrecy phrase is only reported as *concerning*
+    // when it co-occurs with a capability or lives outside the activation body
+    // (see `EffectSurface::concerning_directives`), so a benign QA instruction
+    // in an effect-free design skill does not raise an alarm even though it
+    // matches. That gate is what lets these stay broad without noise.
     Family {
         kind: DirectiveKind::UserSecrecy,
         phrases: &[
@@ -92,13 +97,27 @@ pub const FAMILIES: &[Family] = &[
             "don't tell the user",
             "do not mention",
             "don't mention",
-            "do not report this to the user",
-            "do not report it to the user",
+            "do not report",
+            "don't report",
+            "do not surface",
+            "do not reveal that",
+            "do not disclose",
+            "do not show the user",
             "without telling the user",
             "without informing the user",
+            "without mentioning",
+            "without the user",
             "hide this from",
+            "hide it from",
+            "keep it hidden",
+            "conceal from",
             "do not include this in your summary",
+            "omit from your report",
+            "omit from the summary",
+            "leave this out of",
             "keep this secret",
+            "do not log",
+            "quietly",
             "silently",
         ],
     },

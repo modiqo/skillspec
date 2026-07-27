@@ -125,7 +125,7 @@ pub fn check(
             // does not cover them and the gate must.
             let concerning = !surface.summary.sensitive_path_classes.is_empty()
                 || !surface.concealment.is_empty()
-                || !surface.directives.is_empty()
+                || surface.concerning_directives().next().is_some()
                 || surface
                     .all()
                     .any(|effect| effect.class == EffectClass::NetEgress);
@@ -406,14 +406,8 @@ pub fn analyze_with(path: &Path, bounds: Bounds) -> Result<EffectSurface> {
     let source_root = Path::new(&map.source_root).to_path_buf();
     let mut budget = Budget::new(bounds);
     let extraction = extract::run(&map, &source_root, &mut budget)?;
-
-    let directives = directive::scan(
-        &extraction.skill_body,
-        &extraction.skill_path,
-        extraction.skill_body_line,
-        extraction.activation_description.as_deref(),
-    );
     let concealment = extraction.concealment.clone();
+    let directives = extraction.directives.clone();
 
     let effects = dedupe::merge(extraction.observations);
 
