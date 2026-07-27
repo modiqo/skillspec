@@ -19,6 +19,14 @@ const INTERPRETERS: &[&str] = &[
     "sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node",
 ];
 
+/// Shell reserved words. These open or close control flow; none is a program,
+/// so reading one as a binary is a factual error, not a heuristic judgment.
+const RESERVED_WORDS: &[&str] = &[
+    "if", "then", "else", "elif", "fi", "case", "esac", "for", "while", "until", "do", "done",
+    "in", "function", "select", "return", "break", "continue", "time", "coproc", "declare",
+    "local", "export", "readonly", "unset", "shift", "trap", "set",
+];
+
 /// A command reduced to the binary a grant names.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NormalizedCommand {
@@ -227,10 +235,17 @@ fn basename(token: &str) -> String {
 /// JSON, tables, and pseudo-code, and without this the surface fills with
 /// binaries called `{`, `field_id:`, and `],`.
 fn is_command_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.chars().next().is_some_and(|ch| {
-            ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | '~' | '$')
-        })
+    if name.is_empty() || RESERVED_WORDS.contains(&name) {
+        return false;
+    }
+    // A numbered- or bulleted-list marker: `1.`, `2)`, pure digits.
+    let stem = name.trim_end_matches(['.', ')', ':']);
+    if stem.is_empty() || stem.chars().all(|ch| ch.is_ascii_digit()) {
+        return false;
+    }
+    name.chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '/' | '~' | '$'))
         && name
             .chars()
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '+' | '$'))
@@ -352,6 +367,24 @@ mod tests {
         assert!(normalize("").is_none());
         assert!(normalize("   ").is_none());
         assert!(normalize("sudo").is_none());
+    }
+
+    #[test]
+    fn shell_reserved_words_are_never_commands() {
+        // `do`, `done`, `case`, `fi` open and close control flow; none is a
+        // program, and reading one as a binary is a factual error.
+        for word in [
+            "do", "done", "if", "then", "fi", "case", "esac", "for", "while", "in",
+        ] {
+            assert!(normalize(word).is_none(), "{word}");
+        }
+    }
+
+    #[test]
+    fn list_markers_are_not_commands() {
+        for marker in ["1.", "2)", "3:", "10.", "0"] {
+            assert!(normalize(marker).is_none(), "{marker}");
+        }
     }
 
     #[test]

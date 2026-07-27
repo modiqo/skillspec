@@ -56,6 +56,12 @@ fn consequence(surface: &EffectSurface, out: &mut String) {
     if !sensitive.is_empty() {
         clauses.push(format!("read {}", join(&sensitive, 2)));
     }
+    // A credential env read is not a path, so it misses the read clause above,
+    // yet it is the highest-signal half of an exfiltration. Surface it.
+    let credentials = credential_reads(surface);
+    if !credentials.is_empty() {
+        clauses.push(format!("read the credential {}", join(&credentials, 2)));
+    }
     let egress = hosts(surface, EffectClass::NetEgress);
     if !egress.is_empty() {
         clauses.push(format!("send data to {}", join(&egress, 2)));
@@ -222,6 +228,23 @@ fn sensitive_reads(surface: &EffectSurface) -> Vec<String> {
     patterns
 }
 
+fn credential_reads(surface: &EffectSurface) -> Vec<String> {
+    let mut names = surface
+        .all()
+        .filter(|effect| effect.class == EffectClass::EnvRead)
+        .filter_map(|effect| match &effect.target {
+            crate::effect::EffectTarget::EnvVar {
+                name,
+                credential_like: true,
+            } => Some(name.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    names.sort();
+    names.dedup();
+    names
+}
+
 fn hosts(surface: &EffectSurface, class: EffectClass) -> Vec<String> {
     let mut tokens = surface
         .all()
@@ -306,6 +329,15 @@ mod tests {
         assert!(text.contains("If executed, this skill can"));
         assert!(text.contains("~/.aws/credentials"));
         assert!(text.contains("archive.example.com"));
+    }
+
+    #[test]
+    fn a_credential_env_read_reaches_the_headline() {
+        // The highest-signal half of an exfiltration must not be buried in the
+        // effect list; it belongs in the consequence sentence.
+        let text = fixture("exfil-env-token");
+        assert!(text.contains("credential AWS_SECRET_ACCESS_KEY"));
+        assert!(text.contains("send data to telemetry.example.net"));
     }
 
     #[test]

