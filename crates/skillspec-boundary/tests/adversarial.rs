@@ -192,6 +192,36 @@ fn a_python_exfiltration_is_caught_through_the_python_extractor() {
 }
 
 #[test]
+fn a_deno_typescript_exfiltration_is_caught() {
+    // The same shape through server-side TS: Deno.env.get + Deno.readTextFile +
+    // fetch(POST). Bun and Node share the same call surface.
+    let surface = fixture("deno-exfil");
+    assert!(
+        reads_path_class(&surface, PathClass::Secret),
+        "Deno.readTextFile of the key"
+    );
+    assert!(
+        all(&surface).iter().any(|effect| matches!(
+            &effect.target,
+            EffectTarget::EnvVar { credential_like, .. } if *credential_like
+        )),
+        "the Deno.env.get credential read"
+    );
+    assert!(
+        has_class(&surface, EffectClass::NetEgress),
+        "the fetch POST egress"
+    );
+    assert!(hosts(&surface).contains(&"exfil.example.net".to_owned()));
+    assert!(
+        all(&surface).iter().any(|effect| matches!(
+            &effect.target,
+            EffectTarget::Binary { name, .. } if name == "git"
+        )),
+        "the Deno.Command git invocation"
+    );
+}
+
+#[test]
 fn no_adversarial_fixture_is_silently_clean() {
     // The failure this guards: a hostile skill that produces an empty surface
     // reads as safe. Every one of these must produce something.
@@ -204,6 +234,7 @@ fn no_adversarial_fixture_is_silently_clean() {
         "homoglyph-host",
         "deleted-tracks",
         "py-exfil",
+        "deno-exfil",
     ] {
         let surface = fixture(name);
         assert!(

@@ -8,7 +8,7 @@
 //! nothing. That is a deliberate under-approximation: prose targets are not
 //! determinable, and inventing them would put guesses into the grant set.
 
-use super::{python, shell};
+use super::{python, shell, tsjs};
 use crate::effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget, Reach,
 };
@@ -29,6 +29,8 @@ enum ShellFence {
     Ambiguous,
     /// Labeled `python`: hand to the Python extractor.
     Python,
+    /// Labeled `ts`/`js`: hand to the TS/JS host-effect extractor.
+    TsJs,
     /// Not code: `json`, `text`, or a language with no extractor.
     No,
 }
@@ -41,6 +43,9 @@ fn shell_fence(language: Option<&str>) -> ShellFence {
             "sh" | "bash" | "zsh" | "shell" | "console" | "terminal" | "shell-session"
             | "shellsession" => ShellFence::Explicit,
             "python" | "python3" | "py" => ShellFence::Python,
+            // Server-side TS/JS. `tsx`/`jsx` are browser components and are
+            // deliberately excluded, where a fetch runs in the page sandbox.
+            "ts" | "typescript" | "js" | "javascript" | "mjs" | "cjs" => ShellFence::TsJs,
             _ => ShellFence::No,
         },
     }
@@ -89,6 +94,18 @@ fn extract_code_blocks(
             out.extend(python::extract(
                 body,
                 python::PythonContext {
+                    path: file_path,
+                    origin: EffectOrigin::MarkdownCodeBlock,
+                    reach,
+                    first_line: body_line,
+                },
+            ));
+            continue;
+        }
+        if fence == ShellFence::TsJs {
+            out.extend(tsjs::extract(
+                body,
+                tsjs::TsJsContext {
                     path: file_path,
                     origin: EffectOrigin::MarkdownCodeBlock,
                     reach,

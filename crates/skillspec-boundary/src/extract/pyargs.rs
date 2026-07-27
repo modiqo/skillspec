@@ -97,14 +97,16 @@ fn classify(arg: &str) -> Argument {
     Argument::Dynamic
 }
 
-/// The contents of a Python string literal, or `None` if `arg` is not one.
+/// The contents of a string literal, or `None` if `arg` is not one.
 ///
-/// Handles `f`, `r`, `b` prefixes. An f-string with interpolation is still
-/// returned; the normalizer decides whether the interpolation matters.
+/// Serves both Python and JS/TS callers. Handles Python `f`, `r`, `b` prefixes
+/// (harmless for JS, which has no such prefixes) and JavaScript backtick
+/// template literals. An interpolated string is still returned; the normalizer
+/// decides whether the interpolation matters.
 fn string_literal(arg: &str) -> Option<String> {
     let trimmed = arg.trim();
     let without_prefix = trimmed.trim_start_matches(['f', 'r', 'b', 'F', 'R', 'B']);
-    for quote in ['"', '\''] {
+    for quote in ['"', '\'', '`'] {
         if let Some(rest) = without_prefix.strip_prefix(quote) {
             if let Some(end) = rest.find(quote) {
                 return Some(rest[..end].to_owned());

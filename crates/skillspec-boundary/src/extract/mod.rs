@@ -8,6 +8,7 @@ pub mod markdown;
 pub mod pyargs;
 pub mod python;
 pub mod shell;
+pub mod tsjs;
 
 use crate::bounds::{Budget, SkipReason};
 use crate::effect::{EffectObservation, EffectOrigin, Reach};
@@ -22,6 +23,12 @@ const SHELL_EXTENSIONS: &[&str] = &["sh", "bash", "zsh", "ksh", "command"];
 
 /// Extensions handed to the Python extractor.
 const PYTHON_EXTENSIONS: &[&str] = &["py"];
+
+/// Extensions handed to the TS/JS host-effect extractor.
+///
+/// `.tsx`/`.jsx` are excluded: those are browser component files, where a
+/// `fetch` runs in the page sandbox rather than on the host.
+const TSJS_EXTENSIONS: &[&str] = &["ts", "js", "mjs", "cjs", "mts", "cts"];
 
 /// Everything read out of one package, before deduplication.
 #[derive(Debug)]
@@ -94,6 +101,18 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
                     },
                 ));
             }
+            SourceFileKind::Code if is_tsjs_file(&file.path) => {
+                extractors.insert("tsjs");
+                observations.extend(tsjs::extract(
+                    &content,
+                    tsjs::TsJsContext {
+                        path: &file.path,
+                        origin: EffectOrigin::ScriptFile,
+                        reach,
+                        first_line: 1,
+                    },
+                ));
+            }
             _ => {}
         }
     }
@@ -159,6 +178,10 @@ fn is_python_file(path: &str) -> bool {
     has_extension(path, PYTHON_EXTENSIONS)
 }
 
+fn is_tsjs_file(path: &str) -> bool {
+    has_extension(path, TSJS_EXTENSIONS)
+}
+
 fn has_extension(path: &str, extensions: &[&str]) -> bool {
     Path::new(path)
         .extension()
@@ -222,5 +245,15 @@ mod tests {
         assert!(super::is_python_file("scripts/tool.py"));
         assert!(super::is_python_file("build.PY"));
         assert!(!super::is_python_file("scripts/run.sh"));
+    }
+
+    #[test]
+    fn server_tsjs_files_are_recognized_but_browser_components_are_not() {
+        assert!(super::is_tsjs_file("scripts/tool.ts"));
+        assert!(super::is_tsjs_file("build.mjs"));
+        assert!(super::is_tsjs_file("index.js"));
+        // Browser component files are excluded: their fetch is sandboxed.
+        assert!(!super::is_tsjs_file("src/App.tsx"));
+        assert!(!super::is_tsjs_file("src/Button.jsx"));
     }
 }
