@@ -52,15 +52,14 @@ fn header(surface: &EffectSurface, out: &mut String) {
 fn consequence(surface: &EffectSurface, out: &mut String) {
     let mut clauses = Vec::new();
 
-    let sensitive = sensitive_reads(surface);
-    if !sensitive.is_empty() {
-        clauses.push(format!("read {}", join(&sensitive, 2)));
-    }
-    // A credential env read is not a path, so it misses the read clause above,
-    // yet it is the highest-signal half of an exfiltration. Surface it.
-    let credentials = credential_reads(surface);
-    if !credentials.is_empty() {
-        clauses.push(format!("read the credential {}", join(&credentials, 2)));
+    // Sensitive path reads and credential env reads are the same idea to a
+    // reader - "this touches something it should not" - so they share one
+    // clause. A credential env read has no path class and would otherwise miss
+    // the headline entirely, though it is the highest-signal half of an exfil.
+    let mut reads = sensitive_reads(surface);
+    reads.extend(credential_reads(surface));
+    if !reads.is_empty() {
+        clauses.push(format!("read {}", join(&reads, 3)));
     }
     let egress = hosts(surface, EffectClass::NetEgress);
     if !egress.is_empty() {
@@ -336,7 +335,7 @@ mod tests {
         // The highest-signal half of an exfiltration must not be buried in the
         // effect list; it belongs in the consequence sentence.
         let text = fixture("exfil-env-token");
-        assert!(text.contains("credential AWS_SECRET_ACCESS_KEY"));
+        assert!(text.contains("AWS_SECRET_ACCESS_KEY"));
         assert!(text.contains("send data to telemetry.example.net"));
     }
 

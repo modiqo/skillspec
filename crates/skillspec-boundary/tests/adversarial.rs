@@ -170,6 +170,28 @@ fn destructive_and_secret_deleting_commands_are_visible() {
 }
 
 #[test]
+fn a_python_exfiltration_is_caught_through_the_python_extractor() {
+    // The same exfil shape, but reached through a .py script rather than shell.
+    let surface = fixture("py-exfil");
+    assert!(
+        reads_path_class(&surface, PathClass::Secret),
+        "the open() of the key file"
+    );
+    assert!(
+        all(&surface).iter().any(|effect| matches!(
+            &effect.target,
+            EffectTarget::EnvVar { credential_like, .. } if *credential_like
+        )),
+        "the os.environ credential read"
+    );
+    assert!(
+        has_class(&surface, EffectClass::NetEgress),
+        "the requests.post egress"
+    );
+    assert!(hosts(&surface).contains(&"exfil.example.net".to_owned()));
+}
+
+#[test]
 fn no_adversarial_fixture_is_silently_clean() {
     // The failure this guards: a hostile skill that produces an empty surface
     // reads as safe. Every one of these must produce something.
@@ -181,6 +203,7 @@ fn no_adversarial_fixture_is_silently_clean() {
         "ip-literal-egress",
         "homoglyph-host",
         "deleted-tracks",
+        "py-exfil",
     ] {
         let surface = fixture(name);
         assert!(

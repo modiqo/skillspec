@@ -5,6 +5,8 @@
 //! would encounter by reading the documentation from one they would not.
 
 pub mod markdown;
+pub mod pyargs;
+pub mod python;
 pub mod shell;
 
 use crate::bounds::{Budget, SkipReason};
@@ -17,6 +19,9 @@ use std::path::{Path, PathBuf};
 
 /// Extensions handed to the shell extractor.
 const SHELL_EXTENSIONS: &[&str] = &["sh", "bash", "zsh", "ksh", "command"];
+
+/// Extensions handed to the Python extractor.
+const PYTHON_EXTENSIONS: &[&str] = &["py"];
 
 /// Everything read out of one package, before deduplication.
 #[derive(Debug)]
@@ -70,6 +75,18 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
                 observations.extend(shell::extract(
                     &content,
                     shell::ShellContext {
+                        path: &file.path,
+                        origin: EffectOrigin::ScriptFile,
+                        reach,
+                        first_line: 1,
+                    },
+                ));
+            }
+            SourceFileKind::Code if is_python_file(&file.path) => {
+                extractors.insert("python");
+                observations.extend(python::extract(
+                    &content,
+                    python::PythonContext {
                         path: &file.path,
                         origin: EffectOrigin::ScriptFile,
                         reach,
@@ -135,11 +152,19 @@ fn reach_for(path: &str, skill_path: &str, referenced: &BTreeSet<&str>) -> Reach
 }
 
 fn is_shell_file(path: &str) -> bool {
+    has_extension(path, SHELL_EXTENSIONS)
+}
+
+fn is_python_file(path: &str) -> bool {
+    has_extension(path, PYTHON_EXTENSIONS)
+}
+
+fn has_extension(path: &str, extensions: &[&str]) -> bool {
     Path::new(path)
         .extension()
         .and_then(|extension| extension.to_str())
         .map(str::to_ascii_lowercase)
-        .is_some_and(|extension| SHELL_EXTENSIONS.contains(&extension.as_str()))
+        .is_some_and(|extension| extensions.contains(&extension.as_str()))
 }
 
 fn read_text(path: &PathBuf) -> Result<String> {
@@ -151,7 +176,7 @@ fn read_text(path: &PathBuf) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_shell_file, reach_for};
+    use super::reach_for;
     use crate::effect::Reach;
     use std::collections::BTreeSet;
 
@@ -186,9 +211,16 @@ mod tests {
 
     #[test]
     fn shell_files_are_recognized_by_extension() {
-        assert!(is_shell_file("scripts/run.sh"));
-        assert!(is_shell_file("scripts/RUN.BASH"));
-        assert!(!is_shell_file("scripts/run.py"));
-        assert!(!is_shell_file("README"));
+        assert!(super::is_shell_file("scripts/run.sh"));
+        assert!(super::is_shell_file("scripts/RUN.BASH"));
+        assert!(!super::is_shell_file("scripts/run.py"));
+        assert!(!super::is_shell_file("README"));
+    }
+
+    #[test]
+    fn python_files_are_recognized_by_extension() {
+        assert!(super::is_python_file("scripts/tool.py"));
+        assert!(super::is_python_file("build.PY"));
+        assert!(!super::is_python_file("scripts/run.sh"));
     }
 }

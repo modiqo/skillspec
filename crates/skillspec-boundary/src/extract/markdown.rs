@@ -8,7 +8,7 @@
 //! nothing. That is a deliberate under-approximation: prose targets are not
 //! determinable, and inventing them would put guesses into the grant set.
 
-use super::shell;
+use super::{python, shell};
 use crate::effect::{
     Confidence, EffectClass, EffectEvidence, EffectObservation, EffectOrigin, EffectTarget, Reach,
 };
@@ -27,7 +27,9 @@ enum ShellFence {
     /// Unlabeled: extract only lines that carry an effect signal, since these
     /// blocks are as likely to hold prose or output as commands.
     Ambiguous,
-    /// Not shell: `python`, `json`, or `text`, which is declared non-code.
+    /// Labeled `python`: hand to the Python extractor.
+    Python,
+    /// Not code: `json`, `text`, or a language with no extractor.
     No,
 }
 
@@ -38,6 +40,7 @@ fn shell_fence(language: Option<&str>) -> ShellFence {
             "" => ShellFence::Ambiguous,
             "sh" | "bash" | "zsh" | "shell" | "console" | "terminal" | "shell-session"
             | "shellsession" => ShellFence::Explicit,
+            "python" | "python3" | "py" => ShellFence::Python,
             _ => ShellFence::No,
         },
     }
@@ -82,6 +85,18 @@ fn extract_code_blocks(
         };
         let first_line = node.line_range.map(|range| range[0]).unwrap_or(1);
         let (body, body_line) = strip_fence(text, first_line);
+        if fence == ShellFence::Python {
+            out.extend(python::extract(
+                body,
+                python::PythonContext {
+                    path: file_path,
+                    origin: EffectOrigin::MarkdownCodeBlock,
+                    reach,
+                    first_line: body_line,
+                },
+            ));
+            continue;
+        }
         if looks_like_data(body) {
             continue;
         }
@@ -287,8 +302,16 @@ mod tests {
     }
 
     #[test]
+    fn python_fences_route_to_the_python_extractor() {
+        assert_eq!(
+            super::shell_fence(Some("python")),
+            super::ShellFence::Python
+        );
+    }
+
+    #[test]
     fn other_languages_are_left_to_their_own_extractors() {
-        for language in [Some("python"), Some("rust"), Some("json"), Some("yaml")] {
+        for language in [Some("rust"), Some("json"), Some("yaml")] {
             assert_eq!(
                 super::shell_fence(language),
                 super::ShellFence::No,

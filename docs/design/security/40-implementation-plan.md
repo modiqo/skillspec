@@ -130,9 +130,10 @@ crates/skillspec-boundary/
       mod.rs             dispatch over SourceMap files and nodes
       frontmatter.rs     declared allowed-tools / disallowed-tools
       markdown.rs        prose, command examples, external URIs, references
-      shell.rs           lexical shell extraction
-      python.rs          lexical python extraction
-      javascript.rs      lexical js/ts extraction
+      shell.rs           lexical shell extraction (implemented)
+      pyargs.rs          lexical python call-argument extraction (implemented)
+      python.rs          lexical python extraction (implemented)
+      javascript.rs      lexical js/ts extraction (not built)
       manifest.rs        deps.toml, package.json, requirements.txt,
                          pyproject.toml, Cargo.toml, go.mod
     normalize/

@@ -94,9 +94,13 @@ fn expand_home(path: &str) -> (String, bool) {
     if normalized == "~" || normalized == "$HOME" {
         return (String::new(), true);
     }
-    for root in ["/Users/", "/home/", "/root/"] {
+    // /root is root's home directly, with no username segment.
+    if let Some(rest) = normalized.strip_prefix("/root/") {
+        return (rest.to_owned(), true);
+    }
+    // /Users/<user>/... and /home/<user>/... carry a username to drop.
+    for root in ["/Users/", "/home/"] {
         if let Some(rest) = normalized.strip_prefix(root) {
-            // Drop the user segment: /Users/alice/.aws -> .aws
             if let Some((_user, tail)) = rest.split_once('/') {
                 return (tail.to_owned(), true);
             }
@@ -335,6 +339,20 @@ mod tests {
         assert_eq!(class_of("/Users/alice/.aws/credentials"), PathClass::Secret);
         assert_eq!(class_of("/home/bob/.ssh/id_ed25519"), PathClass::Secret);
         assert_eq!(class_of("/root/.aws/credentials"), PathClass::Secret);
+    }
+
+    #[test]
+    fn root_home_keeps_its_full_path_without_dropping_a_segment() {
+        // /root is the home directory itself; there is no username to strip, so
+        // /root/.aws/credentials must not collapse to ~/credentials.
+        assert_eq!(
+            normalize("/root/.aws/credentials").pattern,
+            "~/.aws/credentials"
+        );
+        assert_eq!(
+            normalize("/Users/alice/.aws/credentials").pattern,
+            "~/.aws/credentials"
+        );
     }
 
     #[test]
