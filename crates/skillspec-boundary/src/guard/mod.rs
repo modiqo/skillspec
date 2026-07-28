@@ -286,10 +286,19 @@ mod tests {
     use crate::guard::policy::GuardPolicy;
 
     fn temp_home() -> std::path::PathBuf {
-        // A unique directory under the crate's target dir, not the real home.
+        // A directory unique to this call, not the real home. Tests within one
+        // process run in parallel, so keying on the pid alone would let two
+        // guard tests share and stomp one store; a per-call counter keeps each
+        // test isolated.
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/guard-store-tests");
-        let unique = base.join(format!("h{}", std::process::id()));
+        let unique = base.join(format!(
+            "h{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
         let _ = std::fs::remove_dir_all(&unique);
         std::fs::create_dir_all(&unique).unwrap();
         unique

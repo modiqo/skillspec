@@ -521,9 +521,79 @@ pub fn unique_nanos() -> u128 {
         .unwrap_or(0)
 }
 
+/// A web link a person can open to read the evidence for a finding, built for
+/// the host's own blob-URL convention.
+///
+/// `rel_path` is the file's path relative to the repository root; `line` is an
+/// optional 1-based line to anchor. The ref is the source's branch when known,
+/// or `HEAD`, which the major hosts resolve to the default branch.
+pub fn web_url(remote: &RemoteSkillSource, rel_path: &str, line: Option<usize>) -> String {
+    let root = remote
+        .repo_url
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .to_owned();
+    let git_ref = remote.branch.as_deref().unwrap_or("HEAD");
+    let path = rel_path.trim_start_matches('/');
+    let host = root
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(&root);
+    if host.contains("gitlab") {
+        anchor(format!("{root}/-/blob/{git_ref}/{path}"), line, "#L")
+    } else if host.contains("bitbucket") {
+        anchor(format!("{root}/src/{git_ref}/{path}"), line, "#lines-")
+    } else {
+        // GitHub and the common self-hosted convention.
+        anchor(format!("{root}/blob/{git_ref}/{path}"), line, "#L")
+    }
+}
+
+fn anchor(url: String, line: Option<usize>, sep: &str) -> String {
+    match line {
+        Some(line) => format!("{url}{sep}{line}"),
+        None => url,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_target;
+
+    #[test]
+    fn web_url_builds_host_appropriate_blob_links() {
+        let github = parse_target("https://github.com/o/r").unwrap().unwrap();
+        assert_eq!(
+            super::web_url(&github, "skills/x/SKILL.md", Some(690)),
+            "https://github.com/o/r/blob/HEAD/skills/x/SKILL.md#L690"
+        );
+
+        let branched = parse_target("https://github.com/o/r/tree/main/skills/x")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            super::web_url(&branched, "skills/x/SKILL.md", Some(12)),
+            "https://github.com/o/r/blob/main/skills/x/SKILL.md#L12"
+        );
+
+        let gitlab = parse_target("https://gitlab.com/g/r").unwrap().unwrap();
+        assert_eq!(
+            super::web_url(&gitlab, "a.md", Some(3)),
+            "https://gitlab.com/g/r/-/blob/HEAD/a.md#L3"
+        );
+
+        let bitbucket = parse_target("https://bitbucket.org/t/r").unwrap().unwrap();
+        assert_eq!(
+            super::web_url(&bitbucket, "a.md", Some(3)),
+            "https://bitbucket.org/t/r/src/HEAD/a.md#lines-3"
+        );
+
+        // No line: no anchor.
+        assert_eq!(
+            super::web_url(&github, "a.md", None),
+            "https://github.com/o/r/blob/HEAD/a.md"
+        );
+    }
 
     #[test]
     fn parses_github_tree_skill_folder_url() {

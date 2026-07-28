@@ -1,3 +1,5 @@
+use super::assess;
+use super::gate_cmd;
 use super::guard_cmd;
 use crate::cli::args::BoundaryCommand;
 use skillspec::{domain::boundary, error::Result, report};
@@ -45,6 +47,8 @@ pub(super) fn command(command: BoundaryCommand) -> Result<()> {
         } => check(path, against, fail_on_incomplete),
         BoundaryCommand::Guard { command } => guard_cmd::run(command),
         BoundaryCommand::Map { path, json } => map(path, json),
+        BoundaryCommand::Assess { path, json } => assess::security(&path, json),
+        BoundaryCommand::Gate { path, then, yes } => gate_cmd::run(path, then, yes),
     }
 }
 

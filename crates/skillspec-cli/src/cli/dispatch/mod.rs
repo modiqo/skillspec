@@ -1,4 +1,5 @@
 use super::args::Command;
+mod assess;
 mod authoring_cmd;
 mod boundary_cmd;
 mod capability_cmd;
@@ -6,15 +7,18 @@ mod checklist_cmd;
 mod deps_cmd;
 mod doctor_cmd;
 mod durable_cmd;
+mod gate_cmd;
 mod grammar_cmd;
 mod guard_cmd;
 mod imports_cmd;
 mod install_cmd;
 mod progress_cmd;
+mod pull_cmd;
 mod router_cmd;
 mod runtime_cmd;
 mod skills_cmd;
 mod source_cmd;
+mod spinner;
 mod status_cmd;
 mod trace_cmd;
 mod visibility_cmd;
@@ -229,6 +233,40 @@ pub(super) fn run(command: Command) -> Result<()> {
         Command::Router { command } => router_cmd::run(command)?,
         Command::DurableExecutor { command } => durable_cmd::run(command)?,
         Command::Install { command } => install_cmd::run(command)?,
+        Command::Pull {
+            source,
+            harness,
+            into,
+            project,
+            plugin,
+            yes,
+        } => pull_cmd::pull(
+            source,
+            pull_cmd::Options {
+                harness,
+                into,
+                project,
+                only: plugin,
+                yes,
+            },
+        )?,
+        Command::Update {
+            source,
+            harness,
+            into,
+            project,
+            plugin,
+            yes,
+        } => pull_cmd::update(
+            source,
+            pull_cmd::Options {
+                harness,
+                into,
+                project,
+                only: plugin,
+                yes,
+            },
+        )?,
         Command::Capability { command } => capability_cmd::run(command)?,
     }
 

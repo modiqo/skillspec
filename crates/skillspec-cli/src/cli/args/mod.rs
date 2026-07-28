@@ -445,6 +445,52 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: InstallCommand,
     },
+    #[command(
+        about = "Assess a skill or plugin, then install it through the applicable harness",
+        long_about = "A boundary-gated install. A skill or plugin ships in a git repository and is copied out of it on install, so `pull` stages the source, runs the same assessment `boundary gate` does (the shape as a tree, then what any skill could reach), and installs only on approval. For a Claude/Codex plugin marketplace it proxies to the harness CLI (`plugin marketplace add` + `plugin install`) when that binary is present; for every other harness it places the skill folders into a skills directory (`~/.claude/skills` by default, `.claude/skills` with --project, or an explicit --into <dir>). Because assessment is part of the install, it is not bypassable the way a raw `claude plugin install` is."
+    )]
+    Pull {
+        /// Skill/plugin to install: a local folder or a public git URL/owner-repo.
+        source: String,
+        /// Force a harness (claude, codex). Default: proxy if a marketplace CLI is present, else place files.
+        #[arg(long)]
+        harness: Option<String>,
+        /// Place skill folders into this directory instead of a harness default.
+        #[arg(long)]
+        into: Option<PathBuf>,
+        /// Place into the project's skills dir (./.claude/skills) rather than the user's home.
+        #[arg(long)]
+        project: bool,
+        /// Restrict a marketplace install to these plugin names (repeatable).
+        #[arg(long = "plugin")]
+        plugin: Vec<String>,
+        /// Proceed without an interactive prompt even when there are findings.
+        #[arg(long)]
+        yes: bool,
+    },
+    #[command(
+        about = "Re-pull a skill or plugin, showing what capability changed before replacing it",
+        long_about = "Like `pull`, but for a source already installed. It re-stages the source, shows the assessment, and — for a placed skill that already exists at the destination — reports how its capability surface changed (a new network host, a new secret read) before replacing it. Marketplace installs are re-run idempotently through the harness CLI."
+    )]
+    Update {
+        /// Skill/plugin to update: a local folder or a public git URL/owner-repo.
+        source: String,
+        /// Force a harness (claude, codex).
+        #[arg(long)]
+        harness: Option<String>,
+        /// The directory the skill was placed into (defaults to the harness skills dir).
+        #[arg(long)]
+        into: Option<PathBuf>,
+        /// The skill lives in the project's skills dir rather than the user's home.
+        #[arg(long)]
+        project: bool,
+        /// Restrict a marketplace update to these plugin names (repeatable).
+        #[arg(long = "plugin")]
+        plugin: Vec<String>,
+        /// Proceed without an interactive prompt even when there are findings.
+        #[arg(long)]
+        yes: bool,
+    },
     #[command(about = "Manage local capability seeds for durable bootstrap")]
     Capability {
         #[command(subcommand)]

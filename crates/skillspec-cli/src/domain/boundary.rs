@@ -2,6 +2,7 @@ use crate::{boundary, error};
 
 pub use boundary::map::{self, SurfaceMap};
 pub use boundary::workspace::{self, WorkspaceSurface};
+pub use boundary::EffectClass;
 pub use boundary::{
     Analysis, CheckMode, CheckOutcome, DriftReport, EffectSurface, EmitTarget, Proposal,
 };

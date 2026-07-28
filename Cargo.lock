@@ -964,6 +964,7 @@ dependencies = [
  "skillspec-runtime",
  "skillspec-source",
  "skillspec-workspace",
+ "termtree",
 ]
 
 [[package]]

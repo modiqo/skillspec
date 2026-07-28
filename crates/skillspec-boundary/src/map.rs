@@ -302,9 +302,11 @@ fn connected_components(
 /// dependency's job, not hand-rolled. Each skill's resources and orphans hang
 /// under it, orphans marked, with file paths shown relative to the skill.
 pub fn render(map: &SurfaceMap) -> String {
+    use crate::style::{self, Style};
     use std::fmt::Write;
     use termtree::Tree;
 
+    let color = style::colors_enabled();
     let resources: usize = map.skills.iter().map(|s| s.resources.len()).sum();
     let root_label = format!(
         "{}   ({} skills · {resources} resources · {} orphans)",
@@ -316,7 +318,8 @@ pub fn render(map: &SurfaceMap) -> String {
 
     for doc in &map.entry_docs {
         root.push(Tree::new(format!(
-            "[entry] {} → indexes {} skill(s)",
+            "{} {} → indexes {} skill(s)",
+            style::paint("[entry]", Style::Accent, color),
             doc.path,
             doc.references_skills.len()
         )));
@@ -335,7 +338,8 @@ pub fn render(map: &SurfaceMap) -> String {
         }
         for orphan in &skill.orphans {
             node.push(Tree::new(format!(
-                "(orphan) {}",
+                "{} {}",
+                style::paint("(orphan)", Style::Warn, color),
                 relative_to(orphan, &skill.package)
             )));
         }

@@ -34,6 +34,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 sha2 = "0.10.9"
+termtree = "1"
 
 [dev-dependencies]
 jsonschema = { version = "0.46.5", default-features = false }

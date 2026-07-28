@@ -399,6 +399,43 @@ fn extract_command(
             });
         }
     }
+
+    if let Some(source) = skill_install_source(&command.name, &command.args) {
+        out.push(EffectObservation {
+            class: EffectClass::PkgInstall,
+            target: EffectTarget::Package {
+                ecosystem: "skill".to_owned(),
+                name: source,
+                pinned: false,
+            },
+            resolution: TargetResolution::Literal,
+            origin: context.origin,
+            reach: context.reach,
+            confidence: Confidence::High,
+            evidence: evidence.clone(),
+        });
+    }
+}
+
+/// A harness skill/plugin install, mapped to the source it pulls in.
+///
+/// Harnesses install skills from a git repository through their own CLI —
+/// `claude plugin install <plugin>@<marketplace>`, `claude plugin marketplace
+/// add <owner/repo>`, and the `codex` equivalents. This is `pkg.install` like
+/// any other, but the ecosystem is `skill`, so it reads as a distinct grant no
+/// ordinary package policy covers: an agent that runs an install fails closed
+/// under the guard, and a skill whose script installs other skills shows it.
+fn skill_install_source(name: &str, args: &[String]) -> Option<String> {
+    if !matches!(name, "claude" | "codex") {
+        return None;
+    }
+    let rest = args.strip_prefix(&["plugin".to_owned()])?;
+    let source = match rest {
+        [verb, source, ..] if matches!(verb.as_str(), "install" | "add") => source,
+        [scope, verb, source, ..] if scope == "marketplace" && verb == "add" => source,
+        _ => return None,
+    };
+    (!source.starts_with('-')).then(|| source.clone())
 }
 
 fn extract_network(
@@ -1098,6 +1135,29 @@ mod tests {
             crate::effect::EffectTarget::Package { ecosystem, name, pinned }
                 if ecosystem == "npm" && name == "left-pad" && !pinned
         ));
+    }
+
+    #[test]
+    fn a_harness_skill_install_is_a_skill_ecosystem_package() {
+        for command in [
+            "claude plugin install rote-onboard@rote-skills",
+            "claude plugin marketplace add modiqo/rote-skills",
+            "codex plugin add rote-onboard@rote-skills",
+        ] {
+            let install = run(command)
+                .into_iter()
+                .find(|observation| observation.class == EffectClass::PkgInstall)
+                .unwrap_or_else(|| panic!("no install effect for `{command}`"));
+            assert!(
+                matches!(&install.target, crate::effect::EffectTarget::Package { ecosystem, .. } if ecosystem == "skill"),
+                "`{command}` should be a skill-ecosystem install, got {:?}",
+                install.target
+            );
+        }
+        // A plain `claude` invocation is not an install.
+        assert!(!run("claude --help")
+            .iter()
+            .any(|observation| observation.class == EffectClass::PkgInstall));
     }
 
     #[test]

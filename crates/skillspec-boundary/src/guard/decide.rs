@@ -266,6 +266,20 @@ mod tests {
     }
 
     #[test]
+    fn an_agent_driven_skill_install_fails_closed() {
+        // A skill installs from a git repo through the harness CLI. No ordinary
+        // policy grants `pkg.install:skill/...`, so it is denied in enforce -
+        // the boundary gate assesses the repo before it can land.
+        let input = bash("claude plugin install rote-onboard@rote-skills");
+        let decision = evaluate("Bash", &input, &[], Mode::Enforce);
+        assert!(decision
+            .effects
+            .iter()
+            .any(|grant| grant.starts_with("pkg.install:skill/")));
+        assert_eq!(decision.decision, Decision::Deny);
+    }
+
+    #[test]
     fn an_unknown_tool_is_a_tool_invocation() {
         let decision = evaluate("mcp__memory__store", &json!({}), &[], Mode::Enforce);
         assert!(decision

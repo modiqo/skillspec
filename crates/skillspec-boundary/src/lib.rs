@@ -36,11 +36,14 @@ pub mod effect;
 pub mod emit;
 pub mod extract;
 pub mod guard;
+pub mod install;
 pub mod map;
 pub mod normalize;
 pub mod proposal;
 pub mod render;
+pub mod risk;
 pub mod sanitize;
+pub mod style;
 pub mod surface;
 pub mod workspace;
 

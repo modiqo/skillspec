@@ -3,13 +3,24 @@ use clap::Subcommand;
 #[derive(Debug, Subcommand)]
 pub(in crate::cli) enum BoundaryCommand {
     #[command(
-        about = "Map the shape of a skill folder before analyzing it",
-        long_about = "Build the surface map of a folder of skills without analyzing effects: which skills are present, which files each one references (resources), which files nothing references (orphans - where a payload or directive can hide), and which skills reference other skills. Skills that reference each other form a connected group; the rest are independent. Use this first to understand a repository's shape before reading per-skill boundary reports."
+        about = "Map the shape of a skill folder before analyzing it (the Structure view)",
+        long_about = "Build the surface map of a folder of skills without analyzing effects: which skills are present, which files each one references (resources), which files nothing references (orphans - where a payload or directive can hide), and which skills reference other skills. Skills that reference each other form a connected group; the rest are independent. This is the Structure half of what `gate` shows; run it first to understand a repository's shape before the security analysis."
     )]
     Map {
         /// Local folder of skills, or public git skill URL.
         path: String,
         /// Emit machine-readable JSON instead of the formatted map.
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(
+        about = "Analyze what a skill could reach, ranked by risk (the Security Analysis view)",
+        long_about = "Run the security analysis on its own: for each skill, what it could reach if executed, ranked by severity (critical/high/medium/low) with scope-awareness (a skill confined to its own directory is low risk; reaching outside it - a home or absolute path, an `..` escape, the network, another skill's files - is what earns review). Each finding states how bad it is, why, what happens if it runs, and a link to the exact line. This is the Security Analysis half of what `gate` shows, without the structure map or the install prompt. `--json` emits the structured findings and per-severity tally for tooling."
+    )]
+    Assess {
+        /// Local skill folder, or public git skill URL.
+        path: String,
+        /// Emit machine-readable JSON instead of the formatted analysis.
         #[arg(long)]
         json: bool,
     },
@@ -54,6 +65,20 @@ pub(in crate::cli) enum BoundaryCommand {
         /// Also fail (exit 2) when the surface is incomplete.
         #[arg(long)]
         fail_on_incomplete: bool,
+    },
+    #[command(
+        about = "Assess a skill or plugin before installing it, then run the install on approval",
+        long_about = "A pre-install gate. A skill or plugin ships in a git repository and is copied out of it on install, so the repository is assessed before anything lands on disk. The gate maps the target (the tree of skills, resources, and orphan files), reports what any skill could reach if executed, and - when there are findings - asks you to confirm before proceeding. Pass the real install command with --then and the gate runs it only on approval; without --then it just reports and approves. --yes proceeds without a prompt (for scripts). With findings and no terminal to confirm, the gate refuses. This is the human-driven counterpart to `guard`, which intercepts an agent-driven install at the PreToolUse hook."
+    )]
+    Gate {
+        /// Skill/plugin repo to assess: a local folder or a public git URL/owner-repo.
+        path: String,
+        /// Install command to run on approval, e.g. "claude plugin install rote-onboard@rote-skills".
+        #[arg(long)]
+        then: Option<String>,
+        /// Proceed without an interactive prompt.
+        #[arg(long)]
+        yes: bool,
     },
     #[command(
         about = "Manage the boundary guard hook that enforces reviewed policies",
