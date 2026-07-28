@@ -27,6 +27,16 @@ const reportFiles = [
   "boundary-stderr.txt",
 ];
 
+// Boundary files assessed the remote URL, so their content is public GitHub
+// blob URLs. Replacing the target with its display form would strip the
+// `https://` and break those links, so only redact runner/local paths there.
+const keepTargetFiles = new Set([
+  "boundary-assess.txt",
+  "boundary-assess.json",
+  "boundary-report.md",
+  "boundary-stderr.txt",
+]);
+
 for (const file of reportFiles) {
   const source = path.join(sourceDir, file);
   if (!fs.existsSync(source)) {
@@ -34,14 +44,15 @@ for (const file of reportFiles) {
   }
 
   const content = fs.readFileSync(source, "utf8");
-  fs.writeFileSync(path.join(outputDir, file), sanitize(content));
+  const cleaned = sanitize(content, { replaceTarget: !keepTargetFiles.has(file) });
+  fs.writeFileSync(path.join(outputDir, file), cleaned);
 }
 
 fs.writeFileSync(path.join(outputDir, "target.txt"), `${displayTarget}\n`);
 
-function sanitize(content) {
+function sanitize(content, { replaceTarget = true } = {}) {
   let output = content;
-  if (displayTarget) {
+  if (replaceTarget && displayTarget) {
     for (const value of replacementTargets) {
       output = output.split(value).join(displayTarget);
       output = output.split(encodeURI(value)).join(encodeURI(displayTarget));

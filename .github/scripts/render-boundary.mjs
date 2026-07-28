@@ -19,7 +19,13 @@ try {
 }
 
 const target = typeof data.target === "string" ? data.target : "";
+// A resolved commit SHA (argv[3]) makes every link permanent — it points at the
+// exact reviewed revision, not whatever the branch tip later becomes.
+const refOverride = (process.argv[3] || "").trim();
 const loc = parseGitHubTarget(target);
+if (refOverride) {
+  loc.ref = refOverride;
+}
 const summary = data.summary || {};
 const skills = Array.isArray(data.skills) ? data.skills : [];
 const reviewable = skills.filter((skill) => skill.warrants_review);
@@ -133,5 +139,10 @@ function blobUrl(loc, pkg, file, line) {
     return "";
   }
   const rel = [loc.subpath, pkg, file].filter(Boolean).join("/").replace(/\/+/g, "/");
-  return `https://github.com/${loc.owner}/${loc.repo}/blob/${loc.ref || "HEAD"}/${rel}${line ? `#L${line}` : ""}`;
+  // A `#L` anchor only jumps to the line on GitHub's *source* view. Markdown
+  // renders rich by default and ignores the anchor, so force plain source with
+  // `?plain=1`. Non-Markdown files already show source, so no query is needed.
+  const query = line && /\.(md|markdown)$/i.test(file) ? "?plain=1" : "";
+  const anchor = line ? `#L${line}` : "";
+  return `https://github.com/${loc.owner}/${loc.repo}/blob/${loc.ref || "HEAD"}/${rel}${query}${anchor}`;
 }

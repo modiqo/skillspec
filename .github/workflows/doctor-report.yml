@@ -176,6 +176,7 @@ jobs:
             const repo = process.env.TARGET_REPO;
             let ref = "";
             let shortSha = "";
+            let fullSha = "";
 
             try {
               const url = new URL(target);
@@ -196,13 +197,15 @@ jobs:
             if (ref) {
               try {
                 const commit = await github.rest.repos.getCommit({ owner, repo, ref });
-                shortSha = (commit.data.sha || "").slice(0, 7);
+                fullSha = commit.data.sha || "";
+                shortSha = fullSha.slice(0, 7);
               } catch (error) {
                 core.warning(`Could not resolve commit ${ref} for issue title: ${error.message}`);
               }
             }
 
             core.setOutput("short_sha", shortSha);
+            core.setOutput("sha", fullSha);
             core.setOutput("title_label", `${owner}/${repo}${shortSha ? `@${shortSha}` : ""}`);
 
       - name: Comment with local-run instructions
@@ -329,6 +332,8 @@ jobs:
           # clickable blob URLs rather than runner paths. Static analysis only;
           # nothing in the package is executed.
           TARGET: ${{ steps.parse.outputs.target }}
+          # The resolved commit SHA makes the report's evidence links permanent.
+          COMMIT_SHA: ${{ steps.request_commit.outputs.sha }}
         run: |
           set -uo pipefail
           mkdir -p doctor-report
@@ -337,10 +342,11 @@ jobs:
             skillspec boundary assess "${TARGET}" --json \
               > doctor-report/boundary-assess.json 2>/dev/null || true
             # Render the JSON into a clean, actionable Markdown report (findings
-            # with clickable links + a what-to-do-next tutorial) for the summary
-            # and the issue comment, rather than dumping the raw terminal tree.
+            # with permanent, line-anchored links + a what-to-do-next tutorial)
+            # for the summary and the issue comment, not the raw terminal tree.
             node .github/scripts/render-boundary.mjs \
-              doctor-report/boundary-assess.json > doctor-report/boundary-report.md || true
+              doctor-report/boundary-assess.json "${COMMIT_SHA}" \
+              > doctor-report/boundary-report.md || true
             echo "status=0" >> "${GITHUB_OUTPUT}"
           else
             echo "status=1" >> "${GITHUB_OUTPUT}"

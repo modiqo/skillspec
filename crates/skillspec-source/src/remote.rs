@@ -544,9 +544,21 @@ pub fn web_url(remote: &RemoteSkillSource, rel_path: &str, line: Option<usize>) 
     } else if host.contains("bitbucket") {
         anchor(format!("{root}/src/{git_ref}/{path}"), line, "#lines-")
     } else {
-        // GitHub and the common self-hosted convention.
-        anchor(format!("{root}/blob/{git_ref}/{path}"), line, "#L")
+        // GitHub and the common self-hosted convention. A `#L` anchor only lands
+        // on the source view; Markdown renders rich and ignores it, so request
+        // plain source with `?plain=1` when anchoring a line in a Markdown file.
+        let query = if line.is_some() && is_markdown_path(path) {
+            "?plain=1"
+        } else {
+            ""
+        };
+        anchor(format!("{root}/blob/{git_ref}/{path}{query}"), line, "#L")
     }
+}
+
+fn is_markdown_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.ends_with(".md") || lower.ends_with(".markdown")
 }
 
 fn anchor(url: String, line: Option<usize>, sep: &str) -> String {
@@ -563,9 +575,16 @@ mod tests {
     #[test]
     fn web_url_builds_host_appropriate_blob_links() {
         let github = parse_target("https://github.com/o/r").unwrap().unwrap();
+        // A Markdown file with a line anchor gets ?plain=1 so the anchor lands.
         assert_eq!(
             super::web_url(&github, "skills/x/SKILL.md", Some(690)),
-            "https://github.com/o/r/blob/HEAD/skills/x/SKILL.md#L690"
+            "https://github.com/o/r/blob/HEAD/skills/x/SKILL.md?plain=1#L690"
+        );
+
+        // A non-Markdown source file needs no query.
+        assert_eq!(
+            super::web_url(&github, "scripts/run.sh", Some(4)),
+            "https://github.com/o/r/blob/HEAD/scripts/run.sh#L4"
         );
 
         let branched = parse_target("https://github.com/o/r/tree/main/skills/x")
@@ -573,7 +592,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             super::web_url(&branched, "skills/x/SKILL.md", Some(12)),
-            "https://github.com/o/r/blob/main/skills/x/SKILL.md#L12"
+            "https://github.com/o/r/blob/main/skills/x/SKILL.md?plain=1#L12"
         );
 
         let gitlab = parse_target("https://gitlab.com/g/r").unwrap().unwrap();
@@ -588,7 +607,7 @@ mod tests {
             "https://bitbucket.org/t/r/src/HEAD/a.md#lines-3"
         );
 
-        // No line: no anchor.
+        // No line: no anchor and no query, even for Markdown.
         assert_eq!(
             super::web_url(&github, "a.md", None),
             "https://github.com/o/r/blob/HEAD/a.md"
