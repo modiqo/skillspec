@@ -228,9 +228,17 @@ mod tests {
     use std::fs;
 
     fn workspace() -> std::path::PathBuf {
+        // Unique per call: tests within one process run in parallel, so keying on
+        // the pid alone would let two of them share and clobber one tree.
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/workspace-tests")
-            .join(format!("w{}", std::process::id()));
+            .join(format!(
+                "w{}-{}",
+                std::process::id(),
+                COUNTER.fetch_add(1, Ordering::Relaxed)
+            ));
         let _ = fs::remove_dir_all(&base);
         // Two independent skills under skills/.
         for (name, body) in [
