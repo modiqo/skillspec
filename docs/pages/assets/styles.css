@@ -4479,3 +4479,59 @@ pre code {
     align-self: auto;
   }
 }
+
+/* Threat strip: attributed vulnerability stats right under the hero — social
+   proof that verifying a skill matters, before the deeper narrative. */
+.threat-strip {
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.threat-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.threat-stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 22px;
+  background: var(--panel, #ffffff);
+}
+
+.threat-stats strong {
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--red, #dc2626);
+  letter-spacing: -0.01em;
+}
+
+.threat-stats span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+
+.threat-stats a {
+  margin-top: auto;
+  align-self: flex-start;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
+.threat-stats a:hover {
+  color: var(--ink);
+}

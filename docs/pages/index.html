@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="SkillSpec is an open-source verifier and executor for agent skills. Assess a skill, install the CLI, then create and run skills with routes, checks, and proof."
+      content="Know what an agent skill does before you install it. Paste a public GitHub URL and SkillSpec reports where the skill drifts from its plan and what it could reach if it runs — credentials, network, your files — ranked by risk. Free, in your browser, nothing executed."
     >
     <title>SkillSpec - Verifiable Agent Skills</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
     <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260713">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260728-hero">
   </head>
   <body>
     <header class="site-header">
@@ -53,37 +53,176 @@
     <main class="shell">
       <section id="home" class="hero" aria-labelledby="page-title">
         <div class="hero-copy">
-          <p class="eyebrow">Agent skill verifier and executor</p>
+          <p class="eyebrow">Verify agent skills before you trust them</p>
           <h1 id="page-title">
-            <a class="heading-link" href="#home">Make agent skills follow the plan.</a>
+            <a class="heading-link" href="#home">Know what a skill does before you install it.</a>
           </h1>
           <p class="lede hero-subheading">
             <span>
-              Today, most skills are instructions the model
-              may not follow.
+              An agent skill is unvetted <code>SKILL.md</code> prose that inherits
+              your shell, your files, and your credentials.
             </span>
             <span>
-              SkillSpec checks a <code>SKILL.md</code> and turns the important
-              parts into a contract.
-            </span>
-            <span>
-              It works with any agent harness, so skills run more reliably
-              without wasting tokens.
-            </span>
-            <span>
-              Then it helps the agent run the
-              right skill with the right steps, tools, checks, and proof.
+              Paste a public GitHub URL and SkillSpec tells you two things in your
+              browser &mdash; free, running nothing: where the skill will
+              <strong>drift from its plan</strong>, and what it could
+              <strong>reach if it executes</strong> (the network, secrets, files
+              beyond its own folder), ranked by risk.
             </span>
           </p>
           <div class="hero-actions" aria-label="Primary actions">
-            <a class="primary-link" href="#assess">Assess a skill</a>
-            <a class="secondary-link" href="#install">Install SkillSpec</a>
+            <a class="primary-link" href="#assess">Assess a skill &rarr;</a>
+            <a class="secondary-link" href="#install">Install the CLI</a>
           </div>
           <p class="hero-note">
-            Open-source CLI and Open-standard contract format for verifiable
-            <code>SKILL.md</code> execution.
+            Snyk&rsquo;s ToxicSkills audit found a security flaw in
+            <strong>36.8%</strong> of 3,984 published skills &mdash; and 76 with
+            live malicious payloads. Three lines of Markdown can exfiltrate an SSH
+            key.
           </p>
         </div>
+      </section>
+
+      <section id="threat" class="threat-strip" aria-label="Why verifying skills matters">
+        <ul class="threat-stats">
+          <li>
+            <strong>36.8%</strong>
+            <span>of 3,984 published skills carry at least one security flaw</span>
+            <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills, 2026</a>
+          </li>
+          <li>
+            <strong>13.4%</strong>
+            <span>contain a critical-level issue &mdash; 534 skills</span>
+            <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills</a>
+          </li>
+          <li>
+            <strong>3 lines</strong>
+            <span>of Markdown are enough to reach shell access</span>
+            <a href="https://snyk.io/articles/skill-md-shell-access/" target="_blank" rel="noreferrer">Snyk threat model</a>
+          </li>
+          <li>
+            <strong>33.6%</strong>
+            <span>attack success when benign skills combine &mdash; near-zero in isolation</span>
+            <a href="https://arxiv.org/abs/2606.15242" target="_blank" rel="noreferrer">Xie et al., 2026</a>
+          </li>
+          <li>
+            <strong>AST01</strong>
+            <span>&ldquo;Malicious Skills&rdquo; &mdash; the top agentic-skill risk</span>
+            <a href="https://owasp.org/www-project-agentic-skills-top-10/ast01" target="_blank" rel="noreferrer">OWASP</a>
+          </li>
+        </ul>
+      </section>
+
+      <section id="assess" class="request-panel" aria-labelledby="request-title">
+        <div>
+          <p class="eyebrow">Assessment</p>
+          <h2 id="request-title">
+            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
+          </h2>
+          <p>
+            Paste a public GitHub skill, plugin, or repo URL. SkillSpec returns
+            two reports together: a <strong>follow-through analysis</strong>
+            (where execution can drift, overload context, collide in discovery,
+            or finish without proof) and a <strong>security analysis</strong>
+            (what each skill could reach if executed, ranked by risk).
+          </p>
+        </div>
+        <form id="doctor-form" class="request-form" novalidate>
+          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
+          <div class="input-row">
+            <input
+              id="target-url"
+              name="target-url"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="https://github.com/org/repo/tree/main/skills/example"
+              required
+            >
+            <button type="submit">Run in CI</button>
+          </div>
+          <fieldset class="request-checks">
+            <legend>Which analyses to run</legend>
+            <label class="request-check">
+              <input type="checkbox" id="check-doctor" checked>
+              <span>Follow-through <span class="request-check-hint">skillspec doctor</span></span>
+            </label>
+            <label class="request-check">
+              <input type="checkbox" id="check-security" checked>
+              <span>Security check <span class="request-check-hint">skillspec boundary</span></span>
+            </label>
+          </fieldset>
+          <p class="input-help">
+            Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
+            Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
+            Public CI checks the GitHub source shape, then runs both the
+            follow-through and the security analysis; it stops when no
+            <code>SKILL.md</code> package is found. This opens a public GitHub
+            issue, so do not submit private repositories, tokens, credentials, or
+            sensitive internal paths.
+          </p>
+          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section id="boundary" class="request-panel boundary-panel" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow">Security</p>
+          <h2 id="boundary-title">
+            <a class="heading-link" href="#boundary">Constrain what a skill can reach.</a>
+          </h2>
+          <p>
+            Doctor tells you whether an agent will <em>follow</em> a skill.
+            <code>skillspec boundary</code> tells you what a skill can
+            <em>reach</em> if it does &mdash; the network hosts, file paths,
+            binaries, and credentials it touches &mdash; ranked by risk, then
+            compiles a least-privilege policy you can enforce, without changing
+            the skill and without executing anything in it.
+          </p>
+          <p>
+            It is a <strong>standalone tool</strong>: no <code>skill.spec.yml</code>,
+            no adoption of the rest of SkillSpec, and it works on a local folder
+            or a public git URL on any host.
+          </p>
+          <ol class="boundary-steps">
+            <li><strong>Map</strong> a collection to see its shape &mdash; skills,
+              resources, orphan files where a payload can hide, and how skills
+              cross-reference.</li>
+            <li><strong>Assess</strong> ranks what each skill can reach by severity
+              (critical / high / medium / low), scope-aware: a skill confined to
+              its own directory is low risk; reaching outside it &mdash; a home or
+              absolute path, the network, another skill's files &mdash; is what
+              earns review. Documentation examples are qualified, not counted as
+              live effects.</li>
+            <li><strong>Gate the install</strong>: <code>skillspec pull</code>
+              assesses a skill or plugin before it lands on disk and installs it
+              only on approval &mdash; across harnesses.</li>
+            <li><strong>Constrain</strong>: compile a deny-by-default policy, and
+              optionally enforce reviewed policies against installed skills
+              through a managed pre-tool hook.</li>
+          </ol>
+          <p class="input-help">
+            Static analysis: nothing in the package is executed. SkillSpec does
+            not enforce the boundary; a harness, hook, or network policy does.
+            See the
+            <a href="https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md">boundary guide</a>.
+          </p>
+        </div>
+        <pre class="boundary-demo" aria-label="Example boundary assess ranked risk output"><code>$ skillspec boundary assess https://github.com/owner/skills
+
+Risk across 18 skills &#8212; <span class="sev-crit">1 critical</span> &middot; 0 high &middot; <span class="sev-med">2 medium</span> &middot; <span class="sev-low">11 low</span> &middot; <span class="sev-ok">4 clean</span>
+2 skill(s) reach beyond their own directory &#8212; review before installing
+&#9500;&#9472;&#9472; <span class="sev-crit">CRITICAL</span>  plugins/pack/skills/main
+&#9474;   &#9500;&#9472;&#9472; [<span class="sev-crit">CRITICAL</span>] sends data to the network &#8594; exfil.example.net
+&#9474;   &#9474;   &#9492;&#9472;&#9472; <span class="dim">&#8230;/main/report.py#L7</span>
+&#9474;   &#9492;&#9472;&#9472; [<span class="sev-high">HIGH</span>] reads credentials &#8594; ~/.aws/credentials
+&#9474;       &#9492;&#9472;&#9472; <span class="dim">&#8230;/main/report.py#L5</span>
+&#9492;&#9472;&#9472; <span class="sev-med">MEDIUM</span>  plugins/onboard/skills/setup
+    &#9492;&#9472;&#9472; [<span class="sev-med">MEDIUM</span>] reads outside its directory &#8594; ~/.config/agent
+
+Cleared &#8212; no review needed
+&#9500;&#9472;&#9472; <span class="sev-ok">11 clean</span> &middot; reach nothing outside their own directory
+&#9492;&#9472;&#9472; <span class="sev-low">4 low</span> &middot; touch only their own files</code></pre>
       </section>
 
       <section id="platform-shift" class="boom-tax-section" aria-labelledby="boom-tax-title">
@@ -261,118 +400,6 @@
           judgment, and move the must-follow parts into a small, checkable
           contract beside it.
         </p>
-      </section>
-
-      <section id="assess" class="request-panel" aria-labelledby="request-title">
-        <div>
-          <p class="eyebrow">Assessment</p>
-          <h2 id="request-title">
-            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
-          </h2>
-          <p>
-            Paste a public GitHub skill, plugin, or repo URL. SkillSpec returns
-            two reports together: a <strong>follow-through analysis</strong>
-            (where execution can drift, overload context, collide in discovery,
-            or finish without proof) and a <strong>security analysis</strong>
-            (what each skill could reach if executed, ranked by risk).
-          </p>
-        </div>
-        <form id="doctor-form" class="request-form" novalidate>
-          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
-          <div class="input-row">
-            <input
-              id="target-url"
-              name="target-url"
-              type="url"
-              inputmode="url"
-              autocomplete="url"
-              placeholder="https://github.com/org/repo/tree/main/skills/example"
-              required
-            >
-            <button type="submit">Run in CI</button>
-          </div>
-          <fieldset class="request-checks">
-            <legend>Which analyses to run</legend>
-            <label class="request-check">
-              <input type="checkbox" id="check-doctor" checked>
-              <span>Follow-through <span class="request-check-hint">skillspec doctor</span></span>
-            </label>
-            <label class="request-check">
-              <input type="checkbox" id="check-security" checked>
-              <span>Security check <span class="request-check-hint">skillspec boundary</span></span>
-            </label>
-          </fieldset>
-          <p class="input-help">
-            Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
-            Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
-            Public CI checks the GitHub source shape, then runs both the
-            follow-through and the security analysis; it stops when no
-            <code>SKILL.md</code> package is found. This opens a public GitHub
-            issue, so do not submit private repositories, tokens, credentials, or
-            sensitive internal paths.
-          </p>
-          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <section id="boundary" class="request-panel boundary-panel" aria-labelledby="boundary-title">
-        <div>
-          <p class="eyebrow">Security</p>
-          <h2 id="boundary-title">
-            <a class="heading-link" href="#boundary">Constrain what a skill can reach.</a>
-          </h2>
-          <p>
-            Doctor tells you whether an agent will <em>follow</em> a skill.
-            <code>skillspec boundary</code> tells you what a skill can
-            <em>reach</em> if it does &mdash; the network hosts, file paths,
-            binaries, and credentials it touches &mdash; ranked by risk, then
-            compiles a least-privilege policy you can enforce, without changing
-            the skill and without executing anything in it.
-          </p>
-          <p>
-            It is a <strong>standalone tool</strong>: no <code>skill.spec.yml</code>,
-            no adoption of the rest of SkillSpec, and it works on a local folder
-            or a public git URL on any host.
-          </p>
-          <ol class="boundary-steps">
-            <li><strong>Map</strong> a collection to see its shape &mdash; skills,
-              resources, orphan files where a payload can hide, and how skills
-              cross-reference.</li>
-            <li><strong>Assess</strong> ranks what each skill can reach by severity
-              (critical / high / medium / low), scope-aware: a skill confined to
-              its own directory is low risk; reaching outside it &mdash; a home or
-              absolute path, the network, another skill's files &mdash; is what
-              earns review. Documentation examples are qualified, not counted as
-              live effects.</li>
-            <li><strong>Gate the install</strong>: <code>skillspec pull</code>
-              assesses a skill or plugin before it lands on disk and installs it
-              only on approval &mdash; across harnesses.</li>
-            <li><strong>Constrain</strong>: compile a deny-by-default policy, and
-              optionally enforce reviewed policies against installed skills
-              through a managed pre-tool hook.</li>
-          </ol>
-          <p class="input-help">
-            Static analysis: nothing in the package is executed. SkillSpec does
-            not enforce the boundary; a harness, hook, or network policy does.
-            See the
-            <a href="https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md">boundary guide</a>.
-          </p>
-        </div>
-        <pre class="boundary-demo" aria-label="Example boundary assess ranked risk output"><code>$ skillspec boundary assess https://github.com/owner/skills
-
-Risk across 18 skills &#8212; <span class="sev-crit">1 critical</span> &middot; 0 high &middot; <span class="sev-med">2 medium</span> &middot; <span class="sev-low">11 low</span> &middot; <span class="sev-ok">4 clean</span>
-2 skill(s) reach beyond their own directory &#8212; review before installing
-&#9500;&#9472;&#9472; <span class="sev-crit">CRITICAL</span>  plugins/pack/skills/main
-&#9474;   &#9500;&#9472;&#9472; [<span class="sev-crit">CRITICAL</span>] sends data to the network &#8594; exfil.example.net
-&#9474;   &#9474;   &#9492;&#9472;&#9472; <span class="dim">&#8230;/main/report.py#L7</span>
-&#9474;   &#9492;&#9472;&#9472; [<span class="sev-high">HIGH</span>] reads credentials &#8594; ~/.aws/credentials
-&#9474;       &#9492;&#9472;&#9472; <span class="dim">&#8230;/main/report.py#L5</span>
-&#9492;&#9472;&#9472; <span class="sev-med">MEDIUM</span>  plugins/onboard/skills/setup
-    &#9492;&#9472;&#9472; [<span class="sev-med">MEDIUM</span>] reads outside its directory &#8594; ~/.config/agent
-
-Cleared &#8212; no review needed
-&#9500;&#9472;&#9472; <span class="sev-ok">11 clean</span> &middot; reach nothing outside their own directory
-&#9492;&#9472;&#9472; <span class="sev-low">4 low</span> &middot; touch only their own files</code></pre>
       </section>
 
       <section id="skillspec-now" class="operating-loop-section" aria-labelledby="operating-loop-title">
