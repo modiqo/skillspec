@@ -948,7 +948,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "skillspec"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "clap",
  "jsonschema",
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-authoring"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "regex",
  "serde",
@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-boundary"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -995,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-core"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
  "serde",
@@ -1007,7 +1007,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-doctor"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "markdown",
  "serde",
@@ -1020,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-harness"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
  "serde",
@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-harness-lab"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1041,7 +1041,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-runtime"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1052,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-source"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "markdown",
  "serde",
@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "skillspec-workspace"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "regex",
  "serde",
