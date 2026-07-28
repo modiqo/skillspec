@@ -40,6 +40,13 @@ if (form && targetInput && formMessage) {
       return;
     }
 
+    const wantsDoctor = document.querySelector("#check-doctor")?.checked ?? true;
+    const wantsSecurity = document.querySelector("#check-security")?.checked ?? true;
+    if (!wantsDoctor && !wantsSecurity) {
+      showFormMessage("Select at least one analysis to run.", true);
+      return;
+    }
+
     const url = validation.url;
     const submitButton = form.querySelector('button[type="submit"]');
     if (submitButton) {
@@ -57,6 +64,11 @@ if (form && targetInput && formMessage) {
         "### Public GitHub skill URL",
         "",
         url,
+        "",
+        "### Analyses requested",
+        "",
+        `- [${wantsDoctor ? "x" : " "}] Follow-through analysis (skillspec doctor)`,
+        `- [${wantsSecurity ? "x" : " "}] Security analysis (skillspec boundary)`,
         "",
         "### Notes",
         "",

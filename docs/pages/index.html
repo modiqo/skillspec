@@ -289,8 +289,19 @@
               placeholder="https://github.com/org/repo/tree/main/skills/example"
               required
             >
-            <button type="submit">Assess skill</button>
+            <button type="submit">Run in CI</button>
           </div>
+          <fieldset class="request-checks">
+            <legend>Which analyses to run</legend>
+            <label class="request-check">
+              <input type="checkbox" id="check-doctor" checked>
+              <span>Follow-through <span class="request-check-hint">skillspec doctor</span></span>
+            </label>
+            <label class="request-check">
+              <input type="checkbox" id="check-security" checked>
+              <span>Security check <span class="request-check-hint">skillspec boundary</span></span>
+            </label>
+          </fieldset>
           <p class="input-help">
             Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
             Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
@@ -697,6 +708,6 @@ Write SKILL.md, then import and prove it.</code></pre>
     </footer>
 
     <script src="./assets/site.js?v=20260628-risk-star"></script>
-    <script src="./assets/app.js?v=20260702-report-share-sha"></script>
+    <script src="./assets/app.js?v=20260728-analysis-checks"></script>
   </body>
 </html>

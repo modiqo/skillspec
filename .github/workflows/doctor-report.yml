@@ -87,8 +87,24 @@ jobs:
               }
             }
 
+            // Which analyses were requested. The public form encodes the choice
+            // as a task list; when no list is present (older issues), run both.
+            const hasChecklist = /### Analyses requested/i.test(body);
+            let wantsDoctor = hasChecklist
+              ? /- \[x\][^\n]*follow-through/i.test(body)
+              : true;
+            let wantsSecurity = hasChecklist
+              ? /- \[x\][^\n]*security/i.test(body)
+              : true;
+            if (!wantsDoctor && !wantsSecurity) {
+              wantsDoctor = true;
+              wantsSecurity = true;
+            }
+
             core.setOutput("valid", String(valid));
             core.setOutput("reason", reason);
+            core.setOutput("wants_doctor", String(wantsDoctor));
+            core.setOutput("wants_security", String(wantsSecurity));
             core.setOutput("target", normalized || raw);
             core.setOutput("display_target", displayTarget || displayForTarget(normalized || raw));
             core.setOutput("owner", owner);
@@ -278,7 +294,7 @@ jobs:
 
       - name: Run doctor
         id: doctor
-        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_doctor == 'true'
         shell: bash
         env:
           TARGET: ${{ steps.parse.outputs.target }}
@@ -302,7 +318,7 @@ jobs:
 
       - name: Run boundary security analysis
         id: boundary
-        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_security == 'true'
         shell: bash
         env:
           # Assess the remote URL, not the local checkout, so evidence loci are
@@ -365,7 +381,7 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Add security analysis to run summary
-        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_security == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -384,7 +400,7 @@ jobs:
           fi
 
       - name: Add doctor failure to run summary
-        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.doctor.outputs.status != '0'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_doctor == 'true' && steps.doctor.outputs.status != '0'
         shell: bash
         env:
           DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}
@@ -426,7 +442,7 @@ jobs:
           if-no-files-found: error
 
       - name: Comment with doctor report
-        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0') }}
+        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0' || (steps.parse.outputs.wants_doctor != 'true' && steps.boundary.outputs.status == '0')) }}
         uses: actions/github-script@v7
         env:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
@@ -435,17 +451,25 @@ jobs:
           script: |
             const fs = require("fs");
             const marker = "<!-- skillspec-doctor-report -->";
-            const report = fs.readFileSync("doctor-report-public/doctor-report.md", "utf8");
+            const hasDoctor = fs.existsSync("doctor-report-public/doctor-report.md");
+            const report = hasDoctor
+              ? fs.readFileSync("doctor-report-public/doctor-report.md", "utf8")
+              : "";
             const shapeGate = fs.existsSync("doctor-report-public/shape-gate.md")
               ? fs.readFileSync("doctor-report-public/shape-gate.md", "utf8")
               : "";
             const maxReportChars = 40000;
-            const fullReport = process.env.RUN_FULL_DOCTOR === "true" && shapeGate
-              ? `${shapeGate}\n\n---\n\n${report}`
-              : report;
+            const fullReport = !hasDoctor
+              ? ""
+              : process.env.RUN_FULL_DOCTOR === "true" && shapeGate
+                ? `${shapeGate}\n\n---\n\n${report}`
+                : report;
             const renderedReport = fullReport.length > maxReportChars
               ? `${fullReport.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
               : fullReport;
+            const lead = hasDoctor
+              ? renderedReport
+              : "### SkillSpec report\n\nFollow-through analysis was not requested for this submission.";
             const maxBoundaryChars = 16000;
             const boundary = fs.existsSync("doctor-report-public/boundary-assess.txt")
               ? fs.readFileSync("doctor-report-public/boundary-assess.txt", "utf8")
@@ -453,7 +477,7 @@ jobs:
             const boundaryBlock = boundary.trim()
               ? [
                   "",
-                  "<details>",
+                  hasDoctor ? "<details>" : "<details open>",
                   "<summary><strong>Security analysis</strong> — <code>skillspec boundary assess</code> (what each skill can reach, ranked by risk)</summary>",
                   "",
                   "```text",
@@ -468,7 +492,7 @@ jobs:
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
-              renderedReport,
+              lead,
               boundaryBlock,
               "",
               `Full artifacts: ${artifactUrl}`,
@@ -510,7 +534,7 @@ jobs:
             }
 
       - name: Comment with doctor failure
-        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.doctor.outputs.status != '0'
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_doctor == 'true' && steps.doctor.outputs.status != '0'
         uses: actions/github-script@v7
         env:
           DISPLAY_TARGET: ${{ steps.parse.outputs.display_target }}

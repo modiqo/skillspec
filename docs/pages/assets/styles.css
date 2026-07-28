@@ -224,6 +224,48 @@ h3 {
   font-weight: 720;
 }
 
+.request-checks {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+
+.request-checks legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-weight: 720;
+  font-size: 0.92rem;
+}
+
+.request-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.request-check input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  accent-color: var(--amber, #d97706);
+  cursor: pointer;
+}
+
+.request-check-hint {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+  opacity: 0.72;
+}
+
 .input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2451,7 +2493,9 @@ button:hover,
 
 .request-panel h2,
 .request-panel .eyebrow,
-.request-panel .request-form label {
+.request-panel .request-form label,
+.request-panel .request-checks legend,
+.request-panel .request-check {
   color: var(--paper-soft);
 }
 
