@@ -154,10 +154,12 @@ jobs:
 
           for package in \
             skillspec-core \
+            skillspec-source \
             skillspec-runtime \
             skillspec-doctor \
-            skillspec-authoring \
             skillspec-harness \
+            skillspec-authoring \
+            skillspec-boundary \
             skillspec-workspace \
             skillspec
           do
