@@ -234,7 +234,10 @@ fn ensure_single_skill(root: &Path) -> Result<()> {
         let names = packages
             .iter()
             .filter_map(|dir| dir.strip_prefix(root).ok())
-            .map(|dir| dir.to_string_lossy().to_string())
+            .map(|dir| {
+                dir.to_string_lossy()
+                    .replace(std::path::MAIN_SEPARATOR, "/")
+            })
             .filter(|dir| !dir.is_empty())
             .take(6)
             .collect::<Vec<_>>()

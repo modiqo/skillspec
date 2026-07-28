@@ -119,11 +119,15 @@ pub fn analyze_workspace(root: &Path) -> Result<WorkspaceSurface> {
 
     let mut packages = Vec::new();
     for dir in dirs {
+        // Package identifiers are always forward-slashed, regardless of the host
+        // OS: they are printed in reports and joined into `/`-based blob URLs, so
+        // a Windows `\` would break both. `MAIN_SEPARATOR` is `/` on Unix, making
+        // this a no-op there.
         let relative = dir
             .strip_prefix(root)
             .unwrap_or(&dir)
             .to_string_lossy()
-            .to_string();
+            .replace(std::path::MAIN_SEPARATOR, "/");
         let package = if relative.is_empty() {
             ".".to_owned()
         } else {
