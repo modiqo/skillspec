@@ -54,7 +54,12 @@ if (reviewable.length) {
       (finding) => (rank[finding.severity] || 0) >= rank.medium,
     );
     for (const finding of findings) {
-      const link = blobUrl(loc, skill.package, finding.file, finding.line);
+      // Prefer the link the CLI resolved (single source of truth); swap in the
+      // reviewed commit SHA for a permanent link. Fall back to reconstruction
+      // for older CLIs that don't emit a `link` field.
+      const link = finding.link
+        ? withCommit(finding.link, refOverride)
+        : blobUrl(loc, skill.package, finding.file, finding.line);
       const label = finding.file
         ? `${finding.file}${finding.line ? `:${finding.line}` : ""}`
         : "";
@@ -132,6 +137,14 @@ function parseGitHubTarget(value) {
   } catch {
     return {};
   }
+}
+
+function withCommit(url, sha) {
+  if (!sha || !/^https?:\/\/github\.com\//.test(url)) {
+    return url;
+  }
+  // Replace the ref segment of a GitHub blob URL with the resolved commit SHA.
+  return url.replace(/\/blob\/[^/]+\//, `/blob/${sha}/`);
 }
 
 function blobUrl(loc, pkg, file, line) {

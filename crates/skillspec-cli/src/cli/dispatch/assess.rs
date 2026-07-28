@@ -60,10 +60,10 @@ pub(super) fn security(target: &str, json: bool) -> Result<()> {
     let analysis = boundary::analyze_any(target)?;
     spinner.stop();
 
-    if json {
-        return report::json(&security_json(target, &analysis));
-    }
     let source = resolve_source(target);
+    if json {
+        return report::json(&security_json(target, &analysis, &source));
+    }
     let assessment = summarize(&analysis, &source);
     report::text(&format!("{}\n", assessment.summary))
 }
@@ -92,8 +92,14 @@ fn scored_risks(analysis: &boundary::Analysis) -> Vec<(String, SkillRisk)> {
 }
 
 /// The machine-readable security report: per-skill severity and findings, plus
-/// the severity tally.
-fn security_json(target: &str, analysis: &boundary::Analysis) -> serde_json::Value {
+/// the severity tally. Each finding carries a resolved `link` — the same
+/// clickable evidence location the tree renders — so a consumer never has to
+/// reconstruct URLs from `file`/`line`.
+fn security_json(
+    target: &str,
+    analysis: &boundary::Analysis,
+    source: &Source,
+) -> serde_json::Value {
     let scored = scored_risks(analysis);
     let mut counts = [0usize; 5]; // critical, high, medium, low, clean
     for (_, risk) in &scored {
@@ -109,11 +115,31 @@ fn security_json(target: &str, analysis: &boundary::Analysis) -> serde_json::Val
     let skills: Vec<serde_json::Value> = scored
         .into_iter()
         .map(|(package, risk)| {
+            let findings: Vec<serde_json::Value> = risk
+                .findings
+                .iter()
+                .map(|finding| {
+                    let mut value =
+                        serde_json::to_value(finding).unwrap_or_else(|_| serde_json::json!({}));
+                    let link = evidence_link(source, &package, finding);
+                    if let Some(object) = value.as_object_mut() {
+                        object.insert(
+                            "link".to_owned(),
+                            if link.is_empty() {
+                                serde_json::Value::Null
+                            } else {
+                                serde_json::Value::String(link)
+                            },
+                        );
+                    }
+                    value
+                })
+                .collect();
             serde_json::json!({
                 "package": package,
                 "severity": risk.severity(),
                 "warrants_review": risk.warrants_review(),
-                "findings": risk.findings,
+                "findings": findings,
             })
         })
         .collect();

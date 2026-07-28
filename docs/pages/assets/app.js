@@ -215,6 +215,18 @@ function escapeHtml(value) {
   );
 }
 
+// One-click examples: fill the input and run, so a first-time visitor never
+// has to hunt for a URL.
+for (const button of document.querySelectorAll(".assess-example")) {
+  button.addEventListener("click", () => {
+    if (!targetInput || !form) {
+      return;
+    }
+    targetInput.value = button.dataset.url || "";
+    form.requestSubmit();
+  });
+}
+
 if (refreshButton) {
   refreshButton.addEventListener("click", () => {
     loadReports({ force: true });

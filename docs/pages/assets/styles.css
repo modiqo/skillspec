@@ -4790,3 +4790,29 @@ pre code {
   font-size: 0.9rem;
 }
 .md-report th { background: var(--panel-soft, #f1f5f9); }
+
+/* One-click example URLs under the input */
+.assess-examples {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.assess-example {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel, #fff);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.assess-example:hover {
+  border-color: var(--ink);
+  background: var(--panel-soft, #f1f5f9);
+}

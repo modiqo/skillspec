@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Antic&amp;display=swap" rel="stylesheet">
     <link rel="alternate" type="text/plain" href="./llms.txt" title="SkillSpec llms.txt">
-    <link rel="stylesheet" href="./assets/styles.css?v=20260728-md">
+    <link rel="stylesheet" href="./assets/styles.css?v=20260728-tryone">
   </head>
   <body>
     <header class="site-header">
@@ -80,6 +80,12 @@
               <label class="assess-check"><input type="checkbox" id="check-security" checked> Security</label>
               <span class="assess-hint">Public repo &middot; nothing is executed &middot; <a href="#install">install the CLI</a></span>
             </div>
+            <p class="assess-examples">
+              Try one:
+              <button type="button" class="assess-example" data-url="https://github.com/anthropics/skills">anthropics/skills</button>
+              <button type="button" class="assess-example" data-url="https://github.com/mattpocock/skills">mattpocock/skills</button>
+              <button type="button" class="assess-example" data-url="https://github.com/modiqo/rote-skills">modiqo/rote-skills</button>
+            </p>
             <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
           </form>
 
@@ -685,6 +691,6 @@ Write SKILL.md, then import and prove it.</code></pre>
     </footer>
 
     <script src="./assets/site.js?v=20260628-risk-star"></script>
-    <script src="./assets/app.js?v=20260728-md-report"></script>
+    <script src="./assets/app.js?v=20260728-tryone"></script>
   </body>
 </html>
