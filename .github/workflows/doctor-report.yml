@@ -336,6 +336,11 @@ jobs:
               > doctor-report/boundary-assess.txt 2> doctor-report/boundary-stderr.txt; then
             skillspec boundary assess "${TARGET}" --json \
               > doctor-report/boundary-assess.json 2>/dev/null || true
+            # Render the JSON into a clean, actionable Markdown report (findings
+            # with clickable links + a what-to-do-next tutorial) for the summary
+            # and the issue comment, rather than dumping the raw terminal tree.
+            node .github/scripts/render-boundary.mjs \
+              doctor-report/boundary-assess.json > doctor-report/boundary-report.md || true
             echo "status=0" >> "${GITHUB_OUTPUT}"
           else
             echo "status=1" >> "${GITHUB_OUTPUT}"
@@ -393,8 +398,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          max_report_chars=24000
-          if [ -f doctor-report-public/boundary-assess.txt ]; then
+          max_report_chars=28000
+          # Prefer the parsed Markdown report; fall back to the raw tree only if
+          # rendering produced nothing.
+          if [ -s doctor-report-public/boundary-report.md ]; then
+            {
+              echo
+              head -c "${max_report_chars}" doctor-report-public/boundary-report.md
+              echo
+            } >> "${GITHUB_STEP_SUMMARY}"
+          elif [ -f doctor-report-public/boundary-assess.txt ]; then
             {
               echo
               echo "## Security analysis — \`skillspec boundary assess\`"
@@ -478,25 +491,35 @@ jobs:
             const lead = hasDoctor
               ? renderedReport
               : "### SkillSpec report\n\nFollow-through analysis was not requested for this submission.";
-            const maxBoundaryChars = 16000;
-            const boundary = fs.existsSync("doctor-report-public/boundary-assess.txt")
+            const maxBoundaryChars = 30000;
+            // Prefer the parsed Markdown report (findings + tutorial), shown
+            // directly. Fall back to the raw tree in a code block only if the
+            // renderer produced nothing.
+            const boundaryMd = fs.existsSync("doctor-report-public/boundary-report.md")
+              ? fs.readFileSync("doctor-report-public/boundary-report.md", "utf8")
+              : "";
+            const boundaryRaw = fs.existsSync("doctor-report-public/boundary-assess.txt")
               ? fs.readFileSync("doctor-report-public/boundary-assess.txt", "utf8")
               : "";
-            const boundaryBlock = boundary.trim()
-              ? [
-                  "",
-                  hasDoctor ? "<details>" : "<details open>",
-                  "<summary><strong>Security analysis</strong> — <code>skillspec boundary assess</code> (what each skill can reach, ranked by risk)</summary>",
-                  "",
-                  "```text",
-                  boundary.length > maxBoundaryChars
-                    ? `${boundary.slice(0, maxBoundaryChars)}\n\n> Truncated in issue comment. Download the artifact for the full analysis.`
-                    : boundary,
-                  "```",
-                  "",
-                  "</details>",
-                ].join("\n")
-              : "";
+            let boundaryBlock = "";
+            if (boundaryMd.trim()) {
+              const clipped = boundaryMd.length > maxBoundaryChars
+                ? `${boundaryMd.slice(0, maxBoundaryChars)}\n\n> Truncated in issue comment. Download the artifact for the full analysis.`
+                : boundaryMd;
+              boundaryBlock = `\n\n${clipped}`;
+            } else if (boundaryRaw.trim()) {
+              boundaryBlock = [
+                "",
+                "<details open>",
+                "<summary><strong>Security analysis</strong> — <code>skillspec boundary assess</code></summary>",
+                "",
+                "```text",
+                boundaryRaw.slice(0, 16000),
+                "```",
+                "",
+                "</details>",
+              ].join("\n");
+            }
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
@@ -516,6 +539,7 @@ jobs:
               "- `source-stage.json`",
               "- `boundary-assess.txt`",
               "- `boundary-assess.json`",
+              "- `boundary-report.md`",
               "- `target.txt`",
             ].join("\n");
 

@@ -23,6 +23,7 @@ const reportFiles = [
   "doctor-stderr.txt",
   "boundary-assess.txt",
   "boundary-assess.json",
+  "boundary-report.md",
   "boundary-stderr.txt",
 ];
 
