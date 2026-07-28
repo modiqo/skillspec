@@ -79,10 +79,13 @@ pub fn build(root: &Path) -> Result<SurfaceMap> {
     let package_rel = packages
         .iter()
         .map(|dir| {
+            // Forward-slashed to match the source map's file paths, which are
+            // always `/`-separated; otherwise `owning_package` never matches on
+            // Windows and every file falls out of its skill. No-op on Unix.
             dir.strip_prefix(root)
                 .unwrap_or(dir)
                 .to_string_lossy()
-                .to_string()
+                .replace(std::path::MAIN_SEPARATOR, "/")
         })
         .map(|rel| if rel.is_empty() { ".".to_owned() } else { rel })
         .collect::<Vec<_>>();
