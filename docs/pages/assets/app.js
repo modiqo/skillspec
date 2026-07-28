@@ -196,14 +196,12 @@ function renderLiveResult(report) {
   if (!liveResult) {
     return;
   }
-  const model = buildReportModel(report);
-  const heading =
-    report.status === "error"
-      ? "Report could not complete"
-      : "Report ready";
+  const heading = report.status === "error" ? "Report could not complete" : "Report ready";
+  // Render the report's own Markdown (follow-through and/or security), not a
+  // doctor-shaped dashboard that reads "not reported" for a security report.
   liveResult.innerHTML =
     `<div class="live-status"><strong>${heading}</strong></div>` +
-    renderReportDashboard(model) +
+    `<div class="md-report">${renderMarkdown(report.markdown || "")}</div>` +
     `<a class="live-issue-link" href="${report.issue.html_url}" target="_blank" rel="noreferrer">Open the full report on GitHub &rarr;</a>`;
 }
 
@@ -752,9 +750,8 @@ function openReportViewer(report, { updateUrl = false, scroll = true } = {}) {
     return;
   }
 
-  const model = buildReportModel(report);
-  viewerTitle.textContent = model.viewerTitle;
-  reportContent.innerHTML = renderReportDashboard(model);
+  viewerTitle.textContent = compactTitle(report.title || titleFromIssue(report.issue));
+  reportContent.innerHTML = `<div class="md-report">${renderMarkdown(report.markdown || "")}</div>`;
   reportViewer.hidden = false;
   activeReport = report;
   if (shareViewerButton) {
@@ -1576,6 +1573,12 @@ function renderMarkdown(markdown) {
       continue;
     }
 
+    if (/^---+\s*$/.test(line)) {
+      blocks.push("<hr>");
+      index += 1;
+      continue;
+    }
+
     if (/^- /.test(line)) {
       const items = [];
       while (index < lines.length && /^- /.test(lines[index])) {
@@ -1586,6 +1589,33 @@ function renderMarkdown(markdown) {
       continue;
     }
 
+    if (/^\d+\.\s/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^\d+\.\s/.test(lines[index])) {
+        items.push(`<li>${renderInline(lines[index].replace(/^\d+\.\s/, ""))}</li>`);
+        index += 1;
+      }
+      blocks.push(`<ol>${items.join("")}</ol>`);
+      continue;
+    }
+
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[index + 1] || "")) {
+      const cells = (row) =>
+        row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      const header = cells(line);
+      index += 2;
+      const rows = [];
+      while (index < lines.length && /^\s*\|.*\|\s*$/.test(lines[index])) {
+        rows.push(cells(lines[index]));
+        index += 1;
+      }
+      blocks.push(
+        `<table><thead><tr>${header.map((c) => `<th>${renderInline(c)}</th>`).join("")}</tr></thead>` +
+          `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${renderInline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`,
+      );
+      continue;
+    }
+
     const paragraphLines = [];
     while (
       index < lines.length &&
@@ -1593,6 +1623,9 @@ function renderMarkdown(markdown) {
       !lines[index].startsWith("```") &&
       !/^(#{1,3})\s+/.test(lines[index]) &&
       !/^- /.test(lines[index]) &&
+      !/^\d+\.\s/.test(lines[index]) &&
+      !/^---+\s*$/.test(lines[index]) &&
+      !/^\s*\|.*\|\s*$/.test(lines[index]) &&
       !lines[index].startsWith(">")
     ) {
       paragraphLines.push(lines[index]);
@@ -1612,6 +1645,7 @@ function renderInline(value) {
   });
   escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
   escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  escaped = escaped.replace(/(^|[\s(])_([^_]+)_(?=[\s).,;:]|$)/g, "$1<em>$2</em>");
   return escaped;
 }
 

@@ -4739,3 +4739,54 @@ pre code {
     grid-template-columns: 1fr;
   }
 }
+
+/* Rendered report Markdown (live panel + viewer) — replaces the doctor-shaped
+   dashboard so a security-only report is not shown as "not reported". */
+.md-report {
+  text-align: left;
+  color: var(--ink);
+  line-height: 1.55;
+}
+.md-report h1 { font-size: 1.35rem; margin: 20px 0 8px; }
+.md-report h2 { font-size: 1.15rem; margin: 22px 0 8px; }
+.md-report h3 { font-size: 1.0rem; margin: 16px 0 6px; }
+.md-report p { margin: 8px 0; }
+.md-report ul, .md-report ol { margin: 8px 0 8px 22px; }
+.md-report li { margin: 4px 0; }
+.md-report a { color: var(--blue, #2563eb); }
+.md-report code {
+  background: var(--panel-soft, #f1f5f9);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--font-mono);
+}
+.md-report pre {
+  background: #17130f;
+  color: #f7efe3;
+  padding: 14px 16px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.md-report pre code { background: transparent; padding: 0; color: inherit; }
+.md-report hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+.md-report blockquote {
+  border-left: 3px solid var(--line);
+  margin: 10px 0;
+  padding: 4px 0 4px 14px;
+  color: var(--muted);
+}
+.md-report table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  display: block;
+  overflow-x: auto;
+}
+.md-report th, .md-report td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.md-report th { background: var(--panel-soft, #f1f5f9); }
