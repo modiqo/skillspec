@@ -4386,3 +4386,52 @@ pre code {
 .boundary-steps li strong {
   color: var(--accent, #d8b46a);
 }
+
+/* The Security panel puts prose on the left and a live terminal on the right;
+   top-align them so the terminal tracks the heading, not the panel's bottom. */
+.boundary-panel {
+  align-items: start;
+}
+
+.boundary-demo {
+  align-self: stretch;
+  margin: 0;
+}
+
+.boundary-demo code {
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+/* Severity colours mirror the CLI: critical/high red, medium orange, low blue,
+   clean green — on the terminal's dark background. */
+.boundary-demo .sev-crit {
+  color: #ff6b6b;
+  font-weight: 700;
+}
+
+.boundary-demo .sev-high {
+  color: #ff8a8a;
+}
+
+.boundary-demo .sev-med {
+  color: #f5a524;
+}
+
+.boundary-demo .sev-low {
+  color: #74b6ff;
+}
+
+.boundary-demo .sev-ok {
+  color: #5bd4a0;
+}
+
+.boundary-demo .dim {
+  color: rgba(247, 239, 227, 0.5);
+}
+
+@media (max-width: 920px) {
+  .boundary-demo {
+    align-self: auto;
+  }
+}

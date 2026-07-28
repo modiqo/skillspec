@@ -21,6 +21,9 @@ const reportFiles = [
   "doctor-report.html",
   "doctor-report.json",
   "doctor-stderr.txt",
+  "boundary-assess.txt",
+  "boundary-assess.json",
+  "boundary-stderr.txt",
 ];
 
 for (const file of reportFiles) {

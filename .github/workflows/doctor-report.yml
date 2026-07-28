@@ -300,6 +300,31 @@ jobs:
             target/debug/skillspec doctor "${DOCTOR_TARGET}" --json > doctor-report/doctor-report.json
           fi
 
+      - name: Run boundary security analysis
+        id: boundary
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        shell: bash
+        env:
+          # Assess the remote URL, not the local checkout, so evidence loci are
+          # clickable blob URLs rather than runner paths. Static analysis only;
+          # nothing in the package is executed.
+          TARGET: ${{ steps.parse.outputs.target }}
+        run: |
+          set -uo pipefail
+          mkdir -p doctor-report
+          if target/debug/skillspec boundary assess "${TARGET}" \
+              > doctor-report/boundary-assess.txt 2> doctor-report/boundary-stderr.txt; then
+            target/debug/skillspec boundary assess "${TARGET}" --json \
+              > doctor-report/boundary-assess.json 2>/dev/null || true
+            echo "status=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "status=1" >> "${GITHUB_OUTPUT}"
+            {
+              echo "The security analysis could not complete for this target."
+              echo "See boundary-stderr.txt in the artifacts."
+            } > doctor-report/boundary-assess.txt
+          fi
+
       - name: Prepare public doctor artifacts
         if: steps.visibility.outputs.public == 'true'
         shell: bash
@@ -338,6 +363,25 @@ jobs:
             echo
             echo "Full Markdown, text, HTML, and JSON reports are attached as workflow artifacts."
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Add security analysis to run summary
+        if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_report_chars=24000
+          if [ -f doctor-report-public/boundary-assess.txt ]; then
+            {
+              echo
+              echo "## Security analysis — \`skillspec boundary assess\`"
+              echo
+              echo '```text'
+              head -c "${max_report_chars}" doctor-report-public/boundary-assess.txt
+              echo
+              echo '```'
+              echo
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
       - name: Add doctor failure to run summary
         if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.doctor.outputs.status != '0'
@@ -395,17 +439,37 @@ jobs:
             const shapeGate = fs.existsSync("doctor-report-public/shape-gate.md")
               ? fs.readFileSync("doctor-report-public/shape-gate.md", "utf8")
               : "";
-            const maxReportChars = 52000;
+            const maxReportChars = 40000;
             const fullReport = process.env.RUN_FULL_DOCTOR === "true" && shapeGate
               ? `${shapeGate}\n\n---\n\n${report}`
               : report;
             const renderedReport = fullReport.length > maxReportChars
               ? `${fullReport.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
               : fullReport;
+            const maxBoundaryChars = 16000;
+            const boundary = fs.existsSync("doctor-report-public/boundary-assess.txt")
+              ? fs.readFileSync("doctor-report-public/boundary-assess.txt", "utf8")
+              : "";
+            const boundaryBlock = boundary.trim()
+              ? [
+                  "",
+                  "<details>",
+                  "<summary><strong>Security analysis</strong> — <code>skillspec boundary assess</code> (what each skill can reach, ranked by risk)</summary>",
+                  "",
+                  "```text",
+                  boundary.length > maxBoundaryChars
+                    ? `${boundary.slice(0, maxBoundaryChars)}\n\n> Truncated in issue comment. Download the artifact for the full analysis.`
+                    : boundary,
+                  "```",
+                  "",
+                  "</details>",
+                ].join("\n")
+              : "";
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
               renderedReport,
+              boundaryBlock,
               "",
               `Full artifacts: ${artifactUrl}`,
               "",
@@ -418,6 +482,8 @@ jobs:
               "- `shape-gate.md`",
               "- `shape-gate.json`",
               "- `source-stage.json`",
+              "- `boundary-assess.txt`",
+              "- `boundary-assess.json`",
               "- `target.txt`",
             ].join("\n");
 
