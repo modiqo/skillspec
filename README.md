@@ -315,10 +315,26 @@ binaries, and credentials it touches — and compiles that into a least-privileg
 policy you can enforce, without changing the skill.
 
 ```bash
-skillspec boundary ./my-skill                 # what could it reach?
+skillspec boundary map ./my-skill             # structure: what's in it
+skillspec boundary assess ./my-skill          # security: what it can reach, ranked by risk
 skillspec boundary emit ./my-skill            # a deny-by-default policy
 skillspec boundary guard install              # enforce reviewed policies
+skillspec pull https://github.com/owner/skills  # assess, then install it
 ```
+
+`assess` ranks findings by severity (critical/high/medium/low) with
+scope-awareness — a skill confined to its own directory is low risk; reaching
+outside it (a home or absolute path, the network, another skill's files) is what
+earns review — and qualifies documentation examples (a secret read shown in a
+mocking guide is not treated as a live exfiltration path). `--json` on `map` and
+`assess` gives structured output.
+
+Because a skill ships in a git repo and is copied out of it on install, you can
+assess it *before* it lands. `skillspec pull` makes that assessment part of the
+install verb: it shows the shape and the risk, asks, and only then installs —
+proxying to the harness CLI for a plugin marketplace, or placing skill folders
+for any `AGENTS.md`/`SKILL.md` harness. `skillspec update` re-pulls and shows
+what capability grew before replacing an installed skill.
 
 It runs on a local skill or a public git URL (GitHub, GitLab, Bitbucket, or
 self-hosted), executes nothing in the package, and is a **standalone tool** — it

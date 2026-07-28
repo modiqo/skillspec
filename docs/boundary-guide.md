@@ -17,6 +17,11 @@ There are three things you can do, in increasing order of commitment:
 
 Nothing forces you past step 1.
 
+There is also a **gate** you can put in front of an install, so a skill is
+assessed before it lands on disk — see [Gate an install](#gate-an-install) — and
+`skillspec pull`/`update`, which make that assessment part of the install verb
+itself across every harness — see [Install through skillspec](#install-through-skillspec-pull-and-update).
+
 ## Install and use it on its own
 
 `skillspec boundary` ships inside the `skillspec` binary, but it is a standalone
@@ -120,6 +125,59 @@ skill and, when that fails, relative to the repository root, so a
 `skills/other/SKILL.md` link written from the root resolves. It's a fast
 orientation step to run first, and `--json` gives the graph for tooling.
 
+The map is the **Structure** half of what `gate` shows; the next command is the
+**Security analysis** half.
+
+### Rank the risk
+
+```bash
+skillspec boundary assess ./skills-repo
+skillspec boundary assess https://github.com/owner/skills --json
+```
+
+`assess` ranks what each skill could reach by severity, so you see the worst
+first and can decide:
+
+```text
+Risk across 18 skills — 0 critical · 0 high · 5 medium · 11 low · 2 clean
+5 skill(s) reach beyond their own directory — review before installing
+├── MEDIUM  plugins/pack/skills/main
+│   └── [MEDIUM] reads outside its directory → ~/.config/agent  ·  can read files beyond the skill folder
+│       └── https://github.com/owner/skills/blob/HEAD/plugins/pack/skills/main/SKILL.md#L12
+└── ...
+
+Cleared — no review needed
+├── 11 clean · reach nothing outside their own directory
+└── 2 low · touch only their own files
+    ├── plugins/pack/skills/pdf
+    └── plugins/pack/skills/docx
+```
+
+Two ideas set the ranking:
+
+- **Scope.** A skill that reads and writes only inside its own directory is doing
+  its job — low risk however much it touches. What earns review is *reaching
+  outside* it: a home or absolute path, an `..` escape, the network, another
+  skill's files, the agent's own config. Skills that stay in scope are named
+  under **Cleared** so their absence from the review list reads as "checked and
+  fine", not "unchecked".
+- **Consequence.** Reading a credential outranks reading the skill's own file; a
+  hidden instruction outranks a visible one; a secret read *plus* a way off the
+  machine is an exfiltration path and outranks either alone. Each finding states
+  how bad it is (`CRITICAL`/`HIGH`/`MEDIUM`/`LOW`, colored red/red/orange/blue in
+  a terminal), what it reaches, what happens if it runs, and a clickable link to
+  the exact line.
+
+**Documentation examples are qualified, not counted as live effects.** A secret
+read or a `curl` shown in a fenced code block of a *referenced Markdown doc* (a
+mocking guide, a how-to) is illustrative, not something the skill executes —
+`assess` downgrades it to `LOW`, tags it *"shown as an example in documentation —
+not an executed effect"*, and does not elevate it to a critical exfiltration
+path. It is still listed (an "example" that reaches a live host is exactly what
+the tag invites checking); a real shipped script keeps full severity. `--json`
+emits the per-skill severity, every finding, and the tally
+(`skillspec.boundary.security.v0`).
+
 Every read-only command works on a remote URL too — the whole collection or one
 skill:
 
@@ -160,6 +218,136 @@ reported at `unmapped` reach.
 `emit`, `check`, `diff`, and `guard add` operate on a single skill. Pointed at a
 folder of many, they tell you to name a specific skill folder rather than
 flatten it.
+
+### Gate an install
+
+A skill or plugin ships in a git repository and is copied out of it on install,
+so the repository can be assessed *before* anything lands on disk. `gate` maps
+the target, reports what any skill could reach if executed, and — when there are
+findings — asks you to confirm before running the real install command:
+
+```bash
+skillspec boundary gate https://github.com/owner/skills \
+  --then 'claude plugin marketplace add owner/skills && claude plugin install pack@skills'
+```
+
+```text
+Structure — what the package contains
+─────────────────────────────────────
+https://github.com/owner/skills   (18 skills · 7 resources · 1 orphans)
+├── plugins/onboard/skills/setup
+├── plugins/pack/skills/main
+│   └── (orphan) references/flow.md
+└── ...
+
+Security analysis — what it could reach, ranked by risk
+───────────────────────────────────────────────────────
+Risk across 18 skills — 1 critical · 0 high · 2 medium · 11 low · 4 clean
+2 skill(s) reach beyond their own directory — review before installing
+├── CRITICAL  plugins/pack/skills/main
+│   ├── [CRITICAL] sends data to the network → exfil.example.net  ·  credentials could be read and sent off the machine
+│   │   └── https://github.com/owner/skills/blob/HEAD/plugins/pack/skills/main/report.py#L7
+│   └── [HIGH] reads credentials → ~/.aws/credentials  ·  can read your saved credentials
+│       └── https://github.com/owner/skills/blob/HEAD/plugins/pack/skills/main/report.py#L5
+└── MEDIUM  plugins/onboard/skills/setup
+    └── [MEDIUM] reads outside its directory → ~/.config/agent  ·  can read files beyond the skill folder
+        └── https://github.com/owner/skills/blob/HEAD/plugins/onboard/skills/setup/SKILL.md#L117
+
+Cleared — no review needed
+├── 11 clean · reach nothing outside their own directory
+└── 4 low · touch only their own files
+    ├── pdf
+    └── docx
+
+Proceed with install? [y/N]
+```
+
+The report is in two clearly headed sections — **Structure** (the map, what the
+package contains) and **Security analysis** (the ranked risk). While the
+repository is cloned and scanned, a dot-matrix spinner runs on stderr; it clears
+itself when the report is ready and is silent when output is not a terminal.
+Severities are colored the way security tools do — critical bold red, high red,
+medium orange, low blue — and color is dropped entirely when stdout is not a
+terminal or `NO_COLOR` is set, so the report reads identically in a pipe or a
+log. Skills needing no review are grouped under **Cleared**: clean ones (reach
+nothing outside their directory) are counted, and the few low-risk ones (touch
+only their own files) are named.
+
+The findings are a **tree** — the same shape `boundary map` uses — so it never
+fractures the way a bordered table does when a line runs long. Each finding sits
+under its skill, and its **evidence link is a leaf directly beneath it**, alone
+on its own line: clickable (an OSC 8 terminal hyperlink for a remote blob URL at
+the exact line, GitLab and Bitbucket shapes handled too; an openable `path:line`
+for a local target), and never divorced from the finding it belongs to.
+
+Risk is ranked, and each finding is stated in the terms you decide on:
+**how bad** (a severity earned by consequence — a credential read outranks a
+read of the skill's own file; a secret read *plus* a way off the machine is an
+exfiltration path and outranks either alone), **why** (the evidence), and **what
+happens if it runs**. Scope sets the floor: a skill that only reads and writes
+inside its own directory is low risk however much it touches — what earns a
+review is *reaching outside* that directory (a home or absolute path, an `..`
+escape, the network, another skill's files, the agent's own config). Skills that
+stay in scope are named so their absence from the review list reads as "checked
+and fine", not "unchecked".
+
+On **y**, the `--then` command runs and the gate exits with its status. On
+**N**, nothing is installed (exit 1). If a skill has findings and no terminal is
+attached to confirm, the gate refuses (exit 2) rather than installing blind —
+pass `--yes` to proceed anyway in a script. A clean target is approved without a
+prompt. Without `--then`, `gate` reports and approves but runs nothing, so you
+can wire it into your own install flow.
+
+This is the **human-driven** interception point: `claude plugin install …` typed
+in a terminal is a CLI command, not an agent tool call, so no harness hook fires
+on it — `gate` is the wrapper you run instead. The **agent-driven** point is
+covered separately: when an agent runs an install through its Bash tool, the
+[guard hook](#3-enforce) intercepts it at `PreToolUse`. A skill install reads as
+a distinct `pkg.install:skill/…` effect that no ordinary policy grants, so in
+enforce mode an agent-initiated install fails closed.
+
+### Install through skillspec (`pull` and `update`)
+
+`gate` wraps an install command you supply. `skillspec pull` goes one step
+further: it *is* the install verb, so the assessment cannot be skipped the way a
+raw `claude plugin install` can, and one command works regardless of harness.
+
+```bash
+skillspec pull https://github.com/owner/skills          # assess, then install
+skillspec pull owner/skills --plugin onboard            # one plugin from a marketplace
+skillspec pull ./my-skill --into ~/.claude/skills       # place a local skill
+```
+
+`pull` stages the source, runs the same assessment as `gate` (the tree, then the
+risk), and on approval installs it one of two ways — it detects which applies:
+
+- **Proxy** — a Claude/Codex plugin-marketplace repo (one carrying
+  `.claude-plugin/marketplace.json`) is installed through the harness CLI:
+  `claude plugin marketplace add owner/repo` then `claude plugin install
+  plugin@marketplace`, for each plugin (or the ones named with `--plugin`). Used
+  automatically when the repo is a marketplace and the CLI is on `PATH`.
+- **Place** — every other harness reads `SKILL.md` from a skills directory, so
+  "install" is copying the skill folders there. skillspec does the copy itself.
+  The destination is `~/.claude/skills` by default, `.claude/skills` with
+  `--project`, or an explicit `--into <dir>` (a `~/.codex/skills`, an
+  `AGENTS.md` `skills/` dir — anywhere a harness reads skills). This path needs
+  no harness CLI and covers the whole `AGENTS.md`/`SKILL.md` gamut.
+
+Force a path with `--harness claude|codex`. The confirmation rules are the
+gate's: a clean source installs without a prompt; a source with findings needs
+an interactive `y` or `--yes`, and refuses (exit 2) when neither a terminal nor
+`--yes` is present.
+
+`skillspec update <source>` re-pulls and, for a placed skill that already exists
+at the destination, **shows how its capability surface changed before replacing
+it** — a new network host, a new secret read — so a skill that quietly grows its
+reach across a version cannot slip in on an update:
+
+```text
+Update to release-notes changes its capability surface:
+Needs review
+- egress_expansion  net.egress:telemetry.example.net  (new capability)
+```
 
 ### Gate a skill in CI
 
@@ -346,7 +534,11 @@ policies and the decision log are left in place.
 
 | Command | Purpose |
 | --- | --- |
-| `boundary map <folder>` | Map the folder's shape: skills, resources, orphans, cross-references |
+| `boundary map <folder> [--json]` | Structure: skills, resources, orphans, cross-references |
+| `boundary assess <target> [--json]` | Security analysis: what each skill can reach, ranked by risk |
+| `boundary gate <target> [--then <cmd>] [--yes]` | Structure + security analysis, then run `<cmd>` on approval |
+| `pull <source> [--harness h] [--into d] [--plugin p] [--yes]` | Assess, then install via CLI proxy or file placement |
+| `update <source> [...]` | Re-pull, showing capability drift before replacing |
 | `boundary <target>` | Report the effect surface |
 | `boundary <target> --reveal <file>` | Write decoded concealment payloads to a file |
 | `boundary check <target> [--against <ref>]` | CI gate; exit codes 0–3 |

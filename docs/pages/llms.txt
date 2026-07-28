@@ -72,8 +72,11 @@ skillspec doctor ./my-skill --json
 Constrain what a skill can reach (standalone; local folder or public git URL):
 
 ```sh
-skillspec boundary map ./skills-repo        # tree: skills, resources, orphans
-skillspec boundary ./my-skill               # effect surface + concealment + directives
+skillspec boundary map ./skills-repo        # structure: skills, resources, orphans (--json)
+skillspec boundary assess ./skills-repo     # security analysis: what each skill reaches, ranked by risk (--json)
+skillspec boundary ./my-skill               # raw effect surface + concealment + directives
+skillspec boundary gate <target> --then '<install cmd>'  # assess before install, run on approval
+skillspec pull <target>                     # assess, then install across harnesses (update: re-pull with drift)
 skillspec boundary emit ./my-skill          # deny-by-default policy
 skillspec boundary guard install            # enforce reviewed policies via a hook
 ```

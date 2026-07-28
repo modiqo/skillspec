@@ -27,8 +27,11 @@ Do not run `skillspec act`, `skillspec query`, `skillspec refs`, or `skillspec -
 For read-only diagnostic routes such as Doctor/source-shape assessment, run the diagnostic command or `skillspec doctor checklist <source> --json` when available, answer directly, and stop. Do not create source maps, import drafts, progress ledgers, final-response proof, or alignment summaries unless the user explicitly asks for proof.
 
 For security assessment — what a skill could reach if executed, and a least-privilege boundary for it — use the standalone `skillspec boundary` commands and answer directly. This is a separate read-only tool that needs no `skill.spec.yml` and installs/changes nothing:
-- `skillspec boundary map <folder-or-url>` — a tree of a skill collection: skills, resources, orphan files, and cross-references.
-- `skillspec boundary <skill-or-url>` — the effect surface: what it reads, reaches, executes, plus concealment and directive findings.
+- `skillspec boundary map <folder-or-url>` — Structure: a tree of a skill collection (skills, resources, orphan files, cross-references). `--json` for the graph.
+- `skillspec boundary assess <folder-or-url>` — Security analysis: what each skill can reach if executed, ranked by severity (critical/high/medium/low), scope-aware (a skill confined to its own directory is low risk), with documentation examples qualified rather than counted as live effects. `--json` for structured findings.
+- `skillspec boundary <skill-or-url>` — the raw effect surface: what it reads, reaches, executes, plus concealment and directive findings.
+- `skillspec boundary gate <folder-or-url> --then '<install command>'` — assess a skill/plugin before install, present tree and risk, and run the install only on approval.
+- `skillspec pull <folder-or-url>` — assess then install across harnesses: proxy to the Claude/Codex plugin CLI for a marketplace repo, or place skill folders for any AGENTS.md/SKILL.md harness. `skillspec update <source>` re-pulls and shows capability drift before replacing an installed skill.
 - `skillspec boundary emit <skill>` — a deny-by-default policy compiled from that surface.
 - `skillspec boundary guard install|add|mode enforce` — enforce a reviewed policy against installed skills via a managed PreToolUse hook.
 

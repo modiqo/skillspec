@@ -324,27 +324,34 @@
             <li><strong>Map</strong> a collection to see its shape &mdash; skills,
               resources, orphan files where a payload can hide, and how skills
               cross-reference.</li>
-            <li><strong>Assess</strong> one skill for its full effect surface,
-              plus hidden-instruction and behavior-retargeting findings.</li>
+            <li><strong>Assess</strong> ranks what each skill can reach by severity
+              (critical / high / medium / low), scope-aware: a skill confined to
+              its own directory is low risk; reaching outside it &mdash; a home or
+              absolute path, the network, another skill's files &mdash; is what
+              earns review. Documentation examples are qualified, not counted as
+              live effects.</li>
+            <li><strong>Gate the install</strong>: <code>skillspec pull</code>
+              assesses a skill or plugin before it lands on disk and installs it
+              only on approval &mdash; across harnesses.</li>
             <li><strong>Constrain</strong>: compile a deny-by-default policy, and
               optionally enforce reviewed policies against installed skills
               through a managed pre-tool hook.</li>
           </ol>
-          <pre aria-label="Example boundary map tree output"><code>$ skillspec boundary map https://github.com/owner/skills
+          <pre aria-label="Example boundary assess ranked risk output"><code>$ skillspec boundary assess https://github.com/owner/skills
 
-owner/skills   (7 skills &middot; 23 resources &middot; 7 orphans)
-&#9500;&#9472;&#9472; [entry] README.md &#8594; indexes 7 skill(s)
-&#9500;&#9472;&#9472; skills/deploy
-&#9474;   &#9500;&#9472;&#9472; &#8594; references: coding-standards
-&#9474;   &#9500;&#9472;&#9472; steps.md
-&#9474;   &#9492;&#9472;&#9472; (orphan) scripts/collect.sh
-&#9492;&#9472;&#9472; skills/format
-    &#9492;&#9472;&#9472; rules.md
+Risk across 18 skills &#8212; 1 critical &middot; 0 high &middot; 2 medium &middot; 11 low &middot; 4 clean
+2 skill(s) reach beyond their own directory &#8212; review before installing
+&#9500;&#9472;&#9472; CRITICAL  plugins/pack/skills/main
+&#9474;   &#9500;&#9472;&#9472; [CRITICAL] sends data to the network &#8594; exfil.example.net
+&#9474;   &#9474;   &#9492;&#9472;&#9472; &#8230;/main/report.py#L7
+&#9474;   &#9492;&#9472;&#9472; [HIGH] reads credentials &#8594; ~/.aws/credentials
+&#9474;       &#9492;&#9472;&#9472; &#8230;/main/report.py#L5
+&#9492;&#9472;&#9472; MEDIUM  plugins/onboard/skills/setup
+    &#9492;&#9472;&#9472; [MEDIUM] reads outside its directory &#8594; ~/.config/agent
 
-$ skillspec boundary ./skills/deploy
-If executed, this skill can read ~/.aws/credentials and send data to
-paste.ee. The credential read is in scripts/collect.sh, which no part of
-SKILL.md references.</code></pre>
+Cleared &#8212; no review needed
+&#9500;&#9472;&#9472; 11 clean &middot; reach nothing outside their own directory
+&#9492;&#9472;&#9472; 4 low &middot; touch only their own files</code></pre>
           <p class="input-help">
             Static analysis: nothing in the package is executed. SkillSpec does
             not enforce the boundary; a harness, hook, or network policy does.
