@@ -4535,3 +4535,207 @@ pre code {
 .threat-stats a:hover {
   color: var(--ink);
 }
+
+/* ---- Hero as a focused tool: one input, Run, stats, live result ---- */
+.hero-tool {
+  display: block;
+  text-align: center;
+  padding: 60px 0 34px;
+  margin-bottom: 8px;
+}
+
+.hero-tool-inner {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.hero-tool h1 {
+  font-size: clamp(2.1rem, 4.4vw, 3.3rem);
+  line-height: 1.06;
+  margin: 8px 0 16px;
+}
+
+.hero-tool-sub {
+  color: var(--muted);
+  font-size: 1.06rem;
+  line-height: 1.55;
+  max-width: 600px;
+  margin: 0 auto 26px;
+}
+
+.assess-box {
+  max-width: 660px;
+  margin: 0 auto;
+}
+
+.assess-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.assess-row input {
+  width: 100%;
+  min-width: 0;
+  font-size: 1.05rem;
+  padding: 16px 18px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.assess-row input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.assess-row button {
+  padding: 0 30px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 1.02rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.assess-row button:hover {
+  background: #000000;
+}
+
+.assess-row button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.assess-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 20px;
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.assess-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 640;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.assess-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--amber, #d97706);
+  cursor: pointer;
+}
+
+.assess-hint a {
+  color: inherit;
+}
+
+.hero-tool .form-message {
+  margin-top: 12px;
+  min-height: 1.1em;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.hero-tool .form-message.error {
+  color: var(--red, #dc2626);
+}
+
+.hero-tool .threat-stats {
+  margin-top: 34px;
+  text-align: left;
+}
+
+/* ---- Live result panel (fed from the submitted CI run) ---- */
+.live-result {
+  margin: 26px auto 0;
+  max-width: 940px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel, #ffffff);
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.live-status strong {
+  color: var(--ink);
+}
+
+.live-spinner {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border: 2px solid var(--line);
+  border-top-color: var(--amber, #d97706);
+  border-radius: 50%;
+  animation: live-spin 0.8s linear infinite;
+}
+
+@keyframes live-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.live-steps {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.live-steps li::before {
+  content: "\2022";
+  margin-right: 8px;
+  color: var(--line);
+}
+
+.live-steps li.done::before {
+  content: "\2713";
+  color: var(--green, #0f9f6e);
+}
+
+.live-steps li.active {
+  color: var(--ink);
+  font-weight: 640;
+}
+
+.live-steps li.active::before {
+  color: var(--amber, #d97706);
+}
+
+.live-result .live-issue-link {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+  .assess-row {
+    grid-template-columns: 1fr;
+  }
+}

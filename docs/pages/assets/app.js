@@ -21,6 +21,7 @@ const runsStatus = document.querySelector("#runs-status");
 const refreshButton = document.querySelector("#refresh-reports");
 const reportViewer = document.querySelector("#report-viewer");
 const reportContent = document.querySelector("#report-content");
+const liveResult = document.querySelector("#live-result");
 const viewerTitle = document.querySelector("#viewer-title");
 const closeViewer = document.querySelector("#close-viewer");
 const shareViewerButton = document.querySelector("#share-viewer");
@@ -76,9 +77,143 @@ if (form && targetInput && formMessage) {
       ].join("\n"),
     );
 
-    showFormMessage("Opening a prefilled GitHub issue request...");
-    window.location.href = issueUrl.toString();
+    // Open the prefilled issue in a NEW tab so this page stays put and can
+    // watch the run. The user clicks "Submit new issue" there to start CI.
+    window.open(issueUrl.toString(), "_blank", "noopener");
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+    showFormMessage("");
+    startLiveWatch(url, { doctor: wantsDoctor, security: wantsSecurity });
   });
+}
+
+// --- Live watch: poll the submitted CI run and render its result inline ------
+
+const LIVE_POLL_MS = 25000;
+const LIVE_TIMEOUT_MS = 12 * 60 * 1000;
+
+async function startLiveWatch(url) {
+  if (!liveResult) {
+    return;
+  }
+  const startedMs = Date.now();
+  liveResult.hidden = false;
+  renderLiveStatus({ phase: "submit", url, issue: null });
+  liveResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  const deadline = startedMs + LIVE_TIMEOUT_MS;
+  let issue = null;
+
+  while (Date.now() < deadline) {
+    await sleep(LIVE_POLL_MS);
+    try {
+      if (!issue) {
+        issue = await findRecentIssueForUrl(url, startedMs - 120000);
+        if (issue) {
+          renderLiveStatus({ phase: "queued", url, issue });
+        }
+      }
+      if (issue) {
+        const report = await loadIssueReport(issue);
+        if (report.status && report.status !== "pending") {
+          renderLiveResult(report);
+          return;
+        }
+        renderLiveStatus({ phase: "running", url, issue });
+      }
+    } catch (_error) {
+      // Rate limit or a transient GitHub error: keep waiting quietly.
+    }
+  }
+  renderLiveStatus({ phase: "timeout", url, issue });
+}
+
+async function findRecentIssueForUrl(url, sinceMs) {
+  const issuesUrl = new URL(
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues`,
+  );
+  issuesUrl.searchParams.set("state", "all");
+  issuesUrl.searchParams.set("sort", "created");
+  issuesUrl.searchParams.set("direction", "desc");
+  issuesUrl.searchParams.set("per_page", "30");
+
+  const issues = await fetchJson(issuesUrl, { timeoutMs: 6000 });
+  const needle = url.replace(/\/+$/, "");
+  return (
+    issues.find(
+      (candidate) =>
+        isDoctorIssue(candidate) &&
+        new Date(candidate.created_at).getTime() >= sinceMs &&
+        typeof candidate.body === "string" &&
+        candidate.body.includes(needle),
+    ) || null
+  );
+}
+
+function liveSteps(phase) {
+  const order = ["submit", "queued", "running", "done"];
+  const labels = {
+    submit: "Submit the issue in the GitHub tab that just opened",
+    queued: "Run picked up by CI",
+    running: "Analyzing the skill",
+    done: "Report ready",
+  };
+  const now = phase === "timeout" ? "running" : phase;
+  const nowIndex = order.indexOf(now);
+  return order
+    .map((step, index) => {
+      const cls = index < nowIndex ? "done" : index === nowIndex ? "active" : "";
+      return `<li class="${cls}">${labels[step]}</li>`;
+    })
+    .join("");
+}
+
+function renderLiveStatus({ phase, url, issue }) {
+  if (!liveResult) {
+    return;
+  }
+  const heads = {
+    submit: "Waiting for you to submit the run on GitHub&hellip;",
+    queued: `Run queued&nbsp;&mdash;&nbsp;issue #${issue ? issue.number : ""}`,
+    running: "Analyzing&hellip; this usually takes a couple of minutes",
+    timeout: "Still running &mdash; the report will appear on the issue when CI finishes",
+  };
+  const spinner = phase === "timeout" ? "" : '<span class="live-spinner" aria-hidden="true"></span>';
+  const issueLink = issue
+    ? `<a class="live-issue-link" href="${issue.html_url}" target="_blank" rel="noreferrer">Follow the run on GitHub issue #${issue.number} &rarr;</a>`
+    : "";
+  liveResult.innerHTML = [
+    `<div class="live-status">${spinner}<strong>${heads[phase] || heads.running}</strong></div>`,
+    `<div class="live-status" style="margin-top:6px;color:var(--muted)">${escapeHtml(url)}</div>`,
+    `<ul class="live-steps">${liveSteps(phase)}</ul>`,
+    issueLink,
+  ].join("");
+}
+
+function renderLiveResult(report) {
+  if (!liveResult) {
+    return;
+  }
+  const model = buildReportModel(report);
+  const heading =
+    report.status === "error"
+      ? "Report could not complete"
+      : "Report ready";
+  liveResult.innerHTML =
+    `<div class="live-status"><strong>${heading}</strong></div>` +
+    renderReportDashboard(model) +
+    `<a class="live-issue-link" href="${report.issue.html_url}" target="_blank" rel="noreferrer">Open the full report on GitHub &rarr;</a>`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch],
+  );
 }
 
 if (refreshButton) {

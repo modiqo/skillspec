@@ -51,118 +51,68 @@
       </nav>
     </header>
     <main class="shell">
-      <section id="home" class="hero" aria-labelledby="page-title">
-        <div class="hero-copy">
-          <p class="eyebrow">Verify agent skills before you trust them</p>
-          <h1 id="page-title">
-            <a class="heading-link" href="#home">Know what a skill does before you install it.</a>
-          </h1>
-          <p class="lede hero-subheading">
-            <span>
-              An agent skill is unvetted <code>SKILL.md</code> prose that inherits
-              your shell, your files, and your credentials.
-            </span>
-            <span>
-              Paste a public GitHub URL and SkillSpec tells you two things in your
-              browser &mdash; free, running nothing: where the skill will
-              <strong>drift from its plan</strong>, and what it could
-              <strong>reach if it executes</strong> (the network, secrets, files
-              beyond its own folder), ranked by risk.
-            </span>
+      <section id="home" class="hero hero-tool" aria-labelledby="page-title">
+        <div class="hero-tool-inner" id="assess">
+          <p class="eyebrow">Verify agent skills before you install them</p>
+          <h1 id="page-title">Know what a skill does before you trust it.</h1>
+          <p class="hero-tool-sub">
+            Paste a public GitHub skill URL. See where it drifts from its plan and
+            what it could reach if it runs &mdash; free, in your browser, nothing
+            executed.
           </p>
-          <div class="hero-actions" aria-label="Primary actions">
-            <a class="primary-link" href="#assess">Assess a skill &rarr;</a>
-            <a class="secondary-link" href="#install">Install the CLI</a>
-          </div>
-          <p class="hero-note">
-            Snyk&rsquo;s ToxicSkills audit found a security flaw in
-            <strong>36.8%</strong> of 3,984 published skills &mdash; and 76 with
-            live malicious payloads. Three lines of Markdown can exfiltrate an SSH
-            key.
-          </p>
-        </div>
-      </section>
 
-      <section id="threat" class="threat-strip" aria-label="Why verifying skills matters">
-        <ul class="threat-stats">
-          <li>
-            <strong>36.8%</strong>
-            <span>of 3,984 published skills carry at least one security flaw</span>
-            <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills, 2026</a>
-          </li>
-          <li>
-            <strong>13.4%</strong>
-            <span>contain a critical-level issue &mdash; 534 skills</span>
-            <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills</a>
-          </li>
-          <li>
-            <strong>3 lines</strong>
-            <span>of Markdown are enough to reach shell access</span>
-            <a href="https://snyk.io/articles/skill-md-shell-access/" target="_blank" rel="noreferrer">Snyk threat model</a>
-          </li>
-          <li>
-            <strong>33.6%</strong>
-            <span>attack success when benign skills combine &mdash; near-zero in isolation</span>
-            <a href="https://arxiv.org/abs/2606.15242" target="_blank" rel="noreferrer">Xie et al., 2026</a>
-          </li>
-          <li>
-            <strong>AST01</strong>
-            <span>&ldquo;Malicious Skills&rdquo; &mdash; the top agentic-skill risk</span>
-            <a href="https://owasp.org/www-project-agentic-skills-top-10/ast01" target="_blank" rel="noreferrer">OWASP</a>
-          </li>
-        </ul>
-      </section>
+          <form id="doctor-form" class="assess-box" novalidate>
+            <label class="sr-only" for="target-url">Public GitHub skill, plugin, or repo URL</label>
+            <div class="assess-row">
+              <input
+                id="target-url"
+                name="target-url"
+                type="url"
+                inputmode="url"
+                autocomplete="url"
+                placeholder="https://github.com/org/repo/tree/main/skills/example"
+                required
+              >
+              <button type="submit">Run</button>
+            </div>
+            <div class="assess-checks">
+              <label class="assess-check"><input type="checkbox" id="check-doctor" checked> Follow-through</label>
+              <label class="assess-check"><input type="checkbox" id="check-security" checked> Security</label>
+              <span class="assess-hint">Public repo &middot; nothing is executed &middot; <a href="#install">install the CLI</a></span>
+            </div>
+            <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+          </form>
 
-      <section id="assess" class="request-panel" aria-labelledby="request-title">
-        <div>
-          <p class="eyebrow">Assessment</p>
-          <h2 id="request-title">
-            <a class="heading-link" href="#assess">Assess your skill before you trust it.</a>
-          </h2>
-          <p>
-            Paste a public GitHub skill, plugin, or repo URL. SkillSpec returns
-            two reports together: a <strong>follow-through analysis</strong>
-            (where execution can drift, overload context, collide in discovery,
-            or finish without proof) and a <strong>security analysis</strong>
-            (what each skill could reach if executed, ranked by risk).
-          </p>
+          <div id="live-result" class="live-result" hidden aria-live="polite"></div>
+
+          <ul class="threat-stats" aria-label="Why verifying skills matters">
+            <li>
+              <strong>36.8%</strong>
+              <span>of 3,984 published skills carry a security flaw</span>
+              <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills, 2026</a>
+            </li>
+            <li>
+              <strong>13.4%</strong>
+              <span>are critical-level &mdash; 534 skills</span>
+              <a href="https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/" target="_blank" rel="noreferrer">Snyk ToxicSkills</a>
+            </li>
+            <li>
+              <strong>3 lines</strong>
+              <span>of Markdown are enough to reach shell access</span>
+              <a href="https://snyk.io/articles/skill-md-shell-access/" target="_blank" rel="noreferrer">Snyk threat model</a>
+            </li>
+            <li>
+              <strong>33.6%</strong>
+              <span>attack success when benign skills combine</span>
+              <a href="https://arxiv.org/abs/2606.15242" target="_blank" rel="noreferrer">Xie et al., 2026</a>
+            </li>
+            <li>
+              <strong>AST01</strong>
+              <span>&ldquo;Malicious Skills&rdquo; &mdash; the top agentic-skill risk</span>
+              <a href="https://owasp.org/www-project-agentic-skills-top-10/ast01" target="_blank" rel="noreferrer">OWASP</a>
+            </li>
+          </ul>
         </div>
-        <form id="doctor-form" class="request-form" novalidate>
-          <label for="target-url">Public GitHub skill, plugin, or repo URL</label>
-          <div class="input-row">
-            <input
-              id="target-url"
-              name="target-url"
-              type="url"
-              inputmode="url"
-              autocomplete="url"
-              placeholder="https://github.com/org/repo/tree/main/skills/example"
-              required
-            >
-            <button type="submit">Run in CI</button>
-          </div>
-          <fieldset class="request-checks">
-            <legend>Which analyses to run</legend>
-            <label class="request-check">
-              <input type="checkbox" id="check-doctor" checked>
-              <span>Follow-through <span class="request-check-hint">skillspec doctor</span></span>
-            </label>
-            <label class="request-check">
-              <input type="checkbox" id="check-security" checked>
-              <span>Security check <span class="request-check-hint">skillspec boundary</span></span>
-            </label>
-          </fieldset>
-          <p class="input-help">
-            Folder URLs using <code>/tree/&lt;branch&gt;/...</code> are canonical.
-            Copied <code>/blob/&lt;branch&gt;/...</code> URLs also work when the path is a folder.
-            Public CI checks the GitHub source shape, then runs both the
-            follow-through and the security analysis; it stops when no
-            <code>SKILL.md</code> package is found. This opens a public GitHub
-            issue, so do not submit private repositories, tokens, credentials, or
-            sensitive internal paths.
-          </p>
-          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
-        </form>
       </section>
 
       <section id="boundary" class="request-panel boundary-panel" aria-labelledby="boundary-title">
@@ -735,6 +685,6 @@ Write SKILL.md, then import and prove it.</code></pre>
     </footer>
 
     <script src="./assets/site.js?v=20260628-risk-star"></script>
-    <script src="./assets/app.js?v=20260728-analysis-checks"></script>
+    <script src="./assets/app.js?v=20260728-live-tool"></script>
   </body>
 </html>
