@@ -267,17 +267,21 @@ jobs:
         if: steps.visibility.outputs.public == 'true'
         uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install SkillSpec (released binary)
         if: steps.visibility.outputs.public == 'true'
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo
-        if: steps.visibility.outputs.public == 'true'
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build SkillSpec CLI
-        if: steps.visibility.outputs.public == 'true'
-        run: cargo build --locked -p skillspec
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Download the published release binary instead of compiling from
+          # source on every submission. The public tool runs the released CLI.
+          bindir="${RUNNER_TEMP}/skillspec-bin"
+          mkdir -p "${bindir}"
+          curl -fsSL \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/skillspec-linux-x86_64.tar.gz" \
+            | tar -xz -C "${bindir}"
+          chmod +x "${bindir}/skillspec"
+          echo "${bindir}" >> "${GITHUB_PATH}"
+          "${bindir}/skillspec" --version
 
       - name: Assess source shape
         id: shape
@@ -289,7 +293,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p doctor-report
-          target/debug/skillspec source stage "${TARGET}" --out doctor-source-stage --json > doctor-report/source-stage.json
+          skillspec source stage "${TARGET}" --out doctor-source-stage --json > doctor-report/source-stage.json
           node .github/scripts/doctor-shape-gate.mjs
 
       - name: Run doctor
@@ -305,15 +309,15 @@ jobs:
           mkdir -p doctor-report
 
           set +e
-          target/debug/skillspec doctor "${DOCTOR_TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
+          skillspec doctor "${DOCTOR_TARGET}" > doctor-report/doctor-report.txt 2> doctor-report/doctor-stderr.txt
           status=$?
           set -e
           echo "status=${status}" >> "${GITHUB_OUTPUT}"
 
           if [ "${status}" -eq 0 ]; then
-            target/debug/skillspec doctor "${DOCTOR_TARGET}" --markdown > doctor-report/doctor-report.md
-            target/debug/skillspec doctor "${DOCTOR_TARGET}" --html > doctor-report/doctor-report.html
-            target/debug/skillspec doctor "${DOCTOR_TARGET}" --json > doctor-report/doctor-report.json
+            skillspec doctor "${DOCTOR_TARGET}" --markdown > doctor-report/doctor-report.md
+            skillspec doctor "${DOCTOR_TARGET}" --html > doctor-report/doctor-report.html
+            skillspec doctor "${DOCTOR_TARGET}" --json > doctor-report/doctor-report.json
           fi
 
       - name: Run boundary security analysis
@@ -328,9 +332,9 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p doctor-report
-          if target/debug/skillspec boundary assess "${TARGET}" \
+          if skillspec boundary assess "${TARGET}" \
               > doctor-report/boundary-assess.txt 2> doctor-report/boundary-stderr.txt; then
-            target/debug/skillspec boundary assess "${TARGET}" --json \
+            skillspec boundary assess "${TARGET}" --json \
               > doctor-report/boundary-assess.json 2>/dev/null || true
             echo "status=0" >> "${GITHUB_OUTPUT}"
           else
@@ -352,12 +356,12 @@ jobs:
         run: node .github/scripts/sanitize-doctor-report.mjs
 
       - name: Add doctor report to run summary
-        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0') }}
+        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || (steps.parse.outputs.wants_doctor == 'true' && steps.doctor.outputs.status == '0')) }}
         shell: bash
         run: |
           set -euo pipefail
           max_report_chars=52000
-          if [ "${{ steps.shape.outputs.run_full_doctor }}" = "true" ]; then
+          if [ -f doctor-report-public/shape-gate.md ]; then
             {
               cat doctor-report-public/shape-gate.md
               echo
@@ -365,20 +369,24 @@ jobs:
               echo
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
-          report_bytes=$(wc -c < doctor-report-public/doctor-report.md | tr -d ' ')
 
-          {
-            head -c "${max_report_chars}" doctor-report-public/doctor-report.md
-            echo
-            if [ "${report_bytes}" -gt "${max_report_chars}" ]; then
+          # The doctor report only exists when the follow-through analysis ran.
+          # A security-only request has no doctor-report.md; skip it gracefully.
+          if [ -f doctor-report-public/doctor-report.md ]; then
+            report_bytes=$(wc -c < doctor-report-public/doctor-report.md | tr -d ' ')
+            {
+              head -c "${max_report_chars}" doctor-report-public/doctor-report.md
               echo
-              echo "> Report truncated in run summary. Download the artifact for the full report."
-            fi
-            echo
-            echo "---"
-            echo
-            echo "Full Markdown, text, HTML, and JSON reports are attached as workflow artifacts."
-          } >> "${GITHUB_STEP_SUMMARY}"
+              if [ "${report_bytes}" -gt "${max_report_chars}" ]; then
+                echo
+                echo "> Report truncated in run summary. Download the artifact for the full report."
+              fi
+              echo
+              echo "---"
+              echo
+              echo "Full Markdown, text, HTML, and JSON reports are attached as workflow artifacts."
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
       - name: Add security analysis to run summary
         if: steps.visibility.outputs.public == 'true' && steps.shape.outputs.run_full_doctor == 'true' && steps.parse.outputs.wants_security == 'true'
