@@ -372,6 +372,8 @@ jobs:
         run: |
           set -euo pipefail
           max_report_chars=52000
+          echo "# Follow-through report — \`skillspec doctor\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo >> "${GITHUB_STEP_SUMMARY}"
           if [ -f doctor-report-public/shape-gate.md ]; then
             {
               cat doctor-report-public/shape-gate.md
@@ -405,6 +407,13 @@ jobs:
         run: |
           set -euo pipefail
           max_report_chars=28000
+          # A clear divider so the security analysis reads as its own report,
+          # separate from the follow-through report above.
+          {
+            echo
+            echo "---"
+            echo
+          } >> "${GITHUB_STEP_SUMMARY}"
           # Prefer the parsed Markdown report; fall back to the raw tree only if
           # rendering produced nothing.
           if [ -s doctor-report-public/boundary-report.md ]; then
@@ -469,7 +478,7 @@ jobs:
           if-no-files-found: error
 
       - name: Comment with doctor report
-        if: ${{ steps.visibility.outputs.public == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0' || (steps.parse.outputs.wants_doctor != 'true' && steps.boundary.outputs.status == '0')) }}
+        if: ${{ steps.visibility.outputs.public == 'true' && steps.parse.outputs.wants_doctor == 'true' && (steps.shape.outputs.run_full_doctor != 'true' || steps.doctor.outputs.status == '0') }}
         uses: actions/github-script@v7
         env:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
@@ -485,68 +494,25 @@ jobs:
             const shapeGate = fs.existsSync("doctor-report-public/shape-gate.md")
               ? fs.readFileSync("doctor-report-public/shape-gate.md", "utf8")
               : "";
-            const maxReportChars = 40000;
+            const maxReportChars = 45000;
             const fullReport = !hasDoctor
-              ? ""
+              ? (shapeGate || "The follow-through analysis produced no report for this target.")
               : process.env.RUN_FULL_DOCTOR === "true" && shapeGate
                 ? `${shapeGate}\n\n---\n\n${report}`
                 : report;
             const renderedReport = fullReport.length > maxReportChars
               ? `${fullReport.slice(0, maxReportChars)}\n\n> Report truncated in issue comment. Download the artifact for the full report.`
               : fullReport;
-            const lead = hasDoctor
-              ? renderedReport
-              : "### SkillSpec report\n\nFollow-through analysis was not requested for this submission.";
-            const maxBoundaryChars = 30000;
-            // Prefer the parsed Markdown report (findings + tutorial), shown
-            // directly. Fall back to the raw tree in a code block only if the
-            // renderer produced nothing.
-            const boundaryMd = fs.existsSync("doctor-report-public/boundary-report.md")
-              ? fs.readFileSync("doctor-report-public/boundary-report.md", "utf8")
-              : "";
-            const boundaryRaw = fs.existsSync("doctor-report-public/boundary-assess.txt")
-              ? fs.readFileSync("doctor-report-public/boundary-assess.txt", "utf8")
-              : "";
-            let boundaryBlock = "";
-            if (boundaryMd.trim()) {
-              const clipped = boundaryMd.length > maxBoundaryChars
-                ? `${boundaryMd.slice(0, maxBoundaryChars)}\n\n> Truncated in issue comment. Download the artifact for the full analysis.`
-                : boundaryMd;
-              boundaryBlock = `\n\n${clipped}`;
-            } else if (boundaryRaw.trim()) {
-              boundaryBlock = [
-                "",
-                "<details open>",
-                "<summary><strong>Security analysis</strong> — <code>skillspec boundary assess</code></summary>",
-                "",
-                "```text",
-                boundaryRaw.slice(0, 16000),
-                "```",
-                "",
-                "</details>",
-              ].join("\n");
-            }
             const artifactUrl = process.env.ARTIFACT_URL;
             const body = [
               marker,
-              lead,
-              boundaryBlock,
+              "## Follow-through report — `skillspec doctor`",
+              "",
+              renderedReport,
               "",
               `Full artifacts: ${artifactUrl}`,
               "",
-              "The artifact contains:",
-              "",
-              "- `doctor-report.txt`",
-              "- `doctor-report.md`",
-              "- `doctor-report.html`",
-              "- `doctor-report.json`",
-              "- `shape-gate.md`",
-              "- `shape-gate.json`",
-              "- `source-stage.json`",
-              "- `boundary-assess.txt`",
-              "- `boundary-assess.json`",
-              "- `boundary-report.md`",
-              "- `target.txt`",
+              "The artifact contains: `doctor-report.txt`, `doctor-report.md`, `doctor-report.html`, `doctor-report.json`, `shape-gate.md`, `shape-gate.json`, `source-stage.json`, `target.txt`.",
             ].join("\n");
 
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -556,6 +522,64 @@ jobs:
             });
             const existing = comments.find((comment) =>
               comment.user.type === "Bot" && comment.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Comment with security report
+        if: ${{ steps.visibility.outputs.public == 'true' && steps.parse.outputs.wants_security == 'true' && steps.boundary.outputs.status == '0' }}
+        uses: actions/github-script@v7
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- skillspec-security-report -->";
+            const max = 45000;
+            const md = fs.existsSync("doctor-report-public/boundary-report.md")
+              ? fs.readFileSync("doctor-report-public/boundary-report.md", "utf8")
+              : "";
+            const raw = fs.existsSync("doctor-report-public/boundary-assess.txt")
+              ? fs.readFileSync("doctor-report-public/boundary-assess.txt", "utf8")
+              : "";
+            let content = "";
+            if (md.trim()) {
+              content = md.length > max
+                ? `${md.slice(0, max)}\n\n> Truncated in issue comment. Download the artifact for the full analysis.`
+                : md;
+            } else if (raw.trim()) {
+              content = ["```text", raw.slice(0, 16000), "```"].join("\n");
+            }
+            if (!content.trim()) {
+              return;
+            }
+            const body = [
+              marker,
+              content,
+              "",
+              `Full analysis artifacts: ${process.env.ARTIFACT_URL}`,
+              "",
+              "The artifact contains: `boundary-report.md`, `boundary-assess.txt`, `boundary-assess.json`.",
+            ].join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (comment) => comment.user.type === "Bot" && comment.body.includes(marker),
             );
             if (existing) {
               await github.rest.issues.updateComment({

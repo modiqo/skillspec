@@ -2,6 +2,7 @@ const REPO_OWNER = "modiqo";
 const REPO_NAME = "skillspec";
 const REPORT_LABEL = "doctor-report";
 const REPORT_MARKER = "<!-- skillspec-doctor-report -->";
+const SECURITY_MARKER = "<!-- skillspec-security-report -->";
 const REPORT_WORKFLOW = "doctor-report.yml";
 const REPORT_QUERY_PARAM = "report";
 const REPORT_SHARE_HASH = "report-viewer";
@@ -646,11 +647,16 @@ function isDoctorIssue(issue) {
 
 async function loadIssueReport(issue) {
   const comments = await fetchJson(issue.comments_url);
-  const reportComment = comments
+  // The follow-through and the security analysis are posted as two separate
+  // comments. Show whichever are present, each as its own section.
+  const doctorComment = comments
     .filter((comment) => comment.body && comment.body.includes(REPORT_MARKER))
     .at(-1);
+  const securityComment = comments
+    .filter((comment) => comment.body && comment.body.includes(SECURITY_MARKER))
+    .at(-1);
 
-  if (!reportComment) {
+  if (!doctorComment && !securityComment) {
     return {
       issue,
       status: "pending",
@@ -663,12 +669,18 @@ async function loadIssueReport(issue) {
     };
   }
 
-  const markdown = cleanReportMarkdown(reportComment.body);
+  const sections = [];
+  if (doctorComment) sections.push(cleanReportMarkdown(doctorComment.body));
+  if (securityComment) sections.push(cleanReportMarkdown(securityComment.body));
+  const markdown = sections.join("\n\n---\n\n");
   const isError =
     /could not run a public report|could not complete the public report|report failed/i.test(
       markdown,
     );
-  const summary = parseSummary(markdown);
+  const summarySource = doctorComment
+    ? cleanReportMarkdown(doctorComment.body)
+    : cleanReportMarkdown(securityComment.body);
+  const summary = parseSummary(summarySource);
 
   return {
     issue,
@@ -678,7 +690,8 @@ async function loadIssueReport(issue) {
     verdict: summary.verdict || (isError ? "error" : "reported"),
     risk: summary.risk || (isError ? "error" : "see report"),
     markdown,
-    updatedAt: reportComment.updated_at || issue.updated_at,
+    updatedAt:
+      (securityComment || doctorComment).updated_at || issue.updated_at,
   };
 }
 
@@ -879,8 +892,8 @@ function matchLine(text, regex) {
 }
 
 function cleanReportMarkdown(body) {
-  let markdown = body.replace(REPORT_MARKER, "").trim();
-  markdown = markdown.replace(/\n+Full artifacts:[\s\S]*$/i, "").trim();
+  let markdown = body.replace(REPORT_MARKER, "").replace(SECURITY_MARKER, "").trim();
+  markdown = markdown.replace(/\n+Full (analysis )?artifacts:[\s\S]*$/i, "").trim();
   return markdown;
 }
 
