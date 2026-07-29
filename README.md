@@ -347,6 +347,10 @@ curl -fsSL https://raw.githubusercontent.com/modiqo/skillspec/main/install.sh | 
 skillspec boundary map https://github.com/owner/skills   # a tree of the shape
 ```
 
+Copy-paste command reference:
+[Security quickstart](https://github.com/modiqo/skillspec/blob/main/docs/security-quickstart.md)
+— analyze, guard by policy, and install safely.
+
 Full walkthrough:
 [Analyzing and constraining agent skills](https://github.com/modiqo/skillspec/blob/main/docs/boundary-guide.md).
 
