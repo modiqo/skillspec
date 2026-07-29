@@ -357,15 +357,16 @@ fn extract_command(
     out: &mut Vec<EffectObservation>,
 ) {
     let piped_interpreter = argv::is_piped_interpreter(command, piped_from_previous);
+    let inline_program = argv::executes_inline_program(command);
     out.push(EffectObservation {
         class: EffectClass::ProcExec,
         target: EffectTarget::Binary {
             name: command.name.clone(),
             privileged: command.privileged,
         },
-        // An interpreter fed from a pipe runs content that is not in the
-        // package, so what executes is not determinable from source.
-        resolution: if piped_interpreter {
+        // An interpreter fed from a pipe or inline program text runs behavior
+        // that the outer shell extractor cannot fully determine.
+        resolution: if piped_interpreter || inline_program {
             TargetResolution::Dynamic
         } else {
             command.resolution

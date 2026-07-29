@@ -98,6 +98,12 @@ impl Staged {
             ".agents/plugins/marketplace.json",
         ] {
             let path = self.manifest_root.join(rel);
+            if std::fs::symlink_metadata(&path)
+                .ok()
+                .is_some_and(|metadata| metadata.file_type().is_symlink())
+            {
+                continue;
+            }
             if let Ok(text) = std::fs::read_to_string(&path) {
                 if let Ok(manifest) = serde_json::from_str::<Marketplace>(&text) {
                     return Some(manifest);
@@ -311,6 +317,7 @@ pub fn place(skills: &[PathBuf], dest: &Path) -> Result<Vec<PathBuf>> {
     })?;
     let mut written = Vec::new();
     for skill in skills {
+        ensure_no_symlinks(skill)?;
         let name = skill.file_name().ok_or_else(|| Error::InvalidInput {
             message: format!("skill path {} has no folder name", skill.display()),
         })?;
@@ -326,6 +333,33 @@ pub fn place(skills: &[PathBuf], dest: &Path) -> Result<Vec<PathBuf>> {
     Ok(written)
 }
 
+fn ensure_no_symlinks(root: &Path) -> Result<()> {
+    let metadata = std::fs::symlink_metadata(root).map_err(|source| Error::InvalidInput {
+        message: format!("failed to inspect {}: {source}", root.display()),
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "refusing to install symbolic link {}; links are not copied from skill packages",
+                root.display()
+            ),
+        });
+    }
+    if !metadata.is_dir() {
+        return Ok(());
+    }
+    let entries = std::fs::read_dir(root).map_err(|source| Error::InvalidInput {
+        message: format!("failed to read {}: {source}", root.display()),
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::InvalidInput {
+            message: format!("failed to read an entry of {}: {source}", root.display()),
+        })?;
+        ensure_no_symlinks(&entry.path())?;
+    }
+    Ok(())
+}
+
 fn copy_dir(from: &Path, to: &Path) -> Result<()> {
     std::fs::create_dir_all(to).map_err(|source| Error::InvalidInput {
         message: format!("failed to create {}: {source}", to.display()),
@@ -339,7 +373,18 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
         })?;
         let path = entry.path();
         let child = to.join(entry.file_name());
-        if path.is_dir() {
+        let file_type = entry.file_type().map_err(|source| Error::InvalidInput {
+            message: format!("failed to inspect {}: {source}", path.display()),
+        })?;
+        if file_type.is_symlink() {
+            return Err(Error::InvalidInput {
+                message: format!(
+                    "refusing to install symbolic link {}; links are not copied from skill packages",
+                    path.display()
+                ),
+            });
+        }
+        if file_type.is_dir() {
             copy_dir(&path, &child)?;
         } else {
             std::fs::copy(&path, &child).map_err(|source| Error::InvalidInput {
@@ -474,6 +519,23 @@ mod tests {
         let written = place(&staged.skills().unwrap(), &dest).expect("place");
         assert_eq!(written.len(), 1);
         assert!(dest.join("skill-a").join("SKILL.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn place_refuses_symlinks_before_writing_the_destination() {
+        use std::os::unix::fs::symlink;
+
+        let staged = local_fixture();
+        let skill = staged.root.join("skill-a");
+        let outside = staged.root.join("outside.md");
+        std::fs::write(&outside, "outside").unwrap();
+        symlink(&outside, skill.join("leak.md")).unwrap();
+        let dest = staged.root.join("out");
+
+        let error = place(&[skill], &dest).unwrap_err().to_string();
+        assert!(error.contains("refusing to install symbolic link"));
+        assert!(!dest.join("skill-a").exists());
     }
 
     // --- fixtures -----------------------------------------------------------

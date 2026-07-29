@@ -57,6 +57,9 @@ pub enum SourceFileKind {
 pub enum SourceFileLoadStatus {
     Loaded,
     BinaryPreserved,
+    /// A symbolic link recorded without reading its target. Source discovery
+    /// must never follow a link supplied by an untrusted package.
+    SymlinkPreserved,
     IgnoredByPolicy,
 }
 

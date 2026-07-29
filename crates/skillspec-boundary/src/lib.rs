@@ -404,7 +404,14 @@ fn collect_reveal(root: &Path, dir: &Path, out: &mut String) -> Result<()> {
     })?;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
                 continue;
             }

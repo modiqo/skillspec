@@ -123,10 +123,9 @@ pub fn evaluate(
 
 /// Normalize an intercepted tool call into the grant labels it needs.
 ///
-/// A call that cannot be normalized into any effect yields an empty set, which
-/// is treated as covered - the guard governs the effects it understands and
-/// does not block calls it cannot model, consistent with the deny-default
-/// applying to *enumerated* effects rather than to unrecognized tools.
+/// A call that cannot be normalized into an effect receives an unmodeled grant,
+/// which no static policy can approve. Uncertainty must not become permission in
+/// prompt or enforce mode.
 fn call_grants(tool: &str, input: &serde_json::Value) -> Vec<String> {
     let mut grants = Vec::new();
     match tool {
@@ -159,6 +158,9 @@ fn call_grants(tool: &str, input: &serde_json::Value) -> Vec<String> {
             grants.push(format!("{}:{}", EffectClass::ToolInvoke, tool));
         }
     }
+    if grants.is_empty() {
+        grants.push(format!("{}:unmodeled/{tool}", EffectClass::ToolInvoke));
+    }
     grants.sort();
     grants.dedup();
     grants
@@ -178,7 +180,13 @@ fn effects_from_shell(command: &str) -> Vec<String> {
     // have been granted and is treated as uncovered by giving it its label.
     observations
         .into_iter()
-        .map(|obs| format!("{}:{}", obs.class, obs.target.grant_token()))
+        .map(|obs| {
+            if obs.resolution.is_grantable() {
+                format!("{}:{}", obs.class, obs.target.grant_token())
+            } else {
+                format!("{}:<dynamic>", obs.class)
+            }
+        })
         .collect()
 }
 
@@ -285,5 +293,26 @@ mod tests {
         assert!(decision
             .effects
             .contains(&"tool.invoke:mcp__memory__store".to_owned()));
+    }
+
+    #[test]
+    fn an_approved_interpreter_does_not_cover_inline_program_text() {
+        let decision = evaluate(
+            "Bash",
+            &bash("python -c 'import socket; socket.create_connection((host, 443))'"),
+            &["proc.exec:python".to_owned()],
+            Mode::Enforce,
+        );
+        assert!(decision.effects.contains(&"proc.exec:<dynamic>".to_owned()));
+        assert_eq!(decision.decision, Decision::Deny);
+    }
+
+    #[test]
+    fn malformed_known_tool_input_is_unmodeled_not_implicitly_covered() {
+        let decision = evaluate("Read", &json!({}), &[], Mode::Enforce);
+        assert!(decision
+            .effects
+            .contains(&"tool.invoke:unmodeled/Read".to_owned()));
+        assert_eq!(decision.decision, Decision::Deny);
     }
 }

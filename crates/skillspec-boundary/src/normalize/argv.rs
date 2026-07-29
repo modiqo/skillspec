@@ -16,7 +16,26 @@ const WRAPPERS: &[&str] = &[
 
 /// Interpreters that execute content handed to them rather than a named script.
 const INTERPRETERS: &[&str] = &[
-    "sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node",
+    "sh",
+    "bash",
+    "zsh",
+    "dash",
+    "ksh",
+    "python",
+    "python3",
+    "pypy",
+    "pypy3",
+    "node",
+    "bun",
+    "deno",
+    "ruby",
+    "perl",
+    "php",
+    "lua",
+    "osascript",
+    "powershell",
+    "pwsh",
+    "cmd",
 ];
 
 /// Shell reserved words. These open or close control flow; none is a program,
@@ -130,6 +149,45 @@ pub fn is_piped_interpreter(command: &NormalizedCommand, piped_from_previous: bo
             .args
             .iter()
             .any(|arg| !arg.starts_with('-') && !arg.is_empty())
+}
+
+/// Whether an interpreter executes program text supplied directly on argv.
+///
+/// A grant for `python script.py` must not authorize `python -c <arbitrary
+/// program>`. The latter can perform effects that are invisible to the outer
+/// shell parser, so both static extraction and the runtime guard treat it as
+/// dynamic execution.
+pub fn executes_inline_program(command: &NormalizedCommand) -> bool {
+    let has = |candidates: &[&str]| {
+        command
+            .args
+            .iter()
+            .any(|arg| candidates.iter().any(|candidate| arg == candidate))
+    };
+    match command.name.as_str() {
+        "sh" | "bash" | "zsh" | "dash" | "ksh" => command.args.iter().any(|arg| {
+            arg == "--command"
+                || (arg.starts_with('-')
+                    && !arg.starts_with("--")
+                    && arg[1..].chars().any(|flag| flag == 'c'))
+        }),
+        "python" | "python3" | "pypy" | "pypy3" => has(&["-c"]),
+        "node" | "bun" => has(&["-e", "--eval", "-p", "--print"]),
+        "deno" => command.args.first().is_some_and(|arg| arg == "eval"),
+        "ruby" | "perl" | "lua" | "osascript" => has(&["-e"]),
+        "php" => has(&["-r"]),
+        "powershell" | "pwsh" => command.args.iter().any(|arg| {
+            matches!(
+                arg.to_ascii_lowercase().as_str(),
+                "-c" | "-command" | "-encodedcommand" | "-enc"
+            )
+        }),
+        "cmd" => command
+            .args
+            .iter()
+            .any(|arg| arg.eq_ignore_ascii_case("/c")),
+        _ => false,
+    }
 }
 
 fn normalize_tokens(tokens: &[String], privileged: bool) -> Option<NormalizedCommand> {
@@ -257,7 +315,7 @@ fn contains_interpolation(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{command_stages, is_piped_interpreter, normalize};
+    use super::{command_stages, executes_inline_program, is_piped_interpreter, normalize};
     use crate::effect::TargetResolution;
 
     #[test]
@@ -353,6 +411,32 @@ mod tests {
     fn an_interpreter_running_a_named_script_is_not_a_piped_interpreter() {
         let command = normalize("python3 scripts/build.py").unwrap();
         assert!(!is_piped_interpreter(&command, true));
+    }
+
+    #[test]
+    fn inline_interpreter_programs_are_distinct_from_named_scripts() {
+        for command in [
+            "python -c 'print(1)'",
+            "bash -lc 'echo hi'",
+            "node --eval 'process.exit()'",
+            "deno eval 'console.log(1)'",
+            "pwsh -EncodedCommand ZQBjAGgAbwA=",
+        ] {
+            assert!(
+                executes_inline_program(&normalize(command).unwrap()),
+                "{command}"
+            );
+        }
+        for command in [
+            "python scripts/run.py",
+            "bash scripts/run.sh",
+            "node scripts/run.js",
+        ] {
+            assert!(
+                !executes_inline_program(&normalize(command).unwrap()),
+                "{command}"
+            );
+        }
     }
 
     #[test]

@@ -217,7 +217,14 @@ fn find_materialized_candidates(
 }
 
 fn collect_skill_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
-    if path.is_file() {
+    let metadata = fs::symlink_metadata(path).map_err(|source| Error::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    if metadata.is_file() {
         if path
             .file_name()
             .and_then(|name| name.to_str())
@@ -235,7 +242,13 @@ fn collect_skill_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
             path: path.to_path_buf(),
             source,
         })?;
-        collect_skill_files(&entry.path(), files)?;
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: entry.path(),
+            source,
+        })?;
+        if !file_type.is_symlink() {
+            collect_skill_files(&entry.path(), files)?;
+        }
     }
     Ok(())
 }

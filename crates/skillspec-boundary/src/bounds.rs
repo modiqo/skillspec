@@ -42,6 +42,11 @@ pub enum SkipReason {
     ByteBudgetExhausted,
     /// Contents are not text.
     Binary,
+    /// A non-asset binary cannot be inspected as source.
+    OpaqueBinary,
+    /// A symbolic link was inventoried but its target was deliberately not read.
+    #[serde(rename = "symlink_not_followed")]
+    Symlink,
 }
 
 impl SkipReason {
@@ -51,6 +56,8 @@ impl SkipReason {
             Self::FileBudgetExhausted => "file_budget_exhausted",
             Self::ByteBudgetExhausted => "byte_budget_exhausted",
             Self::Binary => "binary",
+            Self::OpaqueBinary => "opaque_binary",
+            Self::Symlink => "symlink_not_followed",
         }
     }
 }
@@ -131,10 +138,9 @@ impl Budget {
     /// Whether a resource limit truncated the analysis, so it did not read
     /// everything it should have.
     ///
-    /// A skipped *binary* file does not count: an image or archive holds no
-    /// effects, and its absence hides nothing, so a skill that ships assets is
-    /// not incomplete for that reason. Only a file-count, file-size, or byte
-    /// budget that fired means the surface was genuinely cut short.
+    /// A skipped binary asset does not count: an image is not executable source.
+    /// Opaque non-assets and symlinks do count because their behavior or target
+    /// was deliberately not inspected.
     pub fn truncated(&self) -> bool {
         self.skipped
             .iter()
@@ -193,6 +199,15 @@ mod tests {
         budget.skip("logo.png", SkipReason::Binary);
         assert!(!budget.truncated());
         assert_eq!(budget.skipped().len(), 1);
+    }
+
+    #[test]
+    fn opaque_binaries_and_symlinks_make_the_analysis_incomplete() {
+        for reason in [SkipReason::OpaqueBinary, SkipReason::Symlink] {
+            let mut budget = Budget::new(small_bounds());
+            budget.skip("payload", reason);
+            assert!(budget.truncated(), "{reason:?} must fail closed");
+        }
     }
 
     #[test]

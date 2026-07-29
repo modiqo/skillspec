@@ -51,16 +51,25 @@ pub fn parse_target(target: &str) -> Result<Option<RemoteSkillSource>> {
     // SSH shorthand for any host: git@<host>:<owner>/<repo>[.git][/<path>].
     if let Some(rest) = trimmed.strip_prefix("git@") {
         if let Some((host, path)) = rest.split_once(':') {
-            let parts = split_parts(path.trim_end_matches(".git"));
+            let parts = split_parts(path);
             if parts.len() < 2 {
                 return Err(Error::InvalidInput {
                     message: "SSH shorthand requires git@<host>:<owner>/<repo>.git".to_owned(),
                 });
             }
+            let repo_end = parts
+                .iter()
+                .position(|part| part.ends_with(".git"))
+                .map(|index| index + 1)
+                .unwrap_or_else(|| if is_gitlab_host(host) { parts.len() } else { 2 });
+            let mut repo_parts = parts[..repo_end].to_vec();
+            if let Some(repo) = repo_parts.last_mut() {
+                *repo = repo.trim_end_matches(".git");
+            }
             return Ok(Some(RemoteSkillSource {
-                repo_url: format!("https://{host}/{}/{}.git", parts[0], parts[1]),
+                repo_url: format!("https://{host}/{}.git", repo_parts.join("/")),
                 branch: None,
-                path: (parts.len() > 2).then(|| parts[2..].join("/")),
+                path: (parts.len() > repo_end).then(|| parts[repo_end..].join("/")),
             }));
         }
     }
@@ -119,7 +128,7 @@ fn parse_http_target(rest: &str) -> Result<RemoteSkillSource> {
         });
     }
 
-    let (repo_segments, branch, path_parts) = split_on_tree_marker(&segments);
+    let (repo_segments, branch, path_parts) = split_on_tree_marker(host, &segments);
     let repo_path = repo_segments.join("/");
     let repo_path = repo_path.trim_end_matches(".git");
     let path = path_parts.join("/");
@@ -139,6 +148,7 @@ fn parse_http_target(rest: &str) -> Result<RemoteSkillSource> {
 /// Split path segments at the first tree/blob marker into
 /// (repo segments, branch, subpath segments).
 fn split_on_tree_marker<'a>(
+    host: &str,
     segments: &'a [&'a str],
 ) -> (Vec<&'a str>, Option<String>, Vec<&'a str>) {
     for (index, segment) in segments.iter().enumerate() {
@@ -162,12 +172,24 @@ fn split_on_tree_marker<'a>(
             );
         }
     }
-    // No marker: the first two segments are owner/repo, the rest is a subpath.
+    // A GitLab repository may live below arbitrarily nested groups. With no
+    // tree marker, the whole URL is the repository root; a subfolder must use
+    // `/-/tree/<branch>/<path>` to make the boundary unambiguous.
+    if is_gitlab_host(host) {
+        return (segments.to_vec(), None, Vec::new());
+    }
+    // GitHub/Bitbucket and their shorthands use owner/repo as the boundary.
     (
         segments[..2].to_vec(),
         None,
         segments.get(2..).unwrap_or(&[]).to_vec(),
     )
+}
+
+fn is_gitlab_host(host: &str) -> bool {
+    host.split(':')
+        .next()
+        .is_some_and(|name| name.eq_ignore_ascii_case("gitlab.com"))
 }
 
 fn split_parts(path: &str) -> Vec<&str> {
@@ -755,5 +777,30 @@ mod tests {
         );
         assert_eq!(remote.branch.as_deref(), Some("main"));
         assert_eq!(remote.path.as_deref(), Some("pdf"));
+    }
+
+    #[test]
+    fn a_gitlab_subgroup_repo_root_without_a_tree_marker_keeps_every_group() {
+        let remote = parse_target("https://gitlab.com/group/subgroup/repo")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://gitlab.com/group/subgroup/repo.git"
+        );
+        assert_eq!(remote.branch, None);
+        assert_eq!(remote.path, None);
+    }
+
+    #[test]
+    fn ssh_gitlab_subgroups_and_optional_subpaths_keep_the_repo_boundary() {
+        let remote = parse_target("git@gitlab.com:group/subgroup/repo.git/skills/pdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            remote.repo_url,
+            "https://gitlab.com/group/subgroup/repo.git"
+        );
+        assert_eq!(remote.path.as_deref(), Some("skills/pdf"));
     }
 }

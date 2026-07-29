@@ -49,6 +49,8 @@ jobs:
           set -euo pipefail
           for package in \
             skillspec-core \
+            skillspec-source \
+            skillspec-boundary \
             skillspec-runtime \
             skillspec-doctor \
             skillspec-authoring \

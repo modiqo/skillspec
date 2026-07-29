@@ -19,6 +19,7 @@
 //! This never claims intent. A finding states a capability and what that
 //! capability would mean if exercised, with the evidence that shows it.
 
+use crate::bounds::SkipReason;
 use crate::dedupe::Effect;
 use crate::effect::{EffectClass, EffectTarget, PathClass, Reach, TargetResolution};
 use crate::surface::EffectSurface;
@@ -107,6 +108,9 @@ impl SkillRisk {
     /// Compute the risk of a skill from its effect surface.
     pub fn of(surface: &EffectSurface) -> Self {
         let mut findings = Vec::new();
+        if let Some(finding) = incompleteness_finding(surface) {
+            findings.push(finding);
+        }
         findings.extend(concealment_findings(surface));
         findings.extend(directive_findings(surface));
         findings.extend(effect_findings(surface));
@@ -114,6 +118,55 @@ impl SkillRisk {
         findings.sort_by_key(|finding| std::cmp::Reverse(finding.severity));
         SkillRisk { findings }
     }
+}
+
+/// An incomplete scan is itself review-worthy. Without this finding the
+/// pre-install gate would interpret "we did not read everything" as "clean".
+fn incompleteness_finding(surface: &EffectSurface) -> Option<Finding> {
+    if surface.is_complete() {
+        return None;
+    }
+    let skipped = surface
+        .analysis
+        .files_skipped
+        .iter()
+        .filter(|item| item.reason != SkipReason::Binary)
+        .count();
+    let unresolved = surface.unresolved.len();
+    let file = surface
+        .analysis
+        .files_skipped
+        .iter()
+        .find(|item| item.reason != SkipReason::Binary)
+        .map(|item| item.path.clone())
+        .or_else(|| {
+            surface
+                .unresolved
+                .first()
+                .and_then(|effect| effect.observations.first())
+                .map(|evidence| evidence.path.clone())
+        });
+    let why = match (skipped, unresolved) {
+        (0, unresolved) => {
+            format!("{unresolved} effect target(s) could not be determined statically")
+        }
+        (skipped, 0) => format!("{skipped} file(s) were not analyzed"),
+        (skipped, unresolved) => format!(
+            "{skipped} file(s) were not analyzed and {unresolved} effect target(s) could not be determined"
+        ),
+    };
+    Some(Finding {
+        severity: Severity::High,
+        headline: "analysis incomplete".to_owned(),
+        file,
+        line: None,
+        reached: None,
+        note: None,
+        why,
+        consequence:
+            "additional effects may exist that this report and any derived policy do not cover"
+                .to_owned(),
+    })
 }
 
 /// Where a filesystem target sits relative to the skill's own directory.
@@ -663,5 +716,16 @@ mod tests {
             risk.findings.iter().all(|f| f.severity <= Severity::Low),
             "nothing in a pure documentation example should exceed Low"
         );
+    }
+
+    #[test]
+    fn an_incomplete_surface_always_warrants_review() {
+        let surface = fixture("dynamic-endpoint");
+        let risk = SkillRisk::of(&surface);
+        assert!(risk.warrants_review());
+        assert!(risk
+            .findings
+            .iter()
+            .any(|finding| finding.headline == "analysis incomplete"));
     }
 }

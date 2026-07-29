@@ -68,6 +68,18 @@ pub fn skill_package_dirs(root: &Path) -> Result<Vec<PathBuf>> {
 }
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    let metadata = std::fs::symlink_metadata(dir).map_err(|source| Error::Read {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "boundary source root {} is a symbolic link; pass its resolved directory explicitly",
+                dir.display()
+            ),
+        });
+    }
     let entries = std::fs::read_dir(dir).map_err(|source| Error::Read {
         path: dir.to_path_buf(),
         source,
@@ -76,7 +88,14 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let mut subdirs = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             if !skip_dir(&path) {
                 subdirs.push(path);
             }
@@ -284,5 +303,26 @@ mod tests {
         assert!(clean.surface.summary.sensitive_path_classes.is_empty());
         assert!(!exfil.surface.summary.sensitive_path_classes.is_empty());
         assert_eq!(workspace.concerning_packages(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn package_discovery_does_not_follow_symlinked_directories() {
+        use std::os::unix::fs::symlink;
+
+        let root = workspace();
+        let outside = root.with_extension("outside");
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(
+            outside.join("SKILL.md"),
+            "---\nname: outside\ndescription: Outside.\n---\n# Outside\n",
+        )
+        .unwrap();
+        symlink(&outside, root.join("linked-skill")).unwrap();
+
+        let dirs = skill_package_dirs(&root).unwrap();
+        assert_eq!(dirs.len(), 2);
+        assert!(dirs.iter().all(|dir| !dir.ends_with("linked-skill")));
     }
 }

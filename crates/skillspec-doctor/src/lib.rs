@@ -932,6 +932,18 @@ fn simple_shape_for_source_root(source_root: &Path) -> Result<DoctorShapeReport>
 }
 
 fn collect_inventory_files(root: &Path) -> Result<Vec<PathBuf>> {
+    let metadata = fs::symlink_metadata(root).map_err(|source| Error::Read {
+        path: root.to_path_buf(),
+        source,
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(Error::InvalidInput {
+            message: format!(
+                "doctor source root {} is a symbolic link; pass its resolved directory explicitly",
+                root.display()
+            ),
+        });
+    }
     let mut files = Vec::new();
     collect_inventory_files_inner(root, root, &mut files)?;
     files.sort();
@@ -953,7 +965,16 @@ fn collect_inventory_files_inner(root: &Path, dir: &Path, files: &mut Vec<PathBu
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or("");
-        if path.is_dir() {
+        let file_type = entry.file_type().map_err(|source| Error::Read {
+            path: path.clone(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            // A repository-controlled link must not enlarge the source root.
+            // Shape capture inventories only files physically inside the target.
+            continue;
+        }
+        if file_type.is_dir() {
             if should_skip_inventory_dir(file_name) {
                 continue;
             }
@@ -1388,7 +1409,11 @@ fn plugin_manifest_namespace(root: &Path, plugin_root: &Path) -> Option<String> 
     let entries = fs::read_dir(plugin_root).ok()?;
     for entry in entries.filter_map(|entry| entry.ok()) {
         let child = entry.path();
-        if !child.is_dir()
+        let Ok(child_type) = entry.file_type() else {
+            continue;
+        };
+        if child_type.is_symlink()
+            || !child_type.is_dir()
             || !entry
                 .file_name()
                 .to_str()
@@ -1400,7 +1425,11 @@ fn plugin_manifest_namespace(root: &Path, plugin_root: &Path) -> Option<String> 
             continue;
         };
         for file in files.filter_map(|file| file.ok()) {
-            if file.path().is_file()
+            let Ok(file_type) = file.file_type() else {
+                continue;
+            };
+            if !file_type.is_symlink()
+                && file_type.is_file()
                 && file
                     .file_name()
                     .to_str()
@@ -2032,10 +2061,11 @@ fn next_steps(
 #[cfg(test)]
 mod tests {
     use super::{
-        inspect_target, rewrite_remote_error, rewrite_remote_locations, DoctorCounts, DoctorReport,
-        DoctorShapeReport, SurfaceReport,
+        classify_source_shape, inspect_target, rewrite_remote_error, rewrite_remote_locations,
+        DoctorCounts, DoctorReport, DoctorShapeReport, SurfaceReport,
     };
     use skillspec_core::error::Error;
+    use std::fs;
     use std::path::Path;
 
     #[test]
@@ -2129,5 +2159,35 @@ mod tests {
             .contains("skills/pdf/skills/pdf"));
         assert!(report.suggested_next_steps[0]
             .contains("https://github.com/owner/repo/tree/main/skills/pdf"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shape_capture_does_not_follow_symlinked_skill_directories() {
+        use std::os::unix::fs::symlink;
+
+        let base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/doctor-symlink-test")
+            .join(std::process::id().to_string());
+        let _ = fs::remove_dir_all(&base);
+        let package = base.join("package");
+        let outside = base.join("outside");
+        fs::create_dir_all(&package).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(
+            package.join("SKILL.md"),
+            "---\nname: local\ndescription: Local skill.\n---\n# Local\n",
+        )
+        .unwrap();
+        fs::write(
+            outside.join("SKILL.md"),
+            "---\nname: outside\ndescription: Outside skill.\n---\n# Outside\n",
+        )
+        .unwrap();
+        symlink(&outside, package.join("linked-skill")).unwrap();
+
+        let shape = classify_source_shape(&package).unwrap();
+        assert_eq!(shape.kind, "simple_skill");
+        assert_eq!(shape.skill_files, ["SKILL.md"]);
     }
 }

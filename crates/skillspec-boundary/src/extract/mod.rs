@@ -59,8 +59,19 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
 
     for file in &map.files {
         if file.load_status != SourceFileLoadStatus::Loaded {
-            if file.load_status == SourceFileLoadStatus::BinaryPreserved {
-                budget.skip(&file.path, SkipReason::Binary);
+            match file.load_status {
+                SourceFileLoadStatus::BinaryPreserved => {
+                    let reason = if file.kind == SourceFileKind::Asset {
+                        SkipReason::Binary
+                    } else {
+                        SkipReason::OpaqueBinary
+                    };
+                    budget.skip(&file.path, reason);
+                }
+                SourceFileLoadStatus::SymlinkPreserved => {
+                    budget.skip(&file.path, SkipReason::Symlink);
+                }
+                SourceFileLoadStatus::Loaded | SourceFileLoadStatus::IgnoredByPolicy => {}
             }
             continue;
         }
@@ -70,7 +81,7 @@ pub fn run(map: &SourceMap, source_root: &Path, budget: &mut Budget) -> Result<E
 
         let absolute = source_root.join(&file.path);
         let Ok(content) = read_text(&absolute) else {
-            budget.skip(&file.path, SkipReason::Binary);
+            budget.skip(&file.path, SkipReason::OpaqueBinary);
             continue;
         };
         let reach = reach_for(&file.path, &skill_path, &referenced);
